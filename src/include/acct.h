@@ -89,6 +89,8 @@ extern void account_recordResv(int acctype, resc_resv *presv, char *text);
 extern void account_resvstart(resc_resv *presv);
 #endif
 
+  
+/* howdy */
 extern void account_jobstr(job *pjob);
 extern void account_jobstr2(job *pjob, int type);
 extern void account_job_update(job *pjob, int type);
