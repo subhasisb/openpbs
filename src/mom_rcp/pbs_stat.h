@@ -53,5 +53,5 @@ typedef INT64 int_pbs;
 #define pbs_stat(path, buffer)   stat(path, buffer)
 typedef struct stat  pbs_stat_struct;
 typedef off_t off_t_pbs;
-typedef long int_pbs;
+typedef long int_pbs; special changes
 #endif
