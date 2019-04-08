@@ -1471,6 +1471,9 @@ update_resresv_on_end(resource_resv *resresv, char *job_state)
 	int ret;
 	int i;
 
+	/* used for calendar correction */
+	timed_event *te;
+
 	if (resresv == NULL)
 		return;
 
@@ -1519,6 +1522,7 @@ update_resresv_on_end(resource_resv *resresv, char *job_state)
 		/* We need to correct our calendar */
 		if (resresv->end_event != NULL)
 			set_timed_event_disabled(resresv->end_event, 1);
+
 	}
 	else if (resresv->is_resv && resresv->resv != NULL) {
 		resresv->resv->resv_state = RESV_DELETED;

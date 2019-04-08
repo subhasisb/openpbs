@@ -42,6 +42,7 @@ class TestPreemption(TestFunctional):
     """
     Contains tests for scheduler's preemption functionality
     """
+
     def setUp(self):
         TestFunctional.setUp(self)
 
@@ -63,6 +64,24 @@ class TestPreemption(TestFunctional):
             # Tests needing multi-node setup will create the second node
             # explicity.
             self.server.manager(MGR_CMD_DELETE, NODE, id=self.mom2)
+
+    def submit_jobs(self):
+        """
+        Function to submit two normal job and one high priority job
+        """
+        j1 = Job(TEST_USER)
+        jid1 = self.server.submit(j1)
+        time.sleep(1)
+        j2 = Job(TEST_USER)
+        jid2 = self.server.submit(j2)
+        self.server.expect(JOB, {ATTR_state: 'R'}, id=jid1)
+        self.server.expect(JOB, {ATTR_state: 'R'}, id=jid2)
+
+        j3 = Job(TEST_USER)
+        j3.set_attributes({ATTR_q: 'expressq'})
+        jid3 = self.server.submit(j3)
+
+        return jid1, jid2, jid3
 
     def submit_and_preempt_jobs(self, preempt_order='R'):
         """
@@ -134,7 +153,6 @@ exit 0
         marked as "Job will never run"
         """
         self.submit_and_preempt_jobs(preempt_order='R')
-
 
     def test_qalter_preempt_targets_to_none(self):
         """
@@ -320,4 +338,3 @@ exit 0
         self.server.expect(JOB, {'job_state': 'Q'}, id=hjid2)
         comment = "Not Running: Insufficient amount of resource: host"
         self.server.expect(JOB, {'comment': comment}, id=hjid2)
-
