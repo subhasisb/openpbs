@@ -1008,16 +1008,10 @@ job_purge(job *pjob)
  * @retval NULL	- if job by jobid not found.
  */
 
+#ifdef PBS_MOM
 job *
 find_job(char *jobid)
 {
-#ifndef PBS_MOM
-	size_t len;
-	AVL_IX_REC *pkey;
-	char *host_dot;
-	char *serv_dot;
-	char *host;
-#endif
 	char *at;
 	job  *pj = NULL;
 	char buf[PBS_MAXSVRJOBID+1];
@@ -1033,75 +1027,6 @@ find_job(char *jobid)
 	if ((at = strchr(buf, (int)'@')) != NULL)
 		*at = '\0';
 
-#ifndef PBS_MOM
-	/*
-	 * Avl tree search cannot find partially formed jobid's.
-	 * While storing we supplied the full jobid.
-	 * So while retrieving also we have to provide
-	 * the exact key that was used while storing the job
-	 */
-	if ((host_dot = strchr(buf, '.')) != NULL) {
-		/* The job ID string contains a host string */
-		host = host_dot + 1;
-		if (strncasecmp(server_name, host, PBS_MAXSERVERNAME+1) != 0) {
-			/*
-			 * The server_name and host strings do not match.
-			 * Try to determine if one is the FQDN and the other
-			 * is the short name. If there is no match, do not
-			 * modify the string we will be searching for. If
-			 * there is a match, replace host with server_name.
-			 *
-			 * Do not call is_same_host() to avoid DNS lookup
-			 * because server_name may not resolve to a real
-			 * host when PBS_SERVER_HOST_NAME is set or when
-			 * failover is enabled. The lookup could hang the
-			 * server for some amount of time.
-			 */
-			host_dot = strchr(host, '.');
-			serv_dot = strchr(server_name, '.');
-			if (host_dot != NULL) {
-				/* the host string is FQDN */
-				if (serv_dot == NULL) {
-					/* the server_name is not FQDN */
-					len = strlen(server_name);
-					if (len == (host_dot - host)) {
-						if (strncasecmp(host, server_name, len) == 0) {
-							/* Use server_name to ensure cases match. */
-							strcpy(host, server_name);
-						}
-					}
-				}
-			} else if (serv_dot != NULL) {
-				/* the host string is not FQDN */
-				/* the server_name is FQDN */
-				len = strlen(host);
-				if (len == (serv_dot - server_name)) {
-					if (strncasecmp(host, server_name, len) == 0) {
-						/* Use server_name to ensure cases match. */
-						strcpy(host, server_name);
-					}
-				}
-			}
-		} else {
-			/*
-			 * Case insensitive compare was successful.
-			 * Use server_name to ensure cases match.
-			 */
-			strcpy(host, server_name);
-		}
-	} else {
-		/* The job ID string does not contain a host string */
-		strcat(buf, ".");
-		strcat(buf, server_name);
-	}
-
-	if ((AVL_jctx != NULL) && ((pkey = svr_avlkey_create(buf)) != NULL)) {
-		if (avl_find_key(pkey, AVL_jctx) == AVL_IX_OK)
-			pj = (job *) pkey->recptr;
-		free(pkey);
-		return (pj);
-	}
-#endif
 	pj = (job *)GET_NEXT(svr_alljobs);
 	while (pj != NULL) {
 		if (!strncasecmp(jobid, pj->ji_qs.ji_jobid, sizeof(pj->ji_qs.ji_jobid)))
@@ -1110,6 +1035,32 @@ find_job(char *jobid)
 	}
 	return (pj);  /* may be a null pointer */
 }
+#endif
+
+#ifndef PBS_MOM
+job *
+find_job(char *jobid)
+{
+	job *pjob = job_recov(jobid, NO_RECOV_SUBJOB);
+	if (pjob) {
+		unsigned int d;
+		svr_enquejob(pjob);
+		if ((pjob->ji_qs.ji_un_type == JOB_UNION_TYPE_EXEC) &&
+			(pjob->ji_qs.ji_un.ji_exect.ji_momaddr != 0)) {
+
+			if (pjob->ji_wattr[(int)JOB_ATR_exec_host].at_flags & ATR_VFLAG_SET) {
+				pjob->ji_qs.ji_un.ji_exect.ji_momaddr =
+					get_addr_of_nodebyname(pjob->ji_wattr[(int)JOB_ATR_exec_host].at_val.at_str, &d);
+				pjob->ji_qs.ji_un.ji_exect.ji_momport = d;
+			} else {
+				pjob->ji_qs.ji_un.ji_exect.ji_momaddr = 0;
+				pjob->ji_qs.ji_un.ji_exect.ji_momport = 0;
+			}
+		}
+	}
+	return pjob;
+}
+#endif
 
 /**
  *  @brief

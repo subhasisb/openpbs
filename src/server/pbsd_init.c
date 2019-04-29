@@ -224,7 +224,7 @@ static void  change_logs(int);
 int   chk_save_file(char *filename);
 static void  need_y_response(int, char *);
 static int   pbsd_init_job(job *pjob, int type);
-static int   pbsd_init_reque(job *job, int change_state);
+int   pbsd_init_reque(job *job, int change_state);
 static void  resume_net_move(struct work_task *);
 static void  stop_me(int);
 static int   Rmv_if_resv_not_possible(job *);
@@ -1506,7 +1506,7 @@ pbsd_init(int type)
  *
  * @return	void
  */
-static void
+void
 reassign_resc(job *pjob)
 {
 	int   set_exec_vnode;
@@ -1884,7 +1884,7 @@ pbsd_init_job(job *pjob, int type)
  * @retval	0	- success
  * @retval	-1	- error.
  */
-static int
+int
 pbsd_init_reque(job *pjob, int change_state)
 {
 	char logbuf[384];

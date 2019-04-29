@@ -260,7 +260,6 @@ svr_enquejob(job *pjob)
 {
 	attribute      *pattrjb;
 	attribute_def  *pdef;
-	job	       *pjcur;
 	pbs_queue      *pque;
 	int		rc;
 	pbs_sched	*psched;
@@ -279,25 +278,11 @@ svr_enquejob(job *pjob)
 		if ((pjob->ji_qs.ji_state == JOB_STATE_MOVED) ||
 			(pjob->ji_qs.ji_state == JOB_STATE_FINISHED)) {
 
-			if (is_linked(&svr_alljobs, &pjob->ji_alljobs) == 0) {
-				append_link(&svr_alljobs, &pjob->ji_alljobs, pjob);
-				/**
-				 * Add to AVL tree so that find_job() can return
-				 * faster compared to linked list traverse.
-				 */
-				svr_avljob_oper(pjob, 0);
-			}
+			/* GR8: dont list to svr_alljobs, and dont insert into avl tree */
+
 			server.sv_qs.sv_numjobs++;
 			server.sv_jobstates[pjob->ji_qs.ji_state]++;
-			if (pjob->ji_qs.ji_svrflags & JOB_SVFLG_ArrayJob) {
-				struct ajtrkhd *ptbl = pjob->ji_ajtrk;
-				if (ptbl) {
-					int indx;
-
-					for (indx = 0; indx < ptbl->tkm_ct; ++indx)
-						set_subjob_tblstate(pjob, indx, pjob->ji_qs.ji_state);
-				}
-			}
+			/* GR8: removed subjob code since srini handling it */
 			return (0);
 		} else {
 			return (PBSE_UNKQUE);
@@ -314,30 +299,9 @@ svr_enquejob(job *pjob)
 		pjob->ji_qs.ji_jobid, log_buffer);
 #endif	/* NDEBUG */
 
-	pjcur = (job *)GET_PRIOR(svr_alljobs);
-	while (pjcur) {
-		if ((unsigned long)pjob->ji_wattr[(int)JOB_ATR_qrank].
-			at_val.at_long >=
-			(unsigned long)pjcur->ji_wattr[(int)JOB_ATR_qrank].
-			at_val.at_long)
-			break;
-		pjcur = (job *)GET_PRIOR(pjcur->ji_alljobs);
-	}
-	if (pjcur == 0) {
-		/* link first in server's list */
-		insert_link(&svr_alljobs, &pjob->ji_alljobs, pjob,
-			LINK_INSET_AFTER);
-	} else {
-		/* link after 'current' job in server's list */
-		insert_link(&pjcur->ji_alljobs, &pjob->ji_alljobs, pjob,
-			LINK_INSET_AFTER);
-	}
+	/* GR8: dont link to svr_alljobs by qrank */
 
-	/**
-	 * Add to AVL tree so that find_job() can return
-	 * faster compared to linked list traverse.
-	 */
-	svr_avljob_oper(pjob, 0);
+	/* GR8: dont add to avl tree */
 
 	server.sv_qs.sv_numjobs++;
 	server.sv_jobstates[pjob->ji_qs.ji_state]++;
@@ -346,24 +310,7 @@ svr_enquejob(job *pjob)
 
 	pjob->ji_qhdr = pque;
 
-	pjcur = (job *)GET_PRIOR(pque->qu_jobs);
-	while (pjcur) {
-		if ((unsigned long)pjob->ji_wattr[(int)JOB_ATR_qrank].
-			at_val.at_long >=
-			(unsigned long)pjcur->ji_wattr[(int)JOB_ATR_qrank].
-			at_val.at_long)
-			break;
-		pjcur = (job *)GET_PRIOR(pjcur->ji_jobque);
-	}
-	if (pjcur == 0) {
-		/* link first in list */
-		insert_link(&pque->qu_jobs, &pjob->ji_jobque, pjob,
-			LINK_INSET_AFTER);
-	} else {
-		/* link after 'current' job in list */
-		insert_link(&pjcur->ji_jobque, &pjob->ji_jobque, pjob,
-			LINK_INSET_AFTER);
-	}
+	/* GR8: don't add to queue level list */
 
 	/* update counts: queue and queue by state */
 

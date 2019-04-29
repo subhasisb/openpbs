@@ -455,7 +455,8 @@ req_quejob(struct batch_request *preq)
 
 	/* does job already exist, check both old and new jobs */
 
-	if ((pj = find_job(jid)) == NULL) {
+	//NO NEED TO SEARCH DB for QUEUEJOB, SAVE WILL FAIL ANYWAY
+	if ((pj = find_job(jid)) == (job *)0) {
 		pj = (job *)GET_NEXT(svr_newjobs);
 		while (pj) {
 			if (!strcasecmp(pj->ji_qs.ji_jobid, jid))
@@ -463,6 +464,7 @@ req_quejob(struct batch_request *preq)
 			pj = (job *)GET_NEXT(pj->ji_alljobs);
 		}
 	}
+#endif
 
 #ifndef PBS_MOM		/* server server server server server server */
 	/*
@@ -474,16 +476,15 @@ req_quejob(struct batch_request *preq)
 	 * Otherwise SERVER will continue to reject queue request if job already
 	 * exists.
 	 */
-	if (pj != NULL) {
+	/* if (pj != (job *)0) { MOVE This to "if job save failed at req_commit *"
 		if ((svr_chk_history_conf()) &&
 			(pj->ji_qs.ji_state == JOB_STATE_MOVED)) {
 			job_purge(pj);
 		} else {
-			/* server rejects the queue request */
 			req_reject(PBSE_JOBEXIST, 0, preq);
 			return;
 		}
-	}
+	} */
 
 
 	/* find requested queue, is it there? */
@@ -1968,6 +1969,8 @@ req_commit(struct batch_request *preq)
 
 	if ((pj->ji_qs.ji_svrflags & JOB_SVFLG_HERE) == 0)
 		issue_track(pj);	/* notify creator where job is */
+
+	job_free(pj);
 #endif		/* PBS_SERVER */
 }
 

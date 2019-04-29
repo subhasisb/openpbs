@@ -323,7 +323,6 @@ req_selectjobs(struct batch_request *preq)
 {
 	int		    bad = 0;
 	int		    i;
-	job		   *pjob;
 	svrattrl	   *plist;
 	pbs_queue	   *pque;
 	struct batch_reply *preply;
@@ -396,62 +395,95 @@ req_selectjobs(struct batch_request *preq)
 
 	/* now start checking for jobs that match the selection criteria */
 
+	/*
 	if (pque)
 		pjob = (job *)GET_NEXT(pque->qu_jobs);
 	else
 		pjob = (job *)GET_NEXT(svr_alljobs);
-	while (pjob) {
-		if (server.sv_attr[(int)SRV_ATR_query_others].at_val.at_long ||
-			(svr_authorize_jobreq(preq, pjob) == 0)) {
+	*/
+	{
+		pbs_db_job_info_t       dbjob;
+		pbs_db_obj_info_t       obj;
+		job		   *pjob = (job *)0;
+		pbs_db_conn_t   *conn = (pbs_db_conn_t *) svr_db_conn;
+		void            *state = NULL;
+		int rc;
+		/* get jobs from DB */
+		obj.pbs_db_obj_type = PBS_DB_JOB;
+		obj.pbs_db_un.pbs_db_job = &dbjob;
+		state = pbs_db_cursor_init(conn, &obj, NULL);
+		if (state == NULL) {
+			sprintf(log_buffer, "%s", (char *) conn->conn_db_err);
+			log_err(-1, "req_stat", log_buffer);
+			pbs_db_cursor_close(conn, state);
+			(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
+			return ;
+		}
+		if (pbs_db_get_rowcount(state) <= 0) {
+			/*
+			sprintf(log_buffer, "No records found");
+			log_err(-1, "req_stat", log_buffer);
+			*/
+		} else {
+			/* Now, for each job found ... */
+			while ((rc = pbs_db_cursor_next(conn, state, &obj)) == 0) {
+				if ((pjob = job_recov(dbjob.ji_jobid, NO_RECOV_SUBJOB)) != NULL) {
+					if (server.sv_attr[(int)SRV_ATR_query_others].at_val.at_long ||
+						(svr_authorize_jobreq(preq, pjob) == 0)) {
 
-			/* either job owner or has special permission to see job */
+						/* either job owner or has special permission to see job */
 
-			/* look at  the job and see if the required attributes match */
-			/* If "T" was specified, dosubjobs is set, and if the job is */
-			/* an Array Job, then the State is Not checked.  The State   */
-			/* must be checked against the state of each Subjob	     */
+						/* look at  the job and see if the required attributes match */
+						/* If "T" was specified, dosubjobs is set, and if the job is */
+						/* an Array Job, then the State is Not checked.  The State   */
+						/* must be checked against the state of each Subjob	     */
 
-			if (select_job(pjob, selistp, dosubjobs, dohistjobs)) {
+						if (select_job(pjob, selistp, dosubjobs, dohistjobs)) {
 
-				/* job is selected, include in reply */
+							/* job is selected, include in reply */
 
-				if (preq->rq_type == PBS_BATCH_SelectJobs) {
+							if (preq->rq_type == PBS_BATCH_SelectJobs) {
 
-					/* Select Jobs Reply*/
+								/* Select Jobs Reply*/
 
-					preq->rq_reply.brp_auxcode +=
-						add_select_array_entries(pjob, dosubjobs, pstate, &pselx, selistp);
+								preq->rq_reply.brp_auxcode +=
+									add_select_array_entries(pjob, dosubjobs, pstate, &pselx, selistp);
 
-				} else if (((pjob->ji_qs.ji_svrflags&JOB_SVFLG_SubJob)==0) || (dosubjobs == 2)) {
+							} else if (((pjob->ji_qs.ji_svrflags&JOB_SVFLG_SubJob)==0) || (dosubjobs == 2)) {
 
-					/* Select-Status  Reply */
+								/* Select-Status  Reply */
 
-					plist = (svrattrl *)GET_NEXT(preq->rq_ind.rq_select.rq_rtnattr);
-					if ((dosubjobs == 1) && pjob->ji_ajtrk) {
-						for (i=0; i<pjob->ji_ajtrk->tkm_ct; ++i) {
-							if ((pstate == 0) || chk_job_statenum(pjob->ji_ajtrk->tkm_tbl[i].trk_status, pstate)) {
-								rc = status_subjob(pjob, preq, plist, i, &preply->brp_un.brp_status, &bad);
-								if (rc && (rc != PBSE_PERM))
-									goto out;
 								plist = (svrattrl *)GET_NEXT(preq->rq_ind.rq_select.rq_rtnattr);
+								if ((dosubjobs == 1) && pjob->ji_ajtrk) {
+									for (i=0; i<pjob->ji_ajtrk->tkm_ct; ++i) {
+										if ((pstate == 0) || chk_job_statenum(pjob->ji_ajtrk->tkm_tbl[i].trk_status, pstate)) {
+											rc = status_subjob(pjob, preq, plist, i, &preply->brp_un.brp_status, &bad);
+											if (rc && (rc != PBSE_PERM))
+												goto out;
+											plist = (svrattrl *)GET_NEXT(preq->rq_ind.rq_select.rq_rtnattr);
+
+										}
+									}
+								} else {
+									rc = status_job(pjob, preq, plist,
+										&preply->brp_un.brp_status, &bad);
+									if (rc && (rc != PBSE_PERM))
+										goto out;
+								}
 
 							}
 						}
-					} else {
-						rc = status_job(pjob, preq, plist,
-							&preply->brp_un.brp_status, &bad);
-						if (rc && (rc != PBSE_PERM))
-							goto out;
 					}
-
+					job_free(pjob);
 				}
 			}
 		}
-		if (pque)
-			pjob = (job *)GET_NEXT(pjob->ji_jobque);
-		else
-			pjob = (job *)GET_NEXT(pjob->ji_alljobs);
+		pbs_db_cursor_close(conn, state);
+		/* close transaction */
+		if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0)
+			return;
 	}
+
 out:
 	free_sellist(selistp);
 	if (rc)
