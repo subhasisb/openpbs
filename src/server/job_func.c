@@ -1041,7 +1041,7 @@ find_job(char *jobid)
 job *
 find_job(char *jobid)
 {
-	job *pjob = job_recov(jobid, NO_RECOV_SUBJOB);
+	job *pjob = job_recov(jobid);
 	if (pjob) {
 		unsigned int d;
 		svr_enquejob(pjob);

@@ -1215,8 +1215,9 @@ main(int argc, char **argv)
 
 	/* make sure no other server is running with this home directory */
 
-	(void)sprintf(lockfile, "%s/%s/server.lock", pbs_conf.pbs_home_path,
-		PBS_SVR_PRIVATE);
+	(void)sprintf(lockfile, "%s/%s/server_%d.lock", pbs_conf.pbs_home_path,
+		PBS_SVR_PRIVATE, pbs_conf.batch_service_port);
+	log_err(-1, __func__, lockfile);
 	if ((are_primary = are_we_primary()) == FAILOVER_SECONDARY) {
 		strcat(lockfile, ".secondary");
 	} else if (are_primary == FAILOVER_CONFIG_ERROR) {

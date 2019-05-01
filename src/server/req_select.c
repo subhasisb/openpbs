@@ -427,7 +427,7 @@ req_selectjobs(struct batch_request *preq)
 		} else {
 			/* Now, for each job found ... */
 			while ((rc = pbs_db_cursor_next(conn, state, &obj)) == 0) {
-				if ((pjob = job_recov(dbjob.ji_jobid, NO_RECOV_SUBJOB)) != NULL) {
+				if ((pjob = job_recov(dbjob.ji_jobid)) != NULL) {
 					if (server.sv_attr[(int)SRV_ATR_query_others].at_val.at_long ||
 						(svr_authorize_jobreq(preq, pjob) == 0)) {
 

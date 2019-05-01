@@ -431,11 +431,11 @@ req_quejob(struct batch_request *preq)
 		}
 		created_here = JOB_SVFLG_HERE;
 		if (i == 0) {	/* Normal job */
-			(void)sprintf(jidbuf, "%lld.%s",
-				next_svr_sequence_id, server_name);
+			(void)sprintf(jidbuf, "%lld.%s%d",
+				next_svr_sequence_id, server_name, pbs_conf.batch_service_port);
 		} else {	/* Array Job */
-			(void)sprintf(jidbuf, "%lld[].%s",
-					next_svr_sequence_id, server_name);
+			(void)sprintf(jidbuf, "%lld[].%s%d",
+					next_svr_sequence_id, server_name, pbs_conf.batch_service_port);
 		}
 		jid = jidbuf;
 	}
@@ -453,6 +453,7 @@ req_quejob(struct batch_request *preq)
 	}
 #endif		/* PBS_MOM all all all all all */
 
+#ifdef PBS_MOM
 	/* does job already exist, check both old and new jobs */
 
 	//NO NEED TO SEARCH DB for QUEUEJOB, SAVE WILL FAIL ANYWAY
