@@ -157,10 +157,6 @@ static void delete_occurrence_jobs(resc_resv *presv);
 static void Time4occurrenceFinish(resc_resv *);
 static void running_jobs_count(struct work_task *);
 
-
-/** For faster job lookup through AVL tree */
-static void svr_avljob_oper(job *pjob, int delkey);
-
 /* Global Data Items: */
 extern char *msg_noloopbackif;
 extern char *msg_mombadmodify;
@@ -480,23 +476,11 @@ svr_dequejob(job *pjob)
 	pbs_queue *pque;
 
 	/* remove job from server's all job list and reduce server counts */
-
-	if (is_linked(&svr_alljobs, &pjob->ji_alljobs)) {
-		delete_link(&pjob->ji_alljobs);
-		delete_link(&pjob->ji_unlicjobs);
-
-		/**
-		 * Remove the key from the AVL tree which was
-		 * added for faster job search i.e. find_job().
-		 */
-		svr_avljob_oper(pjob, 1);
-
-		if (--server.sv_qs.sv_numjobs < 0)
+	if (--server.sv_qs.sv_numjobs < 0)
 			bad_ct = 1;
 
-		if (--server.sv_jobstates[pjob->ji_qs.ji_state] < 0)
+	if (--server.sv_jobstates[pjob->ji_qs.ji_state] < 0)
 			bad_ct = 1;
-	}
 
 	if ((pque = pjob->ji_qhdr) != NULL) {
 
@@ -5448,88 +5432,6 @@ svr_avlkey_create(const char *keystr)
 	(void)strcpy(pkey->key, keystr);
 	return (pkey);
 
-}
-
-/**
- * @brief
- *		Add/Delete the job to/from the AVL tree for faster lookup based
- *		on the boolean value of "delkey" parameter.
- *
- * @par Functionality:
- *		Create the key for the avl record using svr_avlkey_create() and call
- *		avl_add_key()/avl_delete_key() based on the boolean value parameter
- *		i.e. "delkey" to add/delete the job to the AVL tree for faster lookup.
- *		If it fails in the AVL operation, then it destroys the AVL tree and
- *		turns off the global avl switch AVL_jctx, so that SERVER falls back
- *		to regular doubly linked list for lookup.
- *
- * @param[in]	pjob	-	job structure to be operated on.
- * @param[in]	delkey	-	0 to add the key.
- *							1 to delete the key.
- *
- * @par	Linkage scope:
- *		static (local)
- *
- * @see	svr_enquejob()
- *		svr_dequejob()
- *
- * @return	void
- *
- * @par	Reentrancy:
- *		MT-unsafe
- *
- */
-static void
-svr_avljob_oper(job *pjob, int delkey)
-{
-	int rc = AVL_IX_OK;
-	AVL_IX_REC *pkey;
-
-	if ((AVL_jctx == NULL) || (pjob == NULL))
-		return;
-
-	/** create the avl key using jobid */
-	pkey = svr_avlkey_create(pjob->ji_qs.ji_jobid);
-	if (pkey == NULL) { /** key creation failed */
-		(void) sprintf(log_buffer, "AVL: failed to create job key.");
-		log_event(PBSEVENT_DEBUG4, PBS_EVENTCLASS_JOB, LOG_DEBUG,
-			pjob->ji_qs.ji_jobid, log_buffer);
-		goto AVL_OP_FAIL;
-	}
-
-	/** call avl interface based on the delkey */
-	if (delkey == 0) {
-		pkey->recptr = pjob;
-		rc = avl_add_key(pkey, AVL_jctx);
-	} else {
-		rc = avl_delete_key(pkey, AVL_jctx);
-	}
-	if (rc != AVL_IX_OK) /** avl operation failed */
-		goto AVL_OP_FAIL;
-
-	/** everything went fine, free() the pkey and return */
-	free(pkey);
-	return;
-
-AVL_OP_FAIL:
-	if (pkey) /** free the pkey if valid */
-		free(pkey);
-	/**
-	 * AVL operation failed, free the AVL tree context which was created
-	 * by avl_create_index(), and turn off the AVL context i.e. AVL_jctx
-	 * [global switch] so that SERVER will fall back to use linked list
-	 * for job lookup.
-	 */
-	if (AVL_jctx != NULL) {
-		(void) sprintf(log_buffer,
-			"AVL: %s failed, using LinkedList.",
-			delkey ? "delete" : "insert");
-		log_event(PBSEVENT_DEBUG4, PBS_EVENTCLASS_SERVER, LOG_DEBUG,
-			msg_daemonname, log_buffer);
-		avl_destroy_index(AVL_jctx);
-		free(AVL_jctx);
-		AVL_jctx = NULL;
-	}
 }
 
 /**
