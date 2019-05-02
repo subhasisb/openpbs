@@ -1217,7 +1217,7 @@ main(int argc, char **argv)
 
 	(void)sprintf(lockfile, "%s/%s/server_%d.lock", pbs_conf.pbs_home_path,
 		PBS_SVR_PRIVATE, pbs_conf.batch_service_port);
-	log_err(-1, __func__, lockfile);
+	
 	if ((are_primary = are_we_primary()) == FAILOVER_SECONDARY) {
 		strcat(lockfile, ".secondary");
 	} else if (are_primary == FAILOVER_CONFIG_ERROR) {
@@ -1347,6 +1347,7 @@ main(int argc, char **argv)
 		LOG_NOTICE,
 		PBS_EVENTCLASS_SERVER, msg_daemonname, log_buffer);
 
+	log_err(-1, __func__, lockfile);
 
 	/* check here if svrdb exists asking to run in updatedb mode */
 	if (server_init_type != RECOV_UPDATEDB &&

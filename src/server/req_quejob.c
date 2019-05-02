@@ -1839,6 +1839,10 @@ req_commit(struct batch_request *preq)
 		return;
 	}
 
+	/* remove job for the server new job list, set state, and enqueue it */
+
+	delete_link(&pj->ji_alljobs);
+
 	svr_evaljobstate(pj, &newstate, &newsub, 1);
 	pj->ji_modified = 0; /* don't save from svr_setjobstate, we will save soon after */
 	(void)svr_setjobstate(pj, newstate, newsub);
@@ -1968,6 +1972,11 @@ req_commit(struct batch_request *preq)
 		issue_track(pj);	/* notify creator where job is */
 
 	job_free(pj);
+
+	if ((pjob = job_recov(dbjob.ji_jobid)) != NULL) {
+					do_stat_of_a_job_ext(preq, pjob, dohistjobs, dosubjobs);
+					job_free(pjob);
+				}
 #endif		/* PBS_SERVER */
 }
 
