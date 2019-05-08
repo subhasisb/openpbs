@@ -645,7 +645,7 @@ pbsd_init(int type)
 
 	/* 5. If not a "create" initialization, recover server db */
 	/*    and sched db					  */
-	rc =svr_recov_db();
+	rc =svr_recov_db(0);
 	if ((rc != 0) && (type != RECOV_CREATE)) {
 #ifdef WIN32
 		if (stalone == 1)
@@ -867,7 +867,7 @@ pbsd_init(int type)
 	}
 	while ((rc = pbs_db_cursor_next(conn, state, &obj)) == 0) {
 		/* recover queue */
-		if ((pque = que_recov_db(dbque.qu_name)) != NULL) {
+		if ((pque = que_recov_db(dbque.qu_name, NULL, 0)) != NULL) {
 			/* que_recov increments sv_numque */
 			sprintf(log_buffer, msg_init_recovque,
 				pque->qu_qs.qu_name);

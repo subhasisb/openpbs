@@ -379,7 +379,7 @@ print_db_job(char *id, int no_attributes)
 			strcat(jobscr.ji_jobid, pbs_conf.pbs_server_name);
 		}
 
-		if (pbs_db_load_obj(conn, &obj) != 0) {
+		if (pbs_db_load_obj(conn, &obj, 0) != 0) {
 			fprintf(stderr, "Job %s not found\n", jobscr.ji_jobid);
 			return (1);
 		}
@@ -405,7 +405,7 @@ print_db_job(char *id, int no_attributes)
 			strcat(dbjob.ji_jobid, pbs_conf.pbs_server_name);
 		}
 
-		if (pbs_db_load_obj(conn, &obj) !=0) {
+		if (pbs_db_load_obj(conn, &obj, 0) !=0) {
 			fprintf(stderr, "Job %s not found\n", dbjob.ji_jobid);
 			return (1);
 		}

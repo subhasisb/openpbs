@@ -6952,7 +6952,7 @@ svr_load_jobscript(job *pj)
 	obj.pbs_db_obj_type = PBS_DB_JOBSCR;
 	obj.pbs_db_un.pbs_db_jobscr = &jobscr;
 
-	if (pbs_db_load_obj(conn, &obj) != 0) {
+	if (pbs_db_load_obj(conn, &obj, 0) != 0) {
 		snprintf(log_buffer, sizeof(log_buffer),
 			"Failed to load job script for job %s from PBS datastore",
 			pj->ji_qs.ji_jobid);

@@ -119,8 +119,12 @@ pg_db_prepare_node_sqls(pbs_db_conn_t *conn)
 		"nd_pque, "
 		"hstore_to_array(attributes) as attributes "
 		"from pbs.node "
-		"where nd_name = $1");
+		"where nd_name = $1 ");
 	if (pg_prepare_stmt(conn, STMT_SELECT_NODE, conn->conn_sql, 1) != 0)
+		return -1;
+
+	strcat(conn->conn_sql, " FOR UPDATE");
+	if (pg_prepare_stmt(conn, STMT_SELECT_NODE_LOCKED, conn->conn_sql, 1) != 0)
 		return -1;
 
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select "
@@ -199,12 +203,14 @@ pg_db_prepare_node_sqls(pbs_db_conn_t *conn)
  * @retval	-1 - On Error
  * @retval	 0 - On Success
  * @retval	>1 - Number of attributes
+ * @retval 	-2 -  Success but data same as old, so not loading data (but locking if lock requested)
  *
  */
 static int
 load_node(PGresult *res, pbs_db_node_info_t *pnd, int row)
 {
 	char *raw_array;
+	//BIGINT db_savetm;
 	static int nd_name_fnum, mom_modtime_fnum, nd_hostname_fnum, nd_state_fnum, nd_ntype_fnum,
 	nd_pque_fnum, attributes_fnum;
 	static int fnums_inited = 0;
@@ -219,6 +225,16 @@ load_node(PGresult *res, pbs_db_node_info_t *pnd, int row)
 		attributes_fnum = PQfnumber(res, "attributes");
 		fnums_inited = 1;
 	}
+
+#if 0
+	GET_PARAM_BIGINT(res, row, db_savetm, ji_savetm_fnum);
+	if (pj->ji_savetm == db_savetm) {
+		/* data same as read last time, so no need to read any further, return success from here */
+		/* however since we loaded data from the database, the row is locked if a lock was requested */
+		return -2;
+	}
+	pj->ji_savetm = db_savetm;  /* update the save timestamp */
+#endif
 
 	GET_PARAM_STR(res, row, pnd->nd_name, nd_name_fnum);
 	GET_PARAM_BIGINT(res, row, pnd->mom_modtime, mom_modtime_fnum);
@@ -297,11 +313,12 @@ pg_db_save_node(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
  * @return      Error code
  * @retval	-1 - Failure
  * @retval	 0 - Success
- * @retval	 1 -  Success but no rows loaded
+ * @retval	>1 - Number of attributes
+ * @retval 	-2 -  Success but data same as old, so not loading data (but locking if lock requested)
  *
  */
 int
-pg_db_load_node(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj)
+pg_db_load_node(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int lock)
 {
 	PGresult *res;
 	int rc;
@@ -309,8 +326,8 @@ pg_db_load_node(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj)
 
 	SET_PARAM_STR(conn, pnd->nd_name, 0);
 
-	if ((rc = pg_db_query(conn, STMT_SELECT_NODE, 1, &res)) != 0)
-		return rc;
+	if ((rc = pg_db_query(conn, STMT_SELECT_NODE, 1, lock, &res)) != 0)
+		return -1;
 
 	rc = load_node(res, pnd, 0);
 
@@ -344,7 +361,7 @@ pg_db_find_node(pbs_db_conn_t *conn, void *st, pbs_db_obj_info_t *obj,
 	if (!state)
 		return -1;
 
-	if ((rc = pg_db_query(conn, STMT_FIND_NODES_ORDBY_INDEX, 0, &res)) != 0)
+	if ((rc = pg_db_query(conn, STMT_FIND_NODES_ORDBY_INDEX, 0, 0, &res)) != 0)
 		return rc;
 
 	state->row = 0;
@@ -482,7 +499,7 @@ pg_db_save_mominfo_tm(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
  *
  */
 int
-pg_db_load_mominfo_tm(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj)
+pg_db_load_mominfo_tm(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int lock)
 {
 	PGresult *res;
 	int rc;
@@ -490,7 +507,7 @@ pg_db_load_mominfo_tm(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj)
 	static int mit_time_fnum = -1;
 	static int mit_gen_fnum = -1;
 
-	if ((rc = pg_db_query(conn, STMT_SELECT_MOMINFO_TIME, 0, &res)) != 0)
+	if ((rc = pg_db_query(conn, STMT_SELECT_MOMINFO_TIME, 0, lock, &res)) != 0)
 		return rc;
 
 	if (mit_time_fnum == -1 || mit_gen_fnum == -1) {

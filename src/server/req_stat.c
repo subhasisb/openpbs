@@ -420,7 +420,7 @@ void req_stat_job(struct batch_request *preq)
 		} else {
 			/* Now, for each job found ... */
 			while ((rc = pbs_db_cursor_next(conn, state, &obj)) == 0) {
-				if ((pjob = job_recov(dbjob.ji_jobid)) != NULL) {
+				if ((pjob = job_recov(dbjob.ji_jobid, NULL, 0)) != NULL) {
 					do_stat_of_a_job_ext(preq, pjob, dohistjobs, dosubjobs);
 					job_free(pjob);
 				}

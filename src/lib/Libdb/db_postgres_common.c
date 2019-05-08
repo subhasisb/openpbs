@@ -197,6 +197,7 @@ pg_db_cmd(pbs_db_conn_t *conn, char *stmt, int num_vars)
  * @param[in]	conn - The connnection handle
  * @param[in]	stmt - Name of the statement (prepared previously)
  * @param[in]	num_vars - The number of parameters in the sql ($1, $2 etc)
+ * @param[in]	lock - query for update or not (lock row/object)
  * @param[out]  res - The result set of the query
  *
  * @return      Error code
@@ -206,11 +207,17 @@ pg_db_cmd(pbs_db_conn_t *conn, char *stmt, int num_vars)
  *
  */
 int
-pg_db_query(pbs_db_conn_t *conn, char *stmt, int num_vars,
-	PGresult **res)
+pg_db_query(pbs_db_conn_t *conn, char *stmt, int num_vars, int lock, PGresult **res)
 {
+	char stmt_tmp[100];
+
+	if (lock) {
+		strcpy(stmt_tmp, stmt);
+		strcat(stmt_tmp, "_locked");
+	}
+	
 	*res = PQexecPrepared((PGconn*) conn->conn_db_handle,
-		stmt,
+		(lock? stmt_tmp : stmt),
 		num_vars,
 		((pg_conn_data_t *) conn->conn_data)->paramValues,
 		((pg_conn_data_t *) conn->conn_data)->paramLengths,

@@ -103,6 +103,10 @@ pg_db_prepare_que_sqls(pbs_db_conn_t *conn)
 	if (pg_prepare_stmt(conn, STMT_SELECT_QUE, conn->conn_sql, 1) != 0)
 		return -1;
 
+	strcat(conn->conn_sql, " FOR UPDATE");
+	if (pg_prepare_stmt(conn, STMT_SELECT_QUE_LOCKED, conn->conn_sql, 1) != 0)
+		return -1;
+
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select "
 			"qu_name, "
 			"qu_type, "
@@ -132,11 +136,13 @@ pg_db_prepare_que_sqls(pbs_db_conn_t *conn)
  * @retval	-1 - On Error
  * @retval	 0 - On Success
  * @retval	>1 - Number of attributes
+ * @retval 	-2 -  Success but data same as old, so not loading data (but locking if lock requested)
  */
 static int
 load_que(PGresult *res, pbs_db_que_info_t *pq, int row)
 {
 	char *raw_array;
+	BIGINT db_savetm;
 	static int qu_name_fnum, qu_type_fnum, qu_ctime_fnum, qu_mtime_fnum, attributes_fnum;
 	static int fnums_inited = 0;
 
@@ -149,10 +155,17 @@ load_que(PGresult *res, pbs_db_que_info_t *pq, int row)
 		fnums_inited = 1;
 	}
 
+	GET_PARAM_BIGINT(res, row, db_savetm, qu_mtime_fnum);
+	if (pq->qu_mtime == db_savetm) {
+		/* data same as read last time, so no need to read any further, return success from here */
+		/* however since we loaded data from the database, the row is locked if a lock was requested */
+		return -2;
+	}
+	pq->qu_mtime = db_savetm; /* update the save timestamp */
+
 	GET_PARAM_STR(res, row, pq->qu_name, qu_name_fnum);
 	GET_PARAM_INTEGER(res, row, pq->qu_type, qu_type_fnum);
 	GET_PARAM_BIGINT(res, row, pq->qu_ctime, qu_ctime_fnum);
-	GET_PARAM_BIGINT(res, row, pq->qu_mtime, qu_mtime_fnum);
 	GET_PARAM_BIN(res, row, raw_array, attributes_fnum);
 
 	/* convert attributes from postgres raw array format */
@@ -219,11 +232,12 @@ pg_db_save_que(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
  * @return      Error code
  * @retval	-1 - Failure
  * @retval	 0 - Success
- * @retval	 1 -  Success but no rows loaded
+ * @retval	>1 - Number of attributes
+ * @retval 	-2 -  Success but data same as old, so not loading data (but locking if lock requested)
  *
  */
 int
-pg_db_load_que(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj)
+pg_db_load_que(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int lock)
 {
 	PGresult *res;
 	int rc;
@@ -231,8 +245,8 @@ pg_db_load_que(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj)
 
 	SET_PARAM_STR(conn, pq->qu_name, 0);
 
-	if ((rc = pg_db_query(conn, STMT_SELECT_QUE, 1, &res)) != 0)
-		return rc;
+	if ((rc = pg_db_query(conn, STMT_SELECT_QUE, 1, lock, &res)) != 0)
+		return -1;
 
 	rc = load_que(res, pq, 0);
 
@@ -266,7 +280,7 @@ pg_db_find_que(pbs_db_conn_t *conn, void *st, pbs_db_obj_info_t *obj, pbs_db_que
 		return -1;
 
 	strcpy(conn->conn_sql, STMT_FIND_QUES_ORDBY_CREATTM);
-	if ((rc = pg_db_query(conn, conn->conn_sql, 0, &res)) != 0)
+	if ((rc = pg_db_query(conn, conn->conn_sql, 0, 0, &res)) != 0)
 		return rc;
 
 	state->row = 0;

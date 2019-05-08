@@ -208,11 +208,12 @@ db_err:
  *
  */
 pbs_queue *
-que_recov_db(char *qname)
+que_recov_db(char *qname, pbs_queue *pq_now, int lock)
 {
 	pbs_queue		*pq;
 	pbs_db_que_info_t	dbque;
 	pbs_db_obj_info_t	obj;
+	int rc;
 	pbs_db_conn_t		*conn = (pbs_db_conn_t *) svr_db_conn;
 
 	obj.pbs_db_obj_type = PBS_DB_QUEUE;
@@ -224,13 +225,20 @@ que_recov_db(char *qname)
 		return NULL;
 	}
 
-	/* load server_qs */
 	dbque.qu_name[sizeof(dbque.qu_name) - 1] = '\0';
+	if (pq_now)
+		dbque.qu_mtime = pq_now->qu_qs.qu_mtime;
+	else
+		dbque.qu_mtime = 0;
+
 	strncpy(dbque.qu_name, qname, sizeof(dbque.qu_name));
 
-	/* read in job fixed sub-structure */
-	if (pbs_db_load_obj(conn, &obj) != 0)
+	rc = pbs_db_load_obj(conn, &obj, lock);
+	if (rc == -1)
 		goto db_err;
+	
+	if (rc == -2)
+		return pq_now; /* no change in job, return the same job */
 
 	if (db_to_svr_que(pq, &dbque) != 0)
 		goto db_err;

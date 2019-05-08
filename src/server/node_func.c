@@ -1577,7 +1577,7 @@ setup_nodes()
 	/* Load  the mominfo_time from the db */
 	obj.pbs_db_obj_type = PBS_DB_MOMINFO_TIME;
 	obj.pbs_db_un.pbs_db_mominfo_tm = &mom_tm;
-	if (pbs_db_load_obj(svr_db_conn, &obj) == -1) {
+	if (pbs_db_load_obj(svr_db_conn, &obj, 0) == -1) {
 		sprintf(log_buffer, "Could not load momtime info");
 		goto db_err;
 	}

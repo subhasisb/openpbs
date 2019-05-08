@@ -305,9 +305,9 @@ pbs_db_delete_obj(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj)
  *
  */
 int
-pbs_db_load_obj(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj)
+pbs_db_load_obj(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int lock)
 {
-	return (db_fn_arr[obj->pbs_db_obj_type].pg_db_load_obj(conn, obj));
+	return (db_fn_arr[obj->pbs_db_obj_type].pg_db_load_obj(conn, obj, lock));
 }
 
 /**

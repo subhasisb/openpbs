@@ -195,6 +195,10 @@ pg_db_prepare_job_sqls(pbs_db_conn_t *conn)
 	if (pg_prepare_stmt(conn, STMT_SELECT_JOB, conn->conn_sql, 1) != 0)
 		return -1;
 
+	strcat(conn->conn_sql, " FOR UPDATE");
+	if (pg_prepare_stmt(conn, STMT_SELECT_JOB_LOCKED, conn->conn_sql, 1) != 0)
+		return -1;
+
 	/*
 	 * Use the sql encode function to encode the $2 parameter. Encode using
 	 * 'escape' mode. Encode considers $2 as a bytea and returns a escaped
@@ -221,6 +225,10 @@ pg_db_prepare_job_sqls(pbs_db_conn_t *conn)
 		"from pbs.job_scr "
 		"where ji_jobid = $1");
 	if (pg_prepare_stmt(conn, STMT_SELECT_JOBSCR, conn->conn_sql, 1) != 0)
+		return -1;
+
+	strcat(conn->conn_sql, " FOR UPDATE");
+	if (pg_prepare_stmt(conn, STMT_SELECT_JOBSCR_LOCKED, conn->conn_sql, 1) != 0)
 		return -1;
 
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select "
@@ -310,12 +318,14 @@ pg_db_prepare_job_sqls(pbs_db_conn_t *conn)
  * @return error code
  * @retval 0 Success
  * @retval -1 Error
- *
+ * @retval	>1 - Number of attributes
+ * @retval 	-2 -  Success but data same as old, so not loading data (but locking if lock requested)
  */
 static int
 load_job(const  PGresult *res, pbs_db_job_info_t *pj, int row)
 {
 	char *raw_array;
+	BIGINT db_savetm;
 	static int ji_jobid_fnum, ji_state_fnum, ji_substate_fnum, ji_svrflags_fnum, ji_numattr_fnum,
 	ji_ordering_fnum, ji_priority_fnum, ji_stime_fnum, ji_endtBdry_fnum, ji_queue_fnum, ji_destin_fnum,
 	ji_un_type_fnum, ji_momaddr_fnum, ji_momport_fnum, ji_exitstat_fnum, ji_quetime_fnum, ji_rteretry_fnum,
@@ -355,6 +365,14 @@ load_job(const  PGresult *res, pbs_db_job_info_t *pj, int row)
 		fnums_inited = 1;
 	}
 
+	GET_PARAM_BIGINT(res, row, db_savetm, ji_savetm_fnum);
+	if (pj->ji_savetm == db_savetm) {
+		/* data same as read last time, so no need to read any further, return success from here */
+		/* however since we loaded data from the database, the row is locked if a lock was requested */
+		return -2;
+	}
+	pj->ji_savetm = db_savetm;  /* update the save timestamp */
+
 	GET_PARAM_STR(res, row, pj->ji_jobid, ji_jobid_fnum);
 	GET_PARAM_INTEGER(res, row, pj->ji_state, ji_state_fnum);
 	GET_PARAM_INTEGER(res, row, pj->ji_substate, ji_substate_fnum);
@@ -378,7 +396,6 @@ load_job(const  PGresult *res, pbs_db_job_info_t *pj, int row)
 	GET_PARAM_STR(res, row, pj->ji_4ash, ji_4ash_fnum);
 	GET_PARAM_INTEGER(res, row, pj->ji_credtype, ji_credtype_fnum);
 	GET_PARAM_INTEGER(res, row, pj->ji_qrank, ji_qrank_fnum);
-	GET_PARAM_BIGINT(res, row, pj->ji_savetm, ji_savetm_fnum);
 	GET_PARAM_BIGINT(res, row, pj->ji_creattm, ji_creattm_fnum);
 	GET_PARAM_BIN(res, row, raw_array, attributes_fnum);
 
@@ -470,11 +487,12 @@ pg_db_save_job(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
  * @return      Error code
  * @retval	-1 - Failure
  * @retval	 0 - Success
- * @retval	 1 -  Success but no rows loaded
+ * @retval	>1 - Number of attributes
+ * @retval 	-2 -  Success but data same as old, so not loading data (but locking if lock requested)
  *
  */
 int
-pg_db_load_job(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj)
+pg_db_load_job(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int lock)
 {
 	PGresult *res;
 	int rc;
@@ -482,8 +500,8 @@ pg_db_load_job(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj)
 
 	SET_PARAM_STR(conn, pj->ji_jobid, 0);
 
-	if ((rc = pg_db_query(conn, STMT_SELECT_JOB, 1, &res)) != 0)
-		return rc;
+	if ((rc = pg_db_query(conn, STMT_SELECT_JOB, 1, lock, &res)) != 0)
+		return -1;
 
 	rc = load_job(res, pj, 0);
 
@@ -528,7 +546,7 @@ pg_db_find_job(pbs_db_conn_t *conn, void *st, pbs_db_obj_info_t *obj,
 		params=0;
 	}
 
-	if ((rc = pg_db_query(conn, conn->conn_sql, params, &res)) != 0)
+	if ((rc = pg_db_query(conn, conn->conn_sql, params, 0, &res)) != 0)
 		return rc;
 
 	state->row = 0;
@@ -648,7 +666,7 @@ pg_db_save_jobscr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
  *
  */
 int
-pg_db_load_jobscr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj)
+pg_db_load_jobscr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int lock)
 {
 	PGresult *res;
 	pbs_db_jobscr_info_t *pscr = obj->pbs_db_un.pbs_db_jobscr;
@@ -665,7 +683,7 @@ pg_db_load_jobscr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj)
 	 * of pg_db_query.
 	 *
 	 */
-	if (pg_db_query(conn, STMT_SELECT_JOBSCR, 1, &res) != 0)
+	if (pg_db_query(conn, STMT_SELECT_JOBSCR, 1, lock, &res) != 0)
 		return -1;
 
 	if (script_fnum == -1)

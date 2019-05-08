@@ -700,7 +700,7 @@ int pbs_db_add_update_attr_obj(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, void
  * @retval       1 -  Success but no rows loaded
  *
  */
-int pbs_db_load_obj(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj);
+int pbs_db_load_obj(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int lock);
 
 /**
  * @brief

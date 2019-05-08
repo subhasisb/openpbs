@@ -268,7 +268,7 @@ enum failover_state {
 
 /* function prototypes */
 
-extern int			svr_recov_db(void);
+extern int			svr_recov_db(int);
 extern int			svr_save_db(struct server *, int mode);
 extern pbs_sched *		sched_recov_db(char *);
 extern int			sched_save_db(pbs_sched *, int mode);

@@ -139,6 +139,10 @@ pg_db_prepare_resv_sqls(pbs_db_conn_t *conn)
 	if (pg_prepare_stmt(conn, STMT_SELECT_RESV, conn->conn_sql, 1) != 0)
 		return -1;
 
+	strcat(conn->conn_sql, " FOR UPDATE");
+	if (pg_prepare_stmt(conn, STMT_SELECT_RESV_LOCKED, conn->conn_sql, 1) != 0)
+		return -1;
+
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select "
 		"ri_resvID, "
 		"ri_queue, "
@@ -183,11 +187,13 @@ pg_db_prepare_resv_sqls(pbs_db_conn_t *conn)
  * @retval	-1 - On Error
  * @retval	 0 - On Success
  * @retval	>1 - Number of attributes
+ * @retval 	-2 -  Success but data same as old, so not loading data (but locking if lock requested)
  */
 static int
 load_resv(PGresult *res, pbs_db_resv_info_t *presv, int row)
 {
 	char *raw_array;
+	BIGINT db_savetm;
 	static int ri_resvid_fnum, ri_queue_fnum, ri_state_fnum, ri_substate_fnum, ri_type_fnum, ri_stime_fnum,
 	ri_etime_fnum, ri_duration_fnum, ri_tactive_fnum, ri_svrflags_fnum, ri_numattr_fnum, ri_resvTag_fnum,
 	ri_un_type_fnum, ri_fromsock_fnum, ri_fromaddr_fnum, ri_savetm_fnum, ri_creattm_fnum,
@@ -217,6 +223,14 @@ load_resv(PGresult *res, pbs_db_resv_info_t *presv, int row)
 		fnums_inited = 1;
 	}
 
+	GET_PARAM_BIGINT(res, row, db_savetm, ri_savetm_fnum);
+	if (presv->ri_savetm == db_savetm) {
+		/* data same as read last time, so no need to read any further, return success from here */
+		/* however since we loaded data from the database, the row is locked if a lock was requested */
+		return -2;
+	}
+	presv->ri_savetm = db_savetm; /* update the save timestamp */
+
 	GET_PARAM_STR(res, row, presv->ri_resvid, ri_resvid_fnum);
 	GET_PARAM_STR(res, row, presv->ri_queue, ri_queue_fnum);
 	GET_PARAM_INTEGER(res, row, presv->ri_state, ri_state_fnum);
@@ -232,7 +246,6 @@ load_resv(PGresult *res, pbs_db_resv_info_t *presv, int row)
 	GET_PARAM_INTEGER(res, row, presv->ri_un_type, ri_un_type_fnum);
 	GET_PARAM_INTEGER(res, row, presv->ri_fromsock, ri_fromsock_fnum);
 	GET_PARAM_BIGINT(res, row, presv->ri_fromaddr, ri_fromaddr_fnum);
-	GET_PARAM_BIGINT(res, row, presv->ri_savetm, ri_savetm_fnum);
 	GET_PARAM_BIGINT(res, row, presv->ri_creattm, ri_creattm_fnum);
 	GET_PARAM_BIN(res, row, raw_array, attributes_fnum);
 
@@ -313,11 +326,12 @@ pg_db_save_resv(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
  * @return      Error code
  * @retval	-1 - Failure
  * @retval	 0 - Success
- * @retval	 1 -  Success but no rows loaded
+ * @retval	>1 - Number of attributes
+ * @retval 	-2 -  Success but data same as old, so not loading data (but locking if lock requested)
  *
  */
 int
-pg_db_load_resv(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj)
+pg_db_load_resv(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int lock)
 {
 	pbs_db_resv_info_t *presv = obj->pbs_db_un.pbs_db_resv;
 	PGresult *res;
@@ -325,8 +339,8 @@ pg_db_load_resv(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj)
 
 	SET_PARAM_STR(conn, presv->ri_resvid, 0);
 
-	if ((rc = pg_db_query(conn, STMT_SELECT_RESV, 1, &res)) != 0)
-		return rc;
+	if ((rc = pg_db_query(conn, STMT_SELECT_RESV, 1, lock, &res)) != 0)
+		return -1;
 
 	rc = load_resv(res, presv, 0);
 
@@ -365,7 +379,7 @@ pg_db_find_resv(pbs_db_conn_t *conn, void *st, pbs_db_obj_info_t *obj,
 	params=0;
 	strcpy(conn->conn_sql, STMT_FINDRESVS_ORDBY_CREATTM);
 
-	if ((rc = pg_db_query(conn, conn->conn_sql, params, &res)) != 0)
+	if ((rc = pg_db_query(conn, conn->conn_sql, params, 0, &res)) != 0)
 		return rc;
 
 	state->row = 0;

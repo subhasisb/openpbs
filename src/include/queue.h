@@ -173,7 +173,7 @@ extern pbs_queue *find_resvqueuebyname(char *);
 extern pbs_queue *get_dfltque(void);
 extern pbs_queue *que_alloc(char *name);
 extern void   que_free(pbs_queue *);
-extern pbs_queue *que_recov_db(char *);
+extern pbs_queue *que_recov_db(char *, pbs_queue *, int);
 extern int    que_save_db(pbs_queue *, int mode);
 
 #define QUE_SAVE_FULL 0

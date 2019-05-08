@@ -1973,10 +1973,6 @@ req_commit(struct batch_request *preq)
 
 	job_free(pj);
 
-	if ((pjob = job_recov(dbjob.ji_jobid)) != NULL) {
-					do_stat_of_a_job_ext(preq, pjob, dohistjobs, dosubjobs);
-					job_free(pjob);
-				}
 #endif		/* PBS_SERVER */
 }
 

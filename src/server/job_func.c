@@ -145,8 +145,9 @@ extern int read_cred(job *pjob, char **cred, size_t *len);
 void on_job_exit(struct work_task *);
 
 /* Local Private Functions */
-
+#ifdef PBS_MOM
 static void job_init_wattr(job *);
+#endif
 
 #ifndef PBS_MOM		/*SERVER ONLY*/
 static void job_or_resv_init_wattr(void*, int);
@@ -371,6 +372,7 @@ job_alloc(void)
 	pj->ji_stderr = 0;
 	pj->ji_setup = NULL;
 #else	/* SERVER */
+	pj->ji_savetm = 0;
 	pj->ji_prunreq = NULL;
 	CLEAR_HEAD(pj->ji_svrtask);
 	CLEAR_HEAD(pj->ji_rejectdest);
@@ -387,9 +389,10 @@ job_alloc(void)
 #endif
 
 	/* set the working attributes to "unspecified" */
-
+#ifdef PBS_MOM
+	/* try to avoid this for server job loads */
 	job_init_wattr(pj);
-
+#endif
 
 #ifndef PBS_MOM
 	/* mark as JOB_INITIAL, set accrue times to zero */
@@ -579,6 +582,7 @@ job_free(job *pj)
 	free(pj);	/* now free the main structure */
 }
 
+#ifdef PBS_MOM
 /**
  * @brief
  * 		job_init_wattr - initialize job working attribute array
@@ -600,6 +604,7 @@ job_init_wattr(job *pj)
 		clear_attr(&pj->ji_wattr[i], &job_attr_def[i]);
 	}
 }
+#endif
 
 
 /**
@@ -1041,7 +1046,7 @@ find_job(char *jobid)
 job *
 find_job(char *jobid)
 {
-	job *pjob = job_recov(jobid);
+	job *pjob = job_recov(jobid, NULL, 0);
 	if (pjob) {
 		unsigned int d;
 		svr_enquejob(pjob);

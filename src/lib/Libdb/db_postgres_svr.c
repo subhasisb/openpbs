@@ -119,6 +119,10 @@ pg_db_prepare_svr_sqls(pbs_db_conn_t *conn)
 	if (pg_prepare_stmt(conn, STMT_SELECT_SVR, conn->conn_sql, 0) != 0)
 		return -1;
 
+	strcat(conn->conn_sql, " FOR UPDATE");
+	if (pg_prepare_stmt(conn, STMT_SELECT_SVR_LOCKED, conn->conn_sql, 1) != 0)
+		return -1;
+
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select "
 		"pbs_schema_version "
 		"from "
@@ -224,13 +228,15 @@ pg_db_save_svr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
  * @return      Error code
  * @retval	-1 - Failure
  * @retval	 0 - Success
- * @retval	 1 -  Success but no rows loaded
+* @retval	>1 - Number of attributes
+ * @retval 	-2 -  Success but data same as old, so not loading data (but locking if lock requested)
  *
  */
 int
-pg_db_load_svr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj)
+pg_db_load_svr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int lock)
 {
 	PGresult *res;
+	BIGINT db_savetm;
 	int rc;
 	char *raw_array;
 	pbs_db_svr_info_t *ps = obj->pbs_db_un.pbs_db_svr;
@@ -238,8 +244,8 @@ pg_db_load_svr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj)
 	sv_creattm_fnum, attributes_fnum;
 	static int fnums_inited = 0;
 
-	if ((rc = pg_db_query(conn, STMT_SELECT_SVR, 0, &res)) != 0)
-		return rc;
+	if ((rc = pg_db_query(conn, STMT_SELECT_SVR, 0, lock, &res)) != 0)
+		return -1;
 
 	if (fnums_inited == 0) {
 		sv_numjobs_fnum = PQfnumber(res, "sv_numjobs");
@@ -250,11 +256,19 @@ pg_db_load_svr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj)
 		attributes_fnum = PQfnumber(res, "attributes");
 		fnums_inited = 1;
 	}
+	
+	GET_PARAM_BIGINT(res, 0, db_savetm, sv_savetm_fnum);
+	if (ps->sv_savetm == db_savetm) {
+		/* data same as read last time, so no need to read any further, return success from here */
+		/* however since we loaded data from the database, the row is locked if a lock was requested */
+		return -2;
+	}
+
+	ps->sv_savetm = db_savetm; /* update the save timestamp */
 
 	GET_PARAM_INTEGER(res, 0, ps->sv_numjobs, sv_numjobs_fnum);
 	GET_PARAM_INTEGER(res, 0, ps->sv_numque, sv_numque_fnum);
 	GET_PARAM_BIGINT(res, 0, ps->sv_jobidnumber, sv_jobidnumber_fnum);
-	GET_PARAM_BIGINT(res, 0, ps->sv_savetm, sv_savetm_fnum);
 	GET_PARAM_BIGINT(res, 0, ps->sv_creattm, sv_creattm_fnum);
 	GET_PARAM_BIN(res, 0, raw_array, attributes_fnum);
 
@@ -285,7 +299,7 @@ pbs_db_get_schema_version(pbs_db_conn_t *conn, int *db_maj_ver, int *db_min_ver)
 	char ver_str[MAX_SCHEMA_VERSION_LEN + 1];
 	char *token;
 
-	if ((rc = pg_db_query(conn, STMT_SELECT_DBVER, 0, &res)) != 0)
+	if ((rc = pg_db_query(conn, STMT_SELECT_DBVER, 0, 0, &res)) != 0)
 		return rc;
 
 	ver_str[0] = '\0';

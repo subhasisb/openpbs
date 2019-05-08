@@ -203,6 +203,7 @@ db_to_svr_job(job *pjob,  pbs_db_job_info_t *dbjob)
 {
 	/* Variables assigned constant values are not stored in the DB */
 	pjob->ji_qs.ji_jsversion = JSVERSION;
+	pjob->ji_savetm = dbjob->ji_savetm;
 	strcpy(pjob->ji_qs.ji_jobid, dbjob->ji_jobid);
 	pjob->ji_qs.ji_state = dbjob->ji_state;
 	pjob->ji_qs.ji_substate = dbjob->ji_substate;
@@ -478,7 +479,6 @@ job *
 job_recov_db_spl(pbs_db_job_info_t *dbjob)
 {
 	job		*pj;
-	pbs_db_conn_t *conn = svr_db_conn;
 
 	pj = job_alloc();	/* allocate & initialize job structure space */
 	if (pj == (job *)0) {
@@ -486,9 +486,6 @@ job_recov_db_spl(pbs_db_job_info_t *dbjob)
 	}
 
 	if (db_to_svr_job(pj, dbjob) != 0)
-		goto db_err;
-
-	if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0)
 		goto db_err;
 
 	return (pj);
@@ -514,39 +511,42 @@ db_err:
  *
  */
 job *
-job_recov_db(char *jid)
+job_recov_db(char *jid, job *pjob, int lock)
 {
 	job		*pj = NULL;
 	pbs_db_job_info_t dbjob;
 	pbs_db_obj_info_t obj;
+	int rc = 0;
 	pbs_db_conn_t *conn = svr_db_conn;
 
-	if (pbs_db_begin_trx(conn, 0, 0) !=0)
-		goto db_err;
-
 	strcpy(dbjob.ji_jobid, jid);
+	if (pjob)
+		dbjob.ji_savetm = pjob->ji_savetm;
+	else
+		dbjob.ji_savetm = 0;
+	
 	obj.pbs_db_obj_type = PBS_DB_JOB;
 	obj.pbs_db_un.pbs_db_job = &dbjob;
 
-	/* read in job fixed sub-structure */
-	if (pbs_db_load_obj(conn, &obj) != 0)
+	rc = pbs_db_load_obj(conn, &obj, lock);
+	if (rc == -1)
 		goto db_err;
+	
+	if (rc == -2)
+		return pjob; /* no change in job, return the same job */
 
 	pj = job_recov_db_spl(&dbjob);
 	if (!pj)
 		goto db_err;
 
-	if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0)
-		goto db_err;
-
 	pbs_db_reset_obj(&obj);
 
 	return (pj);
+
 db_err:
 	if (pj)
 		job_free(pj);
 
-	(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
 	return (NULL);
 }
 
@@ -675,7 +675,7 @@ resv_recov_db(char *resvid)
 	obj.pbs_db_un.pbs_db_resv = &dbresv;
 
 	/* read in job fixed sub-structure */
-	if (pbs_db_load_obj(conn, &obj) != 0)
+	if (pbs_db_load_obj(conn, &obj, 0) != 0)
 		goto db_err;
 
 	if (db_to_svr_resv(presv, &dbresv) != 0)
@@ -774,7 +774,7 @@ job_or_resv_recov_db(char *id, int objtype)
 	if (objtype == RESC_RESV_OBJECT) {
 		return (resv_recov_db(id));
 	} else {
-		return (job_recov_db(id));
+		return (job_recov_db(id, NULL, 0));
 	}
 }
 #endif

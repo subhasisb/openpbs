@@ -264,11 +264,12 @@ db_to_svr_sched(struct pbs_sched *ps, pbs_db_sched_info_t *pdbsched)
  *
  */
 int
-svr_recov_db(void)
+svr_recov_db(int lock)
 {
 	pbs_db_conn_t *conn = (pbs_db_conn_t *) svr_db_conn;
 	pbs_db_svr_info_t dbsvr;
 	pbs_db_obj_info_t obj;
+	int rc;
 
 	/* load server_qs */
 	dbsvr.attr_list.attr_count = 0;
@@ -276,10 +277,15 @@ svr_recov_db(void)
 
 	obj.pbs_db_obj_type = PBS_DB_SVR;
 	obj.pbs_db_un.pbs_db_svr = &dbsvr;
+	dbsvr.sv_savetm = server.sv_qs.sv_savetm;
 
 	/* read in job fixed sub-structure */
-	if (pbs_db_load_obj(conn, &obj) != 0)
+	rc = pbs_db_load_obj(conn, &obj, lock);
+	if (rc == -1)
 		goto db_err;
+	
+	if (rc == -2)
+		return 0; /* no change in server, return success */
 
 	if (db_to_svr_svr(&server, &dbsvr) != 0)
 		goto db_err;
@@ -405,7 +411,7 @@ sched_recov_db(char *sname)
 	strncpy(dbsched.sched_name, sname, sizeof(dbsched.sched_name));
 
 	/* read in job fixed sub-structure */
-	if (pbs_db_load_obj(conn, &obj) != 0)
+	if (pbs_db_load_obj(conn, &obj, 0) != 0)
 		goto db_err;
 
 	if (db_to_svr_sched(ps, &dbsched) != 0)

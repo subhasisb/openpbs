@@ -360,7 +360,7 @@ node_recov_db(void *nd)
 	if (pbs_db_begin_trx(conn, 0, 0) !=0)
 		goto db_err;
 
-	if (pbs_db_load_obj(conn, &obj) != 0)
+	if (pbs_db_load_obj(conn, &obj, 0) != 0)
 		goto db_err;
 
 	initialize_pbsnode(np, NULL, NTYPE_PBS);

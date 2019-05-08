@@ -625,6 +625,8 @@ struct job {
 	 * is decremented when the job is run*/
 	int             ji_etlimit_decr_queued;
 
+	time_t	ji_savetm;
+
 #endif					/* END SERVER ONLY */
 
 	/*
@@ -1140,7 +1142,7 @@ void*	job_or_resv_recov_fs(char *, int);
 
 #else
 
-extern job  *job_recov_db(char *);
+extern job  *job_recov_db(char *, job *pjob, int lock);
 extern void *job_or_resv_recov_db(char *, int);
 extern int  job_save_db(job *, int);
 extern int   job_or_resv_save_db(void *, int, int);
