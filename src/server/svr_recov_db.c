@@ -113,7 +113,7 @@ extern int recov_attr_db(pbs_db_conn_t *conn,
 	int unknown);
 extern int utimes(const char *path, const struct timeval *times);
 #endif /* localmod 005 */
-extern pbs_sched *sched_alloc(char *sched_name);
+extern pbs_sched *sched_alloc(char *sched_name, int append);
 
 /**
  * @brief
@@ -223,26 +223,6 @@ svr_to_db_sched(struct pbs_sched *ps, pbs_db_sched_info_t *pdbsched, int updatet
 			(int)SCHED_ATR_LAST, &pdbsched->attr_list, 1)) != 0) /* encode all attributes */
 			return -1;
 	}
-
-	return 0;
-}
-
-/**
- * @brief
- *	Load a database scheduler object from the scheduler object in server
- *
- * @param[out] ps - Address of the scheduler in pbs server
- * @param[in]  pdbsched  - Address of the database scheduler object
- *
- */
-static int
-db_to_svr_sched(struct pbs_sched *ps, pbs_db_sched_info_t *pdbsched)
-{
-	/* since we dont need the sched_name and sched_sv_name free here */
-	if ((decode_attr_db(ps, &pdbsched->attr_list, sched_attr_def,
-		ps->sch_attr,
-		(int) SCHED_ATR_LAST, 0)) != 0)
-		return -1;
 
 	return 0;
 }
@@ -398,59 +378,6 @@ db_err:
 
 
 static char *schedemsg = "unable to save scheddb ";
-
-/**
- * @brief Recover Schedulers
- *
- * @see	pbsd_init.c
- *
- *
- * @return	Error code
- * @retval	 0 :	On successful recovery and creation of server structure
- * @retval	-1 :	On failure to open or read file.
- * @retval	-2 :	No schedulers found.
- * */
-
-pbs_sched *
-sched_recov_db(char *sname)
-{
-	pbs_sched		*ps;
-	pbs_db_sched_info_t	dbsched;
-	pbs_db_obj_info_t	obj;
-	pbs_db_conn_t		*conn = (pbs_db_conn_t *) svr_db_conn;
-
-	obj.pbs_db_obj_type = PBS_DB_SCHED;
-	obj.pbs_db_un.pbs_db_sched = &dbsched;
-
-	ps = sched_alloc(sname);  /* allocate & init sched structure space */
-	if (ps == NULL) {
-		log_err(-1, "sched_recov", "sched_alloc failed");
-		return NULL;
-	}
-
-	/* load sched */
-	dbsched.sched_name[sizeof(dbsched.sched_name) - 1] = '\0';
-	strncpy(dbsched.sched_name, sname, sizeof(dbsched.sched_name));
-
-	/* read in job fixed sub-structure */
-	if (pbs_db_load_obj(conn, &obj, 0) != 0)
-		goto db_err;
-
-	if (db_to_svr_sched(ps, &dbsched) != 0)
-		goto db_err;
-
-	pbs_db_reset_obj(&obj);
-
-	/* all done recovering the sched */
-	return (ps);
-
-db_err:
-	log_err(-1, "sched_recov", "read of scheddb failed");
-	if (ps)
-		free(ps);
-	return NULL;
-}
-
 
 /**
  * @brief

@@ -321,7 +321,7 @@ encode_svrstate(attribute *pattr, pbs_list_head *phead, char *atname, char *rsna
 	if (pattr->at_val.at_long == SV_STATE_RUN) {
 		if (server.sv_attr[(int)SRV_ATR_scheduling].at_val.at_long == 0)
 			psname = svr_idle;
-		else if (dflt_scheduler->scheduler_sock != -1)
+		else if (dflt_scheduler && dflt_scheduler->scheduler_sock != -1)
 			psname = svr_sched;
 	}
 

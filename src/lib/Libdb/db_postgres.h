@@ -158,6 +158,8 @@ typedef unsigned __int64 uint64_t;
 #define STMT_UPDATE_SCHED_FULL "update_sched_full"
 #define STMT_SELECT_SCHED "select_sched"
 #define STMT_SELECT_SCHED_LOCKED "select_sched_locked"
+#define STMT_SELECT_SCHED_PARTITION "select_sched_partition"
+#define STMT_SELECT_DFLT_SCHED  "select_dflt_sched"
 #define STMT_SELECT_SCHED_ALL "select_sched_all"
 #define STMT_DELETE_SCHED "sched_delete"
 #define STMT_REMOVE_SCHEDATTRS "remove_schedattrs"

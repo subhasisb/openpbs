@@ -2006,10 +2006,6 @@ display(int otype, int ptype, char *oname, struct batch_status *status,
 				printf("Server %s\n", status->name);
 		}
 		else if (otype == MGR_OBJ_SCHED) {
-			if ((oname != NULL) && *oname && strcmp(oname, status->name)) {
-				status = status->next;
-				continue;
-			}
 
 			if (format) {
 					printf("#\n# Create and define scheduler %s\n#\n", status->name);
@@ -2645,7 +2641,7 @@ execute(int aopt, int oper, int type, char *names, struct attropl *attribs)
 						ss = pbs_statvnode(sp->s_connect, pname->obj_name, sa, NULL);
 						break;
 					case MGR_OBJ_SCHED:
-						ss = pbs_statsched(sp->s_connect, sa, NULL);
+						ss = pbs_statsched(sp->s_connect, pname->obj_name, sa, NULL);
 						break;
 					case MGR_OBJ_SITE_HOOK:
 						ss = pbs_stathook(sp->s_connect, pname->obj_name, sa, SITE_HOOK);
@@ -2704,7 +2700,7 @@ execute(int aopt, int oper, int type, char *names, struct attropl *attribs)
 						ss = pbs_statvnode(sp->s_connect, pname->obj_name, sa, NULL);
 						break;
 					case MGR_OBJ_SCHED:
-						ss = pbs_statsched(sp->s_connect, sa, NULL);
+						ss = pbs_statsched(sp->s_connect, pname->obj_name, sa, NULL);
 						break;
 					case MGR_OBJ_SITE_HOOK:
 						ss = pbs_stathook(sp->s_connect, pname->obj_name, sa, SITE_HOOK);

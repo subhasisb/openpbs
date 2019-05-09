@@ -71,7 +71,7 @@ extern pbs_db_conn_t *svr_db_conn;
  * @retval	null	- space not available.
  */
 pbs_sched *
-sched_alloc(char *sched_name)
+sched_alloc(char *sched_name, int append)
 {
 	int i;
 	pbs_sched *psched;
@@ -83,14 +83,17 @@ sched_alloc(char *sched_name)
 		return NULL;
 	}
 
-	CLEAR_LINK(psched->sc_link);
+	if (append)
+		CLEAR_LINK(psched->sc_link);
 	strncpy(psched->sc_name, sched_name, PBS_MAXSCHEDNAME);
 	psched->sc_name[PBS_MAXSCHEDNAME] = '\0';
 	psched->svr_do_schedule = SCH_SCHEDULE_NULL;
 	psched->svr_do_sched_high = SCH_SCHEDULE_NULL;
 	psched->scheduler_sock = -1;
 	psched->scheduler_sock2 = -1;
-	append_link(&svr_allscheds, &psched->sc_link, psched);
+	psched->sch_svtime = 0;
+	if (append)
+		append_link(&svr_allscheds, &psched->sc_link, psched);
 
 	/* set the working attributes to "unspecified" */
 
@@ -110,18 +113,19 @@ sched_alloc(char *sched_name)
  */
 
 pbs_sched *
-find_scheduler(char *sched_name)
+find_sched(char *sched_name)
 {
 	pbs_sched *psched = NULL;
 	if (!sched_name)
 		return NULL;
-	psched = (pbs_sched *) GET_NEXT(svr_allscheds);
-	while (psched != NULL) {
-		if (strcmp(sched_name, psched->sc_name) == 0)
-			break;
-		psched = (pbs_sched *) GET_NEXT(psched->sc_link);
+
+	psched = recov_sched_from_db(NULL, sched_name);
+	if (psched) {
+		if (strcmp(psched->sc_name, "default") == 0)
+			dflt_scheduler = psched;
 	}
-	return (psched);
+	return psched;
+
 }
 
 /**
@@ -519,3 +523,69 @@ action_sched_partition(attribute *pattr, void *pobj, int actmode)
 		(void)contact_sched(SCH_ATTRS_CONFIGURE, NULL, pin_sched->pbs_scheduler_addr, pin_sched->pbs_scheduler_port);
 	return PBSE_NONE;
 }
+
+/**
+ * @brief find a scheduler
+ *
+ * @param[in]   sched_name - scheduler name
+ *
+ * @return      pbs_sched *
+ */
+
+pbs_sched *
+find_scheduler(char *sched_name)
+{
+        pbs_sched *psched = NULL;
+        if (!sched_name)
+                return NULL;
+        psched = (pbs_sched *) GET_NEXT(svr_allscheds);
+        while (psched != (pbs_sched *) 0) {
+                if (strcmp(sched_name, psched->sc_name) == 0)
+                        break;
+                psched = (pbs_sched *) GET_NEXT(psched->sc_link);
+        }
+        return (psched);
+}
+
+/**
+ * @brief find a scheduler
+ *
+ * @param[in]   partition -One of the partitions associated with the given scheduler
+ *
+ * @return      pbs_sched *
+ */
+
+pbs_sched *
+find_scheduler_by_partition(char *partition)
+{
+	int i;
+	pbs_sched *psched = NULL;
+
+        for (psched = (pbs_sched *) GET_NEXT(svr_allscheds); psched; psched = (pbs_sched *) GET_NEXT(psched->sc_link)) {
+        	if (psched->sch_attr[SCHED_ATR_partition].at_val.at_arst) {
+			for (i=0; i<psched->sch_attr[SCHED_ATR_partition].at_val.at_arst->as_usedptr; ++i) {
+				if (strcmp(partition, psched->sch_attr[SCHED_ATR_partition].at_val.at_arst->as_string[i]) == 0)
+					return psched;
+			}
+        	}
+	}
+
+	return NULL;
+
+}
+/*
+ * This function is used to copy the miscellaneous contents of scheduler that are not
+ * present in db to the the scheduler that is just recovered from db.
+ */
+void
+copy_sched_misc_not_in_db(pbs_sched *target, pbs_sched *src)
+{
+	if (target != NULL && src != NULL) {
+		target->pbs_scheduler_addr = src->pbs_scheduler_addr ;
+		target->pbs_scheduler_port = src->pbs_scheduler_port;
+		target->sch_next_schedule = src->sch_next_schedule;
+		target->scheduler_sock = src->scheduler_sock;
+		target->scheduler_sock2 = src->scheduler_sock2;
+	}
+}
+

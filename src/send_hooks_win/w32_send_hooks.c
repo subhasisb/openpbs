@@ -126,7 +126,7 @@ unsigned int	pbs_scheduler_port = 0;
 struct python_interpreter_data  svr_interp_data;
 
 struct server	server;		/* the server structure */
-struct pbs_sched	*dflt_scheduler;	/* the sched structure */
+volatile	struct pbs_sched	*dflt_scheduler;	/* the sched structure */
 char	        server_host[PBS_MAXHOSTNAME+1];	/* host_name  */
 char	        primary_host[PBS_MAXHOSTNAME+1]; /* host_name of primary */
 int		shutdown_who;		/* see req_shutdown() */

@@ -53,6 +53,7 @@
  *	- Return the status of sched objects.
  *
  * @param[in] c - communication handle
+ * @param[in] id - object id
  * @param[in] attrib - pointer to attribute list
  * @param[in] extend - extend string for encoding req
  *
@@ -63,7 +64,7 @@
  */
 
 struct batch_status *
-__pbs_statsched(int c, struct attrl *attrib, char *extend)
+__pbs_statsched(int c, char *id, struct attrl *attrib, char *extend)
 {
 	struct batch_status *ret = NULL;
 	int                  rc;
@@ -81,7 +82,7 @@ __pbs_statsched(int c, struct attrl *attrib, char *extend)
 	if (pbs_client_thread_lock_connection(c) != 0)
 		return NULL;
 
-	ret = PBSD_status(c, PBS_BATCH_StatusSched, "", attrib, extend);
+	ret = PBSD_status(c, PBS_BATCH_StatusSched, id, attrib, extend);
 
 	/* unlock the thread lock and update the thread context data */
 	if (pbs_client_thread_unlock_connection(c) != 0)

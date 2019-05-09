@@ -165,33 +165,23 @@ main(int argc, char *argv[])
 	if (strcmp(sched_name, "default") != 0) {
 		int pbs_sd;
 		struct batch_status *bs;
-		struct batch_status *cur_bs;
+		struct attrl *cur_attrl;
 		pbs_sd = pbs_connect(NULL);
 		if (pbs_sd < 0) {
 			fprintf(stderr, "Can't connect to the server\n");
 			exit(1);
 		}
-		bs = pbs_statsched(pbs_sd, NULL, NULL);
 
-		for (cur_bs = bs; cur_bs != NULL; cur_bs = cur_bs->next) {
-			if (strcmp(cur_bs->name, sched_name) == 0) {
-				struct attrl *cur_attrl;
-				for (cur_attrl = cur_bs->attribs; cur_attrl != NULL; cur_attrl = cur_attrl->next) {
-					if (strcmp(cur_attrl->name, ATTR_sched_priv) == 0) {
-						strncpy(path_buf, cur_attrl->value, sizeof(path_buf));
-						path_buf[sizeof(path_buf) - 1] = '\0';
-						break;
-					}
-				}
-				if (cur_attrl == NULL) {
-					fprintf(stderr, "Scheduler %s does not have its sched_priv set\n", sched_name);
-					exit(1);
-				}
+		bs = pbs_statsched(pbs_sd, sched_name, NULL, NULL);
+		for (cur_attrl = bs->attribs; cur_attrl != NULL; cur_attrl = cur_attrl->next) {
+			if (strcmp(cur_attrl->name, ATTR_sched_priv) == 0) {
+				strncpy(path_buf, cur_attrl->value, sizeof(path_buf));
+				path_buf[sizeof(path_buf) - 1] = '\0';
 				break;
 			}
 		}
-		if (cur_bs == NULL) {
-			fprintf(stderr, "Scheduler %s does not exist\n", sched_name);
+		if (cur_attrl == NULL) {
+			fprintf(stderr, "Scheduler %s does not have its sched_priv set\n", sched_name);
 			exit(1);
 		}
 		pbs_disconnect(pbs_sd);

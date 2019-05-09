@@ -880,6 +880,7 @@ req_stat_sched(struct batch_request *preq)
 {
 	svrattrl	   *pal;
 	struct batch_reply *preply;
+	int stat_reply = 0;
 	int rc = 0;
 	pbs_sched *psched;
 
@@ -889,25 +890,76 @@ req_stat_sched(struct batch_request *preq)
 	preply->brp_choice = BATCH_REPLY_CHOICE_Status;
 	CLEAR_HEAD(preply->brp_un.brp_status);
 
-	for (psched = (pbs_sched *) GET_NEXT(svr_allscheds);
-			(psched != NULL);
-			psched = (pbs_sched *) GET_NEXT(psched->sc_link)
-		) {
-		rc = status_sched(psched, preq, &preply->brp_un.brp_status);
-		if (rc != 0) {
-			break;
+	psched = NULL;
+	if(strlen(preq->rq_ind.rq_status.rq_id) != 0) {
+		psched = recov_sched_from_db(NULL,preq->rq_ind.rq_status.rq_id);
+		/*psched = find_scheduler(preq->rq_ind.rq_status.rq_id);*/
+		if(psched) {
+			if (strcmp(psched->sc_name, "default") == 0)
+				dflt_scheduler = psched;
+			stat_reply = status_sched(psched, preq, &preply->brp_un.brp_status);
+		} else {
+			req_reject(PBSE_UNKSCHED, 0, preq);
+			return;
 		}
+	} else {
+		pbs_db_obj_info_t obj;
+		pbs_db_sched_info_t dbsched;
+		int count;
+		pbs_db_conn_t *conn = (pbs_db_conn_t *) svr_db_conn;
+		void *state = NULL;
+		pbs_db_query_options_t qry_options = {0};
+
+
+		if (pbs_db_begin_trx(conn, 0, 0) != 0)
+			return;
+
+		obj.pbs_db_obj_type = PBS_DB_SCHED;
+		obj.pbs_db_un.pbs_db_sched = &dbsched;
+		qry_options.flags = 3;
+
+		state = pbs_db_cursor_init(conn, &obj, &qry_options);
+		if (state == NULL) {
+			snprintf(log_buffer, LOG_BUF_SIZE, "%s", (char *) conn->conn_db_err);
+			log_err(-1, __func__, log_buffer);
+			pbs_db_cursor_close(conn, state);
+			(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
+			return;
+		}
+
+		count = pbs_db_get_rowcount(state);
+		if (count > 0) {
+			 while ((rc = pbs_db_cursor_next(conn, state, &obj)) == 0) {
+				psched = recov_sched_from_db(NULL, dbsched.sched_name);
+				if(psched) {
+					if (strcmp(psched->sc_name, "default") == 0)
+						dflt_scheduler = psched;
+					if (pbs_conf.pbs_use_tcp == 0) {
+						/* check if throughput mode is visible in non-TPP mode, if so make it invisible */
+						psched->sch_attr[SCHED_ATR_throughput_mode].at_flags = 0;
+					}
+					stat_reply = status_sched(psched, preq, &preply->brp_un.brp_status);
+					if (stat_reply != 0)
+						break;
+				}
+				pbs_db_reset_obj(&obj);
+			 }
+		}
+                /* end the transaction */
+                 if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0)
+                         return;
+
 	}
 
-	if (!rc) {
+	if (!stat_reply) {
 		(void)reply_send(preq);
 	} else {
 		if (rc != PBSE_NOATTR)
-			req_reject(rc, 0, preq);
+			req_reject(stat_reply, 0, preq);
 		else {
 			pal = (svrattrl *)GET_NEXT(preq->rq_ind.
 				rq_status.rq_attr);
-			reply_badattr(rc, bad, pal, preq);
+			reply_badattr(stat_reply, bad, pal, preq);
 		}
 	}
 }

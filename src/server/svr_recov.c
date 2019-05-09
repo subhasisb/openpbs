@@ -91,7 +91,7 @@ extern char	*msg_svdbopen;
 extern char	*msg_svdbnosv;
 extern char	pbs_recov_filename[];
 
-extern pbs_sched *sched_alloc(char *sched_name);
+extern pbs_sched *sched_alloc(char *sched_name, int append);
 /**
  * @brief
  *		Recover server information and attributes from server database
@@ -601,7 +601,7 @@ sched_recov_fs(char *svrfile)
 
 	/* read in server attributes */
 	/* create default */
-	if((dflt_scheduler = sched_alloc(PBS_DFLT_SCHED_NAME))) {
+	if((dflt_scheduler = sched_alloc(PBS_DFLT_SCHED_NAME, 1))) {
 		if (recov_attr_fs(sdb, dflt_scheduler, sched_attr_def, dflt_scheduler->sch_attr,
 			(int)SCHED_ATR_LAST, 0) != 0) {
 			log_err(errno, __func__, "error on recovering sched attr");

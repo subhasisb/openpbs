@@ -101,6 +101,7 @@ typedef struct pbs_sched {
 	unsigned int pbs_scheduler_port;
 	time_t sch_next_schedule;		/* when to next run scheduler cycle */
 	char sc_name[PBS_MAXSCHEDNAME + 1];
+	time_t sch_svtime;
 	/* sched object's attributes  */
 	attribute sch_attr[SCHED_ATR_LAST];
 } pbs_sched;
@@ -112,6 +113,14 @@ extern void set_scheduler_flag(int flag, pbs_sched *psched);
 extern int find_assoc_sched_jid(char *jid, pbs_sched **target_sched);
 extern int find_assoc_sched_pque(pbs_queue *pq, pbs_sched **target_sched);
 extern pbs_sched *find_sched_from_sock(int sock);
+extern pbs_sched *recov_sched_from_db(char *partition,  char *sched_name);
+extern pbs_sched *sched_alloc(char *sched_name, int append);
+extern void sched_free(pbs_sched *psched);
+extern int db_to_svr_sched(struct pbs_sched *ps, pbs_db_sched_info_t *pdbsched);
+extern int sched_delete(pbs_sched *psched);
+extern pbs_sched * find_sched(char *sched_name);
+extern pbs_net_t pbs_scheduler_addr;
+extern unsigned int pbs_scheduler_port;
 
 #ifdef	__cplusplus
 }

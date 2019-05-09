@@ -140,7 +140,7 @@ extern	void unset_job_history_duration(void);
 extern	void unset_max_job_sequence_id(void);
 extern	void force_qsub_daemons_update(void);
 extern  void unset_node_fail_requeue(void);
-extern pbs_sched *sched_alloc(char *sched_name);
+extern pbs_sched *sched_alloc(char *sched_name, int append);
 extern pbs_sched *find_scheduler(char *sched_name);
 extern void sched_free(pbs_sched *psched);
 extern int sched_delete(pbs_sched *psched);
@@ -1704,7 +1704,7 @@ mgr_sched_set(struct batch_request *preq)
 	int	  rc;
 	pbs_sched *psched;
 
-	psched = find_scheduler(preq->rq_ind.rq_manager.rq_objname);
+	psched = find_sched(preq->rq_ind.rq_manager.rq_objname);
 	if (!psched) {
 		req_reject(PBSE_UNKSCHED, 0, preq);
 		return;
@@ -1744,7 +1744,7 @@ mgr_sched_unset(struct batch_request *preq)
 	int	  bad_attr = 0;
 	svrattrl *plist, *tmp_plist;
 	int	  rc;
-	pbs_sched *psched = find_scheduler(preq->rq_ind.rq_manager.rq_objname);
+	pbs_sched *psched = find_sched(preq->rq_ind.rq_manager.rq_objname);
 	if (!psched) {
 		req_reject(PBSE_UNKSCHED, 0, preq);
 		return;
@@ -3355,7 +3355,7 @@ mgr_sched_delete(struct batch_request *preq)
 			}
 		}
 	} else {
-		psched = find_scheduler(preq->rq_ind.rq_manager.rq_objname);
+		psched = find_sched(preq->rq_ind.rq_manager.rq_objname);
 		if (!psched) {
 			req_reject(PBSE_UNKSCHED, 0, preq);
 			return;
@@ -3652,12 +3652,12 @@ mgr_sched_create(struct batch_request *preq)
 		req_reject(PBSE_SCHED_NAME_BIG, 0, preq);
 		return;
 	}
-	if (find_scheduler(preq->rq_ind.rq_manager.rq_objname)) {
+	if (find_sched(preq->rq_ind.rq_manager.rq_objname)) {
 		req_reject(PBSE_SCHEDEXIST, 0, preq);
 		return;
 	}
 
-	psched = sched_alloc(preq->rq_ind.rq_manager.rq_objname);
+	psched = sched_alloc(preq->rq_ind.rq_manager.rq_objname, 1);
 	if (!psched)
 		req_reject(PBSE_SYSTEM, 0, preq);
 

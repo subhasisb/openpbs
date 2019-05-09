@@ -104,6 +104,29 @@ pg_db_prepare_sched_sqls(pbs_db_conn_t *conn)
 		return -1;
 
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select "
+			"sched_name, "
+			"extract(epoch from sched_savetm)::bigint as sched_savetm, "
+			"extract(epoch from sched_creattm)::bigint as sched_creattm, "
+			"hstore_to_array(attributes) as attributes "
+			"from "
+			"pbs.scheduler "
+			"where attributes->'partition.' like $1");
+	if (pg_prepare_stmt(conn, STMT_SELECT_SCHED_PARTITION, conn->conn_sql, 1) != 0)
+		return -1;
+
+
+	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select "
+			"sched_name, "
+			"extract(epoch from sched_savetm)::bigint as sched_savetm, "
+			"extract(epoch from sched_creattm)::bigint as sched_creattm, "
+			"hstore_to_array(attributes) as attributes "
+			"from "
+			"pbs.scheduler "
+			"where not exist(attributes, 'partition.')");
+	if (pg_prepare_stmt(conn, STMT_SELECT_DFLT_SCHED, conn->conn_sql, 1) != 0)
+		return -1;
+
+	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select "
 		"sched_name, "
 		"extract(epoch from sched_savetm)::bigint as sched_savetm, "
 		"extract(epoch from sched_creattm)::bigint as sched_creattm, "
@@ -201,8 +224,10 @@ load_sched(PGresult *res, pbs_db_sched_info_t *psch, int row)
 
 	GET_PARAM_BIGINT(res, row, db_savetm, sched_savetm_fnum);
 	if (psch->sched_savetm == db_savetm) {
-		/* data same as read last time, so no need to read any further, return success from here */
-		/* however since we loaded data from the database, the row is locked if a lock was requested */
+		/*
+		  data same as read last time, so no need to read any further, return success from here
+		  however since we loaded data from the database, the row is locked if a lock was requested
+		 */
 		return -2;
 	}
 	psch->sched_savetm = db_savetm; /* update the save timestamp */
@@ -237,10 +262,18 @@ pg_db_load_sched(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int lock)
 	int rc;
 	pbs_db_sched_info_t *psch = obj->pbs_db_un.pbs_db_sched;
 
-	SET_PARAM_STR(conn, psch->sched_name, 0);
-
-	if ((rc = pg_db_query(conn, STMT_SELECT_SCHED, 1, lock, &res)) != 0)
+	if ( psch->partition_name[0] != '\0') {
+		SET_PARAM_STR(conn, psch->partition_name, 0);
+		if ((rc = pg_db_query(conn, STMT_SELECT_SCHED_PARTITION, 1, 0, &res)) != 0)
+			return rc;
+	} else if (psch->sched_name[0] != '\0') {
+		SET_PARAM_STR(conn, psch->sched_name, 0);
+	if ((rc = pg_db_query(conn, STMT_SELECT_SCHED, 1, 0, &res)) != 0)
 		return -1;
+	} else {
+		if ((rc = pg_db_query(conn, STMT_SELECT_DFLT_SCHED, 0, 0, &res)) != 0)
+			return rc;
+	}
 
 	rc = load_sched(res, psch, 0);
 
@@ -271,13 +304,28 @@ pg_db_find_sched(pbs_db_conn_t *conn, void *st, pbs_db_obj_info_t *obj,
 	PGresult *res;
 	pg_query_state_t *state = (pg_query_state_t *) st;
 	int rc;
-	int params;
+	int params = 0;
 
 	if (!state)
 		return -1;
-	strncpy(conn->conn_sql, STMT_SELECT_SCHED_ALL, (MAX_SQL_LENGTH-1));
+
+	if ((opts != NULL) && (opts->flags == 0)) {
+		strncpy(conn->conn_sql, STMT_SELECT_DFLT_SCHED, (MAX_SQL_LENGTH-1));
+	} else if (opts->flags == 1) {
+		strncpy(conn->conn_sql, STMT_SELECT_SCHED_PARTITION, (MAX_SQL_LENGTH-1));
+		params = 1;
+		pbs_db_sched_info_t *psch = obj->pbs_db_un.pbs_db_sched;
+		SET_PARAM_STR(conn, psch->partition_name, 0);
+	} else if (opts->flags == 2) {
+		strncpy(conn->conn_sql, STMT_SELECT_SCHED, (MAX_SQL_LENGTH-1));
+		params = 1;
+		pbs_db_sched_info_t *psch = obj->pbs_db_un.pbs_db_sched;
+		SET_PARAM_STR(conn, psch->sched_name, 0);
+	} else if (opts->flags == 3) {
+		strncpy(conn->conn_sql, STMT_SELECT_SCHED_ALL, (MAX_SQL_LENGTH-1));
+	}
+
 	conn->conn_sql[MAX_SQL_LENGTH-1] = '\0';
-	params = 0;
 
 	if ((rc = pg_db_query(conn, conn->conn_sql, params, 0, &res)) != 0)
 		return rc;

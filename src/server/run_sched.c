@@ -68,6 +68,7 @@
 #include "pbs_sched.h"
 #include "queue.h"
 #include "pbs_share.h"
+#include "pbs_sched.h"
 
 
 /* Global Data */
@@ -91,6 +92,9 @@ int scheduler_sock2 = -1;
 int scheduler_jobs_stat = 0;	/* set to 1 once scheduler queried jobs in a cycle*/
 extern int svr_unsent_qrun_req;
 #define PRIORITY_CONNECTION 1
+
+pbs_net_t		pbs_scheduler_addr;
+unsigned int		pbs_scheduler_port;
 
 /**
  * @brief
@@ -206,30 +210,35 @@ find_assoc_sched_jid(char *jid, pbs_sched **target_sched)
 int
 find_assoc_sched_pque(pbs_queue *pq, pbs_sched **target_sched)
 {
-	pbs_sched *psched;
-
 	*target_sched = NULL;
 	if (pq == NULL)
 		return 0;
 
 	if (pq->qu_attr[QA_ATR_partition].at_flags & ATR_VFLAG_SET) {
-		attribute *part_attr;
-		for (psched = (pbs_sched*) GET_NEXT(svr_allscheds); psched; psched = (pbs_sched*) GET_NEXT(psched->sc_link)) {
-			part_attr = &(psched->sch_attr[SCHED_ATR_partition]);
-			if (part_attr->at_flags & ATR_VFLAG_SET) {
-				int k;
-				for (k = 0; k < part_attr->at_val.at_arst->as_usedptr; k++) {
-					if ((part_attr->at_val.at_arst->as_string[k] != NULL)
-							&& (!strcmp(part_attr->at_val.at_arst->as_string[k],
-									pq->qu_attr[QA_ATR_partition].at_val.at_str))) {
-						*target_sched = psched;
-						return 1;
-					}
-				}
-			}
+		*target_sched = recov_sched_from_db(pq->qu_attr[QA_ATR_partition].at_val.at_str, NULL);
+		if (*target_sched == NULL) {
+			/* if scheduler is not present in the database means one possibility is
+			 * somebody deleted it from another server so if this is the case then we need to
+			 * delete the scheduler from the cache also
+			 */
+			pbs_sched *old_sched;
+			old_sched = find_scheduler_by_partition(pq->qu_attr[QA_ATR_partition].at_val.at_str);
+			if (old_sched != NULL)
+				sched_free(old_sched);
+			return 0;
 		}
+		else
+			return 1;
 	} else {
-		*target_sched = dflt_scheduler;
+		dflt_scheduler = *target_sched = recov_sched_from_db(NULL, "default");
+		if (!dflt_scheduler) {
+			dflt_scheduler = sched_alloc(PBS_DFLT_SCHED_NAME, 1);
+			set_sched_default(dflt_scheduler, 0);
+			(void)sched_save_db(dflt_scheduler, SVR_SAVE_NEW);
+			*target_sched = dflt_scheduler;
+		}
+		dflt_scheduler->pbs_scheduler_addr = pbs_scheduler_addr;
+		dflt_scheduler->pbs_scheduler_port = pbs_scheduler_port;
 		return 1;
 	}
 	return 0;
@@ -359,6 +368,7 @@ schedule_high(pbs_sched *psched)
 	if (psched->scheduler_sock == -1) {
 		if ((s = contact_sched(psched->svr_do_sched_high, NULL, psched->pbs_scheduler_addr, psched->pbs_scheduler_port)) < 0) {
 			set_attr_svr(&(psched->sch_attr[(int) SCHED_ATR_sched_state]), &sched_attr_def[(int) SCHED_ATR_sched_state], SC_DOWN);
+			(void)sched_save_db(psched, SVR_SAVE_FULL);
 			return (-1);
 		}
 		set_sched_sock(s, psched);
@@ -371,6 +381,7 @@ schedule_high(pbs_sched *psched)
 	}
 
 	set_attr_svr(&(psched->sch_attr[(int) SCHED_ATR_sched_state]), &sched_attr_def[(int) SCHED_ATR_sched_state], SC_SCHEDULING);
+	(void)sched_save_db(psched, SVR_SAVE_FULL);
 
 	return 1;
 }
@@ -436,6 +447,7 @@ schedule_jobs(pbs_sched *psched)
 
 		if ((s = contact_sched(cmd, jid, psched->pbs_scheduler_addr, psched->pbs_scheduler_port)) < 0) {
 			set_attr_svr(&(psched->sch_attr[(int) SCHED_ATR_sched_state]), &sched_attr_def[(int) SCHED_ATR_sched_state], SC_DOWN);
+			(void)sched_save_db(psched, SVR_SAVE_FULL);
 			return (-1);
 		}
 		else if (pdefr != NULL)
@@ -448,6 +460,7 @@ schedule_jobs(pbs_sched *psched)
 		psched->svr_do_schedule = SCH_SCHEDULE_NULL;
 
 		set_attr_svr(&(psched->sch_attr[(int) SCHED_ATR_sched_state]), &sched_attr_def[(int) SCHED_ATR_sched_state], SC_SCHEDULING);
+		(void)sched_save_db(psched, SVR_SAVE_FULL);
 
 		first_time = 0;
 
@@ -499,6 +512,7 @@ scheduler_close(int sock)
 		return;
 
 	set_attr_svr(&(psched->sch_attr[(int) SCHED_ATR_sched_state]), &sched_attr_def[(int) SCHED_ATR_sched_state], SC_IDLE);
+	(void)sched_save_db(psched, SVR_SAVE_FULL);
 
 	if ((sock != -1) && (sock == psched->scheduler_sock2)) {
 		psched->scheduler_sock2 = -1;
@@ -621,3 +635,100 @@ set_scheduler_flag(int flag, pbs_sched *psched)
 	}
 
 }
+
+pbs_sched *
+recov_sched_from_db(char *partition, char *sched_name)
+{
+	int ret;
+	int append = 1;
+	pbs_db_sched_info_t dbsched;
+	pbs_db_obj_info_t obj;
+	pbs_sched *ps = NULL;
+	pbs_sched *old_sched = NULL;
+	char *sname = "new";
+	pbs_db_conn_t *conn = (pbs_db_conn_t *) svr_db_conn;
+
+	obj.pbs_db_obj_type = PBS_DB_SCHED;
+	obj.pbs_db_un.pbs_db_sched = &dbsched;
+
+
+	dbsched.partition_name[0] = '\0';
+	dbsched.sched_name[0] = '\0';
+
+	if (partition != NULL) {
+		snprintf(dbsched.partition_name, sizeof(dbsched.partition_name), "%%%s%%", partition);
+		old_sched = find_scheduler_by_partition(partition);
+		if (old_sched != NULL)
+			append = 0;
+	}
+	else if (sched_name != NULL) {
+		snprintf(dbsched.sched_name, sizeof(dbsched.sched_name), "%s", sched_name);
+		old_sched = find_scheduler(dbsched.sched_name);
+		if (old_sched != NULL)
+			append = 0;
+	}
+
+	if (old_sched) {
+		dbsched.sched_savetm = old_sched->sch_svtime;
+	} else {
+		dbsched.sched_savetm = 0;
+	}
+
+	/* recover sched */
+	ret = pbs_db_load_obj(conn, &obj, 0);
+
+	if ((ret == -2) || (ret != 0)) {
+		goto db_err;
+	}
+
+	ps = sched_alloc(sname, append);  /* allocate & init sched structure space */
+	if (ps == NULL) {
+		log_err(-1, "sched_recov", "sched_alloc failed");
+		goto db_err;
+	}
+
+	if (db_to_svr_sched(ps, &dbsched) != 0)
+		goto db_err;
+
+	pbs_db_reset_obj(&obj);
+
+	/* all done recovering the sched */
+	if (append == 0) {
+		if (ps != NULL) {
+			copy_sched_misc_not_in_db(ps, old_sched);
+			sched_free(old_sched);
+			CLEAR_LINK(ps->sc_link);
+			append_link(&svr_allscheds, &ps->sc_link, ps);
+		}
+	}
+	return (ps);
+
+db_err:
+	if (ps)
+		free(ps);
+	return old_sched;
+}
+
+/**
+ * @brief
+ *	Load a database scheduler object from the scheduler object in server
+ *
+ * @param[out] ps - Address of the scheduler in pbs server
+ * @param[in]  pdbsched  - Address of the database scheduler object
+ *
+ */
+int
+db_to_svr_sched(struct pbs_sched *ps, pbs_db_sched_info_t *pdbsched)
+{
+	/* Following code is for the time being only */
+	strcpy(ps->sc_name, pdbsched->sched_name);
+	ps->sch_svtime = pdbsched->sched_savetm;
+	/* since we dont need the sched_name and sched_sv_name free here */
+	if ((decode_attr_db(ps, &pdbsched->attr_list, sched_attr_def,
+		ps->sch_attr,
+		(int) SCHED_ATR_LAST, 0)) != 0)
+		return -1;
+
+	return 0;
+}
+

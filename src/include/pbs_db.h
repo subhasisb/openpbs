@@ -241,6 +241,7 @@ typedef struct pbs_db_svr_info pbs_db_svr_info_t;
  */
 struct pbs_db_sched_info {
 	char    sched_name[PBS_MAXSCHEDNAME+1];
+	char    partition_name[PBS_MAXSCHEDNAME+1];
 	BIGINT  sched_creattm;
 	BIGINT  sched_savetm;
 	pbs_db_attr_list_t attr_list; /* list of attributes */

@@ -470,6 +470,7 @@ svr_enquejob(job *pjob)
 				else {
 					sprintf(log_buffer, "Unable to reach scheduler associated with job %s", pjob->ji_qs.ji_jobid);
 					log_err(-1, __func__, log_buffer);
+				return PBSE_UNKSCHED;
 				}
 			}
 		} else if (server.sv_attr[SRV_ATR_EligibleTimeEnable].at_val.at_long &&
