@@ -174,7 +174,7 @@ query_server(status *pol, int pbs_sd)
 {
 	struct batch_status *server;	/* info about the server */
 	struct batch_status *sched;	/* info about the this scheduler object */
-	struct batch_status *bs_resvs = NULL;	/* batch status of the reservations */
+	struct batch_status *bs_resvs;	/* batch status of the reservations */
 	server_info *sinfo;		/* scheduler internal form of server info */
 	queue_info **qinfo;		/* array of queues on the server */
 	counts *cts;			/* used to count running per user/grp */
@@ -257,6 +257,8 @@ query_server(status *pol, int pbs_sd)
 	 */
 	if (dflt_sched)
 		bs_resvs = stat_resvs(pbs_sd);
+	else
+		bs_resvs = NULL;
 
 	if (bs_resvs  == NULL && pbs_errno != 0) {
 		pbs_statfree(server);
@@ -270,6 +272,7 @@ query_server(status *pol, int pbs_sd)
 		pbs_statfree(server);
 		sinfo->fairshare = NULL;
 		free_server(sinfo, 0);
+		pbs_statfree(bs_resvs);
 		return NULL;
 	}
 
@@ -283,6 +286,7 @@ query_server(status *pol, int pbs_sd)
 		pbs_statfree(server);
 		sinfo->fairshare = NULL;
 		free_server(sinfo, 0);
+		pbs_statfree(bs_resvs);
 		return NULL;
 	}
 
@@ -324,13 +328,15 @@ query_server(status *pol, int pbs_sd)
 			if (ret_val == 0) {
 				sinfo->fairshare = NULL;
 				free_server(sinfo, 1);
+				pbs_statfree(bs_resvs);
 				return NULL;
 			}
 		}
 	}
-	
+
 	/* get reservations, if any - NOTE: will set sinfo -> num_resvs */
 	sinfo->resvs = query_reservations(sinfo, bs_resvs);
+	pbs_statfree(bs_resvs);
 
 	if (create_server_arrays(sinfo) == 0) { /* bad stuff happened */
 		sinfo->fairshare = NULL;
