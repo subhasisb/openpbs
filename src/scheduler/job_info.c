@@ -4861,7 +4861,7 @@ preemption_similarity(resource_resv *hjob, resource_resv *pjob, schd_error *full
 			case INSUFFICIENT_QUEUE_RESOURCE:
 				if (hjob->job->queue == pjob->job->queue) {
 					for (res = hjob->job->queue->qres; res != NULL; res = res->next) {
-						if (res->avail != SCHD_INFINITY)
+						if (res->avail != SCHD_INFINITY_RES)
 							if (find_resource_req(pjob->resreq, res->def) != NULL)
 								match = 1;
 					}
@@ -4869,7 +4869,7 @@ preemption_similarity(resource_resv *hjob, resource_resv *pjob, schd_error *full
 				break;
 			case INSUFFICIENT_SERVER_RESOURCE:
 				for (res = hjob->server->res; res != NULL; res = res->next) {
-					if (res->avail != SCHD_INFINITY)
+					if (res->avail != SCHD_INFINITY_RES)
 						if (find_resource_req(pjob->resreq, res->def) != NULL)
 							match = 1;
 				}
