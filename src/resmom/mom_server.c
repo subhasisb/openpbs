@@ -386,8 +386,8 @@ reply_hello4(int stream)
 
 	}
 
-	rpp_flush(stream);
-	return;
+	if (rpp_flush(stream) == 0)
+		return;
 
 err:
 	sprintf(log_buffer, "%s for %s", dis_emsg[ret], "HELLO");
@@ -759,7 +759,7 @@ is_request(int stream, int version)
 
 	switch (command) {
 
-		case IS_NULL:		/* a ping from the server */
+		case IS_NULL:		/* a reply from the server */
 			DBPRT(("%s: IS_NULL\n", __func__))
 
 			/*
@@ -779,6 +779,7 @@ is_request(int stream, int version)
 			/*
 			 ** rpp_retry can be zero, i.e. no retries.
 			 */
+			DBPRT(("rpp_retry: %d: rpp_highwater:%d\n", new_retry, new_water))
 			if (new_retry >= 0 && rpp_retry != new_retry) {
 				sprintf(log_buffer, "rpp_retry changed from %d to %d",
 					rpp_retry, new_retry);
@@ -799,7 +800,7 @@ is_request(int stream, int version)
 					LOG_DEBUG, msg_daemonname, log_buffer);
 				rpp_highwater = new_water;
 			}
-			break;
+		/* fall into IS_HELLO */
 
 		case IS_HELLO:		/* server wants a return greeting (HELLO) */
 			DBPRT(("%s: IS_HELLO, state=0x%x stream=%d\n", __func__,
@@ -814,7 +815,6 @@ is_request(int stream, int version)
 			 * Note, the HELLO2 means the Server is ver 8.0 or higher and
 			 * does "vnodes".
 			 */
-			server_stream = stream;		/* save stream to server */
 			next_sample_time = min_check_poll;
 			reply_hello4(stream);
 			internal_state_update = UPDATE_MOM_STATE;
@@ -822,12 +822,12 @@ is_request(int stream, int version)
 			sprintf(log_buffer, "Hello from server at %s", netaddr(addr));
 			log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER,  LOG_DEBUG,
 				msg_daemonname, log_buffer);
+
 			break;
 
 		case IS_HELLO_NO_INVENTORY:
 			DBPRT(("%s: IS_HELLO_NO_INVENTORY, state=0x%x stream=%d\n", __func__,
 				internal_state, stream))
-			server_stream = stream;         /* save stream to server */
 			next_sample_time = min_check_poll;
 			reply_hello4(stream);
 			internal_state_update = UPDATE_MOM_STATE;
@@ -1411,84 +1411,15 @@ state_to_server(int what_to_update)
 	if (ret != DIS_SUCCESS)
 		goto err;
 
-	rpp_flush(server_stream);
-	internal_state_update = 0;
-	return;
+	if (rpp_flush(server_stream) == 0) {
+		internal_state_update = 0;
+		return;
+	}
 
 err:
 	log_err(errno, "state_to_server", (char *)dis_emsg[ret]);
 	rpp_close(server_stream);
 	server_stream = -1;
-}
-
-/**
- * @brief
- * 	register_withserver() - send info about this Mom to the Server.
- *
- * @return Void
- *
- */
-void
-register_with_server(void)
-{
-	int			i, ret;
-	extern const char *dis_emsg[];
-	char			*pv;
-
-	if (server_stream < 0)
-		return;
-
-	if (av_phy_mem == 0)
-		av_phy_mem = strTouL(physmem(0), &pv, 10);
-
-	i = internal_state & MOM_STATE_MASK;
-	if (internal_state & (MOM_STATE_BUSYKB | MOM_STATE_INBYKB))
-		i |= MOM_STATE_BUSY;
-	if (cycle_harvester == 1)
-		i |= MOM_STATE_CONF_HARVEST;
-
-	DBPRT(("updating state 0x%x to server\n", i))
-	ret = is_compose(server_stream, IS_REGISTERMOM);
-	if (ret != DIS_SUCCESS)
-		goto err;
-
-	ret = diswst(server_stream, mom_short_name); /* short host name */
-	if (ret != DIS_SUCCESS)
-		goto err;
-	ret = diswui(server_stream, pbs_mom_port);   /* mom's port */
-	if (ret != DIS_SUCCESS)
-		goto err;
-	ret = diswui(server_stream, i);		/* node state */
-	if (ret != DIS_SUCCESS)
-		goto err;
-	ret = diswsi(server_stream, num_pcpus); /* phy cpus */
-	if (ret != DIS_SUCCESS)
-		goto err;
-	ret = diswsi(server_stream, num_acpus); /* avail cpus */
-	if (ret != DIS_SUCCESS)
-		goto err;
-	ret = diswull(server_stream, av_phy_mem); /* phy mem */
-	if (ret != DIS_SUCCESS)
-		goto err;
-	ret = diswst(server_stream, arch(0));	/* arch type */
-	if (ret != DIS_SUCCESS)
-		goto err;
-	ret = diswui(server_stream, 0); /* license type in Bubo no longer */
-	/* makes sense as licenses apply  */
-	/* to jobs instead of nodes.      */
-	/* Passing a dummy 0 to prevent   */
-	/* breakage of protocol.	  */
-	if (ret != DIS_SUCCESS)
-		goto err;
-	rpp_flush(server_stream);
-
-	return;
-
-err:
-	log_err(errno, "register_with_server", (char *)dis_emsg[ret]);
-	rpp_close(server_stream);
-	server_stream = -1;
-	return;
 }
 
 /**

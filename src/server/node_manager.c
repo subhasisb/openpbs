@@ -51,7 +51,6 @@
  * 	node_down_requeue()
  * 	post_discard_job()
  * 	momptr_down()
- * 	ping_a_mom()
  * 	set_vnode_state()
  * 	vnode_available()
  * 	vnode_unavailable()
@@ -360,10 +359,53 @@ tinsert2(const u_long key1, const u_long key2, mominfo_t *momp, struct tree **ro
 }
 
 /**
+ * @brief 
+ * send IS_NULL to mom along with rpp_retry and rpp_highwater
+ * values.
+ *
+ * @param[in] pmom - pointer to mom
+ *
+ */
+static void
+reply_hellosvr(mominfo_t *pmom)
+{
+	mom_svrinfo_t *psvrmom = (mom_svrinfo_t *)(pmom->mi_data);
+	struct	sockaddr_in	*addr;
+	int	ret;
+
+	ret = is_compose(psvrmom->msr_stream, IS_NULL);
+	if (ret != DIS_SUCCESS)
+		goto err;
+
+	/*
+	** Send rpp_retry and rpp_highwater values with IS_NULL.
+	** Old versions of MOM will ignore extra data.
+	*/
+	ret = diswsi(psvrmom->msr_stream, rpp_retry);
+	if (ret != DIS_SUCCESS)
+		goto err;
+	ret = diswsi(psvrmom->msr_stream, rpp_highwater);
+	if (ret != DIS_SUCCESS)
+		goto err;
+
+	if (rpp_flush(psvrmom->msr_stream) != 0)
+		goto err;
+
+	return;
+
+	ret = DIS_NOCOMMIT;
+
+err:
+	addr = rpp_getaddr(psvrmom->msr_stream);
+	snprintf(log_buffer, sizeof(log_buffer), "%s %d to %s(%s)",
+		dis_emsg[ret], errno, pmom->mi_host, netaddr(addr));
+	log_err(-1, __func__, log_buffer);
+	stream_eof(psvrmom->msr_stream, ret, "ping no ack");
+}
+
+/**
  * @brief
  *  	delete node with given key
- * @see
- * 		ping_a_mom
  *
  * @param[in]	key1	-	key to be located
  * @param[in]	key2	-	key to be located
@@ -932,7 +974,7 @@ momptr_down(mominfo_t *pmom, char *why)
 	int		 setwktask = 0;
 	int		 is_provisioning = 0;
 
-	psvrmom->msr_state |= (INUSE_DOWN | INUSE_NEEDS_HELLO_PING);
+	psvrmom->msr_state |= INUSE_DOWN;
 
 	/* log message if node just down or been down for an hour */
 	/* mark mom down and vnodes down as well                  */
@@ -953,7 +995,7 @@ momptr_down(mominfo_t *pmom, char *why)
 #ifndef NAS /* localmod 023 */
 	/* do not display 'node down' msg and comment */
 	if (is_provisioning) {
-		set_all_state(pmom, 1, INUSE_DOWN | INUSE_NEEDS_HELLO_PING, NULL,
+		set_all_state(pmom, 1, INUSE_DOWN, NULL,
 			Set_All_State_Regardless);
 	} else {
 #endif /* localmod 023 */
@@ -967,7 +1009,7 @@ momptr_down(mominfo_t *pmom, char *why)
 		log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_NODE,
 			LOG_ALERT, pmom->mi_host, log_buffer);
 
-		set_all_state(pmom, 1, INUSE_DOWN | INUSE_NEEDS_HELLO_PING, log_buffer,
+		set_all_state(pmom, 1, INUSE_DOWN, log_buffer,
 			Set_ALL_State_All_Down);
 #ifndef NAS /* localmod 023 */
 	}
@@ -1081,341 +1123,6 @@ send_ip_addrs_to_mom(int stream)
 			return (ret);
 	}
 	return (rpp_flush(stream));
-}
-
-/**
- * @brief Find out whether a mom needs a ping, and if so,
- * 		which message to send (IS_HELLO, or IS_NULL)
- *
- * @param[in] pmom - pointer to mom to ping
- * @param[in] force_hello - Whether to force a hello sequence with the mom
- * 			The force_hello flag will only be set in the case of RESTART
- * @param[in] once - Whether it is a one shot ping which is done when a new device registers with comm
- *                   In this case a new ping series is not create, but just a single ping done
- *
- * @return - The msg to send to the mom
- * @retval  IS_HELLO - mom needs a hello message
- * @retval  IS_HELLO_NO_INVENTORY - mom needs a hello message telling
- * 		her not to report her inventory
- * @retval  IS_NULL  - mom has established communications, send only a heartbeat (IS_NULL)
- * @retval  -1       - mom does not need to be sent any ping messages yet
- *
- */
-static int
-mom_ping_need(mominfo_t *pmom, int force_hello, int once)
-{
-	mom_svrinfo_t   *psvrmom = (mom_svrinfo_t *)(pmom->mi_data);
-	struct pbsnode  *np;
-	struct pbssubn  *snp;
-	int             do_ping = 0;
-	int             nchild;
-	int             com;
-
-	if (psvrmom->msr_state & INUSE_INIT) {
-		/* Mom has been sent IS_HOST_TO_VNODE */
-		/* Ignore her until she replies or it times out      */
-
-		if (time_now < (psvrmom->msr_timeinit + 2 * svr_ping_rate))
-			return -1; /* no ping/hello now */
-
-		/* too old, reset to send HELLO */
-		set_all_state(pmom, 0, INUSE_INIT, NULL, Set_ALL_State_All_Down);
-		set_all_state(pmom, 1, INUSE_NEEDS_HELLO_PING, NULL,
-			Set_ALL_State_All_Down);
-		log_event(PBSEVENT_DEBUG, PBS_EVENTCLASS_NODE, LOG_NOTICE,
-			pmom->mi_host, "Node failed to reply to vnode map update");
-	}
-
-	/* Query each vnode associated to the Mom */
-	for (nchild = 0; (nchild < psvrmom->msr_numvnds) && (do_ping==0); ++nchild) {
-		np = psvrmom->msr_children[nchild];
-		if (np->nd_state & (INUSE_OFFLINE|INUSE_OFFLINE_BY_MOM)) {
-			if (force_hello) {
-				/* In the case where a mom is marked as "offline" */
-				/* and there was a restart (causing force_hello to */
-				/* be set), set do_ping to 1 so that we cause the */
-				/* server to ping the offline mom to see if her */
-				/* state has changed */
-				do_ping =1;
-			} else {
-				/* ping as long as there are still jobs running */
-				/* on the node */
-				for (snp=np->nd_psn; snp; snp=snp->next) {
-					if (snp->jobs) {
-						do_ping = 1;
-						break;
-					}
-				}
-			}
-		} else {
-			do_ping = 1;
-		}
-
-		if (np->nd_state & INUSE_UNRESOLVABLE)
-			do_ping = 0; /* never ping if state is unreachable */
-	}
-
-	if (do_ping == 0) {
-		/* no jobs on offline node, don't ping */
-		psvrmom->msr_state |= INUSE_NEEDS_HELLO_PING;
-		return -1;
-	}
-
-	if (psvrmom->msr_stream < 0) {
-		unsigned int port;
-
-		port = pmom->mi_rmport;
-		if ((psvrmom->msr_state & INUSE_DOWN) == 0)
-			momptr_down(pmom, "ping no stream");
-		psvrmom->msr_stream = rpp_open(pmom->mi_host, port);
-		if (psvrmom->msr_stream == -1) {
-			sprintf(log_buffer, "rpp_open to %s, port %u",
-				pmom->mi_host, port);
-			log_err(errno, __func__, log_buffer);
-			return -1;
-		}
-		com = IS_HELLO;
-#ifdef NAS /* localmod 005 */
-		tinsert2((u_long)psvrmom->msr_stream, 0ul, pmom, &streams);
-#else
-		tinsert2((u_long)psvrmom->msr_stream, 0, pmom, &streams);
-#endif /* localmod 005 */
-	} else {
-		if (once) {
-			/* in case of one shot ping, don't ping recently pinged devices */
-			DBPRT(("%s: time_now = %lu, timepinged=%lu, ping_nodes_rate=%d, difference=%lu\n",
-				__func__, (unsigned long)time_now,
-				(unsigned long)psvrmom->msr_timepinged, ping_nodes_rate,
-				(unsigned long)(time_now - psvrmom->msr_timepinged)))
-			if (time_now - psvrmom->msr_timepinged < ping_nodes_rate) {
-				DBPRT(("%s: **** NOT PINGING ***\n", __func__))
-				return -1; /* skip this mom since it was pinged recently. This is to avoid a DOS attack */
-			}
-		}
-		com = IS_NULL;
-	}
-
-	DBPRT(("%s: **** ping %s on port %u, comm=%s\n", __func__, pmom->mi_host, pmom->mi_port, (com == IS_HELLO)? "IS_HELLO":"IS_NULL"));
-
-	if (psvrmom->msr_state & INUSE_NEEDS_HELLO_PING)
-		com = IS_HELLO;
-	else if (psvrmom->msr_state & INUSE_NEED_ADDRS) {
-		/* just need to send IP_CLUSTER_ADDRS2 */
-		if (send_ip_addrs_to_mom(psvrmom->msr_stream) != DIS_SUCCESS) {
-			sprintf(log_buffer, "Unable to send IP addresses on stream %d",
-				psvrmom->msr_stream);
-			log_err(-1, __func__, log_buffer);
-		}
-		psvrmom->msr_stream &= ~INUSE_NEED_ADDRS;
-	}
-
-	if (com == IS_HELLO) {
-		/* know that a HELLO is needed, but with or without inventory? */
-		if (psvrmom->msr_vnode_pool != 0) {
-			vnpool_mom_t *ppool;
-
-			ppool = find_vnode_pool(pmom);
-			if (ppool != NULL) {
-				/* We found the vnode_pool matching this mom.
-				 * Now check if she's the inventory_mom
-				 */
-				if (ppool->vnpm_inventory_mom != pmom) {
-					/* not the "one" Mom that sends inventory */
-					com = IS_HELLO_NO_INVENTORY;
-				}
-			}
-		}
-	}
-
-	psvrmom->msr_timepinged = time_now; /* record the time when it was last pinged */
-	return com;
-}
-
-/**
- * @brief ping a single mom.
- *
- * @param[in] pmom - pointer to mom to ping
- * @param[in] force_hello - Whether to force a hello sequence with the mom
- * 			The force_hello flag will only be set in the case of RESTART
- * @param[in] once - one shot ping?
- *
- */
-static void
-ping_a_mom(mominfo_t *pmom, int force_hello, int once)
-{
-	mom_svrinfo_t *psvrmom = (mom_svrinfo_t *)(pmom->mi_data);
-	struct	sockaddr_in	*addr;
-	int	ret;
-	int	com;
-
-	com = mom_ping_need(pmom, force_hello, once);
-	if (com == -1)
-		return; /* this mom does not need a ping */
-
-	ret = is_compose(psvrmom->msr_stream, com);
-	if (ret != DIS_SUCCESS)
-		goto err;
-
-	if (com == IS_NULL) {
-		/*
-		 ** Send rpp_retry and rpp_highwater values with IS_NULL.
-		 ** Old versions of MOM will ignore extra data.
-		 */
-		ret = diswsi(psvrmom->msr_stream, rpp_retry);
-		if (ret != DIS_SUCCESS)
-			goto err;
-		ret = diswsi(psvrmom->msr_stream, rpp_highwater);
-		if (ret != DIS_SUCCESS)
-			goto err;
-	}
-
-	if (rpp_flush(psvrmom->msr_stream) == 0) {
-
-		if (pbs_conf.pbs_use_tcp == 1) {
-			/*
-			 * If the message later fails to be delivered, with TPP, the network is deemed broken,
-			 * and the stream would automatically get closed and everything will start afresh.
-			 * It is therefore okay for us to reset INUSE_NEEDS_HELLO_PING here.
-			 *
-			 */
-			if (com == IS_HELLO) {
-				/* reset the INUSE_NEEDS_HELLO_PING, so we don't send repeated hellos */
-				psvrmom->msr_state &= ~INUSE_NEEDS_HELLO_PING;
-			}
-		}
-
-		return;
-	}
-	ret = DIS_NOCOMMIT;
-
-err:
-	addr = rpp_getaddr(psvrmom->msr_stream);
-	snprintf(log_buffer, sizeof(log_buffer), "%s %d to %s(%s)",
-		dis_emsg[ret], errno, pmom->mi_host, netaddr(addr));
-	log_err(-1, __func__, log_buffer);
-
-	stream_eof(psvrmom->msr_stream, ret, "ping no ack");
-}
-
-/**
- * @brief In case of TPP multicast mode, this function flushes the data to be sent out
- * 	to all the moms that are determined to be part of the mcast message
- *
- * @param[in] mtfd - The TPP multicast channel to flush
- * @param[in] com  - The message (IS_HELLO, IS_NULL) to be sent
- *
- */
-static void
-ping_flush_mcast(int mtfd, int com)
-{
-	int                  ret;
-	int                  *strms;
-	int                  count;
-	int                  i;
-	mominfo_t            *pmom;
-	mom_svrinfo_t        *psvrmom;
-	struct	sockaddr_in  *addr;
-
-	ret = is_compose(mtfd, com);
-	if (ret != DIS_SUCCESS)
-		goto err;
-
-	if (com == IS_NULL) {
-		/*
-		 ** Send rpp_retry and rpp_highwater values with IS_NULL.
-		 ** Old versions of MOM will ignore extra data.
-		 */
-		ret = diswsi(mtfd, rpp_retry);
-		if (ret != DIS_SUCCESS)
-			goto err;
-		ret = diswsi(mtfd, rpp_highwater);
-		if (ret != DIS_SUCCESS)
-			goto err;
-	}
-
-	if (rpp_flush(mtfd) == 0) {
-		/*
-		 * If the message later fails to be delivered, with TPP, the network is deemed broken,
-		 * and the stream would automatically get closed and everything will start afresh.
-		 * It is therefore okay for us to reset INUSE_NEEDS_HELLO_PING here.
-		 *
-		 */
-		if (com == IS_HELLO) {
-			strms = tpp_mcast_members(mtfd, &count);
-			/* reset the INUSE_NEEDS_HELLO_PING, so we don't send repeated hellos */
-			for(i = 0; i < count; i++) {
-				if ((pmom = tfind2((u_long) strms[i], 0, &streams))) {
-					psvrmom = (mom_svrinfo_t *) (pmom->mi_data);
-					psvrmom->msr_state &= ~INUSE_NEEDS_HELLO_PING;
-				}
-			}
-		}
-		return;
-	}
-	ret = DIS_NOCOMMIT;
-
-err:
-	strms = tpp_mcast_members(mtfd, &count);
-	/* reset the INUSE_NEEDS_HELLO_PING, so we don't send repeated hellos */
-	for(i = 0; i < count; i++) {
-		if ((pmom = tfind2((u_long) strms[i], 0, &streams))) {
-			psvrmom = (mom_svrinfo_t *) (pmom->mi_data);
-			psvrmom->msr_state &= ~INUSE_NEEDS_HELLO_PING;
-			/* find the respective mom from the stream */
-			addr = rpp_getaddr(psvrmom->msr_stream);
-			snprintf(log_buffer, sizeof(log_buffer), "%s %d to %s(%s)",
-				dis_emsg[ret], errno, pmom->mi_host, netaddr(addr));
-			log_err(-1, __func__, log_buffer);
-
-			stream_eof(psvrmom->msr_stream, ret, "ping no ack");
-		}
-	}
-}
-
-/**
- * @brief The TPP multicast version of ping_a_mom
- *
- * This is not used when its known that a single mom will be pinged.
- * This is only used from the periodic ping_nodes which typically sends
- * a ping message to a lot of moms.
- *
- * @param[in] pmom - The mom to ping
- * @param[in] force_hello - Whether to force a HELLO message to this mom
- * @param[in] mtfd_ishello - The TPP channel to add moms as members for those that need IS_HELLO
- * @param[in] mtfd_isnull  - The TPP channel to add moms as members for those that need IS_NULL
- * @param[in] mtfd_ishello_no_inv - The TPP channel to add moms as members for
- *		those that need IS_HELLO_NO_INVENTORY
- * @param[in] once         - One shot ping?
- *
- * @see ping_nodes
- * @see ping_flush_mcast
- *
- */
-static void
-ping_a_mom_mcast(mominfo_t *pmom, int force_hello, int mtfd_ishello, int mtfd_isnull, int mtfd_ishello_no_inv, int once)
-{
-	mom_svrinfo_t *psvrmom = (mom_svrinfo_t *)(pmom->mi_data);
-	int rc;
-	int com;
-
-	com = mom_ping_need(pmom, force_hello, once);
-	if (com == -1)
-		return; /* this mom does not need a ping */
-
-	if (com == IS_NULL)
-		rc = tpp_mcast_add_strm(mtfd_isnull, psvrmom->msr_stream);
-	else if (com == IS_HELLO_NO_INVENTORY)
-		rc = tpp_mcast_add_strm(mtfd_ishello_no_inv, psvrmom->msr_stream);
-	else
-		rc = tpp_mcast_add_strm(mtfd_ishello, psvrmom->msr_stream);
-
-	if (rc == -1) {
-		snprintf(log_buffer, sizeof(log_buffer),
-				 "Failed to add mom at %s:%d to ping mcast", pmom->mi_host, pmom->mi_port);
-		log_err(-1, __func__, log_buffer);
-		rpp_close(psvrmom->msr_stream);
-		psvrmom->msr_stream = -1;
-	}
 }
 
 /**
@@ -3219,8 +2926,7 @@ stream_eof(int stream, int ret, char *msg)
 		((mom_svrinfo_t *)(mp->mi_data))->msr_stream = -1;
 
 		/* Since stream is now closed, reset the intermediate
-		 * state INUSE_INIT. This would allow ping_a_mom
-		 * to be functional
+		 * state INUSE_INIT.
 		 */
 		((mom_svrinfo_t *) (mp->mi_data))->msr_state &= ~INUSE_INIT;
 
@@ -3266,96 +2972,13 @@ mark_nodes_unknown(int all)
 				psvrmom->msr_stream = -1;
 
 				/* Since stream is being closed, reset the intermediate
-				 * state INUSE_INIT. This would allow ping_a_mom
-				 * to be functional
+				 * state INUSE_INIT.
 				 */
 				psvrmom->msr_state &= ~INUSE_INIT;
-				psvrmom->msr_state |= INUSE_NEEDS_HELLO_PING | INUSE_UNKNOWN | INUSE_MARKEDDOWN;
+				psvrmom->msr_state |= INUSE_UNKNOWN | INUSE_MARKEDDOWN;
 			}
 		}
 	}
-}
-
-/**
- * @brief
- * 		Send a ping to any node that is in an unknown stat.
- * @par
- *		If wt_parm1 is NULL, set up a worktask to ping again.
- *
- * @param[in]	ptask	-	work task structure.
- *
- * @return	void
- */
-void
-ping_nodes(struct work_task *ptask)
-{
-	int	i;
-	int	once = 0;
-
-	DBPRT(("%s: entered\n", __func__))
-
-	if (!ptask)
-		once = 1; /* not main ping series, just an one shot ping for any new devices */
-
-	if (pbs_conf.pbs_use_tcp == 1) {
-		/*
-		 * If this is configured to talk TCP, then do the
-		 * ping functionality only if tpp_network_up global variable
-		 * to 1. This is set to 1 at pbsd_main by the TPP router connection
-		 * established handler
-		 */
-		if (tpp_network_up == 1) {
-			int mtfd_ishello;
-			int mtfd_isnull;
-			int mtfd_ishello_no_inv;
-
-			/* open the tpp mcast channel here */
-			if ((mtfd_ishello = tpp_mcast_open()) == -1) {
-				log_err(-1, __func__, "Failed to open TPP mcast channel for mom pings");
-				return;
-			}
-
-			/* open the tpp mcast channel here */
-			if ((mtfd_isnull = tpp_mcast_open()) == -1) {
-				tpp_mcast_close(mtfd_ishello);
-				log_err(-1, __func__, "Failed to open TPP mcast channel for mom pings");
-				return;
-			}
-
-			/* open the tpp mcast channel here */
-			if ((mtfd_ishello_no_inv = tpp_mcast_open()) == -1) {
-				tpp_mcast_close(mtfd_ishello);
-				tpp_mcast_close(mtfd_isnull);
-				log_err(-1, __func__, "Failed to open TPP mcast channel for mom pings");
-				return;
-			}
-
-			for (i=0; i<mominfo_array_size; i++) {
-				if (mominfo_array[i]) {
-					ping_a_mom_mcast(mominfo_array[i], 0,
-						mtfd_ishello, mtfd_isnull,
-						mtfd_ishello_no_inv, once);
-				}
-			}
-
-			ping_flush_mcast(mtfd_ishello, IS_HELLO);
-			ping_flush_mcast(mtfd_ishello_no_inv, IS_HELLO_NO_INVENTORY);
-			ping_flush_mcast(mtfd_isnull, IS_NULL);
-
-			tpp_mcast_close(mtfd_ishello);
-			tpp_mcast_close(mtfd_isnull);
-			tpp_mcast_close(mtfd_ishello_no_inv);
-		}
-	} else {
-		for (i = 0; i < mominfo_array_size; i++) {
-			if (mominfo_array[i]) {
-				ping_a_mom(mominfo_array[i], 0, once);
-			}
-		}
-	}
-
-	if (ptask != NULL)
-		global_ping_task = set_task(WORK_Timed, time_now + ping_nodes_rate, ping_nodes, NULL);
 }
 
 /**
@@ -4522,7 +4145,7 @@ is_request(int stream, int version)
 	mom_svrinfo_t		*psvrmom;
 	int			 s;
 	int			 stm;
-	char			restartmsg[]="Mom restarted on host";
+	char			hellosvrmsg[]="Mom sent hellosvr on host";
 	char			*val;
 	unsigned long		 oldstate;
 	vnl_t			*vnlp;			/* vnode list */
@@ -4556,18 +4179,18 @@ is_request(int stream, int version)
 	if (ret != DIS_SUCCESS)
 		goto badcon;
 
-	if (command == IS_RESTART) {
+	if (command == IS_HELLOSVR) {
 		port = disrui(stream, &ret);
 		if (ret != DIS_SUCCESS)
 			goto badcon;
 
-		DBPRT(("%s: IS_RESTART port %lu\n", __func__, port))
+		DBPRT(("%s: IS_HELLOSVR port %lu\n", __func__, port))
 
 		if ((pmom = tfind2(ipaddr, port, &ipaddrs)) == NULL)
 			goto badcon;
 
 		log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_NODE,
-			LOG_NOTICE, pmom->mi_host, restartmsg);
+			LOG_NOTICE, pmom->mi_host, hellosvrmsg);
 
 		stm = ((mom_svrinfo_t *)(pmom->mi_data))->msr_stream;
 		if (stm >= 0) {
@@ -4581,8 +4204,7 @@ is_request(int stream, int version)
 			tdelete2((u_long)stm, 0, &streams);
 #endif /* localmod 005 */
 		}
-		((mom_svrinfo_t *)(pmom->mi_data))->msr_state |=
-			INUSE_NEEDS_HELLO_PING|INUSE_UNKNOWN;
+		((mom_svrinfo_t *)(pmom->mi_data))->msr_state |= INUSE_UNKNOWN;
 
 		if (((mom_svrinfo_t *)(pmom->mi_data))->msr_vnode_pool != 0) {
 			/*
@@ -4604,13 +4226,17 @@ is_request(int stream, int version)
 			}
 		}
 
-		/* do not need to tdelete2() this stream, it was never inserted */
-		rpp_close(stream);
-
-		((mom_svrinfo_t *)(pmom->mi_data))->msr_stream = -1;
+		/* we save this stream for future communications */
+		((mom_svrinfo_t *)(pmom->mi_data))->msr_stream = stream;
 		((mom_svrinfo_t *)(pmom->mi_data))->msr_state &= ~INUSE_INIT;
+#ifdef NAS /* localmod 005 */
+		tinsert2((u_long)stream, 0ul, pmom, &streams);
+#else
+		tinsert2((u_long)stream, 0, pmom, &streams);
+#endif /* localmod 005 */
 
-		ping_a_mom(pmom, 1, 0);
+		rpp_eom(stream);
+		reply_hellosvr(pmom);
 		return;
 
 	} else {
@@ -4640,14 +4266,6 @@ found:
 			DBPRT(("%s: IS_NULL\n", __func__))
 			break;
 
-		case IS_HELLO:
-			/* Old, pre 8.0, reply from Mom */
-			set_all_state(pmom, 0,
-				INUSE_DOWN|INUSE_UNKNOWN|INUSE_NEEDS_HELLO_PING,
-				NULL, Set_All_State_Regardless);
-			psvrmom->msr_timedown = 0;
-			log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_NODE,
-				LOG_NOTICE, pmom->mi_host, node_up);
 			/* fall into HELLO2, HELLO3 case */
 		case IS_HELLO2:
 		case IS_HELLO3:
@@ -4671,8 +4289,7 @@ found:
 			/* and set initializing and the time		     */
 
 			set_all_state(pmom, 0,
-				INUSE_UNKNOWN|INUSE_NEEDS_HELLO_PING|
-				INUSE_NEED_ADDRS, NULL,
+				INUSE_UNKNOWN|INUSE_NEED_ADDRS, NULL,
 				Set_All_State_Regardless);
 			set_all_state(pmom, 1, INUSE_DOWN|INUSE_INIT, NULL,
 				Set_ALL_State_All_Down);
@@ -4720,18 +4337,6 @@ found:
 			ret = send_ip_addrs_to_mom(stream);
 			if (ret != DIS_SUCCESS)
 				goto err;
-
-			if (command == IS_HELLO) {
-				/* pre-8.0 Mom - should delete this in a release or 2 */
-				set_all_state(pmom, 0, INUSE_DOWN|INUSE_UNKNOWN|
-					INUSE_NEEDS_HELLO_PING|INUSE_INIT|
-					INUSE_NEED_ADDRS,
-					NULL, Set_All_State_Regardless);
-				psvrmom->msr_timedown = 0;
-				psvrmom->msr_timeinit = 0;
-				log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_NODE,
-					LOG_NOTICE, pmom->mi_host, node_up);
-			}
 
 			break;
 
@@ -5172,8 +4777,7 @@ found:
 				psvrmom->msr_state &= ~INUSE_MARKEDDOWN;
 
 			set_all_state(pmom, 0, INUSE_DOWN|INUSE_UNKNOWN|
-				INUSE_NEEDS_HELLO_PING|INUSE_INIT|
-				INUSE_NEED_ADDRS,
+				INUSE_INIT|INUSE_NEED_ADDRS,
 				NULL, Set_All_State_Regardless);
 
 			/* log a node up message only if it was not marked
@@ -8503,42 +8107,6 @@ degrade_downed_nodes_reservations(void)
 			vnode_unavailable(pn, 0);
 		}
 	}
-}
-
-/**
- * @brief
- * 		Process a Restart message from a Mom via TCP
- *		Finds the Mom by name and kills any existing RPP stream to her.
- *		Sets the Mom state to unknown and needs a hello ping.
- *
- * @param[in]	preq - pointer to batch request of restart request from Mom
- *
- * @returns	void
- */
-void
-req_momrestart(struct batch_request *preq)
-{
-	mominfo_t *pmom;
-	int        stm;
-
-	pmom = find_mom_entry(preq->rq_host, preq->rq_ind.rq_momrestart.rq_port);
-	if (pmom == NULL) {
-		DBPRT(("Restart from unknown Mom %s (%s) port %d\n", preq->rq_ind.rq_momrestart.rq_momhost, preq->rq_host, preq->rq_ind.rq_momrestart.rq_port))
-		req_reject(PBSE_UNKNODE, 0, preq);
-		return;
-	}
-	DBPRT(("Restart from Mom %s port %d\n", preq->rq_host, preq->rq_ind.rq_momrestart.rq_port))
-	stm = ((mom_svrinfo_t *)(pmom->mi_data))->msr_stream;
-	if (stm != -1) {
-		rpp_destroy(stm);
-		tdelete2((u_long)stm, 0, &streams);
-		((mom_svrinfo_t *)(pmom->mi_data))->msr_stream = -1;
-	}
-	((mom_svrinfo_t *)(pmom->mi_data))->msr_state &= ~INUSE_INIT;
-	((mom_svrinfo_t *)(pmom->mi_data))->msr_state |=
-		INUSE_NEEDS_HELLO_PING | INUSE_UNKNOWN;
-	reply_ack(preq);
-	ping_a_mom(pmom, 1, 0);
 }
 
 /**

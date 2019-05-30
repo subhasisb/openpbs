@@ -83,8 +83,8 @@ typedef unsigned long pbs_net_t;        /* for holding host addresses */
 #define	IM_PROTOCOL_VER	6	/* inter-mom protocol version number */
 #define	IM_OLD_PROTOCOL_VER 5	/* inter-mom old protocol version number */
 
-#define	IS_PROTOCOL	4	/* inter-server protocol number */
-#define	IS_PROTOCOL_VER	3	/* inter-server protocol version number */
+#define	IS_PROTOCOL	5	/* inter-server protocol number */
+#define	IS_PROTOCOL_VER	1	/* inter-server protocol version number */
 
 
 /*
@@ -97,7 +97,7 @@ typedef unsigned long pbs_net_t;        /* for holding host addresses */
 #define IS_RESCUSED		4
 #define IS_JOBOBIT		5
 #define IS_BADOBIT		6
-#define IS_RESTART		7
+#define IS_RESTART		7	/* Deprecated */
 #define IS_SHUTDOWN		8
 #define IS_IDLE			9
 #define IS_ACKOBIT		10
@@ -123,6 +123,7 @@ typedef unsigned long pbs_net_t;        /* for holding host addresses */
 #define IS_HOOK_CHECKSUMS		 30 /* mom reports about hooks seen */
 #define IS_HELLO_NO_INVENTORY	31 /* send info about the mom node only */
 #define IS_UPDATE_FROM_HOOK2	32 /* request to update vnodes from a hook running on a parent mom host or an allowed non-parent mom host */
+#define IS_HELLOSVR		33 /* hello send to server from mom to initiate a hello sequence */
 
 #define IS_CMD          40
 #define IS_CMD_REPLY    41

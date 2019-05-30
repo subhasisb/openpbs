@@ -310,7 +310,6 @@ enum	part_flags { PART_refig, PART_add, PART_rmv };
 #define INUSE_JOBEXCL	 0x40	/* Node is used by one job (exclusive)	*/
 #define	INUSE_BUSY	 0x80	/* Node is busy (high loadave)		*/
 #define INUSE_UNKNOWN	 0x100	/* Node has not been heard from yet	*/
-#define INUSE_NEEDS_HELLO_PING	0x200	/* Fresh hello sequence needs to be initiated */
 #define INUSE_INIT	 0x400	/* Node getting vnode map info		*/
 #define INUSE_PROV	 0x800	/* Node is being provisioned		*/
 #define INUSE_WAIT_PROV	 0x1000	/* Node is being provisioned		*/
@@ -513,9 +512,6 @@ extern void		destroy_vmap(void *);
 extern mominfo_t	*find_vmapent_byID(void *, const char *);
 extern int		add_vmapent_byID(void *, const char *, void *);
 
-#ifdef	_WORK_TASK_H
-extern  void ping_nodes(struct work_task *);
-#endif	/* _WORK_TASK_H */
 #ifdef	__cplusplus
 }
 #endif

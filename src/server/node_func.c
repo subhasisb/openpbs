@@ -786,8 +786,7 @@ effective_node_delete(struct pbsnode *pnode)
  * @brief
  *	setup_notification -  Sets up the  mechanism for notifying
  *	other members of the server's node pool that a new node was added
- *	manually via qmgr.  Actual notification occurs some time later through
- *	the ping_nodes mechanism.
+ *	manually via qmgr.
  *	The IS_CLUSTER_ADDRS2 message is only sent to the existing Moms.
  * @see
  * 		mgr_node_create

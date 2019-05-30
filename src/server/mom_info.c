@@ -364,7 +364,7 @@ create_svrmom_entry(char *hostname, unsigned int port, unsigned long *pul)
 		return NULL;
 	}
 
-	psvrmom->msr_state =INUSE_UNKNOWN | INUSE_NEEDS_HELLO_PING | INUSE_DOWN;
+	psvrmom->msr_state =INUSE_UNKNOWN | INUSE_DOWN;
 	psvrmom->msr_pcpus = 0;
 	psvrmom->msr_acpus = 0;
 	psvrmom->msr_pmem  = 0;
