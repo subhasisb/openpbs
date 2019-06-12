@@ -92,7 +92,7 @@ typedef unsigned long pbs_net_t;        /* for holding host addresses */
  */
 #define	IS_NULL			0
 #define	IS_HELLO		1
-#define	IS_CLUSTER_ADDRS	2
+#define	IS_CLUSTER_ADDRS	2	/* Deprecated */
 #define IS_UPDATE		3
 #define IS_RESCUSED		4
 #define IS_JOBOBIT		5
@@ -114,7 +114,8 @@ typedef unsigned long pbs_net_t;        /* for holding host addresses */
 #define IS_HELLO4		20
 #define IS_DISCARD_DONE		21
 #define IS_HPCBP_ATTRIBUTES	22 	/* Deprecated */
-#define	IS_CLUSTER_ADDRS2	23
+#define	IS_CLUSTER_ADDRS2	23	/* Deprecated */
+#define IS_REGISTERMOM		13
 #define IS_UPDATE_FROM_HOOK	24 /* request to update vnodes from a hook running on parent mom host */
 #define IS_RESCUSED_FROM_HOOK	25 /* request from child mom for a hook */
 #define IS_HOOK_JOB_ACTION      26 /* request from hook to delete/requeue job */

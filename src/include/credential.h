@@ -52,18 +52,6 @@ extern "C" {
  *
  */
 
-/*
- * a full ticket (credential) as passed from the client to the server
- * is of the following size: 8 for the pbs_iff key + 8 for the timestamp +
- * space for user and host name rounded up to multiple of 8 which is the
- * sub-credential size
- */
-#define PBS_KEY_SIZE	 8
-#define PBS_TIMESTAMP_SZ 8
-#define PBS_SUBCRED_SIZE ((PBS_MAXUSER + PBS_MAXHOSTNAME + 7) / 8 * 8)
-#define PBS_SEALED_SIZE (PBS_SUBCRED_SIZE + PBS_TIMESTAMP_SZ)
-#define PBS_TICKET_SIZE (PBS_KEY_SIZE + PBS_SEALED_SIZE)
-
 #define CREDENTIAL_LIFETIME  1800
 #define CREDENTIAL_TIME_DELTA 300
 #ifdef	__cplusplus

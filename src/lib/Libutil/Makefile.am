@@ -51,7 +51,6 @@ libutil_a_SOURCES = \
 	work_task.c \
 	entlim.c \
 	daemon_protect.c \
-	pbs_array_list.c \
 	pbs_secrets.c \
-	pbs_aes_encrypt.c \
+	pbs_crypto.c \
 	munge_supp.c

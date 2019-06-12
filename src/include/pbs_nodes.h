@@ -58,7 +58,6 @@ extern pbs_db_conn_t	*svr_db_conn;
 #endif
 
 
-#include "pbs_array_list.h"
 #include "hook.h"
 #include "hook_func.h"
 
@@ -320,9 +319,8 @@ enum	part_flags { PART_refig, PART_add, PART_rmv };
 #define INUSE_RESVEXCL	0x2000	/* Node is exclusive to a reservation	*/
 #define INUSE_OFFLINE_BY_MOM 0x4000 /* Node is offlined by mom */
 #define INUSE_MARKEDDOWN 0x8000 /* TPP layer marked node down */
-#define INUSE_NEED_ADDRS	0x10000	/* Needs to be sent IP addrs */
-#define INUSE_MAINTENANCE	0x20000 /* Node has a job in the admin suspended state */
-#define INUSE_SLEEP             0x40000 /* Node is sleeping */
+#define INUSE_MAINTENANCE	0x10000 /* Node has a job in the admin suspended state */
+#define INUSE_SLEEP             0x20000 /* Node is sleeping */
 
 #define VNODE_AVAILABLE (INUSE_FREE | INUSE_JOB | INUSE_JOBEXCL | \
 			 INUSE_RESVEXCL | INUSE_BUSY)
@@ -416,7 +414,6 @@ extern int svr_totnodes;                     /* number of nodes (hosts) */
 extern struct tree *ipaddrs;
 extern struct tree *streams;
 extern mominfo_t **mominfo_array;
-extern pntPBS_IP_LIST pbs_iplist;
 extern int mominfo_array_size;
 extern int mom_send_vnode_map;
 extern int svr_num_moms;
@@ -438,7 +435,6 @@ extern	int	initialize_pbsnode(struct pbsnode*, char*, int);
 extern	void	initialize_pbssubn(struct pbsnode *, struct pbssubn*, struct prop*);
 extern  struct pbssubn *create_subnode(struct pbsnode *, struct pbssubn *lstsn);
 extern	void	effective_node_delete(struct pbsnode*);
-extern	void	setup_notification(void);
 extern  struct	pbssubn  *find_subnodebyname(char *);
 extern	struct	pbsnode  *find_nodebyname(char *);
 extern	struct	pbsnode  *find_nodebyaddr(pbs_net_t);
@@ -497,7 +493,7 @@ extern int add_mom_to_pool(mominfo_t *);
 extern void remove_mom_from_pool(mominfo_t *);
 extern void reset_pool_inventory_mom(mominfo_t *);
 extern vnpool_mom_t *find_vnode_pool(mominfo_t *pmom);
-extern int  send_ip_addrs_to_mom(int);
+extern int  send_pbs_key_to_mom(int);
 #endif
 
 extern  int	   recover_vmap(void);
@@ -511,6 +507,7 @@ extern int		create_vmap(void **);
 extern void		destroy_vmap(void *);
 extern mominfo_t	*find_vmapent_byID(void *, const char *);
 extern int		add_vmapent_byID(void *, const char *, void *);
+extern char 		*read_pbs_key(void);
 
 #ifdef	__cplusplus
 }

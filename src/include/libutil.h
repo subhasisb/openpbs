@@ -297,6 +297,8 @@ int get_my_index();
 long long get_next_hash(long long curr, long long max_id);
 long long get_last_hash(long long njobid);
 int get_server_shard(char * shard_hint);
+int sha256(char *string, char *outputBuffer);
+
 
 #ifdef  __cplusplus
 }

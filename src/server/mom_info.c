@@ -627,3 +627,51 @@ add_mom_data(const char *vnid, void *data)
 	return NULL;
 }
 #endif  /* PBS_MOM */
+
+/**
+ * @brief
+ *		Reading PBS key from server_priv.
+ *
+ * @return	PBS Key
+ * @retval	NULL	- Failure
+ *
+ */
+char *
+read_pbs_key()
+{
+	char key_file[MAXPATHLEN + 1];
+	FILE *fp;
+
+#ifndef PBS_MOM
+	sprintf(key_file, "%s/server_priv/pbs.key", pbs_conf.pbs_home_path);
+#else
+	sprintf(key_file, "%s/mom_priv/pbs.key", pbs_conf.pbs_home_path);
+#endif
+	if (access( key_file, F_OK ) == -1 ) {
+		sprintf(log_buffer, "file: [%s] does not exist!", key_file);
+		log_event(PBSEVENT_ADMIN, PBS_EVENTCLASS_SERVER,
+				LOG_ALERT, msg_daemonname, log_buffer);
+		return NULL;
+	}
+
+	if ((fp = fopen(key_file, "r")) != NULL) {
+		char *buf = NULL;
+		char *ret = NULL;
+		int len = 0;
+		ret = pbs_fgets(&buf, &len, fp);
+		if (ret == NULL) {
+			sprintf(log_buffer, "EOF while reading: [%s]",
+				key_file);
+			log_event(PBSEVENT_ADMIN, PBS_EVENTCLASS_SERVER,
+					LOG_ALERT, msg_daemonname, log_buffer);
+			return NULL;
+		}
+		return ret;
+	} else {
+		sprintf(log_buffer, "fopen failed for: [%s], errno: [%d]",
+				key_file, errno);
+		log_event(PBSEVENT_ADMIN, PBS_EVENTCLASS_SERVER,
+				LOG_ALERT, msg_daemonname, log_buffer);
+	}
+	return NULL;
+}

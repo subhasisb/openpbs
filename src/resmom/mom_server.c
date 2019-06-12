@@ -697,8 +697,6 @@ err:
 void
 is_request(int stream, int version)
 {
-	u_long			ipdepth = 0;
-	u_long			counter = 0;
 	int			command = 0;
 	int			i;
 	int			n;
@@ -823,38 +821,11 @@ is_request(int stream, int version)
 			log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER,  LOG_DEBUG,
 				msg_daemonname, log_buffer);
 
-			break;
+			enable_exechost2 = 1;
 
-		case IS_HELLO_NO_INVENTORY:
-			DBPRT(("%s: IS_HELLO_NO_INVENTORY, state=0x%x stream=%d\n", __func__,
-				internal_state, stream))
-			next_sample_time = min_check_poll;
-			reply_hello4(stream);
-			internal_state_update = UPDATE_MOM_STATE;
-			state_to_server(UPDATE_MOM_ONLY);
-			sprintf(log_buffer, "Hello (no inventory required) from server at %s", netaddr(addr));
-			log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER,  LOG_DEBUG,
-				msg_daemonname, log_buffer);
-			break;
-
-		case IS_CLUSTER_ADDRS:
-			DBPRT(("%s: IS_CLUSTER_ADDRS\n", __func__))
-			enable_exechost2 = 0;
-			for (;;) {
-				ipaddr = disrul(stream, &ret);
-				if (ret != DIS_SUCCESS)
-					break;
-				DBPRT(("%s:\t%ld.%ld.%ld.%ld\n", __func__,
-					(ipaddr & 0xff000000) >> 24,
-					(ipaddr & 0x00ff0000) >> 16,
-					(ipaddr & 0x0000ff00) >> 8,
-					(ipaddr & 0x000000ff)))
-				addrinsert(ipaddr);
-			}
-			if (ret != DIS_EOD)
-				goto err;
 			is_compose(stream, IS_MOM_READY);  /* tell server we're ready */
 			rpp_flush(stream);
+
 			if (send_hook_checksums() != DIS_SUCCESS)
 				goto err;
 			/* send any unacknowledged hook job and vnl action requests */
@@ -872,29 +843,19 @@ is_request(int stream, int version)
 			mom_recvd_ip_cluster_addrs = 1;
 			break;
 
-		case IS_CLUSTER_ADDRS2:
-			DBPRT(("%s: IS_CLUSTER_ADDRS2\n", __func__))
+		case IS_HELLO_NO_INVENTORY:
+			DBPRT(("%s: IS_HELLO_NO_INVENTORY, state=0x%x stream=%d\n", __func__,
+				internal_state, stream))
+			next_sample_time = min_check_poll;
+			reply_hello4(stream);
+			internal_state_update = UPDATE_MOM_STATE;
+			state_to_server(UPDATE_MOM_ONLY);
+			sprintf(log_buffer, "Hello (no inventory required) from server at %s", netaddr(addr));
+			log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER,  LOG_DEBUG,
+				msg_daemonname, log_buffer);
+
 			enable_exechost2 = 1;
-			for (;;) {
-				ipaddr = disrul(stream, &ret);
-				if (ret != DIS_SUCCESS)
-					break;
-				ipdepth = disrul(stream, &ret);
-				if (ret != DIS_SUCCESS)
-					break;
-				counter = ipaddr;
-				while (counter <= ipaddr + ipdepth) {
-					DBPRT(("%s:\t%ld.%ld.%ld.%ld", __func__,
-						(counter & 0xff000000) >> 24,
-						(counter & 0x00ff0000) >> 16,
-						(counter & 0x0000ff00) >> 8,
-						(counter & 0x000000ff)))
-					addrinsert(counter++);
-					DBPRT((" %lu\n", ipdepth))
-				}
-			}
-			if (ret != DIS_EOD)
-				goto err;
+
 			is_compose(stream, IS_MOM_READY);  /* tell server we're ready */
 			rpp_flush(stream);
 

@@ -305,6 +305,7 @@ long		joinjob_alarm_time = -1;
 long		job_launch_delay  = -1;	/* # of seconds to delay job launch due to pipe reads (pipe read timeout)  */
 int		update_joinjob_alarm_time = 0;
 int		update_job_launch_delay = 0;
+char		*pbs_key;
 
 #ifdef NAS /* localmod 015 */
 unsigned long	spoolsize = 0; /* default spoolsize = unlimited */
@@ -8036,7 +8037,7 @@ log_tppmsg(int level, const char *objname, char *mess)
 		snprintf(id, sizeof(id), "%s(Thread %d)", (objname != NULL) ? objname : msg_daemonname, thrd_index);
 
 	log_event(etype, PBS_EVENTCLASS_TPP, level, id, mess);
-	DBPRT(("%s\n", mess));
+	DBPRT(("%s\n", mess))
 }
 
 /*
@@ -8872,6 +8873,11 @@ main(int argc, char *argv[])
 		if (g_ssHandle != 0) SetServiceStatus(g_ssHandle, &ss);
 #endif	/* WIN32 */
 		return (1);
+	}
+
+	
+	if ((pbs_key = (read_pbs_key())) == NULL) {
+	//	return 1; we need to return here
 	}
 
 #if	MOM_CSA || MOM_ALPS /* ALPS needs libjob support */

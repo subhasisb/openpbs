@@ -870,7 +870,7 @@ log_tppmsg(int level, const char *objname, char *mess)
 		snprintf(id, sizeof(id), "%s(Thread %d)", (objname != NULL) ? objname : msg_daemonname, thrd_index);
 
 	log_event(etype, PBS_EVENTCLASS_TPP, level, id, mess);
-	DBPRT(("mess: %s\n", mess));
+	DBPRT(("%s\n", mess));
 }
 
 DWORD WINAPI

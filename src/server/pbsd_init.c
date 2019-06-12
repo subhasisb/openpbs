@@ -187,6 +187,7 @@ extern pbs_list_head svr_alljobs;
 extern pbs_list_head svr_allresvs;
 extern pbs_list_head task_list_event;
 extern time_t	 time_now;
+extern char	*pbs_key;
 
 extern struct server server;
 extern struct attribute attr_jobscript_max_size;
@@ -338,6 +339,7 @@ init_server_attrs()
 		}
 	}
 }
+
 
 /**
  * @brief
@@ -806,6 +808,10 @@ pbsd_init(int type)
 		server.sv_attr[(int)SRV_ATR_scheduling].at_flags |=
 			ATR_VFLAG_SET|ATR_VFLAG_MODCACHE;
 	}
+
+	if ((pbs_key = (read_pbs_key())) == NULL) {
+	//	return -1; we need to return here
+ 	}
 
 	/*
 	 * 8A. If not a "create" initialization, recover queues.

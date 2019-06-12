@@ -215,6 +215,7 @@ extern char *msg_noloopbackif;
 extern char *msg_job_end_stat;
 extern char *msg_daemonname;
 extern char *msg_new_inventory_mom;
+extern char *pbs_key;
 extern pbs_list_head	svr_allhooks;
 
 extern void is_vnode_prov_done(char *); /* for provisioning */
@@ -260,7 +261,6 @@ extern long node_fail_requeue;
 struct	tree	*ipaddrs = NULL;	/* tree of ip addrs */
 struct	tree	*streams = NULL;	/* tree of stream numbers */
 
-extern pntPBS_IP_LIST pbs_iplist;
 
 static int
 comp_keys(u_long key1, u_long key2, struct tree *pt)
@@ -1085,45 +1085,6 @@ momptr_down(mominfo_t *pmom, char *why)
 	return;
 }
 
-/**
- * @brief Send the IS_CLUSTER_ADDRS2 message to Mom so she has the
- *      latest list of IP addresses of the all the Moms in the complex.
- *
- * @param[in] stream - the open stream to the Mom
- *
- * @return int
- * @retval DIS_SUCCESS (0) for success
- * @retval != 0 otherwise.
- */
-int
-send_ip_addrs_to_mom(int stream)
-{
-	int		j;
-	int		ret;
-
-	ret = is_compose(stream, IS_CLUSTER_ADDRS2);
-	if (ret != DIS_SUCCESS)
-		return (ret);
-	for (j = 0; j < pbs_iplist->li_nrowsused; j++) {
-#ifdef DEBUG
-		unsigned long	ipaddr;
-		ipaddr = IPLIST_GET_LOW(pbs_iplist, j);
-		DBPRT(("%s: ip %d\t%ld.%ld.%ld.%ld\n", __func__, j,
-			(ipaddr & 0xff000000) >> 24,
-			(ipaddr & 0x00ff0000) >> 16,
-			(ipaddr & 0x0000ff00) >> 8,
-			(ipaddr & 0x000000ff)))
-#endif	/* DEBUG */
-		DBPRT(("%s: depth %ld\n", __func__, (long)IPLIST_GET_HIGH(pbs_iplist, j)))
-		ret = diswul(stream, IPLIST_GET_LOW(pbs_iplist, j));
-		if (ret != DIS_SUCCESS)
-			return (ret);
-		ret = diswul(stream, IPLIST_GET_HIGH(pbs_iplist, j));
-		if (ret != DIS_SUCCESS)
-			return (ret);
-	}
-	return (rpp_flush(stream));
-}
 
 /**
  * @brief
@@ -4289,7 +4250,7 @@ found:
 			/* and set initializing and the time		     */
 
 			set_all_state(pmom, 0,
-				INUSE_UNKNOWN|INUSE_NEED_ADDRS, NULL,
+				INUSE_UNKNOWN, NULL,
 				Set_All_State_Regardless);
 			set_all_state(pmom, 1, INUSE_DOWN|INUSE_INIT, NULL,
 				Set_ALL_State_All_Down);
@@ -4326,18 +4287,6 @@ found:
 				/* validate jobs Mom reported against what I have */
 				mom_running_jobs(stream);
 			}
-			/*
-			 * respond to HELLO from Mom by sending her optional vmap and
-			 * all addresses of all Moms
-			 */
-
-			/* Send the Mom addresses		    */
-			/* Mom will respond when she receives these */
-
-			ret = send_ip_addrs_to_mom(stream);
-			if (ret != DIS_SUCCESS)
-				goto err;
-
 			break;
 
 		case IS_UPDATE:
@@ -4776,8 +4725,7 @@ found:
 			if (psvrmom->msr_state & INUSE_MARKEDDOWN)
 				psvrmom->msr_state &= ~INUSE_MARKEDDOWN;
 
-			set_all_state(pmom, 0, INUSE_DOWN|INUSE_UNKNOWN|
-				INUSE_INIT|INUSE_NEED_ADDRS,
+			set_all_state(pmom, 0, INUSE_DOWN|INUSE_UNKNOWN|INUSE_INIT,
 				NULL, Set_All_State_Regardless);
 
 			/* log a node up message only if it was not marked

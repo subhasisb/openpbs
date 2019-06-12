@@ -57,8 +57,6 @@
  * 	initialize_pbsnode() 	-   performs node initialization on a new node
  * 	effective_node_delete() -  effectively deletes a node from the server's node
  *								list by setting the node's "deleted" bit
- * 	setup_notification() 	-   sets mechanism for notifying other hosts about a new
- *								host
  * 	process_host_name_part()- processes hostname part of a batch request into a
  *								prop structure, host's IP addresses into an array, and node
  *								node type (cluster/time-shared) into an int variable
@@ -698,7 +696,7 @@ free_pnode(struct pbsnode *pnode)
 void
 effective_node_delete(struct pbsnode *pnode)
 {
-	int		 i, j;
+	int		 i;
 	struct pbssubn  *psubn;
 	struct pbssubn  *pnxt;
 	mom_svrinfo_t	*psvrmom;
@@ -742,12 +740,6 @@ effective_node_delete(struct pbsnode *pnode)
 			/* Then remove this MoM from any other vnode she manages */
 			remove_mom_from_vnodes(pnode->nd_moms[0]);
 
-			/* then delete the Mom */
-			for (j=0; psvrmom->msr_addrs[j]; j++) {
-				u_long	ipaddr = psvrmom->msr_addrs[j];
-				if (ipaddr)
-					delete_iplist_element(pbs_iplist, ipaddr);
-			}
 			delete_svrmom_entry(pnode->nd_moms[0]);
 			pnode->nd_moms[0] = NULL; /* since we deleted the mom */
 		} else {
@@ -780,36 +772,6 @@ effective_node_delete(struct pbsnode *pnode)
 	free_pnode(pnode);
 	if (socket_released)
 		license_more_nodes();
-}
-
-/**
- * @brief
- *	setup_notification -  Sets up the  mechanism for notifying
- *	other members of the server's node pool that a new node was added
- *	manually via qmgr.
- *	The IS_CLUSTER_ADDRS2 message is only sent to the existing Moms.
- * @see
- * 		mgr_node_create
- *
- * @return	void
- */
-void
-setup_notification()
-{
-	int	i;
-	int	nmom;
-
-	for (i=0; i<svr_totnodes; i++) {
-		if (pbsndlist[i]->nd_state & INUSE_DELETED)
-			continue;
-
-		set_vnode_state(pbsndlist[i], INUSE_DOWN, Nd_State_Or);
-		pbsndlist[i]->nd_attr[(int)ND_ATR_state].at_flags |= ATR_VFLAG_MODCACHE;
-		for (nmom = 0; nmom < pbsndlist[i]->nd_nummoms; ++nmom) {
-			((mom_svrinfo_t *)(pbsndlist[i]->nd_moms[nmom]->mi_data))->msr_state |= INUSE_NEED_ADDRS;
-			((mom_svrinfo_t *)(pbsndlist[i]->nd_moms[nmom]->mi_data))->msr_timepinged = 0;
-		}
-	}
 }
 
 
@@ -2804,6 +2766,7 @@ action_node_partition(attribute *pattr, void *pobj, int actmode)
 	if (pnode->nd_attr[(int)ND_ATR_Queue].at_flags & ATR_VFLAG_SET) {
 		pq = find_queuebyname(pnode->nd_attr[(int)ND_ATR_Queue].at_val.at_str, 0);
 		if (pq == 0)
+
 			return PBSE_UNKQUE;
 		if (pq->qu_attr[QA_ATR_partition].at_flags & ATR_VFLAG_SET &&
 				pattr->at_flags & ATR_VFLAG_SET) {

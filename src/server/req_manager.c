@@ -124,7 +124,6 @@
 #define PERM_OPorMGR (ATR_DFLAG_MGWR | ATR_DFLAG_MGRD | ATR_DFLAG_OPRD | ATR_DFLAG_OPWR)
 
 struct work_task *global_ping_task = NULL;
-pntPBS_IP_LIST pbs_iplist = NULL;
 
 AVL_IX_DESC *node_tree = NULL;
 AVL_IX_DESC *hostaddr_tree = NULL;
@@ -2963,7 +2962,6 @@ create_pbs_node2(char *objname, svrattrl *plist, int perms, int *bad, struct pbs
 	char		*pname;		/* node name w/o any :ts       */
 	u_long		*pul;		/* 0 terminated host adrs array*/
 	int		 rc;
-	int		 j;
 	int		 iht;
 	attribute	*pattr;
 	svrattrl	*plx;
@@ -3245,21 +3243,7 @@ create_pbs_node2(char *objname, svrattrl *plist, int perms, int *bad, struct pbs
 			return (PBSE_SYSTEM);
 		}
 
-		if (!pbs_iplist) {
-			pbs_iplist = create_pbs_iplist();
-			if (!pbs_iplist) {
-				return (PBSE_SYSTEM); /* No Memory */
-			}
-		}
 		smp = (mom_svrinfo_t *)(pmom->mi_data);
-		for (j = 0; smp->msr_addrs[j]; j++) {
-			u_long ipaddr = smp->msr_addrs[j];
-			if (insert_iplist_element(pbs_iplist, ipaddr)) {
-				delete_pbs_iplist(pbs_iplist);
-				return (PBSE_SYSTEM); /* No Memory */
-			}
-
-		}
 
 		/* cross link the vnode (pnode) and its Mom (pmom) */
 
@@ -3767,9 +3751,6 @@ struct batch_request *preq;
 	}
 	mgr_log_attr(msg_man_set, plist,
 		PBS_EVENTCLASS_NODE, preq->rq_ind.rq_manager.rq_objname, NULL);
-
-	setup_notification();	    /*set mechanism for notifying */
-	/*other nodes of new member   */
 
 	if (save_nodes_db(1, NULL)) { /*if update fails now (odd)   */
 		svr_chngNodesfile = 1;  /*try it when server shutsdown*/

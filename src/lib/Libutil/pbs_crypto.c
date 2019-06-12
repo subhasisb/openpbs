@@ -7,9 +7,10 @@
 
 #include <openssl/evp.h>
 #include <openssl/aes.h>
+#include "openssl/sha.h"
 #include "ticket.h"
 /**
- * @file	pbs_aes_encrypt.c
+ * @file	pbs_crypto.c
  */
 extern unsigned char pbs_aes_key[];
 extern unsigned char pbs_aes_iv[];
@@ -174,4 +175,30 @@ pbs_decrypt_pwd(char *crypted, int credtype, size_t len, char **str)
                 (*str)[outlen] = 0; /* set a null character at the end */
 
         return ret;
+}
+
+/**
+ * @brief	calculate sha256 of string and store it in outputBuffer
+ *
+ * @param[in]	string	string input
+ * @param[out]	outputBuffer	Output is stored here
+ *
+ * @return	int
+ * @retval	0: success
+ * @retval	1: failure
+ */
+int sha256(char *string, char *outputBuffer)
+{
+	unsigned char hash[SHA256_DIGEST_LENGTH];
+	SHA256_CTX sha256;
+	int i = 0;
+	if (!(SHA256_Init(&sha256) &&
+		SHA256_Update(&sha256, string, strlen(string)) &&
+		SHA256_Final(hash, &sha256))) {
+		return 1;
+	}
+	for(i = 0; i < SHA256_DIGEST_LENGTH; i++)
+		sprintf(outputBuffer + (i * 2), "%02x", hash[i]);
+	outputBuffer[SHA256_DIGEST_LENGTH*2] = 0;
+	return 0;
 }

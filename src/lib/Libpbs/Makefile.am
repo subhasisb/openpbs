@@ -266,7 +266,7 @@ libpbs_la_SOURCES = \
 	../Libutil/misc_utils.c \
 	../Libutil/munge_supp.c \
 	../Libutil/pbs_secrets.c \
-	../Libutil/pbs_aes_encrypt.c \
+	../Libutil/pbs_crypto.c \
 	../Libnet/hnls.c \
 	ecl_job_attr_def.c \
 	ecl_svr_attr_def.c \
