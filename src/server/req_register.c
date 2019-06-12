@@ -564,8 +564,8 @@ depend_on_que(attribute *pattr, void *pobj, int mode)
 	job           *pjob = (job *)pobj;
 
 	if (((mode != ATR_ACTION_ALTER) && (mode != ATR_ACTION_NOOP)) ||
-		(pjob->ji_qhdr == 0) ||
-		(pjob->ji_qhdr->qu_qs.qu_type != QTYPE_Execution))
+		(find_queuebyname(pjob->ji_qs.ji_queue) == 0) ||
+		(find_queuebyname(pjob->ji_qs.ji_queue)->qu_qs.qu_type != QTYPE_Execution))
 		return (0);
 
 

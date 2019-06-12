@@ -403,7 +403,7 @@ rerun_or_kill(job *pjob, char *text)
 		(void)issue_signal(pjob, "SIGKILL", release_req, 0);
 		pjob->ji_qs.ji_substate  = JOB_SUBSTATE_RERUN;
 		(void)strcpy(log_buffer, msg_init_queued);
-		(void)strcat(log_buffer, pjob->ji_qhdr->qu_qs.qu_name);
+		(void)strcat(log_buffer, pjob->ji_qs.ji_queue);
 		(void)strcat(log_buffer, text);
 	} else if (server_state != SV_STATE_SHUTDEL) {
 

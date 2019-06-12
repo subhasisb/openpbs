@@ -304,8 +304,6 @@ svr_enquejob(job *pjob)
 
 	/* place into queue in order of queue rank starting at end */
 
-	pjob->ji_qhdr = pque;
-
 	/* GR8: don't add to queue level list */
 
 	/* update counts: queue and queue by state */
@@ -482,7 +480,7 @@ svr_dequejob(job *pjob)
 	if (--server.sv_jobstates[pjob->ji_qs.ji_state] < 0)
 			bad_ct = 1;
 
-	if ((pque = pjob->ji_qhdr) != NULL) {
+	if ((pque = find_queuebyname(pjob->ji_qs.ji_queue)) != NULL) {
 
 		/* update any entity count and entity resources usage at que */
 
@@ -497,7 +495,6 @@ svr_dequejob(job *pjob)
 			if (--pque->qu_njstate[pjob->ji_qs.ji_state] < 0)
 				bad_ct = 1;
 		}
-		pjob->ji_qhdr = NULL;
 	}
 
 #ifndef NDEBUG
@@ -534,7 +531,7 @@ int
 svr_setjobstate(job *pjob, int newstate, int newsubstate)
 {
 	int    changed = 0;
-	pbs_queue *pque = pjob->ji_qhdr;
+	pbs_queue *pque = find_queuebyname(pjob->ji_qs.ji_queue);
 	pbs_sched *psched;
 
 	/*
@@ -639,7 +636,7 @@ svr_setjobstate(job *pjob, int newstate, int newsubstate)
 	if (newstate == JOB_STATE_RUNNING) {
 		if (pjob->ji_etlimit_decr_queued == FALSE) {
 			account_entity_limit_usages(pjob, NULL, NULL, DECR, ETLIM_ACC_ALL_QUEUED);
-			account_entity_limit_usages(pjob, pjob->ji_qhdr, NULL, DECR, ETLIM_ACC_ALL_QUEUED);
+			account_entity_limit_usages(pjob, find_queuebyname(pjob->ji_qs.ji_queue), NULL, DECR, ETLIM_ACC_ALL_QUEUED);
 			pjob->ji_etlimit_decr_queued = TRUE;
 		}
 	}
@@ -1395,7 +1392,7 @@ svr_chkque(job *pjob, pbs_queue *pque, char *hostname, int mtype)
 	}
 
 	/* after check unset defaults & reset based on current queue, if one */
-	if (pjob->ji_qhdr) {
+	if (find_queuebyname(pjob->ji_qs.ji_queue)) {
 		clear_default_resc(pjob);
 		(void)set_resc_deflt(pjob, JOB_OBJECT, NULL);
 	}
@@ -2311,7 +2308,7 @@ set_resc_deflt(void *pobj, int objtype, pbs_queue *pque)
 			pjob = (job *)pobj;
 			assert(pjob != NULL);
 			if (pque == NULL)
-				pque = pjob->ji_qhdr;
+				pque = find_queuebyname(pjob->ji_qs.ji_queue);
 			assert(pque != NULL);
 			pdest = &pjob->ji_wattr[(int)JOB_ATR_resource];
 			psched = &pjob->ji_wattr[(int)JOB_ATR_SchedSelect];
@@ -2330,7 +2327,7 @@ set_resc_deflt(void *pobj, int objtype, pbs_queue *pque)
 			assert(presv != NULL);
 			pjob = presv->ri_jbp;
 			assert(pjob != NULL);
-			pque = pjob->ji_qhdr;
+			pque = find_queuebyname(pjob->ji_qs.ji_queue);
 			assert(pque != NULL);
 			pdest = &presv->ri_wattr[(int)RESV_ATR_resource];
 			break;
@@ -2534,9 +2531,9 @@ correct_ct(pbs_queue *pqj)
 		pjob = (job *)GET_NEXT(pjob->ji_alljobs)) {
 		server.sv_qs.sv_numjobs++;
 		server.sv_jobstates[pjob->ji_qs.ji_state]++;
-		if (pjob->ji_qhdr) {
-			(pjob->ji_qhdr)->qu_numjobs++;
-			(pjob->ji_qhdr)->qu_njstate[pjob->ji_qs.ji_state]++;
+		if (find_queuebyname(pjob->ji_qs.ji_queue)) {
+			(find_queuebyname(pjob->ji_qs.ji_queue))->qu_numjobs++;
+			(find_queuebyname(pjob->ji_qs.ji_queue))->qu_njstate[pjob->ji_qs.ji_state]++;
 		}
 	}
 	return;
@@ -5049,7 +5046,7 @@ void
 svr_histjob_update(job * pjob, int newstate, int newsubstate)
 {
 	int oldstate = pjob->ji_qs.ji_state;
-	pbs_queue *pque = pjob->ji_qhdr;
+	pbs_queue *pque = find_queuebyname(pjob->ji_qs.ji_queue);
 
 	/* update the state count in queue and server */
 	if (oldstate != newstate) {
@@ -5327,7 +5324,7 @@ svr_setjob_histinfo(job *pjob, histjob_type type)
 		(pjob->ji_qs.ji_state != JOB_STATE_FINISHED)) {
 		account_entity_limit_usages(pjob, NULL, NULL, DECR,
 				pjob->ji_etlimit_decr_queued ? ETLIM_ACC_ALL_MAX : ETLIM_ACC_ALL);
-		account_entity_limit_usages(pjob, pjob->ji_qhdr, NULL, DECR,
+		account_entity_limit_usages(pjob, find_queuebyname(pjob->ji_qs.ji_queue), NULL, DECR,
 				pjob->ji_etlimit_decr_queued ? ETLIM_ACC_ALL_MAX : ETLIM_ACC_ALL);
 	}
 

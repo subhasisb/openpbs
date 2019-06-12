@@ -468,7 +468,7 @@ modify_job_attr(job *pjob, svrattrl *plist, int perm, int *bad)
 	int	   newsubstate = -1;
 	long	   newaccruetype = -1;
 
-	if (pjob->ji_qhdr->qu_qs.qu_type == QTYPE_Execution)
+	if (find_queuebyname(pjob->ji_qs.ji_queue)->qu_qs.qu_type == QTYPE_Execution)
 		allow_unkn = -1;
 	else
 		allow_unkn = (int)JOB_ATR_UNKN;
@@ -553,13 +553,13 @@ modify_job_attr(job *pjob, svrattrl *plist, int perm, int *bad)
 
 			if (rc == 0) {
 				rc =  chk_resc_limits(&newattr[(int)JOB_ATR_resource],
-					pjob->ji_qhdr);
+					find_queuebyname(pjob->ji_qs.ji_queue));
 			}
 			if (rc == 0) {
-				rc = check_entity_resc_limit_max(pjob, pjob->ji_qhdr,
+				rc = check_entity_resc_limit_max(pjob, find_queuebyname(pjob->ji_qs.ji_queue),
 					&newattr[(int)JOB_ATR_resource]);
 				if (rc == 0) {
-					rc = check_entity_resc_limit_queued(pjob, pjob->ji_qhdr,
+					rc = check_entity_resc_limit_queued(pjob, find_queuebyname(pjob->ji_qs.ji_queue),
 						&newattr[(int)JOB_ATR_resource]);
 					if (rc == 0)
 					{
@@ -609,7 +609,7 @@ modify_job_attr(job *pjob, svrattrl *plist, int perm, int *bad)
 	if (changed_resc) {
 		account_entity_limit_usages(pjob, NULL,
 				&newattr[(int)JOB_ATR_resource], INCR, ETLIM_ACC_ALL_RES);
-		account_entity_limit_usages(pjob, pjob->ji_qhdr,
+		account_entity_limit_usages(pjob, find_queuebyname(pjob->ji_qs.ji_queue),
 				&newattr[(int)JOB_ATR_resource], INCR, ETLIM_ACC_ALL_RES);
 	}
 

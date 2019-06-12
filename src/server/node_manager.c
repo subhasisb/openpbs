@@ -7963,7 +7963,7 @@ update_job_node_rassn(job *pjob, attribute *pexech, enum batch_op op)
 		(pexech == &pjob->ji_wattr[(int) JOB_ATR_exec_vnode_deallocated])) {
 		char *pc;
 		sysru = &server.sv_attr[(int)SRV_ATR_resource_assn];
-		queru = &pjob->ji_qhdr->qu_attr[(int)QE_ATR_ResourceAssn];
+		queru = &find_queuebyname(pjob->ji_qs.ji_queue)->qu_attr[(int)QE_ATR_ResourceAssn];
 
 		pc = pexech->at_val.at_str;
 		while (*pc != '\0') {

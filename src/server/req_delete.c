@@ -336,7 +336,7 @@ decr_single_subjob_usage(job *parent)
 {
 	parent->ji_qs.ji_svrflags &= ~JOB_SVFLG_ArrayJob; /* small hack to decrement usage for a single un-instantiated subjob */
 	account_entity_limit_usages(parent, NULL, NULL, DECR, ETLIM_ACC_ALL); /* for server limit */
-	account_entity_limit_usages(parent, parent->ji_qhdr, NULL, DECR, ETLIM_ACC_ALL); /* for queue limit */
+	account_entity_limit_usages(parent, find_queuebyname(parent->ji_qs.ji_queue), NULL, DECR, ETLIM_ACC_ALL); /* for queue limit */
 	parent->ji_qs.ji_svrflags |= JOB_SVFLG_ArrayJob; /* setting arrayjob flag back */
 }
 

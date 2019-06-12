@@ -189,7 +189,7 @@ find_assoc_sched_jid(char *jid, pbs_sched **target_sched)
 	if (pj == NULL)
 		return 0;
 
-	return find_assoc_sched_pque(pj->ji_qhdr, target_sched);
+	return find_assoc_sched_pque(find_queuebyname(pj->ji_qs.ji_queue), target_sched);
 }
 
 /**

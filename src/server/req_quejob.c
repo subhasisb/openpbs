@@ -1935,7 +1935,7 @@ req_commit(struct batch_request *preq)
 	 * to the user.
 	 */
 
-	pque = pj->ji_qhdr;
+	pque = find_queuebyname(pj->ji_qs.ji_queue);
 
 	if ((preq->rq_fromsvr == 0) &&
 		(pque->qu_qs.qu_type == QTYPE_RoutePush) &&
@@ -1953,7 +1953,7 @@ req_commit(struct batch_request *preq)
 		preq->rq_user, preq->rq_host,
 		pj->ji_wattr[(int)JOB_ATR_job_owner].at_val.at_str,
 		pj->ji_wattr[(int)JOB_ATR_jobname].at_val.at_str,
-		pj->ji_qhdr->qu_qs.qu_name);
+		pj->ji_qs.ji_queue);
 
 	/* acknowledge the request with the job id */
 	if ((rc = reply_jobid(preq, pj->ji_qs.ji_jobid, BATCH_REPLY_CHOICE_Commit))) {

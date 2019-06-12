@@ -494,11 +494,11 @@ acct_job(job *pjob, int type, char *buf, int len)
 	len -= i;
 
 	/* queue name */
-	nd = sizeof(QUEUE_FMT) + strlen(pjob->ji_qhdr->qu_qs.qu_name);
+	nd = sizeof(QUEUE_FMT) + strlen(pjob->ji_qs.ji_queue);
 	if (nd > len)
 		if (grow_acct_buf(&pb, &len, nd) == -1)
 			return (pb);
-	(void)snprintf(pb, len, QUEUE_FMT, pjob->ji_qhdr->qu_qs.qu_name);
+	(void)snprintf(pb, len, QUEUE_FMT, pjob->ji_qs.ji_queue);
 	i = strlen(pb);
 	pb  += i;
 	len -= i;
@@ -765,7 +765,7 @@ acct_resv(resc_resv *presv, char *buf, int len)
 		(presv->ri_qp != NULL))
 		(void)sprintf(pb, "queue=%s ", presv->ri_qp->qu_qs.qu_name);
 	else if (presv->ri_qs.ri_type == RESV_JOB_OBJECT && presv->ri_jbp)
-		(void)sprintf(pb, "queue=%s ", presv->ri_jbp->ji_qhdr->qu_qs.qu_name);
+		(void)sprintf(pb, "queue=%s ", presv->ri_jbp->ji_qs.ji_queue);
 	i = strlen(pb);
 	pb  += i;
 	len -= i;
@@ -1470,11 +1470,11 @@ common_acct_job(job *pjob, char *buf, int len)
 	len -= i;
 
 	/* queue name */
-	nd = 8 + strlen(pjob->ji_qhdr->qu_qs.qu_name);
+	nd = 8 + strlen(pjob->ji_qs.ji_queue);
 	if (nd > len)
 		if (grow_acct_buf(&pb, &len, nd) == -1)
 			return (pb);
-	(void)sprintf(pb, "queue=%s ", pjob->ji_qhdr->qu_qs.qu_name);
+	(void)sprintf(pb, "queue=%s ", pjob->ji_qs.ji_queue);
 
 	return (pb);
 }
@@ -1712,11 +1712,11 @@ build_common_data_for_job_update(job *pjob, int type, char *buf, int len)
 	len -= ct;
 
 	/* queue name */
-	nd = sizeof(QUEUE_FMT) + strlen(pjob->ji_qhdr->qu_qs.qu_name);
+	nd = sizeof(QUEUE_FMT) + strlen(pjob->ji_qs.ji_queue);
 	if (nd > len)
 		if (grow_acct_buf(&pb, &len, nd) == -1)
 			return (pb);
-	(void)snprintf(pb, len, QUEUE_FMT, pjob->ji_qhdr->qu_qs.qu_name);
+	(void)snprintf(pb, len, QUEUE_FMT, pjob->ji_qs.ji_queue);
 	ct = strlen(pb);
 	pb  += ct;
 	len -= ct;
