@@ -268,10 +268,6 @@ stat_a_jobidname(struct batch_request *preq, char *name, int dohistjobs, int dos
 	}
 }
 
-int do_stat_of_a_job_ext(struct batch_request *preq, job *pjob, int dohistjobs, int dosubjobs) {
-	return do_stat_of_a_job(preq, pjob, dohistjobs, dosubjobs);
-}
-
 /**
  * @brief
  * 		Service the Status Job Request
@@ -388,48 +384,11 @@ void req_stat_job(struct batch_request *preq)
 			pjob = (job *)GET_NEXT(pjob->ji_jobque);
 		}
 	} else {
-		/* pjob = (job *)GET_NEXT(svr_alljobs);
+		pjob = (job *)GET_NEXT(svr_alljobs);
 		while (pjob && (rc == PBSE_NONE)) {
 			rc = do_stat_of_a_job(preq, pjob, dohistjobs, dosubjobs);
 			pjob = (job *)GET_NEXT(pjob->ji_alljobs);
 		}
-		*/
-		pbs_db_job_info_t       dbjob;
-		pbs_db_obj_info_t       obj;
-		job		   *pjob = (job *)0;
-		pbs_db_conn_t   *conn = (pbs_db_conn_t *) svr_db_conn;
-		void            *state = NULL;
-		int rc;
-		/* get jobs from DB */
-		obj.pbs_db_obj_type = PBS_DB_JOB;
-		obj.pbs_db_un.pbs_db_job = &dbjob;
-		state = pbs_db_cursor_init(conn, &obj, NULL);
-		if (state == NULL) {
-			sprintf(log_buffer, "%s", (char *) conn->conn_db_err);
-			log_err(-1, "req_stat", log_buffer);
-			pbs_db_cursor_close(conn, state);
-			(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
-			return ;
-		}
-		if (pbs_db_get_rowcount(state) <= 0) {
-			/*
-			 *
-			 sprintf(log_buffer, "No records found");
-			log_err(-1, "req_stat", log_buffer);
-			*/
-		} else {
-			/* Now, for each job found ... */
-			while ((rc = pbs_db_cursor_next(conn, state, &obj)) == 0) {
-				if ((pjob = job_recov(dbjob.ji_jobid, NULL, 0)) != NULL) {
-					do_stat_of_a_job_ext(preq, pjob, dohistjobs, dosubjobs);
-					job_free(pjob);
-				}
-			}
-		}
-		pbs_db_cursor_close(conn, state);
-		/* close transaction */
-		if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0)
-			return;
 
 	}
 

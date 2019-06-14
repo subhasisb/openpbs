@@ -7612,8 +7612,7 @@ free_nodes(job *pjob)
 		psvrmom = (mom_svrinfo_t *)(mominfo_array[i]->mi_data);
 
 		for (j=0; j<psvrmom->msr_jbinxsz; j++) {
-			if (psvrmom->msr_jobindx[j] && (strcmp(psvrmom->msr_jobindx[j]->ji_qs.ji_jobid, pjob->ji_qs.ji_jobid) == 0)) {
-				//job_free(psvrmom->msr_jobindx[j]);
+			if (psvrmom->msr_jobindx[j] == pjob) {
 				psvrmom->msr_jobindx[j] = NULL;
 				if (is_called_by_job_purge)
 					special_case = 1;
@@ -7644,7 +7643,7 @@ free_nodes(job *pjob)
 
 				for (prev=NULL, jp=np->jobs; jp; jp=next) {
 					next = jp->next;
-					if (strcmp(jp->job->ji_qs.ji_jobid, pjob->ji_qs.ji_jobid) != 0) {
+					if (jp->job != pjob) {
 						prev = jp;
 						still_has_jobs = 1; /* another job still here */
 						continue;

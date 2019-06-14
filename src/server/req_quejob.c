@@ -431,11 +431,11 @@ req_quejob(struct batch_request *preq)
 		}
 		created_here = JOB_SVFLG_HERE;
 		if (i == 0) {	/* Normal job */
-			(void)sprintf(jidbuf, "%lld.%s%d",
-				next_svr_sequence_id, server_name, pbs_conf.batch_service_port);
+			(void)sprintf(jidbuf, "%lld.%s",
+				next_svr_sequence_id, server_name);
 		} else {	/* Array Job */
-			(void)sprintf(jidbuf, "%lld[].%s%d",
-					next_svr_sequence_id, server_name, pbs_conf.batch_service_port);
+			(void)sprintf(jidbuf, "%lld[].%s",
+					next_svr_sequence_id, server_name);
 		}
 		jid = jidbuf;
 	}
@@ -1970,8 +1970,6 @@ req_commit(struct batch_request *preq)
 
 	if ((pj->ji_qs.ji_svrflags & JOB_SVFLG_HERE) == 0)
 		issue_track(pj);	/* notify creator where job is */
-
-	job_free(pj);
 
 #endif		/* PBS_SERVER */
 }
