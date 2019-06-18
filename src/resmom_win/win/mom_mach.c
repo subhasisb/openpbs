@@ -1170,7 +1170,7 @@ cput_job(char *jobid)
 	/*
 	 * account for any processes that are not part of the job object due to pbs_attach
 	 */
-	pjob = find_job(jobid);
+	pjob = find_job_in_avl(jobid);
 	ptask = (task *)GET_NEXT(pjob->ji_tasks);
 	while (ptask) {
 		FILETIME  ftCreation, ftExit, ftKernel, ftUser;

@@ -2269,7 +2269,7 @@ get_hook_results(char *input_file, int *accept_flag, int *reject_flag,
 						found_rerunjob_action = 0;
 						found_deletejob_action = 0;
 					}
-					pjob2 = find_job(jobid_str);
+					pjob2 = find_job_in_avl(jobid_str);
 					pjob2_prev = pjob2;
 					if (reject_rerunjob != NULL)
 						*reject_rerunjob = 0;

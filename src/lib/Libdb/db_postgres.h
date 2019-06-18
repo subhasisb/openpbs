@@ -96,6 +96,7 @@ typedef unsigned __int64 uint64_t;
 #define STMT_UPDATE_JOB_QUICK "update_job_quick"
 #define STMT_FINDJOBS_ORDBY_QRANK   "findjobs_ordby_qrank"
 #define STMT_FINDJOBS_BYQUE_ORDBY_QRANK "findjobs_byque_ordby_qrank"
+#define STMT_FINDJOBS_FROM_TIME "findjobs_from_time"
 #define STMT_DELETE_JOB "delete_job"
 #define STMT_REMOVE_JOBATTRS "remove_jobattrs"
 

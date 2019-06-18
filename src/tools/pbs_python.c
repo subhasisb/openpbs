@@ -181,7 +181,7 @@ set_scheduler_flag(int flag, pbs_sched *psched)
 }
 
 job	*
-find_job(char *jobid)
+find_job_in_avl(char *jobid)
 {
 	return NULL;
 }

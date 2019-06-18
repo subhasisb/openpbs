@@ -1080,7 +1080,7 @@ extern void  add_dest(job *);
 extern int   depend_on_que(attribute *, void *, int);
 extern int   depend_on_exec(job *);
 extern int   depend_on_term(job *);
-extern job  *find_job(char *);
+extern job  *find_job_in_avl(char *);
 extern char *get_egroup(job *);
 extern char *get_variable(job *, char *);
 extern void  check_block(job *, char *);

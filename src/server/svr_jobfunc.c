@@ -159,7 +159,7 @@ static void running_jobs_count(struct work_task *);
 
 
 /** For faster job lookup through AVL tree */
-static void svr_avljob_oper(job *pjob, int delkey);
+void svr_avljob_oper(job *pjob, int delkey);
 
 /* Global Data Items: */
 extern char *msg_noloopbackif;
@@ -302,7 +302,7 @@ svr_enquejob(job *pjob)
 	}
 
 	/**
-	 * Add to AVL tree so that find_job() can return
+	 * Add to AVL tree so that find_job_in_avl() can return
 	 * faster compared to linked list traverse.
 	 */
 	svr_avljob_oper(pjob, 0);
@@ -520,7 +520,7 @@ svr_dequejob(job *pjob)
 
 		/**
 		 * Remove the key from the AVL tree which was
-		 * added for faster job search i.e. find_job().
+		 * added for faster job search i.e. find_job_in_avl().
 		 */
 		svr_avljob_oper(pjob, 1);
 
@@ -5453,7 +5453,7 @@ svr_chk_histjob(job *pjob)
  * @see
  * 		svr_enquejob()
  *		svr_dequejob()
- *		find_job()
+ *		find_job_in_avl()
  *
  * @return	Pointer to AVL_IX_REC record for success.
  * @retval	NULL	: failure.
@@ -5511,7 +5511,7 @@ svr_avlkey_create(const char *keystr)
  *		MT-unsafe
  *
  */
-static void
+void
 svr_avljob_oper(job *pjob, int delkey)
 {
 	int rc = AVL_IX_OK;

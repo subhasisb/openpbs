@@ -455,7 +455,6 @@ req_quejob(struct batch_request *preq)
 
 #ifdef PBS_MOM
 	/* does job already exist, check both old and new jobs */
-
 	//NO NEED TO SEARCH DB for QUEUEJOB, SAVE WILL FAIL ANYWAY
 	if ((pj = find_job(jid)) == (job *)0) {
 		pj = (job *)GET_NEXT(svr_newjobs);
@@ -1497,7 +1496,7 @@ req_mvjobfile(struct batch_request *preq)
 
 	pj = locate_new_job(preq, NULL);
 	if (pj == NULL)
-		pj = find_job(preq->rq_ind.rq_jobfile.rq_jobid);
+		pj = find_job_in_avl(preq->rq_ind.rq_jobfile.rq_jobid);
 
 	if ((preq->rq_fromsvr == 0) || (pj == NULL)) {
 		req_reject(PBSE_IVALREQ, 0, preq);
@@ -1649,7 +1648,7 @@ req_mvjobfile(struct batch_request *preq)
 
 	pj = locate_new_job(preq, NULL);
 	if (pj == NULL)
-		pj = find_job(preq->rq_ind.rq_jobfile.rq_jobid);
+		pj = find_job_in_avl(preq->rq_ind.rq_jobfile.rq_jobid);
 
 	if (pj == NULL) {
 		req_reject(PBSE_UNKJOBID, 0, preq);

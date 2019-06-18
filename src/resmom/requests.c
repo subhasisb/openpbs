@@ -226,7 +226,7 @@ fork_to_user(struct batch_request *preq)
 		cred_len = 0;
 	}
 
-	pjob = find_job(rqcpf->rq_jobid);
+	pjob = find_job_in_avl(rqcpf->rq_jobid);
 	if (pjob) {
 		pwdp = \
 		     getpwnam(pjob->ji_wattr[(int)JOB_ATR_euser].at_val.at_str);
@@ -343,7 +343,7 @@ struct batch_request *preq;
 	/* create a PBS_EXEC env entry */
 	setenv("PBS_EXEC", pbs_conf.pbs_exec_path, 1);
 
-	if (((pjob = find_job(rqcpf->rq_jobid)) != NULL) &&
+	if (((pjob = find_job_in_avl(rqcpf->rq_jobid)) != NULL) &&
 		(pjob->ji_grpcache != NULL)) {
 
 		/* used the good stuff cached in the job structure */
@@ -580,7 +580,7 @@ req_deletejob(struct batch_request *preq)
 	char *jobid = NULL;
 
 	jobid = preq->rq_ind.rq_delete.rq_objname;
-	pjob = find_job(jobid);
+	pjob = find_job_in_avl(jobid);
 
 	if (!pjob) {
 		req_reject(PBSE_UNKJOBID, 0, preq);
@@ -679,7 +679,7 @@ req_holdjob(struct batch_request *preq)
 {
 	job	*pjob;
 
-	pjob = find_job(preq->rq_ind.rq_hold.rq_orig.rq_objname);
+	pjob = find_job_in_avl(preq->rq_ind.rq_hold.rq_orig.rq_objname);
 	if (pjob == NULL) {
 		req_reject(PBSE_UNKJOBID, 0, preq);
 		return;
@@ -790,7 +790,7 @@ req_messagejob(struct batch_request *preq)
 	int	      ret = 0;
 	job	     *pjob;
 
-	pjob = find_job(preq->rq_ind.rq_message.rq_jid);
+	pjob = find_job_in_avl(preq->rq_ind.rq_message.rq_jid);
 	if ((preq->rq_ind.rq_message.rq_file == PBS_BATCH_FileOpt_Default) ||
 		(preq->rq_ind.rq_message.rq_file & PBS_BATCH_FileOpt_OFlg)) {
 		ret = message_job(pjob, StdOut, preq->rq_ind.rq_message.rq_text);
@@ -831,7 +831,7 @@ req_py_spawn(struct batch_request *preq)
 	char		**argv;
 	obitent		*op;
 
-	pjob = find_job(preq->rq_ind.rq_py_spawn.rq_jid);
+	pjob = find_job_in_avl(preq->rq_ind.rq_py_spawn.rq_jid);
 	if (pjob == NULL) {
 		req_reject(PBSE_UNKJOBID, 0, preq);
 		return;
@@ -974,7 +974,7 @@ req_modifyjob(struct batch_request *preq)
 	int		 recreate_nodes = 0;
 	char		*new_peh = NULL;
 
-	pjob = find_job(preq->rq_ind.rq_modify.rq_objname);
+	pjob = find_job_in_avl(preq->rq_ind.rq_modify.rq_objname);
 	if (pjob == NULL) {
 		req_reject(PBSE_UNKJOBID, 0, preq);
 		return;
@@ -1841,7 +1841,7 @@ req_signaljob(struct batch_request *preq)
 	int		reject_errcode = 0;
 
 	sname = preq->rq_ind.rq_signal.rq_signame;
-	pjob = find_job(preq->rq_ind.rq_signal.rq_jid);
+	pjob = find_job_in_avl(preq->rq_ind.rq_signal.rq_jid);
 
 	if (pjob == NULL) {
 		req_reject(PBSE_UNKJOBID, 0, preq);
@@ -2178,7 +2178,7 @@ del_files(struct batch_request *preq, char **pbadfile)
 	 * chdir to that job directory
 	 */
 	if (sandbox_private) {
-		pjob = find_job(rqcpf->rq_jobid);
+		pjob = find_job_in_avl(rqcpf->rq_jobid);
 		if (pjob) {
 			if (pjob->ji_grpcache)
 				pbs_jobdir = jobdirname(rqcpf->rq_jobid, pjob->ji_grpcache->gc_homedir);
@@ -2397,7 +2397,7 @@ req_rerunjob(struct batch_request *preq)
 	char		*svrport;
 	struct work_task *wtask = NULL;
 
-	pjob = find_job(preq->rq_ind.rq_rerun);
+	pjob = find_job_in_avl(preq->rq_ind.rq_rerun);
 	if (pjob == NULL) {
 		req_reject(PBSE_UNKJOBID, 0, preq);
 		return;
@@ -2531,7 +2531,7 @@ post_cpyfile(struct work_task *pwt)
 	DBPRT(("%s\n", log_buffer))
 	log_event(PBSEVENT_JOB, PBS_EVENTCLASS_JOB, LOG_DEBUG, jobid, log_buffer);
 
-	pjob = find_job(jobid);
+	pjob = find_job_in_avl(jobid);
 
 	ecode = pwt->wt_aux;
 
@@ -2674,7 +2674,7 @@ req_cpyfile(struct batch_request *preq)
 	else
 		rqcpf = &preq->rq_ind.rq_cpyfile;
 
-	pjob = find_job(rqcpf->rq_jobid);
+	pjob = find_job_in_avl(rqcpf->rq_jobid);
 	if (pjob != NULL) {
 		/*
 		 * Once a job starts file processing, the checkpoint
@@ -2909,7 +2909,7 @@ req_delfile(struct batch_request *preq)
 	else
 		rqcpf = &preq->rq_ind.rq_cpyfile;
 
-	pjob = find_job(rqcpf->rq_jobid);
+	pjob = find_job_in_avl(rqcpf->rq_jobid);
 	if (pjob) {
 		/*
 		 * check to see is there any copy request pending
@@ -3098,7 +3098,7 @@ req_cpyfile(struct batch_request *preq)
 	stage_inout.file_max = 0;
 	stage_inout.file_list = NULL;
 	stage_inout.bad_list = NULL;
-	pjob = find_job(rqcpf->rq_jobid);
+	pjob = find_job_in_avl(rqcpf->rq_jobid);
 	if (pjob) {
 		/*
 		 ** Once a job starts file processing, the checkpoint
@@ -3349,7 +3349,7 @@ struct batch_request *preq;
 	job		*pjob;
 	char		*bad_list = NULL;
 
-	pjob = find_job(preq->rq_ind.rq_cpyfile.rq_jobid);
+	pjob = find_job_in_avl(preq->rq_ind.rq_cpyfile.rq_jobid);
 	if (pjob) {
 		/*
 		 * Check to see if the post_cpyfile has already been

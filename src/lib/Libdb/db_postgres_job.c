@@ -194,11 +194,40 @@ pg_db_prepare_job_sqls(pbs_db_conn_t *conn)
 		"from pbs.job where ji_jobid = $1");
 	if (pg_prepare_stmt(conn, STMT_SELECT_JOB, conn->conn_sql, 1) != 0)
 		return -1;
-
 	strcat(conn->conn_sql, " FOR UPDATE");
 	if (pg_prepare_stmt(conn, STMT_SELECT_JOB_LOCKED, conn->conn_sql, 1) != 0)
 		return -1;
-
+	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select "
+			"ji_jobid,"
+			"ji_state,"
+			"ji_substate,"
+			"ji_svrflags,"
+			"ji_numattr,"
+			"ji_ordering,"
+			"ji_priority,"
+			"ji_stime,"
+			"ji_endtBdry,"
+			"ji_queue,"
+			"ji_destin,"
+			"ji_un_type,"
+			"ji_momaddr,"
+			"ji_momport,"
+			"ji_exitstat,"
+			"ji_quetime,"
+			"ji_rteretry,"
+			"ji_fromsock,"
+			"ji_fromaddr,"
+			"ji_4jid,"
+			"ji_4ash,"
+			"ji_credtype,"
+			"ji_qrank,"
+			"extract(epoch from ji_savetm)::bigint as ji_savetm, "
+			"extract(epoch from ji_creattm)::bigint as ji_creattm, "
+			"hstore_to_array(attributes) as attributes "
+			"from pbs.job where extract(epoch from ji_savetm)::bigint > $1 "
+			"order by ji_qrank ");
+		if (pg_prepare_stmt(conn, STMT_FINDJOBS_FROM_TIME, conn->conn_sql, 1) != 0)
+			return -1;
 	/*
 	 * Use the sql encode function to encode the $2 parameter. Encode using
 	 * 'escape' mode. Encode considers $2 as a bytea and returns a escaped
@@ -531,6 +560,7 @@ pg_db_find_job(pbs_db_conn_t *conn, void *st, pbs_db_obj_info_t *obj,
 	PGresult *res;
 	pg_query_state_t *state = (pg_query_state_t *) st;
 	pbs_db_job_info_t *pdjob = obj->pbs_db_un.pbs_db_job;
+
 	int rc;
 	int params;
 
@@ -541,6 +571,10 @@ pg_db_find_job(pbs_db_conn_t *conn, void *st, pbs_db_obj_info_t *obj,
 		SET_PARAM_STR(conn, pdjob->ji_queue, 0);
 		params=1;
 		strcpy(conn->conn_sql, STMT_FINDJOBS_BYQUE_ORDBY_QRANK);
+	} else if (opts != NULL && opts->timestamp){
+		SET_PARAM_BIGINT(conn, opts->timestamp, 0);
+		params=1;
+		strcpy(conn->conn_sql, STMT_FINDJOBS_FROM_TIME);
 	} else {
 		strcpy(conn->conn_sql, STMT_FINDJOBS_ORDBY_QRANK);
 		params=0;

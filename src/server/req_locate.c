@@ -92,7 +92,7 @@ req_locatejob(struct batch_request *preq)
 
 	if ((at = strchr(preq->rq_ind.rq_locate, (int)'@')) != NULL)
 		*at = '\0';			/* strip off @server_name */
-	pjob = find_job(preq->rq_ind.rq_locate);
+	pjob = find_job_in_avl(preq->rq_ind.rq_locate);
 
 	/*
 	 * Reject request for history jobs:

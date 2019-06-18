@@ -3539,12 +3539,12 @@ _pps_helper_get_job(job *pjob_o, const char *jobid, const char *qname)
 		t = is_job_array((char *)jobid);
 
 		if (t == IS_ARRAY_Single) {
-			pjob = find_job((char *)jobid); /* has data if instantiated */
+			pjob = find_job_in_avl((char *)jobid); /* has data if instantiated */
 			if (pjob == NULL) { /* otherwise, return parent */
 				pjob = find_arrayparent((char *)jobid);
 			}
 		} else if ((t == IS_ARRAY_NO) || (t == IS_ARRAY_ArrayJob)) {
-			pjob = find_job((char *)jobid); /* regular or ArrayJob itself */
+			pjob = find_job_in_avl((char *)jobid); /* regular or ArrayJob itself */
 		} else {
 			pjob = find_arrayparent((char *)jobid); /* subjob(s) */
 		}

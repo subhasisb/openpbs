@@ -403,7 +403,7 @@ post_hold(struct work_task *pwt)
 		conn->cn_authen &= ~PBS_NET_CONN_NOTIMEOUT;
 	}
 
-	pjob = find_job(preq->rq_ind.rq_hold.rq_orig.rq_objname);
+	pjob = find_job_in_avl(preq->rq_ind.rq_hold.rq_orig.rq_objname);
 	if (pjob  == NULL) {
 		log_event(PBSEVENT_DEBUG, PBS_EVENTCLASS_JOB, LOG_DEBUG,
 			preq->rq_ind.rq_hold.rq_orig.rq_objname,

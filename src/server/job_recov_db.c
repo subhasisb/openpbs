@@ -501,6 +501,69 @@ db_err:
 
 /**
  * @brief
+ *	Refresh/retrieve job from database and add it into AVL tree if not present
+ *
+ * @param[in]	jobid - Job id of job to refresh
+ *
+ * @return	The recovered job
+ * @retval	NULL - Failure
+ * @retval	!NULL - Success, pointer to job structure recovered
+ *
+ */
+job *
+refresh_job(char *jobid) {
+	int i;
+	job	*new_job_ptr = NULL;
+	job *stale_job_ptr = NULL;
+	pbs_db_conn_t *conn = svr_db_conn;
+	pbs_db_obj_info_t obj;
+	pbs_db_job_info_t dbjob;
+
+	/* get the old pointer of the job, if job is in AVL tree */
+	stale_job_ptr = find_job_in_avl(jobid);
+
+	if(stale_job_ptr == NULL) {
+		/* if job is not in AVL tree, load the job from database */
+		new_job_ptr = job_recov_db(jobid);
+		if (new_job_ptr == NULL) {
+			snprintf(log_buffer, LOG_BUF_SIZE, "Failed to recover job from db %s", jobid);
+			log_err(-1, "refresh_job", log_buffer);
+			return NULL;
+		}
+		/* add job into AVL tree */
+		svr_enquejob(new_job_ptr);
+		return new_job_ptr;
+	} else {
+		strcpy(dbjob.ji_jobid, jobid);
+		obj.pbs_db_obj_type = PBS_DB_JOB;
+		obj.pbs_db_un.pbs_db_job = &dbjob;
+
+		if (pbs_db_load_obj(conn, &obj) != 0) {
+			snprintf(log_buffer, LOG_BUF_SIZE, "Failed to load job %s", dbjob.ji_jobid);
+			log_err(-1, "refresh_job", log_buffer);
+			pbs_db_reset_obj(&obj);
+			return NULL;
+		}
+
+		/* remove any malloc working job attribute space */
+		for (i=0; i < (int)JOB_ATR_LAST; i++) {
+			job_attr_def[i].at_free(&stale_job_ptr->ji_wattr[i]);
+		}
+
+		/* refresh all the job attributes */
+		if (db_to_svr_job(stale_job_ptr, &dbjob) != 0) {
+			snprintf(log_buffer, LOG_BUF_SIZE, "Failed to refresh job attribute %s", dbjob.ji_jobid);
+			log_err(-1, "refresh_job", log_buffer);
+			pbs_db_reset_obj(&obj);
+			return NULL;
+		}
+		pbs_db_reset_obj(&obj);
+		return stale_job_ptr;
+	}
+}
+
+/**
+ * @brief
  *	Recover job from database
  *
  * @param[in]	jid - Job id of job to recover

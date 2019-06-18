@@ -2762,7 +2762,7 @@ send_resc_used_to_ms(int stream, char *jobid)
 	if (stream == -1)
 		return (-1);
 
-	pjob = find_job(jobid);
+	pjob = find_job_in_avl(jobid);
 	if (pjob == NULL)
 		return (-1);
 
@@ -2862,7 +2862,7 @@ recv_resc_used_from_sister(int stream, char *jobid, int nodeidx)
 	if (nodeidx < 0)
 		return (-1);
 
-	pjob = find_job(jobid);
+	pjob = find_job_in_avl(jobid);
 	if (pjob == NULL)
 		return (-1);
 
@@ -3113,7 +3113,7 @@ im_request(int stream, int version)
 
 			np = NULL;
 			/* does job already exist? */
-			pjob = find_job(jobid);
+			pjob = find_job_in_avl(jobid);
 			if (pjob) {	/* job is here */
 				kill_job(pjob, SIGKILL);
 				mom_deljob(pjob);
@@ -3506,7 +3506,7 @@ join_err:
 	/*
 	 ** Check if job already exists.
 	 */
-	if ((pjob = find_job(jobid)) == NULL) {
+	if ((pjob = find_job_in_avl(jobid)) == NULL) {
 		SEND_ERR(PBSE_JOBEXIST)
 		goto done;
 	}
@@ -5673,7 +5673,7 @@ tm_request(int fd, int version)
 		}
 		else {
 			/* verify the jobid is known */
-			if ((pjob = find_job(jobid)) == NULL) {
+			if ((pjob = find_job_in_avl(jobid)) == NULL) {
 				sprintf(log_buffer, "job not found");
 				i = TM_ENOTFOUND;
 				goto aterr;
@@ -5902,7 +5902,7 @@ aterr:
 
 	/* Continue normal processing for all other commands. */
 	/* verify the jobid is known */
-	if ((pjob = find_job(jobid)) == NULL) {
+	if ((pjob = find_job_in_avl(jobid)) == NULL) {
 		sprintf(log_buffer, "job not found");
 		goto err;
 	}

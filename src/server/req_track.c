@@ -279,7 +279,7 @@ track_history_job(struct rq_track *prqt, char *extend)
 	if (svr_chk_history_conf() == 0)
 		return;
 
-	pjob = find_job(prqt->rq_jid);
+	pjob = find_job_in_avl(prqt->rq_jid);
 
 	/*
 	 * Return if not found the job OR job is not created here

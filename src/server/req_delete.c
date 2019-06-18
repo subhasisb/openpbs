@@ -237,7 +237,7 @@ check_deletehistoryjob(struct batch_request * preq)
 		}
 	}
 
-	histpjob = find_job(jid);
+	histpjob = find_job_in_avl(jid);
 
 	historyjob = svr_chk_histjob(histpjob);
 	if (historyjob == PBSE_HISTJOBID) {
@@ -501,7 +501,7 @@ req_deletejob(struct batch_request *preq)
 		/* If not deleteing running subjobs, delete2 to del parent   */
 
 		if (--preq->rq_refct == 0) {
-			if ((parent = find_job(jid)) != NULL)
+			if ((parent = find_job_in_avl(jid)) != NULL)
 				req_deletejob2(preq, parent);
 			else
 				reply_send(preq);
@@ -1249,7 +1249,7 @@ post_delete_mom1(struct work_task *pwt)
 		return;
 	}
 
-	pjob = find_job(preq_sig->rq_ind.rq_signal.rq_jid);
+	pjob = find_job_in_avl(preq_sig->rq_ind.rq_signal.rq_jid);
 	release_req(pwt);
 	if (pjob == NULL) {
 		/* job has gone away */

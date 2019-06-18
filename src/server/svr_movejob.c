@@ -438,7 +438,7 @@ post_movejob(struct work_task *pwt)
 		return;
 	}
 
-	jobp = find_job(req->rq_ind.rq_move.rq_jid);
+	jobp = find_job_in_avl(req->rq_ind.rq_move.rq_jid);
 	if ((jobp == NULL) || (jobp != (job *)pwt->wt_parm2)) {
 		sprintf(log_buffer,
 			"job %s not found",

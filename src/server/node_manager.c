@@ -2327,7 +2327,7 @@ stat_update(int stream)
 		}
 		DBPRT(("stat_update: update for %s\n", rused.ru_pjobid))
 
-		if (((pjob = find_job(rused.ru_pjobid)) != NULL)     &&
+		if (((pjob = find_job_in_avl(rused.ru_pjobid)) != NULL)     &&
 			((pjob->ji_qs.ji_state == JOB_STATE_RUNNING) ||
 			(pjob->ji_qs.ji_state == JOB_STATE_EXITING)) &&
 			(pjob->ji_wattr[(int)JOB_ATR_run_version].at_val.at_long == rused.ru_hop)) {
@@ -2836,7 +2836,7 @@ recv_wk_job_idle(int stream)
 	if (rc)
 		return;
 
-	pjob = find_job(jobid);
+	pjob = find_job_in_avl(jobid);
 	if (pjob) {
 		/* suspend or resume job */
 
@@ -4372,7 +4372,7 @@ mom_running_jobs(int stream)
 			goto err;
 
 		DBPRT(("mom_running_jobs: %s substate: %d runver: %ld\n", jobid, substate, runver))
-		if ((pjob = find_job(jobid)) == NULL) {
+		if ((pjob = find_job_in_avl(jobid)) == NULL) {
 			/* job not found,  tell Mom to discard it */
 			send_discard_job(stream, jobid, -1, "not known to Server");
 			discarded=1;
@@ -5202,7 +5202,7 @@ found:
 			log_event(PBSEVENT_DEBUG3, PBS_EVENTCLASS_NODE, LOG_DEBUG,
 				pmom->mi_host, log_buffer);
 			DBPRT(("%s: Mom %s %s (%d)\n", __func__, pmom->mi_host, log_buffer, j))
-			pjob = find_job(jid);
+			pjob = find_job_in_avl(jid);
 			if (pjob &&
 				(pjob->ji_wattr[(int)JOB_ATR_run_version].at_val.at_long==j)) {
 				post_discard_job(pjob, pmom, JDCD_REPLIED);
@@ -5241,7 +5241,7 @@ found:
 				if (ret != DIS_SUCCESS)
 					goto err;
 
-				if (((pjob = find_job(jid)) != NULL)               &&
+				if (((pjob = find_job_in_avl(jid)) != NULL)               &&
 					((pjob->ji_qs.ji_state == JOB_STATE_RUNNING) ||
 					(pjob->ji_qs.ji_state == JOB_STATE_EXITING))  &&
 					(pjob->ji_wattr[(int)JOB_ATR_run_version].at_val.at_long == runct)) {

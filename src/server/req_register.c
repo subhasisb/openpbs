@@ -194,7 +194,7 @@ req_register(struct batch_request *preq)
 
 	/* find the "parent" job specified in the request */
 
-	if ((pjob = find_job(preq->rq_ind.rq_register.rq_parent)) == NULL) {
+	if ((pjob = find_job_in_avl(preq->rq_ind.rq_register.rq_parent)) == NULL) {
 
 		/*
 		 * job not found... if server is initializing, it may not
@@ -440,7 +440,7 @@ post_doq(struct work_task *pwt)
 
 		log_event(PBSEVENT_JOB, PBS_EVENTCLASS_JOB, LOG_INFO,
 			jobid, log_buffer);
-		pjob = find_job(jobid);
+		pjob = find_job_in_avl(jobid);
 		if ((msg = pbse_to_txt(preq->rq_reply.brp_code)) != NULL) {
 			(void)strcat(log_buffer, " ");
 			(void)strcat(log_buffer, msg);
@@ -454,7 +454,7 @@ post_doq(struct work_task *pwt)
 				snprintf(log_msg, sizeof(log_msg), "%s, %s", msg_job_moved,
 					"sending dependency request to remote server");
 				log_event(PBSEVENT_JOB, PBS_EVENTCLASS_JOB, LOG_INFO, jobid, log_msg);
-				ppjob = find_job(preq->rq_ind.rq_register.rq_parent);
+				ppjob = find_job_in_avl(preq->rq_ind.rq_register.rq_parent);
 				if(ppjob && (ppjob->ji_qs.ji_state == JOB_STATE_MOVED) && (ppjob->ji_qs.ji_substate == JOB_SUBSTATE_MOVED)) {
 					char *destin;
 					/* job destination should be <remote queue>@<remote server> */
@@ -624,7 +624,7 @@ post_doe(struct work_task *pwt)
 	struct depend_job    *pdj;
 	job		     *pjob;
 
-	pjob = find_job(jobid);
+	pjob = find_job_in_avl(jobid);
 	if (pjob) {
 		pattr = &pjob->ji_wattr[(int)JOB_ATR_depend];
 		pdep = find_depend(JOB_DEPEND_TYPE_BEFORESTART, pattr);

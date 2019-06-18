@@ -350,7 +350,7 @@ find_arrayparent(char *subjobid)
 	pc = strchr(subjobid, (int)'.');
 	if (pc)
 		strcat(idbuf, pc);
-	return (find_job(idbuf));
+	return (find_job_in_avl(idbuf));
 }
 /**
  * @brief

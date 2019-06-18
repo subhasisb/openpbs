@@ -161,7 +161,7 @@ cnvrt_qmove(resc_resv  *presv)
 		return (-1);
 	}
 
-	pjob = find_job(presv->ri_wattr[(int)RESV_ATR_convert].at_val.at_str);
+	pjob = find_job_in_avl(presv->ri_wattr[(int)RESV_ATR_convert].at_val.at_str);
 	if (pjob != NULL)
 		q_job_id = pjob->ji_qs.ji_jobid;
 	else {

@@ -182,7 +182,7 @@ find_assoc_sched_jid(char *jid, pbs_sched **target_sched)
 
 	t = is_job_array(jid);
 	if ((t == IS_ARRAY_NO) || (t == IS_ARRAY_ArrayJob))
-		pj = find_job(jid);		/* regular or ArrayJob itself */
+		pj = find_job_in_avl(jid);		/* regular or ArrayJob itself */
 	else
 		pj = find_arrayparent(jid); /* subjob(s) */
 
@@ -417,7 +417,7 @@ schedule_jobs(pbs_sched *psched)
 			if (pdefr->dr_sent == 0) {
 				s = is_job_array(pdefr->dr_id);
 				if (s == IS_ARRAY_NO) {
-					if (find_job(pdefr->dr_id) != NULL) {
+					if (find_job_in_avl(pdefr->dr_id) != NULL) {
 						jid = pdefr->dr_id;
 						cmd = SCH_SCHEDULE_AJOB;
 						break;
