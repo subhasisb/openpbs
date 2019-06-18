@@ -1098,6 +1098,18 @@ find_job(char *jobid)
 	if ((AVL_jctx != NULL) && ((pkey = svr_avlkey_create(buf)) != NULL)) {
 		if (avl_find_key(pkey, AVL_jctx) == AVL_IX_OK)
 			pj = (job *) pkey->recptr;
+		else {
+			/* search, load and add to avl from db if available */
+			if((pj = job_recov_db(buf, NULL, 0)))
+			{
+				pkey->recptr = pj;
+				if(avl_add_key(pkey, AVL_jctx) != AVL_IX_OK)
+				{
+					job_free(pj);
+					return (NULL);
+				}
+			}
+		}
 		free(pkey);
 		return (pj);
 	}
