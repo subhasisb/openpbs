@@ -242,6 +242,7 @@ tickle_for_reply(void)
 /**
  * @brief
  * 		svr_enquejob	-	Enqueue the job into specified queue.
+ * 		uses pjob->ji_newjob to determine if pjob is new job or reloaded job
  *
  * @param[in]	pjob	-	The job to be enqueued.
  *
@@ -269,50 +270,17 @@ svr_enquejob(job *pjob)
 
 	pque = find_queuebyname(pjob->ji_qs.ji_queue);
 	if (pque == NULL) {
-		/*
-		 * If it is a history job, then don't return PBSE_UNKQUE
-		 * error but link the job to SERVER job list and update
-		 * job history timestamp and subjob state table and return
-		 * 0 (SUCCESS). INFO: The job is not associated with any
-		 * queue as the queue has been already purged.
-		 */
-		if ((pjob->ji_qs.ji_state == JOB_STATE_MOVED) ||
-			(pjob->ji_qs.ji_state == JOB_STATE_FINISHED)) {
-//SHRINI_THOUGHTS: we should remove this as we should try not caching history jobs
-			if (is_linked(&svr_alljobs, &pjob->ji_alljobs) == 0) {
-				append_link(&svr_alljobs, &pjob->ji_alljobs, pjob);
-				/**
-				 * Add to AVL tree so that find_job() can return
-				 * faster compared to linked list traverse.
-				 */
-				svr_avljob_oper(pjob, 0);
-			}
-			server.sv_qs.sv_numjobs++;
-			server.sv_jobstates[pjob->ji_qs.ji_state]++;
-			if (pjob->ji_qs.ji_svrflags & JOB_SVFLG_ArrayJob) {
-				struct ajtrkhd *ptbl = pjob->ji_ajtrk;
-				if (ptbl) {
-					int indx;
-
-					for (indx = 0; indx < ptbl->tkm_ct; ++indx)
-						set_subjob_tblstate(pjob, indx, pjob->ji_qs.ji_state);
-				}
-			}
-			return (0);
-		} else {
+//SHRINI_THOUGHTS: removed as no point in caching history jobs
 			return (PBSE_UNKQUE);
-		}
 	}
 
 	/* add job to server's all job list and update server counts */
 
-#ifndef NDEBUG
 	(void)sprintf(log_buffer, "enqueuing into %s, state %x hop %ld",
 		pque->qu_qs.qu_name, pjob->ji_qs.ji_state,
 		pjob->ji_wattr[(int)JOB_ATR_hopcount].at_val.at_long);
 	log_event(PBSEVENT_DEBUG2, PBS_EVENTCLASS_JOB, LOG_DEBUG,
 		pjob->ji_qs.ji_jobid, log_buffer);
-#endif	/* NDEBUG */
 
 	pjcur = (job *)GET_PRIOR(svr_alljobs);
 	while (pjcur) {
@@ -338,9 +306,13 @@ svr_enquejob(job *pjob)
 	 * faster compared to linked list traverse.
 	 */
 	svr_avljob_oper(pjob, 0);
+
 	//SHRINI_THOUGHTS: below should be atomically done for new jobs only
-	server.sv_qs.sv_numjobs++;
-	server.sv_jobstates[pjob->ji_qs.ji_state]++;
+	if (pjob->ji_newjob)
+	{
+		server.sv_qs.sv_numjobs++;
+		server.sv_jobstates[pjob->ji_qs.ji_state]++;
+	}
 
 	/* place into queue in order of queue rank starting at end */
 
@@ -366,9 +338,13 @@ svr_enquejob(job *pjob)
 
 	/* update counts: queue and queue by state */
 	//SHRINI_THOUGHTS: below should be atomically done for new jobs only
-	pque->qu_numjobs++;
-	pque->qu_njstate[pjob->ji_qs.ji_state]++;
+	if (pjob->ji_newjob)
+	{
+		pque->qu_numjobs++;
+		pque->qu_njstate[pjob->ji_qs.ji_state]++;
+	}
 
+#if 0 //SHRINI_THOUGHTS: not worrying about array jobs for now
 	if ((pjob->ji_qs.ji_state == JOB_STATE_MOVED) ||
 		(pjob->ji_qs.ji_state == JOB_STATE_FINISHED)) {
 		if (pjob->ji_qs.ji_svrflags & JOB_SVFLG_ArrayJob) {
@@ -384,6 +360,7 @@ svr_enquejob(job *pjob)
 		}
 		return (0);
 	}
+#endif //#if 0 //SHRINI_THOUGHTS: not worrying about array jobs for now
 
 	/* update the current location and type attribute */
 
@@ -420,7 +397,7 @@ svr_enquejob(job *pjob)
 	 * set any "unspecified" resources which have default values,
 	 * first with queue defaults, then with server defaults
 	 */
-
+//SHRINI_THOUGHTS: hope set_resc_deflt() works for both new and reloaded jobs
 	rc = set_resc_deflt((void *)pjob, JOB_OBJECT, NULL);
 	if (rc)
 		return rc;
@@ -438,7 +415,7 @@ svr_enquejob(job *pjob)
 
 	/* update any entity count and entity resources usage for the queue */
 	//SHRINI_THOUGHTS: entity limits usage should not be accounted for DB reloaded jobs
-	if (!(pjob->ji_qs.ji_svrflags & JOB_SVFLG_SubJob) || (server.sv_attr[(int)SRV_ATR_State].at_val.at_long == SV_STATE_INIT)) {
+	if ((pjob->ji_newjob && !(pjob->ji_qs.ji_svrflags & JOB_SVFLG_SubJob)) || (server.sv_attr[(int)SRV_ATR_State].at_val.at_long == SV_STATE_INIT)) {
 		account_entity_limit_usages(pjob, pque, NULL, INCR, ETLIM_ACC_ALL);
 	}
 
@@ -467,7 +444,7 @@ svr_enquejob(job *pjob)
 		 * ignore this during Server recovery as the dependency
 		 * was registered when the job was first enqueued.
 		 */
-
+		//SHRINI_THOUGHTS: fingers crossed, that below works for reloaded jobs
 		if (server.sv_attr[(int)SRV_ATR_State].at_val.at_long != SV_STATE_INIT) {
 			if (pjob->ji_wattr[(int)JOB_ATR_depend].at_flags&ATR_VFLAG_SET) {
 				rc = depend_on_que(&pjob->ji_wattr[(int)JOB_ATR_depend], pjob, ATR_ACTION_NOOP);
@@ -487,7 +464,7 @@ svr_enquejob(job *pjob)
 				ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
 
 			/* better notify the Scheduler we have a new job */
-
+			//SHRINI_THOUGHTS: when we reverse sched server interface we can do away below stuff
 			if (find_assoc_sched_jid(pjob->ji_qs.ji_jobid, &psched))
 				set_scheduler_flag(SCH_SCHEDULE_NEW, psched);
 			else {
