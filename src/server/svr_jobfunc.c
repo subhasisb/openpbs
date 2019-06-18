@@ -278,7 +278,7 @@ svr_enquejob(job *pjob)
 		 */
 		if ((pjob->ji_qs.ji_state == JOB_STATE_MOVED) ||
 			(pjob->ji_qs.ji_state == JOB_STATE_FINISHED)) {
-
+//SHRINI_THOUGHTS: we should remove this as we should try not caching history jobs
 			if (is_linked(&svr_alljobs, &pjob->ji_alljobs) == 0) {
 				append_link(&svr_alljobs, &pjob->ji_alljobs, pjob);
 				/**
@@ -338,7 +338,7 @@ svr_enquejob(job *pjob)
 	 * faster compared to linked list traverse.
 	 */
 	svr_avljob_oper(pjob, 0);
-
+	//SHRINI_THOUGHTS: below should be atomically done for new jobs only
 	server.sv_qs.sv_numjobs++;
 	server.sv_jobstates[pjob->ji_qs.ji_state]++;
 
@@ -365,7 +365,7 @@ svr_enquejob(job *pjob)
 	}
 
 	/* update counts: queue and queue by state */
-
+	//SHRINI_THOUGHTS: below should be atomically done for new jobs only
 	pque->qu_numjobs++;
 	pque->qu_njstate[pjob->ji_qs.ji_state]++;
 
@@ -373,6 +373,7 @@ svr_enquejob(job *pjob)
 		(pjob->ji_qs.ji_state == JOB_STATE_FINISHED)) {
 		if (pjob->ji_qs.ji_svrflags & JOB_SVFLG_ArrayJob) {
 			int indx;
+			//SHRINI_THOUGHTS: F U array jobs !!
 			struct ajtrkhd *ptbl = pjob->ji_ajtrk;
 			if (ptbl) {
 				for (indx = 0; indx < ptbl->tkm_ct; ++indx)
@@ -436,7 +437,7 @@ svr_enquejob(job *pjob)
 	}
 
 	/* update any entity count and entity resources usage for the queue */
-
+	//SHRINI_THOUGHTS: entity limits usage should not be accounted for DB reloaded jobs
 	if (!(pjob->ji_qs.ji_svrflags & JOB_SVFLG_SubJob) || (server.sv_attr[(int)SRV_ATR_State].at_val.at_long == SV_STATE_INIT)) {
 		account_entity_limit_usages(pjob, pque, NULL, INCR, ETLIM_ACC_ALL);
 	}
