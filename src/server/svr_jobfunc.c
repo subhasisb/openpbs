@@ -445,6 +445,7 @@ svr_enquejob(job *pjob)
 		 * was registered when the job was first enqueued.
 		 */
 		//SHRINI_THOUGHTS: fingers crossed, that below works for reloaded jobs
+		//SHRINI_THOUGHTS: eventually job dependency feature should move out of server
 		if (server.sv_attr[(int)SRV_ATR_State].at_val.at_long != SV_STATE_INIT) {
 			if (pjob->ji_wattr[(int)JOB_ATR_depend].at_flags&ATR_VFLAG_SET) {
 				rc = depend_on_que(&pjob->ji_wattr[(int)JOB_ATR_depend], pjob, ATR_ACTION_NOOP);

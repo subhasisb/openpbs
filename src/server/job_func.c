@@ -1102,7 +1102,11 @@ find_job(char *jobid)
 			/* search, load and add to avl from db if available */
 			if((pj = job_recov_db(buf, NULL, 0)))
 			{
-				svr_enquejob(pj);
+				if (svr_enquejob(pj))
+				{
+					free(pkey);
+					return NULL;
+				}
 			}
 		}
 		free(pkey);
