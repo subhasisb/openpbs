@@ -213,7 +213,6 @@ que_recov_db(char *qname, pbs_queue *pq_now, int lock)
 	pbs_queue		*pq;
 	pbs_db_que_info_t	dbque;
 	pbs_db_obj_info_t	obj;
-	int rc;
 	pbs_db_conn_t		*conn = (pbs_db_conn_t *) svr_db_conn;
 
 	obj.pbs_db_obj_type = PBS_DB_QUEUE;
@@ -237,9 +236,6 @@ que_recov_db(char *qname, pbs_queue *pq_now, int lock)
 	if (pbs_db_load_obj(conn, &obj, 0) != 0)
 		goto db_err;
 	
-	if (rc == -2)
-		return pq_now; /* no change in job, return the same job */
-
 	if (db_to_svr_que(pq, &dbque) != 0)
 		goto db_err;
 

@@ -223,11 +223,11 @@ static void  init_abt_job(job *);
 static void  change_logs(int);
 int   chk_save_file(char *filename);
 static void  need_y_response(int, char *);
-static int   pbsd_init_job(job *pjob, int type);
+int   pbsd_init_job(job *pjob, int type);
 int   pbsd_init_reque(job *job, int change_state);
 static void  resume_net_move(struct work_task *);
 static void  stop_me(int);
-static int   Rmv_if_resv_not_possible(job *);
+int   Rmv_if_resv_not_possible(job *);
 static int   attach_queue_to_reservation(resc_resv *);
 static void  call_log_license(struct work_task *);
 extern int create_resreleased(job *pjob);
@@ -364,8 +364,6 @@ pbsd_init(int type)
 	char	*hook_suffix = HOOK_FILE_SUFFIX;
 	int	hook_suf_len = strlen(hook_suffix);
 	int	 logtype;
-	int	 numjobs;
-	job	*pjob;
 	hook	*phook, *phook_current;
 	pbs_queue *pque;
 	resc_resv *presv;
@@ -378,7 +376,6 @@ pbsd_init(int type)
 	struct sigaction oact;
 #endif
 	struct tm	*ptm;
-	pbs_db_job_info_t	dbjob;
 	pbs_db_resv_info_t	dbresv;
 	pbs_db_que_info_t	dbque;
 	pbs_db_sched_info_t	dbsched;
@@ -1552,7 +1549,7 @@ reassign_resc(job *pjob)
  * @retval	0	- success
  * @retval	-1	- error.
  */
-static int
+int
 pbsd_init_job(job *pjob, int type)
 {
 	unsigned int d;
@@ -2063,7 +2060,7 @@ init_abt_job(job *pjob)
  * @retval	0	- OK to requeue
  * @retval	1	- should not be requeued
  */
-static int
+int
 Rmv_if_resv_not_possible(job *pjob)
 {
 	int	    rc=0;	/*assume OK to requeue*/

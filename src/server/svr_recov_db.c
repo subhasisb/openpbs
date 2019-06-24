@@ -269,7 +269,6 @@ svr_recov_db(int lock)
 	pbs_db_conn_t *conn = (pbs_db_conn_t *) svr_db_conn;
 	pbs_db_svr_info_t dbsvr;
 	pbs_db_obj_info_t obj;
-	int rc;
 
 	/* load server_qs */
 	dbsvr.attr_list.attr_count = 0;
@@ -283,9 +282,6 @@ svr_recov_db(int lock)
 	if (pbs_db_load_obj(conn, &obj, 0) != 0)
 		goto db_err;
 	
-	if (rc == -2)
-		return 0; /* no change in server, return success */
-
 	if (db_to_svr_svr(&server, &dbsvr) != 0)
 		goto db_err;
 
