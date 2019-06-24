@@ -280,8 +280,7 @@ svr_recov_db(int lock)
 	dbsvr.sv_savetm = server.sv_qs.sv_savetm;
 
 	/* read in job fixed sub-structure */
-	rc = pbs_db_load_obj(conn, &obj, lock);
-	if (rc == -1)
+	if (pbs_db_load_obj(conn, &obj, 0) != 0)
 		goto db_err;
 	
 	if (rc == -2)

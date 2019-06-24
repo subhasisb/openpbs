@@ -528,8 +528,8 @@ job_recov_db(char *jid, job *pjob, int lock)
 	obj.pbs_db_obj_type = PBS_DB_JOB;
 	obj.pbs_db_un.pbs_db_job = &dbjob;
 
-	rc = pbs_db_load_obj(conn, &obj, lock);
-	if (rc == -1)
+	/* read in job fixed sub-structure */
+	if (pbs_db_load_obj(conn, &obj, 0) != 0)
 		goto db_err;
 	
 	if (rc == -2)

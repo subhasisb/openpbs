@@ -233,8 +233,8 @@ que_recov_db(char *qname, pbs_queue *pq_now, int lock)
 
 	strncpy(dbque.qu_name, qname, sizeof(dbque.qu_name));
 
-	rc = pbs_db_load_obj(conn, &obj, lock);
-	if (rc == -1)
+	/* read in job fixed sub-structure */
+	if (pbs_db_load_obj(conn, &obj, 0) != 0)
 		goto db_err;
 	
 	if (rc == -2)
