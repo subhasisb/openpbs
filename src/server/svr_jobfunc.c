@@ -465,12 +465,14 @@ svr_enquejob(job *pjob)
 				ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
 
 			/* better notify the Scheduler we have a new job */
-			//SHRINI_THOUGHTS: when we reverse sched server interface we can do away below stuff
-			if (find_assoc_sched_jid(pjob->ji_qs.ji_jobid, &psched))
-				set_scheduler_flag(SCH_SCHEDULE_NEW, psched);
-			else {
-				sprintf(log_buffer, "Unable to reach scheduler associated with job %s", pjob->ji_qs.ji_jobid);
-				log_err(-1, __func__, log_buffer);
+			if (pjob->ji_newjob)
+			{
+				if (find_assoc_sched_jid(pjob->ji_qs.ji_jobid, &psched))
+					set_scheduler_flag(SCH_SCHEDULE_NEW, psched);
+				else {
+					sprintf(log_buffer, "Unable to reach scheduler associated with job %s", pjob->ji_qs.ji_jobid);
+					log_err(-1, __func__, log_buffer);
+				}
 			}
 		} else if (server.sv_attr[SRV_ATR_EligibleTimeEnable].at_val.at_long &&
 			server.sv_attr[SRV_ATR_scheduling].at_val.at_long) {
