@@ -526,7 +526,7 @@ refresh_job(char *jobid) {
 
 	if(stale_job_ptr == NULL) {
 		/* if job is not in AVL tree, load the job from database */
-		new_job_ptr = job_recov_db(jobid);
+		new_job_ptr = job_recov_db(jobid, stale_job_ptr, 0);
 		if (new_job_ptr == NULL) {
 			snprintf(log_buffer, LOG_BUF_SIZE, "Failed to recover job from db %s", jobid);
 			log_err(-1, "refresh_job", log_buffer);
