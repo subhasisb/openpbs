@@ -1377,7 +1377,7 @@ pbsd_init(int type)
 			}
 			buf[0] = '\0';
 			for(j = 0; j < arst->as_usedptr; j++) {
-				if(find_job_in_avl(arst->as_string[j]) == NULL) {
+				if(find_job(arst->as_string[j]) == NULL) {
 					strncat(buf, arst->as_string[j], len);
 					strncat(buf, ",", len);
 					buf[len] = '\0';

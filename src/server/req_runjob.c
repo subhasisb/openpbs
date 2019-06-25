@@ -745,7 +745,7 @@ post_stagein(struct work_task *pwt)
 
 	preq = pwt->wt_parm1;
 	code = preq->rq_reply.brp_code;
-	pjob = find_job_in_avl(preq->rq_extra);
+	pjob = find_job(preq->rq_extra);
 	free(preq->rq_extra);
 
 	if (pjob != NULL) {

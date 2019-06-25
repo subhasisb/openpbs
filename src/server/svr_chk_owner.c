@@ -425,7 +425,7 @@ chk_job_request(char *jobid, struct batch_request *preq, int *rc)
 		deletehist = 1;
 	t = is_job_array(jobid);
 	if ((t == IS_ARRAY_NO) || (t == IS_ARRAY_ArrayJob))
-		pjob = find_job_in_avl(jobid);		/* regular or ArrayJob itself */
+		pjob = find_job(jobid);		/* regular or ArrayJob itself */
 	else
 		pjob = find_arrayparent(jobid); /* subjob(s) */
 
@@ -456,7 +456,7 @@ chk_job_request(char *jobid, struct batch_request *preq, int *rc)
 	 * host portion of the job ID in the request with the host portion of
 	 * the one from the server job structure. Do not modify anything
 	 * before the first dot in the job ID because it may be an array job.
-	 * This will allow find_job_in_avl() to look for an exact match when the
+	 * This will allow find_job() to look for an exact match when the
 	 * request is serviced by MoM.
 	 */
 	p1 = strchr(pjob->ji_qs.ji_jobid, '.');

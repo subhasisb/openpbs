@@ -1699,7 +1699,7 @@ job_obit(struct resc_used_update *pruu, int stream)
 
 	DBPRT(("%s: Obit received for job %s status=%d hop=%d\n", __func__,
 		pruu->ru_pjobid, pruu->ru_status, pruu->ru_hop))
-	pjob = find_job_in_avl(pruu->ru_pjobid);
+	pjob = find_job(pruu->ru_pjobid);
 	if (pjob == NULL) {		/* not found */
 		DBPRT(("%s: job %s not found!\n", __func__, pruu->ru_pjobid))
 		if ((server_init_type == RECOV_COLD) ||

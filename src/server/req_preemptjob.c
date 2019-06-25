@@ -308,7 +308,7 @@ req_preemptjobs(struct batch_request *preq)
 
 	for (i = 0; i < count; i++) {
 		ppj = &(preq->rq_ind.rq_preempt.ppj_list[i]);
-		pjob = find_job_in_avl(ppj->job_id);
+		pjob = find_job(ppj->job_id);
 		/* The job is already out of the way. This must have happened after the scheduler
 		 * queried the universe and before it tried to preempt the jobs.
 		 * Regardless of the preempt_order, use the correct reply code to what

@@ -112,15 +112,15 @@ extern int status_nodeattrib(svrattrl *, attribute_def *, struct pbsnode *,
 
 extern int svr_chk_histjob(job *);
 
-/*-------for stat server----------*/
-extern job  *find_job_in_avl(char *);
-extern int svr_enquejob(job *);
+
 
 
 /* Private Data Definitions */
 
 static int bad;
+/*-------for stat server----------*/
 static time_t from_time; /* Timestamp at update of qstat cache */
+job *refresh_job(char *);
 
 /* The following private support functions are included */
 
@@ -231,7 +231,7 @@ stat_a_jobidname(struct batch_request *preq, char *name, int dohistjobs, int dos
 		return (rc);	/* no job still needs to be stat-ed */
 
 	} else if ((i == IS_ARRAY_NO) || (i == IS_ARRAY_ArrayJob)) {
-		pjob = find_job_in_avl(name);
+		pjob = find_job(name);
 		if (pjob == NULL) {
 			return (PBSE_UNKJOBID);
 		} else if ((!dohistjobs) && (rc = svr_chk_histjob(pjob))) {
@@ -305,7 +305,6 @@ void req_stat_job(struct batch_request *preq)
 	int		    rc   = 0;
 	int		    type = 0;
 	char		   *pnxtjid = NULL;
-	time_t from_time;
 	int db_rc = 0;
 
 	/* check for any extended flag in the batch request. 't' for
@@ -432,7 +431,6 @@ get_all_db_jobs() {
 	void		*state = NULL;
 	int		    rc_cur = 0;
 	pbs_db_query_options_t opts;
-	job		*p_stale_job = NULL;
 
 	if (pbs_db_begin_trx(conn, 0, 0) !=0) {
 		(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);

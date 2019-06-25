@@ -352,7 +352,7 @@ post_chkpt(struct work_task *ptask)
 	struct batch_request *preq;
 
 	preq = (struct batch_request *)ptask->wt_parm1;
-	pjob = find_job_in_avl(preq->rq_ind.rq_hold.rq_orig.rq_objname);
+	pjob = find_job(preq->rq_ind.rq_hold.rq_orig.rq_objname);
 	if (!preq || !pjob)
 		return;
 	if (preq->rq_reply.brp_code == 0) {

@@ -125,6 +125,8 @@ extern time_t time_now;
 
 #ifndef PBS_MOM
 
+extern job *refresh_job(char *);
+
 /**
  * @brief
  *		Load a server job object to a database job object
@@ -520,7 +522,7 @@ refresh_job(char *jobid) {
 	pbs_db_job_info_t dbjob;
 
 	/* get the old pointer of the job, if job is in AVL tree */
-	stale_job_ptr = find_job_in_avl(jobid);
+	stale_job_ptr = find_job_avl(jobid);
 
 	if(stale_job_ptr == NULL) {
 		/* if job is not in AVL tree, load the job from database */
@@ -538,7 +540,7 @@ refresh_job(char *jobid) {
 		obj.pbs_db_obj_type = PBS_DB_JOB;
 		obj.pbs_db_un.pbs_db_job = &dbjob;
 
-		if (pbs_db_load_obj(conn, &obj) != 0) {
+		if (pbs_db_load_obj(conn, &obj, 0) != 0) {
 			snprintf(log_buffer, LOG_BUF_SIZE, "Failed to load job %s", dbjob.ji_jobid);
 			log_err(-1, "refresh_job", log_buffer);
 			pbs_db_reset_obj(&obj);

@@ -48,7 +48,7 @@
  *   job_purge	  				- purge job from server
  *   tasks_free
  *   job_init_wattr				- initialize job working attribute array set the types and the "unspecified value" flag
- *   find_job_in_avl					- find job by jobid
+ *   find_job					- find job by jobid
  *   write_cred					- Output credential into job file.
  *	 read_cred					- Check if this job has an associated credential file.  If it does,
  *	 								the credential file is opened and the credential is read into malloc'ed memory.
@@ -989,7 +989,21 @@ job_purge(job *pjob)
 
 /**
  * @brief
- * 		find_job_in_avl() - find job by jobid
+ * 		wrapper function to call find_job_avl
+ *
+ * @param[in]	jobid - job ID string.
+ *
+ * @return	pointer to job struct
+ * @retval NULL	- if job by jobid not found.
+ */
+job *
+find_job(char *jobid) {
+	return(find_job_avl(jobid));
+}
+
+/**
+ * @brief
+ * 		find_job_avl() - find job by jobid
  *
  *		Search list of all server jobs for one with same job id
  *		Return NULL if not found or pointer to job struct if found.
@@ -1009,7 +1023,7 @@ job_purge(job *pjob)
  */
 
 job *
-find_job_in_avl(char *jobid)
+find_job_avl(char *jobid)
 {
 #ifndef PBS_MOM
 	size_t len;

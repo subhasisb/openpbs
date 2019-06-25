@@ -1496,7 +1496,7 @@ req_mvjobfile(struct batch_request *preq)
 
 	pj = locate_new_job(preq, NULL);
 	if (pj == NULL)
-		pj = find_job_in_avl(preq->rq_ind.rq_jobfile.rq_jobid);
+		pj = find_job(preq->rq_ind.rq_jobfile.rq_jobid);
 
 	if ((preq->rq_fromsvr == 0) || (pj == NULL)) {
 		req_reject(PBSE_IVALREQ, 0, preq);
@@ -1648,7 +1648,7 @@ req_mvjobfile(struct batch_request *preq)
 
 	pj = locate_new_job(preq, NULL);
 	if (pj == NULL)
-		pj = find_job_in_avl(preq->rq_ind.rq_jobfile.rq_jobid);
+		pj = find_job(preq->rq_ind.rq_jobfile.rq_jobid);
 
 	if (pj == NULL) {
 		req_reject(PBSE_UNKJOBID, 0, preq);

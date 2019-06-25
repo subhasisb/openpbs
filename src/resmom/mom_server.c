@@ -1061,7 +1061,7 @@ is_request(int stream, int version)
 			n = disrsi(stream, &ret);	/* job's run_version */
 			if (ret != DIS_SUCCESS)
 				n = -1;			/* default to -1 */
-			pjob = find_job_in_avl(jobid);
+			pjob = find_job(jobid);
 			if (pjob) {
 				long runver;
 

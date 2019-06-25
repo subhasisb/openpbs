@@ -2651,7 +2651,7 @@ rid_job(char *jobid)
 {
 	job	*pjob;
 
-	pjob = find_job_in_avl(jobid);
+	pjob = find_job(jobid);
 	if (pjob)
 		mom_deljob(pjob);
 }
@@ -2673,7 +2673,7 @@ set_job_toexited(char *jobid)
 {
 	job *pjob;
 
-	pjob = find_job_in_avl(jobid);
+	pjob = find_job(jobid);
 	if (pjob) {
 		pjob->ji_qs.ji_substate = JOB_SUBSTATE_EXITED;
 		if (pjob->ji_qs.ji_svrflags & JOB_SVFLG_CHKPT) {

@@ -270,7 +270,6 @@ svr_enquejob(job *pjob)
 
 	pque = find_queuebyname(pjob->ji_qs.ji_queue);
 	if (pque == NULL) {
-//SHRINI_THOUGHTS: removed as no point in caching history jobs
 			return (PBSE_UNKQUE);
 	}
 
@@ -302,7 +301,7 @@ svr_enquejob(job *pjob)
 	}
 
 	/**
-	 * Add to AVL tree so that find_job_in_avl() can return
+	 * Add to AVL tree so that find_job() can return
 	 * faster compared to linked list traverse.
 	 */
 	svr_avljob_oper(pjob, 0);
@@ -520,7 +519,7 @@ svr_dequejob(job *pjob)
 
 		/**
 		 * Remove the key from the AVL tree which was
-		 * added for faster job search i.e. find_job_in_avl().
+		 * added for faster job search i.e. find_job().
 		 */
 		svr_avljob_oper(pjob, 1);
 
@@ -5453,7 +5452,7 @@ svr_chk_histjob(job *pjob)
  * @see
  * 		svr_enquejob()
  *		svr_dequejob()
- *		find_job_in_avl()
+ *		find_job()
  *
  * @return	Pointer to AVL_IX_REC record for success.
  * @retval	NULL	: failure.

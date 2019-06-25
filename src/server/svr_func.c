@@ -5240,7 +5240,7 @@ fail_vnode_job(struct prov_vnode_info * prov_vnode_info, int hold_or_que)
 	if (prov_vnode_info->pvnfo_jobid[0] == '\0')
 		return;
 
-	pjob = (job *) find_job_in_avl(prov_vnode_info->pvnfo_jobid);
+	pjob = (job *) find_job(prov_vnode_info->pvnfo_jobid);
 	if (!pjob)
 		return;
 
@@ -5549,7 +5549,7 @@ check_and_run_jobs(struct prov_vnode_info * prov_vnode_info)
 	DBPRT(("%s: Entered, node=%s, jobid=%s\n", __func__,
 		prov_vnode_info->pvnfo_vnode, prov_vnode_info->pvnfo_jobid))
 
-	pjob = (job *) find_job_in_avl(prov_vnode_info->pvnfo_jobid);
+	pjob = (job *) find_job(prov_vnode_info->pvnfo_jobid);
 	if (pjob == NULL)
 		return;
 
@@ -6441,7 +6441,7 @@ start_vnode_provisioning(struct prov_vnode_info * prov_vnode_info)
 		return (PBSE_INTERNAL);
 	}
 
-	pjob = find_job_in_avl(prov_vnode_info->pvnfo_jobid);
+	pjob = find_job(prov_vnode_info->pvnfo_jobid);
 	if (pjob) {
 		/* log job prov success message */
 		sprintf(log_buffer, "Provisioning vnode %s with AOE %s "
