@@ -173,7 +173,7 @@ struct pbs_db_job_info {
 	char     ji_queue[PBS_MAXQUEUENAME + 1]; /* name of current queue */
 	char     ji_destin[PBS_MAXROUTEDEST + 1]; /* dest from qmove/route */
 	INTEGER  ji_un_type;
-	INTEGER  ji_momaddr; /* host addr of Server */
+	BIGINT  ji_momaddr; /* host addr of Server */
 	INTEGER  ji_momport; /* port # */
 	INTEGER  ji_exitstat; /* job exit status from MOM */
 	BIGINT   ji_quetime; /* time entered queue */
