@@ -209,7 +209,10 @@ db_to_svr_job(job *pjob,  pbs_db_job_info_t *dbjob)
 	strcpy(pjob->ji_qs.ji_jobid, dbjob->ji_jobid);
 	pjob->ji_qs.ji_state = dbjob->ji_state;
 	pjob->ji_qs.ji_substate = dbjob->ji_substate;
-	pjob->ji_qs.ji_svrflags = dbjob->ji_svrflags;
+	/* dbjob->ji_svrflags fetching wrong value from database, thus commented out.
+	 *  will fix it proper later.
+	 */
+	//pjob->ji_qs.ji_svrflags = dbjob->ji_svrflags;
 	pjob->ji_qs.ji_numattr = dbjob->ji_numattr ;
 	pjob->ji_qs.ji_ordering = dbjob->ji_ordering;
 	pjob->ji_qs.ji_priority = dbjob->ji_priority;
