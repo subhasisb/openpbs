@@ -3684,7 +3684,7 @@ _pps_helper_get_resv(resc_resv *presv_o, const char *resvid)
 			log_err(PBSE_INTERNAL, __func__, log_buffer);
 			return NULL;
 		}
-		presv = find_resv((char *)resvid_out);
+		presv = find_resv((char *)resvid_out, 0);
 	}
 
 	if (presv == NULL) {

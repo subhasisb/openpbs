@@ -697,11 +697,10 @@ svr_setjobstate(job *pjob, int newstate, int newsubstate)
 		if (pjob->ji_qs.ji_svrflags & JOB_SVFLG_ArrayJob)
 		   return (job_save(pjob, SAVEJOB_FULL));
 		else
-		   return (job_save(pjob, SAVEJOB_QUICK));
-		   */
-		  return (job_save(pjob, SAVEJOB_FULL));
-	}
-
+		   return (job_save(pjob, SAVEJOB_FULL));
+		*/
+		return (job_save(pjob, SAVEJOB_FULL));
+	}	
 	return (0);
 }
 
@@ -2883,6 +2882,9 @@ Time4resv(struct work_task *ptask)
 		resv_setResvState(presv, state, sub);
 		cmp_resvStateRelated_attrs((void *)presv,
 			presv->ri_qs.ri_type);
+		/* This resv_save is called to save any state changes done is resv_setResvState function */
+		if (presv->ri_modified)
+			(void)job_or_resv_save((void *)presv, SAVERESV_FULL, RESC_RESV_OBJECT);
 		if (presv->ri_qs.ri_type == RESV_JOB_OBJECT &&
 			(pjob = presv->ri_jbp)) {
 
@@ -3034,6 +3036,10 @@ Time4resvFinish(struct work_task *ptask)
 			 */
 			change_enableORstart(presv, Q_CHNG_START, "FALSE");
 			(void)resv_setResvState(presv, RESV_DELETING_JOBS, RESV_DELETING_JOBS);
+
+			/* This resv_save is called to save any state changes done is resv_setResvState function */
+			if (presv->ri_modified)
+				(void)job_or_resv_save((void *)presv, SAVERESV_FULL, RESC_RESV_OBJECT);
 
 			/* 2) Issue delete messages to jobs in running state and keep jobs in
 			 * Queued state. Server periodically monitors the reservation queue

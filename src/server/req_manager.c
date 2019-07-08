@@ -3909,7 +3909,7 @@ check_resource_set_on_jobs_or_resvs(struct batch_request *preq, resource_def *pr
 		}
 	}
 
-	/* Reject if resource is on a job and the type or flag are being modified */
+	/* Reject if resource is on a resource and the type or flag are being modified */
 	pr = (resc_resv *)GET_NEXT(svr_allresvs);
 	while (pr != NULL) {
 		pattr = &pr->ri_wattr[RESV_ATR_resource];

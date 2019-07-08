@@ -187,7 +187,7 @@ find_job(char *jobid)
 }
 
 resc_resv *
-find_resv(char *resvid)
+find_resv(char *resvid, int lock)
 {
 	return NULL;
 }

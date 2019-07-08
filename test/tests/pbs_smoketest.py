@@ -63,7 +63,6 @@ class SmokeTest(PBSTestSuite):
         jid = self.server.submit(j)
         self.server.expect(JOB, {'job_state': 'R'}, id=jid)
 
-    '''
     @skipOnCpuSet
     def test_submit_job_array(self):
         """
@@ -113,7 +112,6 @@ class SmokeTest(PBSTestSuite):
         self.server.expect(RESV, a, id=rid, interval=1)
         self.server.expect(JOB, {'job_state': 'R'}, jid1)
         self.server.expect(JOB, {'job_state': 'B'}, jid2)
-    '''
 
     def test_standing_reservation(self):
         """
@@ -188,7 +186,6 @@ class SmokeTest(PBSTestSuite):
         jobs = self.server.select()
         self.assertNotEqual(jobs, None)
 
-    '''
     def test_alter(self):
         """
         Test to alter job
@@ -200,7 +197,6 @@ class SmokeTest(PBSTestSuite):
         self.server.expect(JOB, {'job_state': 'Q'}, id=jid)
         self.server.alterjob(jid, {'comment': 'job comment altered'})
         self.server.expect(JOB, {'comment': 'job comment altered'}, id=jid)
-    '''
 
     def test_sigjob(self):
         """
@@ -294,7 +290,6 @@ class SmokeTest(PBSTestSuite):
         self.server.manager(MGR_CMD_CREATE, QUEUE, a, qname, expect=True)
         self.server.manager(MGR_CMD_DELETE, QUEUE, id=qname)
 
-    '''
     @skipOnCpuSet
     def test_fgc_limits(self):
         """
@@ -315,7 +310,6 @@ class SmokeTest(PBSTestSuite):
         j3id = self.server.submit(j3)
         self.server.expect(JOB, 'comment', op=SET, id=j3id)
         self.server.expect(JOB, {'job_state': 'Q'}, id=j3id)
-    '''
 
     @skipOnCpuSet
     def test_limits(self):
@@ -1129,7 +1123,6 @@ class SmokeTest(PBSTestSuite):
                                    {'session_id': (NOT, self.isSuspended)},
                                    id=job['id'])
 
-    '''
     @skipOnCpuSet
     def test_suspend_job_array_with_preempt(self):
         """
@@ -1153,7 +1146,6 @@ class SmokeTest(PBSTestSuite):
                 self.server.expect(JOB,
                                    {'session_id': (NOT, self.isSuspended)},
                                    id=job['id'])
-    '''
 
     def create_resource_helper(self, r, t, f, c):
         """
@@ -1338,7 +1330,6 @@ class SmokeTest(PBSTestSuite):
                 if d and len(d) > 0:
                     self.assertFalse(ar in d[0])
 
-    '''
     @timeout(720)
     def test_resource_delete(self):
         """
@@ -1367,7 +1358,6 @@ class SmokeTest(PBSTestSuite):
                         self.delete_resource_helper(
                             self.resc_name, t, f, c, k, v)
                         self.logger.info("")
-    '''
 
     def setup_fs(self, formula):
 

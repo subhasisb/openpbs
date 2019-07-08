@@ -318,7 +318,7 @@ req_confirmresv(struct batch_request *preq)
 		return;
 	}
 
-	presv = find_resv(preq->rq_ind.rq_run.rq_jid);
+	presv = find_resv(preq->rq_ind.rq_run.rq_jid, 0);
 	if (presv == NULL) {
 		req_reject(PBSE_UNKRESVID, 0, preq);
 		return;
@@ -614,6 +614,12 @@ req_confirmresv(struct batch_request *preq)
 		presv->ri_qs.ri_type);
 	Update_Resvstate_if_resv(presv->ri_jbp);
 
+	/* In "Update_Resvstate_if_resv" function, the job pointer is passed as a parameter
+	   and that job's states are modified. Hence presv->ri_jbp->ji_modified is set to 1.
+	   Should we save that job to DB as well by calling job_save for that job? Rest of
+	   the places where Update_Resvstate_if_resv function is called, we are calling 
+	   the job_save function later on.*/
+
 	if (presv->ri_modified)
 		(void)job_or_resv_save((void *)presv, SAVERESV_FULL, RESC_RESV_OBJECT);
 
@@ -624,7 +630,7 @@ req_confirmresv(struct batch_request *preq)
 	 * is moving from state UNCONFIRMED to CONFIRMED
 	 */
 	if (presv->ri_brp) {
-		presv = find_resv(presv->ri_qs.ri_resvID);
+		presv = find_resv(presv->ri_qs.ri_resvID, 0);
 		if (presv->ri_wattr[(int)RESV_ATR_convert].at_val.at_str != NULL) {
 			rc = cnvrt_qmove(presv);
 			if (rc != 0) {

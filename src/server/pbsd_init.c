@@ -231,6 +231,7 @@ int   Rmv_if_resv_not_possible(job *);
 static int   attach_queue_to_reservation(resc_resv *);
 static void  call_log_license(struct work_task *);
 extern int create_resreleased(job *pjob);
+int am_i_resv_owner(char *);
 
 extern pbs_sched *sched_alloc(char *sched_name, int append);
 
@@ -907,30 +908,35 @@ pbsd_init(int type)
 		return (-1);
 	}
 	while ((rc = pbs_db_cursor_next(conn, state, &obj)) == 0) {
-		/* recover reservation */
-		presv = (resc_resv *) job_or_resv_recov(dbresv.ri_resvid,
-			RESC_RESV_OBJECT);
-		if (presv != NULL) {
+		/* As part of multi server, will check the reservation owner(server)
+		 * and then only load the reservation from db and add it to the list for quick availabilty.
+		 */
+		if(am_i_resv_owner(dbresv.ri_resvid)) {
+			/* recover reservation */
+			presv = (resc_resv *) job_or_resv_recov(dbresv.ri_resvid,
+				RESC_RESV_OBJECT);
+			if (presv != NULL) {
 
-			is_resv_window_in_future(presv);
-			set_old_subUniverse(presv);
+				is_resv_window_in_future(presv);
+				set_old_subUniverse(presv);
 
-			append_link(&svr_allresvs, &presv->ri_allresvs, presv);
-			if (attach_queue_to_reservation(presv)) {
+				append_link(&svr_allresvs, &presv->ri_allresvs, presv);
+				if (attach_queue_to_reservation(presv)) {
 
-				/* reservation needed queue; failed to find it */
-				sprintf(log_buffer, msg_init_resvNOq,
-					presv->ri_qs.ri_queue, presv->ri_qs.ri_resvID);
-				log_event(PBSEVENT_SYSTEM | PBSEVENT_ADMIN |
-					PBSEVENT_DEBUG, PBS_EVENTCLASS_RESV,
-					LOG_NOTICE, msg_daemonname, log_buffer);
-			} else {
+					/* reservation needed queue; failed to find it */
+					sprintf(log_buffer, msg_init_resvNOq,
+						presv->ri_qs.ri_queue, presv->ri_qs.ri_resvID);
+					log_event(PBSEVENT_SYSTEM | PBSEVENT_ADMIN |
+						PBSEVENT_DEBUG, PBS_EVENTCLASS_RESV,
+						LOG_NOTICE, msg_daemonname, log_buffer);
+				} else {
 
-				sprintf(log_buffer, msg_init_recovresv,
-					presv->ri_qs.ri_resvID);
-				log_event(PBSEVENT_SYSTEM | PBSEVENT_ADMIN |
-					PBSEVENT_DEBUG, PBS_EVENTCLASS_SERVER,
-					LOG_INFO, msg_daemonname, log_buffer);
+					sprintf(log_buffer, msg_init_recovresv,
+						presv->ri_qs.ri_resvID);
+					log_event(PBSEVENT_SYSTEM | PBSEVENT_ADMIN |
+						PBSEVENT_DEBUG, PBS_EVENTCLASS_SERVER,
+						LOG_INFO, msg_daemonname, log_buffer);
+				}
 			}
 		}
 		pbs_db_reset_obj(&obj);
@@ -2049,7 +2055,7 @@ Rmv_if_resv_not_possible(job *pjob)
 		 *resc_resv structure exists and, if so, rejoin
 		 */
 
-		presv = find_resv(pjob->ji_qs.ji_jobid);
+		presv = find_resv(pjob->ji_qs.ji_jobid, 0);
 		if (presv == NULL ||
 			pjob->ji_wattr[JOB_ATR_reserve_end]
 			.at_val.at_long < time_now)
@@ -2157,3 +2163,7 @@ call_log_license(struct work_task *ptask)
 	(void)set_task(WORK_Timed, ntime, call_log_license, 0);
 }
 
+/* check the ownership of the reservtaion (i.e. servername)*/
+int am_i_resv_owner(char *resvid) {
+	return 1;
+}

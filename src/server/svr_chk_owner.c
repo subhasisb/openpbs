@@ -534,7 +534,13 @@ chk_rescResv_request(char *resvID, struct batch_request *preq)
 {
 	resc_resv	*presv;
 
-	if ((presv = find_resv(resvID)) == NULL) {
+	/* No need to lock the row when we are going to delete the reservation. Currently
+	   chk_rescResv_request is called for modify and delete reservation only. */
+	int lock = 0;
+	if(preq->rq_type == PBS_BATCH_ModifyResv)
+		lock = 1;
+
+	if ((presv = find_resv(resvID, lock)) == NULL) {
 		log_event(PBSEVENT_DEBUG, PBS_EVENTCLASS_RESV, LOG_INFO,
 			resvID, msg_unkresvID);
 		req_reject(PBSE_UNKRESVID, 0, preq);

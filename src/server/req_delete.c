@@ -1085,6 +1085,9 @@ req_deleteReservation(struct batch_request *preq)
 		eval_resvState(presv, RESVSTATE_req_deleteReservation,
 			relVal, &state, &sub);
 		(void) resv_setResvState(presv, state, sub);
+		/* This resv_save is called to save any state changes done is resv_setResvState function */
+		if (presv->ri_modified)
+			(void)job_or_resv_save((void *)presv, SAVERESV_FULL, RESC_RESV_OBJECT);
 		pjob = (job *) GET_NEXT(presv->ri_qp->qu_jobs);
 		while (pjob != NULL) {
 
@@ -1194,6 +1197,9 @@ req_deleteReservation(struct batch_request *preq)
 		eval_resvState(presv, RESVSTATE_req_deleteReservation,
 			relVal, &state, &sub);
 		(void) resv_setResvState(presv, state, sub);
+		/* This resv_save is called to save any state changes done is resv_setResvState function */
+		if (presv->ri_modified)
+			(void)job_or_resv_save((void *)presv, SAVERESV_FULL, RESC_RESV_OBJECT);
 		reply_ack(preq);
 		resv_purge(presv);
 		return;

@@ -776,6 +776,10 @@ fixup_arrayindicies(attribute *pattr, void *pobj, int mode)
 	job  *pjob = pobj;
 	char *str;
 
+	/* it's a hack only is just to bypass this function during refresh_job() */
+	if(mode == ATR_ACTION_RECOV)
+		return (PBSE_NONE);
+
 	/* set all all sub jobs expired,  then reset queued the ones in "remaining" */
 	for (i=0; i < pjob->ji_ajtrk->tkm_ct; i++)
 		set_subjob_tblstate(pjob, i, JOB_STATE_EXPIRED);

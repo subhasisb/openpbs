@@ -122,6 +122,7 @@ static int bad;
 /*-------for stat server----------*/
 static time_t from_time; /* Timestamp at update of qstat cache */
 job *refresh_job(char *);
+resc_resv *refresh_resv(char *);
 
 /* The following private support functions are included */
 
@@ -130,6 +131,7 @@ static int status_node(struct pbsnode *, struct batch_request *, pbs_list_head *
 static int status_resv(resc_resv *, struct batch_request *, pbs_list_head *);
 extern pbs_sched *find_scheduler(char *sched_name);
 static int get_all_db_jobs();
+static int get_all_db_resv();
 
 /**
  * @brief
@@ -415,8 +417,6 @@ void req_stat_job(struct batch_request *preq)
 /**
  * @brief
  * 		Get all the jobs from database which are changed after given time.
- *
- * @param[in]	from_time	-	time in epoch seconds
  *
  * @return	0 - success
  * 			1 - fail/error
@@ -1112,6 +1112,7 @@ req_stat_resv(struct batch_request * preq)
 	resc_resv	   *presv = NULL;
 	int		    rc   = 0;
 	int		    type = 0;
+	int			db_rc = 0;
 
 	/*
 	 * first, validate the name sent in the request.
@@ -1119,12 +1120,18 @@ req_stat_resv(struct batch_request * preq)
 	 * or a '\0' or "@..." for all reservations.
 	 */
 
+	/*---------for updating/adding all reservations-----------*/
+	db_rc = get_all_db_resv();
+	if (db_rc)
+		req_reject(db_rc, bad, preq);
+	/*--------------------------------*/
+
 	name = preq->rq_ind.rq_status.rq_id;
 
 	if ((*name == '\0') || (*name =='@'))
-		type = 1;
+		type = 1; /* for all reservations */
 	else {
-		presv = find_resv(name);
+		presv = find_resv(name, 0);
 		if (presv == NULL) {
 			req_reject(PBSE_UNKRESVID, 0, preq);
 			return;
@@ -1157,6 +1164,64 @@ req_stat_resv(struct batch_request * preq)
 		(void)reply_send(preq);
 	else
 		req_reject(rc, bad, preq);
+}
+
+/**
+ * @brief
+ * 		Get all the reservations from database which are changed after given time.
+ *
+ * @return	0 - success
+ * 			1 - fail/error
+ */
+
+static int
+get_all_db_resv() {
+
+	resc_resv *presv = NULL;
+	pbs_db_resv_info_t dbresv;
+	pbs_db_obj_info_t obj;
+	pbs_db_conn_t *conn = svr_db_conn;
+	void		*state = NULL;
+	int		    rc_cur = 0;
+	//pbs_db_query_options_t opts;
+
+	if (pbs_db_begin_trx(conn, 0, 0) !=0) {
+		(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
+		return (1);
+	}
+
+	//opts.timestamp = from_time;
+	obj.pbs_db_obj_type = PBS_DB_RESV;
+	obj.pbs_db_un.pbs_db_resv = &dbresv;
+	state = pbs_db_cursor_init(conn, &obj, NULL);
+
+	if (state == NULL) {
+		sprintf(log_buffer, "%s", (char *) conn->conn_db_err);
+		log_err(-1, __func__, log_buffer);
+		pbs_db_cursor_close(conn, state);
+		(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
+		return (1);
+	}
+	/* load reservations from DB */
+	while ((rc_cur = pbs_db_cursor_next(conn, state, &obj)) == 0) {
+		/*	if (dbresv.ri_savetm > from_time) {
+			from_time = dbresv.ri_savetm;
+		}*/
+		/* For now Not comparing timestamp */
+		if ((presv = refresh_resv(dbresv.ri_resvid)) == NULL) {
+				sprintf(log_buffer, "Failed to refresh resv %s", dbresv.ri_resvid);
+				log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_NOTICE,
+				msg_daemonname, log_buffer);
+			continue;
+		}
+		pbs_db_reset_obj(&obj);
+	} /* END while */
+
+	/* close the connection */
+	pbs_db_cursor_close(conn, state);
+	if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0)
+		return (1);
+	return 0;
 }
 
 /**

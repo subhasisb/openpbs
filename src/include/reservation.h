@@ -232,6 +232,8 @@ struct resc_resv {
 	struct work_task	*resv_start_task;
 	struct work_task	*resv_end_task;
 
+	time_t	ri_savetm;
+
 	/*
 	 * fixed size internal data - maintained via "quick save"
 	 * some of the items are copies of attributes, if so this
@@ -317,8 +319,9 @@ struct resc_resv {
 #define	Q_CHNG_ENABLE		0
 #define	Q_CHNG_START		1
 
-extern resc_resv  *find_resv(char *);
+extern resc_resv  *find_resv(char *, int);
 extern resc_resv  *resc_resv_alloc(void);
+extern resc_resv  *resv_recov_db(char *, resc_resv *, int);
 extern void  resv_purge(resc_resv *);
 extern int   start_end_dur_wall(void *, int);
 

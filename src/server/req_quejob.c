@@ -197,8 +197,8 @@ static	int	validate_place_req_of_job_in_reservation(job *pj);
 
 /* To generate the job/resv id's locally */
 long long svr_jobidnumber = -1; /* this should be loaded by init */
-
 static char *pbs_o_que = "PBS_O_QUEUE=";
+resc_resv *get_resv_for_que(char *);
 /**
  * @brief
  * 		validate_perm_res_in_select -	checks to see if the resources
@@ -1025,6 +1025,20 @@ req_quejob(struct batch_request *preq)
 	 *
 	 * Also check for conflict for job and reservation place spec
 	 */
+
+	/* As part of multi server need to fetch the reservation from the db if it's a reservation queue.
+	 * So for the time being let's assume it that if queue name starts with 'R' this means it's a resv queue.
+	 * For future: restrict the queue name starts with 'R' or else need to add an attr to queue structure for
+	 * finding out whether it's a queue or resv queue.
+	 */
+
+	int is_normal_que;
+	char resv_char[]="R";
+	is_normal_que = strncmp(pj->ji_qs.ji_queue, resv_char, 1);
+	if(!is_normal_que) {
+		/* it's a resv queue */
+		pque->qu_resvp = (resc_resv *)get_resv_for_que(pj->ji_qs.ji_queue);
+	}
 	if (pque->qu_resvp) {
 		job_attr_def[(int)JOB_ATR_reserve_ID].at_free(
 			&pj->ji_wattr[(int)JOB_ATR_reserve_ID]);
@@ -1253,6 +1267,27 @@ req_quejob(struct batch_request *preq)
 #endif	/* not PBS_MOM */
 }
 
+/* fetch reservation from the db related to the reservation queue */
+#ifndef PBS_MOM
+resc_resv *
+get_resv_for_que(char *que_name) {
+
+	/* find_resv() need full qualify name
+	 * i.e. R41.server_name so we need to make that name
+	 */
+	char	full_qu_name[300]; /* queue name */
+	resc_resv *qu_resvp;
+	snprintf(full_qu_name, sizeof(full_qu_name), "%s.%s", que_name, server_name);
+	qu_resvp = find_resv(full_qu_name, 0);
+	if(qu_resvp == NULL) {
+		sprintf(log_buffer,"Failed to fetch the reservation %s from database",
+				full_qu_name);
+			log_err(-1,__func__,log_buffer);
+			return NULL;
+	}
+	return qu_resvp;
+}
+#endif
 /**
  * @brief
  * 		req_jobcredential - receive a set of credentials to be used by the job
@@ -2171,7 +2206,7 @@ req_resvSub(struct batch_request *preq)
 	 * this capability, but will have this code here
 	 */
 
-	if ((presv = find_resv(rid)) == NULL) {
+	if ((presv = find_resv(rid, 0)) == NULL) {
 		/* Not on "all_resvs" list try "new_resvs" list */
 		presv = (resc_resv *)GET_NEXT(svr_newresvs);
 		while (presv) {
@@ -2598,8 +2633,7 @@ req_resvSub(struct batch_request *preq)
 	presv->ri_qs.ri_un.ri_newt.ri_fromsock = sock;
 	presv->ri_qs.ri_un.ri_newt.ri_fromaddr = get_connectaddr(sock);
 
-	/* start a transaction and save resv and server structure */
-	pbs_db_begin_trx(conn, 0, 0);
+	/* save resv and server structure */
 
 	if (job_or_resv_save((void *)presv, SAVERESV_NEW, RESC_RESV_OBJECT)) {
 		(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
@@ -2611,11 +2645,8 @@ req_resvSub(struct batch_request *preq)
 	/* Now, no need to save server here because server
 	   has already saved in the get_next_svr_sequence_id() */
 
-	if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0) {
-		(void)resv_purge(presv);
-		req_reject(PBSE_SYSTEM, 0, preq);
-		return;
-	}
+	/* Removing begin and end transaction as we are not saving
+	   anything in server here. */
 
 	svr_jobidnumber = next_svr_sequence_id;
 

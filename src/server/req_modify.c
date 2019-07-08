@@ -721,7 +721,6 @@ modify_job_attr(job *pjob, svrattrl *plist, int perm, int *bad)
 void
 req_modifyReservation(struct batch_request *preq)
 {
-	char		*rid = NULL;
 	svrattrl	*psatl = NULL;
 	attribute_def	*pdef = NULL;
 	int		rc = 0;
@@ -736,33 +735,21 @@ req_modifyReservation(struct batch_request *preq)
 	int		next_occr_start = 0;
 	extern char	*msg_stdg_resv_occr_conflict;
 	resc_resv	*presv;
+	pbs_db_conn_t		*conn = (pbs_db_conn_t *) svr_db_conn;
+
+	if (pbs_db_begin_trx(conn, 0, 0) != 0)
+		goto err;
 
 	if (preq == NULL)
-		return;
+		goto err;
 
 	sock = preq->rq_conn;
 
+	/*  Calling find_resv inside chk_rescResv_request function with locking the reservation row */
 	presv = chk_rescResv_request(preq->rq_ind.rq_modify.rq_objname, preq);
-	/* Note: on failure, chk_rescResv_request invokes req_reject
-	 * appropriate reply is sent and batch_request is freed.
-	 */
-	if (presv == NULL)
-		return;
-
-	rid = preq->rq_ind.rq_modify.rq_objname;
-	if ((presv = find_resv(rid)) == NULL) {
-		/* Not on "all_resvs" list try "new_resvs" list */
-		presv = (resc_resv *)GET_NEXT(svr_newresvs);
-		while (presv) {
-			if (!strcmp(presv->ri_qs.ri_resvID, rid))
-				break;
-			presv = (resc_resv *)GET_NEXT(presv->ri_allresvs);
-		}
-	}
-
 	if (presv == NULL) {
 		req_reject(PBSE_UNKRESVID, 0, preq);
-		return;
+		goto err;
 	}
 
 	is_standing = presv->ri_wattr[RESV_ATR_resv_standing].at_val.at_long;
@@ -784,7 +771,7 @@ req_modifyReservation(struct batch_request *preq)
 		if (index < 0) {
 			/* didn`t recognize the name */
 			reply_badattr(PBSE_NOATTR, 1, psatl, preq);
-			return;
+			goto err;
 		}
 		pdef = &resv_attr_def[index];
 
@@ -802,7 +789,7 @@ req_modifyReservation(struct batch_request *preq)
 		}
 		if ((pdef->at_flags & resc_access_perm) == 0) {
 			reply_badattr(PBSE_ATTRRO, 1, psatl, preq);
-			return;
+			goto err;
 		}
 
 		switch (index) {
@@ -821,25 +808,25 @@ req_modifyReservation(struct batch_request *preq)
 							log_event(PBSEVENT_RESV, PBS_EVENTCLASS_RESV, LOG_INFO,
 								preq->rq_ind.rq_modify.rq_objname, log_buffer);
 							req_reject(PBSE_STDG_RESV_OCCR_CONFLICT, 0, preq);
-							return;
+							goto err;
 						}
 					} else {
 						req_reject(PBSE_BADTSPEC, 0, preq);
-						return;
+						goto err;
 					}
 				} else {
 					if (presv->ri_qp->qu_numjobs)
 						req_reject(PBSE_RESV_NOT_EMPTY, 0, preq);
 					else
 						req_reject(PBSE_BADTSPEC, 0, preq);
-					return;
+					goto err;
 				}
 				break;
 			case RESV_ATR_end:
 				temp = strtol(psatl->al_value, &end, 10);
 				if (temp == presv->ri_wattr[RESV_ATR_end].at_val.at_long) {
 					req_reject(PBSE_BADTSPEC, 0, preq);
-					return;
+					goto err;
 				}
 				if (!is_standing || temp < next_occr_start) {
 					send_to_scheduler = RESV_END_TIME_MODIFIED;
@@ -850,7 +837,7 @@ req_modifyReservation(struct batch_request *preq)
 					log_event(PBSEVENT_RESV, PBS_EVENTCLASS_RESV, LOG_INFO,
 						preq->rq_ind.rq_modify.rq_objname, log_buffer);
 					req_reject(PBSE_STDG_RESV_OCCR_CONFLICT, 0, preq);
-					return;
+					goto err;
 				}
 				break;
 			default:
@@ -863,7 +850,7 @@ req_modifyReservation(struct batch_request *preq)
 
 		if (rc != 0) {
 			reply_badattr(rc, 1, psatl, preq);
-			return;
+			goto err;
 		}
 
 		psatl = (svrattrl *)GET_NEXT(psatl->al_link);
@@ -877,7 +864,7 @@ req_modifyReservation(struct batch_request *preq)
 		if (start_end_dur_wall(presv, RESC_RESV_OBJECT)) {
 			req_reject(PBSE_BADTSPEC, 0, preq);
 			resv_revert_alter_times(presv);
-			return;
+			goto err;
 		}
 		presv->ri_wattr[RESV_ATR_resource].at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 	}
@@ -885,6 +872,9 @@ req_modifyReservation(struct batch_request *preq)
 	psatl = (svrattrl *)GET_NEXT(preq->rq_ind.rq_modify.rq_attr);
 	if (psatl)
 		rc = modify_resv_attr(presv, psatl, preq->rq_perm, &bad);
+	
+	if (presv->ri_modified)
+		(void)job_or_resv_save((void *)presv, SAVERESV_FULL, RESC_RESV_OBJECT);
 
 	if (send_to_scheduler)
 		set_scheduler_flag(SCH_SCHEDULE_RESV_RECONFIRM, dflt_scheduler);
@@ -913,7 +903,7 @@ req_modifyReservation(struct batch_request *preq)
 		if ((rc = reply_text(preq, PBSE_NONE, buf))) {
 			/* reply failed,  close connection; DON'T purge resv */
 			close_client(sock);
-			return;
+			goto err;
 		}
 	} else {
 		/*Don't reply back until scheduler decides*/
@@ -925,6 +915,13 @@ req_modifyReservation(struct batch_request *preq)
 		(void)snprintf(buf, sizeof(buf), "requestor=%s@%s Interactive=%ld",
 			preq->rq_user, preq->rq_host, dt);
 	}
+
+	if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0)
+		goto err;
+	
+	
+err:
+	(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
 }
 
 
@@ -1002,4 +999,3 @@ modify_resv_attr(resc_resv *presv, svrattrl *plist, int perm, int *bad)
 
 	return (0);
 }
-

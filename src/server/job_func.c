@@ -167,6 +167,7 @@ extern char *pbs_server_name;
 extern pbs_list_head svr_newjobs;
 extern pbs_list_head svr_alljobs;
 extern int is_called_by_job_purge;
+extern int am_i_resv_owner(char *);
 
 #ifdef PBS_MOM
 #include "mom_func.h"
@@ -1617,33 +1618,37 @@ resv_free(resc_resv *presv)
  * @brief
  * 		find_resv() - find resc_resv struct by reservation ID
  *
- *		Search list of all server resc_resv structs for one with same
- *		reservation ID as input "resvID"
+ *		Search database for reservation by resvID
  *
  * @param[in]	resvID - reservation ID
+ * @param[in]	lock - Lock for locking DB row
  *
  * @return	pointer to resc_resv struct
  * @retval	NULL	- not found
  */
 
 resc_resv *
-find_resv(char *resvID)
+find_resv(char *resvID, int lock)
 {
 	char *at;
-	resc_resv  *presv;
+	resc_resv  *presv = NULL;
 
 	if ((at = strchr(resvID, (int)'@')) != 0)
 		*at = '\0';	/* strip of @server_name */
-	presv = (resc_resv *)GET_NEXT(svr_allresvs);
-	while (presv != NULL) {
-		if (!strcmp(resvID, presv->ri_qs.ri_resvID))
-			return (presv);
-		presv = (resc_resv *)GET_NEXT(presv->ri_allresvs);
+	if(am_i_resv_owner(resvID)) {
+		/* if current server is the resv owner then resv should be in the list */
+		presv = (resc_resv *)GET_NEXT(svr_allresvs);
+		while (presv != NULL) {
+			if (!strcmp(resvID, presv->ri_qs.ri_resvID))
+				break;
+			presv = (resc_resv *)GET_NEXT(presv->ri_allresvs);
+		}
+		return presv;
 	}
 	if (at)
 		*at = '@';	/* restore @server_name */
 
-	return (presv);		/* pointer value is null */
+	return resv_recov_db(resvID, presv, lock);
 }
 
 
@@ -2020,6 +2025,10 @@ add_resc_resv_to_job(job *pjob)
 	eval_resvState(presv, RESVSTATE_add_resc_resv_to_job,
 		0, &state, &sub);
 	(void)resv_setResvState(presv, state, sub);
+
+	/* This resv_save is called to save any state changes done is resv_setResvState function */
+	if (presv->ri_modified)
+		(void)job_or_resv_save((void *)presv, SAVERESV_FULL, RESC_RESV_OBJECT);
 
 	/* process reservation window, duration, wall info */
 
