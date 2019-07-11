@@ -188,7 +188,6 @@ pg_db_save_svr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
 	char *raw_array = NULL;
 	static int sv_savetm_fnum;
 	static int fnums_inited = 0;
-	PGresult *res;
 
 	SET_PARAM_INTEGER(conn, ps->sv_numjobs, 0);
 	SET_PARAM_INTEGER(conn, ps->sv_numque, 1);
@@ -217,13 +216,12 @@ pg_db_save_svr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
 
 	rc = pg_db_cmd_ret(conn, stmt, params);
 	if (rc == 0) {
-		res = conn->conn_resultset;
 		if (fnums_inited == 0) {
-			sv_savetm_fnum = PQfnumber(res, "sv_savetm");
+			sv_savetm_fnum = PQfnumber(conn->conn_resultset, "sv_savetm");
 			fnums_inited = 1;
 		}
-		GET_PARAM_BIGINT(res, 0, ps->sv_savetm, sv_savetm_fnum);
-		PQclear(res);
+		GET_PARAM_BIGINT(conn->conn_resultset, 0, ps->sv_savetm, sv_savetm_fnum);
+		PQclear(conn->conn_resultset);
 	}
 
 	free(raw_array);
@@ -355,16 +353,25 @@ pg_db_del_attr_svr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, void *obj_id, pb
 {
 	char *raw_array = NULL;
 	int len = 0;
+	//static int sv_savetm_fnum;
+	//static int fnums_inited = 0;
 
 	if ((len = convert_db_attr_list_to_array(&raw_array, attr_list)) <= 0)
 		return -1;
 
-
 	SET_PARAM_BIN(conn, raw_array, len, 0);
 
-	if (pg_db_cmd(conn, STMT_REMOVE_SVRATTRS, 1) != 0)
+	if (pg_db_cmd_ret(conn, STMT_REMOVE_SVRATTRS, 1) != 0)
 		return -1;
 
+	/* 
+	if (fnums_inited == 0) {
+		sv_savetm_fnum = PQfnumber(conn->conn_resultset, "sv_savetm");
+		fnums_inited = 1;
+	}
+	GET_PARAM_BIGINT(conn->conn_resultset, 0, ps->sv_savetm, sv_savetm_fnum);
+	PQclear(conn->conn_resultset);
+	*/
 	free(raw_array);
 
 	return 0;
