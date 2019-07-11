@@ -94,8 +94,9 @@ pg_db_prepare_job_sqls(pbs_db_conn_t *conn)
 		"values ($1, $2, $3, $4, $5, $6, $7, $8, $9, "
 		"$10, $11, $12, $13,"
 		"$14, $15, $16, $17, $18, $19, $20, $21, $22, $23,"
-		 "localtimestamp, localtimestamp,"
-		"hstore($24::text[]))");
+		"localtimestamp, localtimestamp,"
+		"hstore($24::text[])) "
+		"returning ji_savetm");
 
 	if (pg_prepare_stmt(conn, STMT_INSERT_JOB, conn->conn_sql, 24) != 0)
 		return -1;
@@ -125,14 +126,16 @@ pg_db_prepare_job_sqls(pbs_db_conn_t *conn)
 		"ji_qrank = $23,"
 		"ji_savetm = localtimestamp,"
 		"attributes = attributes || hstore($24::text[]) "
-		"where ji_jobid = $1");
+		"where ji_jobid = $1 "
+		"returning ji_savetm");
 	if (pg_prepare_stmt(conn, STMT_UPDATE_JOB, conn->conn_sql, 24) != 0)
 		return -1;
 
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "update pbs.job set "
 		"ji_savetm = localtimestamp,"
 		"attributes = attributes - hstore($2::text[]) "
-		"where ji_jobid = $1");
+		"where ji_jobid = $1 "
+		"returning ji_savetm");
 	if (pg_prepare_stmt(conn, STMT_REMOVE_JOBATTRS, conn->conn_sql, 2) != 0)
 		return -1;
 
@@ -160,7 +163,8 @@ pg_db_prepare_job_sqls(pbs_db_conn_t *conn)
 		"ji_credtype = $22,"
 		"ji_qrank = $23,"
 		"ji_savetm = localtimestamp "
-		"where ji_jobid = $1");
+		"where ji_jobid = $1 "
+		"returning ji_savetm");
 	if (pg_prepare_stmt(conn, STMT_UPDATE_JOB_QUICK, conn->conn_sql, 23) != 0)
 		return -1;
 
@@ -188,8 +192,8 @@ pg_db_prepare_job_sqls(pbs_db_conn_t *conn)
 		"ji_4ash,"
 		"ji_credtype,"
 		"ji_qrank,"
-		"extract(epoch from ji_savetm)::bigint as ji_savetm, "
-		"extract(epoch from ji_creattm)::bigint as ji_creattm, "
+		"ji_savetm, "
+		"ji_creattm, "
 		"hstore_to_array(attributes) as attributes "
 		"from pbs.job where ji_jobid = $1");
 	if (pg_prepare_stmt(conn, STMT_SELECT_JOB, conn->conn_sql, 1) != 0)
@@ -221,10 +225,10 @@ pg_db_prepare_job_sqls(pbs_db_conn_t *conn)
 			"ji_4ash,"
 			"ji_credtype,"
 			"ji_qrank,"
-			"extract(epoch from ji_savetm)::bigint as ji_savetm, "
-			"extract(epoch from ji_creattm)::bigint as ji_creattm, "
+			"ji_savetm, "
+			"ji_creattm, "
 			"hstore_to_array(attributes) as attributes "
-			"from pbs.job where extract(epoch from ji_savetm)::bigint > $1 "
+			"from pbs.job where ji_savetm > $1 "
 			"order by ji_qrank ");
 		if (pg_prepare_stmt(conn, STMT_FINDJOBS_FROM_TIME, conn->conn_sql, 1) != 0)
 			return -1;
@@ -284,8 +288,8 @@ pg_db_prepare_job_sqls(pbs_db_conn_t *conn)
 		"ji_4ash,"
 		"ji_credtype,"
 		"ji_qrank,"
-		"extract(epoch from ji_savetm)::bigint as ji_savetm, "
-		"extract(epoch from ji_creattm)::bigint as ji_creattm, "
+		"ji_savetm, "
+		"ji_creattm, "
 		"hstore_to_array(attributes) as attributes "
 		"from pbs.job order by ji_qrank");
 	if (pg_prepare_stmt(conn, STMT_FINDJOBS_ORDBY_QRANK, conn->conn_sql, 0) != 0)
@@ -315,11 +319,11 @@ pg_db_prepare_job_sqls(pbs_db_conn_t *conn)
 		"ji_4ash,"
 		"ji_credtype,"
 		"ji_qrank,"
-		"extract(epoch from ji_savetm)::bigint as ji_savetm, "
-		"extract(epoch from ji_creattm)::bigint as ji_creattm, "
+		"ji_savetm, "
+		"ji_creattm, "
 		"hstore_to_array(attributes) as attributes "
-		"from pbs.job where ji_queue = $1"
-		" order by ji_qrank");
+		"from pbs.job where ji_queue = $1 "
+		"order by ji_qrank");
 	if (pg_prepare_stmt(conn, STMT_FINDJOBS_BYQUE_ORDBY_QRANK,
 		conn->conn_sql, 1) != 0)
 		return -1;
@@ -454,6 +458,8 @@ pg_db_save_job(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
 	int params;
 	int rc;
 	char *raw_array = NULL;
+	static int ji_savetm_fnum;
+	static int fnums_inited = 0;
 
 	SET_PARAM_STR(conn, pjob->ji_jobid, 0);
 	SET_PARAM_INTEGER(conn, pjob->ji_state, 1);
@@ -498,7 +504,15 @@ pg_db_save_job(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
 	else
 		stmt = STMT_INSERT_JOB;
 
-	rc = pg_db_cmd(conn, stmt, params);
+	rc = pg_db_cmd_ret(conn, stmt, params);
+	if (rc == 0) {
+		if (fnums_inited == 0) {
+			ji_savetm_fnum = PQfnumber(conn->conn_resultset, "ji_savetm");
+			fnums_inited = 1;
+		}
+		GET_PARAM_BIGINT(conn->conn_resultset, 0, pjob->ji_savetm, ji_savetm_fnum);
+		PQclear(conn->conn_resultset);
+	}
 
 	free(raw_array);
 

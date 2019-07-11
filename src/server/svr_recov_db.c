@@ -356,6 +356,7 @@ svr_save_db(struct server *ps, int mode)
 		savetype = PBS_INSERT_DB;
 		rc = pbs_db_save_obj(conn, &obj, savetype);
 	}
+	server.sv_qs.sv_savetm = dbsvr.sv_savetm;
 
 	pbs_db_reset_obj(&obj);
 
@@ -427,6 +428,8 @@ sched_save_db(pbs_sched *ps, int mode)
 		rc = pbs_db_save_obj(conn, &obj, savetype);
 	}
 
+	ps->sch_svtime = dbsched.sched_savetm;
+	
 	/* free the attribute list allocated by encode_attrs */
 	pbs_db_reset_obj(&obj);
 

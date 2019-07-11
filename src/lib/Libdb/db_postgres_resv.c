@@ -132,8 +132,8 @@ pg_db_prepare_resv_sqls(pbs_db_conn_t *conn)
 		"ri_un_type, "
 		"ri_fromsock, "
 		"ri_fromaddr, "
-		"extract(epoch from ri_savetm)::bigint as ri_savetm, "
-		"extract(epoch from ri_creattm)::bigint as ri_creattm, "
+		"ri_savetm, "
+		"ri_creattm, "
 		"hstore_to_array(attributes) as attributes "
 		"from pbs.resv where ri_resvid = $1");
 	if (pg_prepare_stmt(conn, STMT_SELECT_RESV, conn->conn_sql, 1) != 0)
@@ -159,8 +159,8 @@ pg_db_prepare_resv_sqls(pbs_db_conn_t *conn)
 		"ri_un_type, "
 		"ri_fromsock, "
 		"ri_fromaddr, "
-		"extract(epoch from ri_savetm)::bigint as ri_savetm, "
-		"extract(epoch from ri_creattm)::bigint as ri_creattm, "
+		"ri_savetm, "
+		"ri_creattm, "
 		"hstore_to_array(attributes) as attributes "
 		"from pbs.resv "
 		"order by ri_creattm");

@@ -184,6 +184,8 @@ que_save_db(pbs_queue *pque, int mode)
 	    goto db_err;
 	}
 
+	pque->qu_qs.qu_mtime = dbque.qu_mtime;
+
 	pbs_db_reset_obj(&obj);
 
 	return (0);
@@ -234,6 +236,7 @@ que_recov_db(char *qname, pbs_queue *pq, int lock)
 		dbque.qu_mtime = pq->qu_qs.qu_mtime;
 	else
 		dbque.qu_mtime = 0;
+
 	strncpy(dbque.qu_name, qname, sizeof(dbque.qu_name));
 
 	if (!pq) {
@@ -246,7 +249,6 @@ que_recov_db(char *qname, pbs_queue *pq, int lock)
 	}
 
 	/* read in job fixed sub-structure */
-
 	rc = pbs_db_load_obj(conn, &obj, lock);
 	if (rc == -1){
 		goto db_err;

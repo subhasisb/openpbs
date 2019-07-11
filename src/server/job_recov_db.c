@@ -402,10 +402,6 @@ job_save_db(job *pjob, int updatetype)
 	else
 		savetype = PBS_UPDATE_DB_FULL;
 
-
-	sprintf(log_buffer, "Trying to save job %s, updatetype=%d, savetype=%d", pjob->ji_qs.ji_jobid, updatetype, savetype);
-	log_err(-1, __func__, log_buffer);
-
 	if (svr_to_db_job(pjob, &dbjob, savetype) != 0)
 		goto db_err;
 
@@ -455,6 +451,9 @@ job_save_db(job *pjob, int updatetype)
 
 	if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0)
 		goto db_err;
+
+	pjob->ji_savetm = dbjob.ji_savetm; /* update savetm when we save a job, so that we do not save multiple times */
+
 	pbs_db_reset_obj(&obj);
 	pjob->ji_modified = 0;
 	pjob->ji_newjob = 0; /* reset dontsave - job is now saved */

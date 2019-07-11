@@ -75,7 +75,8 @@ pg_db_prepare_svr_sqls(pbs_db_conn_t *conn)
 		"attributes "
 		") "
 		"values "
-		"($1, $2, $3, $4, $5, localtimestamp, localtimestamp, hstore($6::text[]))");
+		"($1, $2, $3, $4, $5, localtimestamp, localtimestamp, hstore($6::text[])) "
+		"returning sv_savetm");
 	if (pg_prepare_stmt(conn, STMT_INSERT_SVR, conn->conn_sql, 6) != 0)
 		return -1;
 
@@ -87,7 +88,8 @@ pg_db_prepare_svr_sqls(pbs_db_conn_t *conn)
 		"sv_svraddr = $4, "
 		"sv_svrport = $5, "
 		"sv_savetm = localtimestamp, "
-		"attributes = hstore($6::text[]) ");
+		"attributes = hstore($6::text[]) "
+		"returning sv_savetm");
 	if (pg_prepare_stmt(conn, STMT_UPDATE_SVR_FULL, conn->conn_sql, 6) != 0)
 		return -1;
 
@@ -97,13 +99,15 @@ pg_db_prepare_svr_sqls(pbs_db_conn_t *conn)
 		"sv_jobidnumber = $3, "
 		"sv_svraddr = $4, "
 		"sv_svrport = $5, "
-		"sv_savetm = localtimestamp ");
+		"sv_savetm = localtimestamp "
+		"returning sv_savetm");
 	if (pg_prepare_stmt(conn, STMT_UPDATE_SVR_QUICK, conn->conn_sql, 5) != 0)
 		return -1;
 
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "update pbs.server set "
 		"sv_savetm = localtimestamp,"
-		"attributes = attributes - hstore($1::text[]) ");
+		"attributes = attributes - hstore($1::text[]) "
+		"returning sv_savetm");
 	if (pg_prepare_stmt(conn, STMT_REMOVE_SVRATTRS, conn->conn_sql, 1) != 0)
 		return -1;
 
@@ -111,8 +115,8 @@ pg_db_prepare_svr_sqls(pbs_db_conn_t *conn)
 		"sv_numjobs, "
 		"sv_numque, "
 		"sv_jobidnumber, "
-		"extract(epoch from sv_savetm)::bigint as sv_savetm, "
-		"extract(epoch from sv_creattm)::bigint as sv_creattm, "
+		"sv_savetm, "
+		"sv_creattm, "
 		"hstore_to_array(attributes) as attributes "
 		"from "
 		"pbs.server ");
@@ -120,7 +124,7 @@ pg_db_prepare_svr_sqls(pbs_db_conn_t *conn)
 		return -1;
 
 	strcat(conn->conn_sql, " FOR UPDATE");
-	if (pg_prepare_stmt(conn, STMT_SELECT_SVR_LOCKED, conn->conn_sql, 1) != 0)
+	if (pg_prepare_stmt(conn, STMT_SELECT_SVR_LOCKED, conn->conn_sql, 0) != 0)
 		return -1;
 
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select "
@@ -182,6 +186,9 @@ pg_db_save_svr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
 	int params;
 	int rc = 0;
 	char *raw_array = NULL;
+	static int sv_savetm_fnum;
+	static int fnums_inited = 0;
+	PGresult *res;
 
 	SET_PARAM_INTEGER(conn, ps->sv_numjobs, 0);
 	SET_PARAM_INTEGER(conn, ps->sv_numque, 1);
@@ -208,9 +215,15 @@ pg_db_save_svr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
 	else
 		stmt = STMT_INSERT_SVR;
 
-	if (pg_db_cmd(conn, stmt, params) != 0) {
-		free(raw_array);
-		rc = -1;
+	rc = pg_db_cmd_ret(conn, stmt, params);
+	if (rc == 0) {
+		res = conn->conn_resultset;
+		if (fnums_inited == 0) {
+			sv_savetm_fnum = PQfnumber(res, "sv_savetm");
+			fnums_inited = 1;
+		}
+		GET_PARAM_BIGINT(res, 0, ps->sv_savetm, sv_savetm_fnum);
+		PQclear(res);
 	}
 
 	free(raw_array);
@@ -270,7 +283,6 @@ pg_db_load_svr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int lock)
 	GET_PARAM_INTEGER(res, 0, ps->sv_numque, sv_numque_fnum);
 	GET_PARAM_BIGINT(res, 0, ps->sv_jobidnumber, sv_jobidnumber_fnum);
 	GET_PARAM_BIGINT(res, 0, ps->sv_creattm, sv_creattm_fnum);
-	GET_PARAM_BIGINT(res, 0, ps->sv_savetm, sv_savetm_fnum);
 	GET_PARAM_BIN(res, 0, raw_array, attributes_fnum);
 
 	/* convert attributes from postgres raw array format */

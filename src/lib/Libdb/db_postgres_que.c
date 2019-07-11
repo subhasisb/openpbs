@@ -71,7 +71,8 @@ pg_db_prepare_que_sqls(pbs_db_conn_t *conn)
 		"attributes "
 		") "
 		"values "
-		"($1, $2,  localtimestamp, localtimestamp, hstore($3::text[]))");
+		"($1, $2,  localtimestamp, localtimestamp, hstore($3::text[])) "
+		"returning qu_mtime");
 
 	if (pg_prepare_stmt(conn, STMT_INSERT_QUE, conn->conn_sql, 3) != 0)
 		return -1;
@@ -81,7 +82,8 @@ pg_db_prepare_que_sqls(pbs_db_conn_t *conn)
 			"qu_type = $2, "
 			"qu_mtime = localtimestamp, "
 			"attributes = hstore($3::text[])"
-			" where qu_name = $1");
+			" where qu_name = $1 "
+			"returning qu_mtime");
 	if (pg_prepare_stmt(conn, STMT_UPDATE_QUE_FULL, conn->conn_sql, 3) != 0)
 		return -1;
 
@@ -89,14 +91,15 @@ pg_db_prepare_que_sqls(pbs_db_conn_t *conn)
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "update pbs.queue set "
 		"qu_mtime = localtimestamp,"
 		"attributes = attributes - hstore($2::text[]) "
-		"where qu_name = $1");
+		"where qu_name = $1 "
+		"returning qu_mtime");
 	if (pg_prepare_stmt(conn, STMT_REMOVE_QUEATTRS, conn->conn_sql, 2) != 0)
 		return -1;
 
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select qu_name, "
 			"qu_type, "
-			"extract(epoch from qu_ctime)::bigint as qu_ctime, "
-			"extract(epoch from qu_mtime)::bigint as qu_mtime, "
+			"qu_ctime, "
+			"qu_mtime, "
 			"hstore_to_array(attributes) as attributes "
 			"from pbs.queue "
 			"where qu_name = $1");
@@ -110,8 +113,8 @@ pg_db_prepare_que_sqls(pbs_db_conn_t *conn)
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select "
 			"qu_name, "
 			"qu_type, "
-			"extract(epoch from qu_ctime)::bigint as qu_ctime, "
-			"extract(epoch from qu_mtime)::bigint as qu_mtime, "
+			"qu_ctime, "
+			"qu_mtime, "
 			"hstore_to_array(attributes) as attributes "
 			"from pbs.queue order by qu_ctime");
 	if (pg_prepare_stmt(conn, STMT_FIND_QUES_ORDBY_CREATTM, conn->conn_sql, 0) != 0)
@@ -191,6 +194,9 @@ pg_db_save_que(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
 	char *stmt;
 	int params;
 	char *raw_array = NULL;
+	int rc;
+	static int qu_mtime_fnum;
+	static int fnums_inited = 0;
 
 	SET_PARAM_STR(conn, pq->qu_name, 0);
 	SET_PARAM_INTEGER(conn, pq->qu_type, 1);
@@ -212,9 +218,14 @@ pg_db_save_que(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
 	else
 		stmt = STMT_INSERT_QUE;
 
-	if (pg_db_cmd(conn, stmt, params) != 0) {
-		free(raw_array);
-		return -1;
+	rc = pg_db_cmd_ret(conn, stmt, params);
+	if (rc == 0) {
+		if (fnums_inited == 0) {
+			qu_mtime_fnum = PQfnumber(conn->conn_resultset, "qu_mtime");
+			fnums_inited = 1;
+		}
+		GET_PARAM_BIGINT(conn->conn_resultset, 0, pq->qu_mtime, qu_mtime_fnum);
+		PQclear(conn->conn_resultset);
 	}
 
 	free(raw_array);

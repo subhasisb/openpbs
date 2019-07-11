@@ -835,16 +835,24 @@ int pg_db_cmd_ret(pbs_db_conn_t *conn, char *stmt, int num_vars)
 {
 	PGresult *res;
 	char *rows_affected = NULL;
+	ExecStatusType res_rc;
 
 	res = PQexecPrepared((PGconn*) conn->conn_db_handle, stmt, num_vars,
 			((pg_conn_data_t *) conn->conn_data)->paramValues,
 			((pg_conn_data_t *) conn->conn_data)->paramLengths,
-			((pg_conn_data_t *) conn->conn_data)->paramFormats, 0);
+			((pg_conn_data_t *) conn->conn_data)->paramFormats,
+			conn->conn_result_format);
 
-	if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+	res_rc = PQresultStatus(res);
+	if (!(res_rc == PGRES_COMMAND_OK || res_rc == PGRES_TUPLES_OK)) {
 		pg_set_error(conn, "Execution of Prepared statement", stmt);
 		PQclear(res);
 		return -1;
+	}
+	
+	if (PQntuples(res) <= 0) {
+		PQclear(res);
+		return 1;
 	}
 	rows_affected = PQcmdTuples(res);
 
