@@ -184,7 +184,6 @@ pg_db_save_svr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
 	pbs_db_svr_info_t *ps = obj->pbs_db_un.pbs_db_svr;
 	char *stmt;
 	int params;
-	int rc = 0;
 	char *raw_array = NULL;
 	static int sv_savetm_fnum;
 	static int fnums_inited = 0;
@@ -214,19 +213,21 @@ pg_db_save_svr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
 	else
 		stmt = STMT_INSERT_SVR;
 
-	rc = pg_db_cmd_ret(conn, stmt, params);
-	if (rc == 0) {
-		if (fnums_inited == 0) {
-			sv_savetm_fnum = PQfnumber(conn->conn_resultset, "sv_savetm");
-			fnums_inited = 1;
-		}
-		GET_PARAM_BIGINT(conn->conn_resultset, 0, ps->sv_savetm, sv_savetm_fnum);
-		PQclear(conn->conn_resultset);
+	if (pg_db_cmd_ret(conn, stmt, params) != 0) {
+		free(raw_array);
+		return -1;
 	}
+
+	if (fnums_inited == 0) {
+		sv_savetm_fnum = PQfnumber(conn->conn_resultset, "sv_savetm");
+		fnums_inited = 1;
+	}
+	GET_PARAM_BIGINT(conn->conn_resultset, 0, ps->sv_savetm, sv_savetm_fnum);
+	PQclear(conn->conn_resultset);
 
 	free(raw_array);
 
-	return rc;
+	return 0;
 }
 
 /**
@@ -361,8 +362,10 @@ pg_db_del_attr_svr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, void *obj_id, pb
 
 	SET_PARAM_BIN(conn, raw_array, len, 0);
 
-	if (pg_db_cmd_ret(conn, STMT_REMOVE_SVRATTRS, 1) != 0)
+	if (pg_db_cmd_ret(conn, STMT_REMOVE_SVRATTRS, 1) != 0) {
+		free(raw_array);
 		return -1;
+	}
 
 	/* 
 	if (fnums_inited == 0) {

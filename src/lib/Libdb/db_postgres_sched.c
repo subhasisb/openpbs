@@ -167,7 +167,6 @@ pg_db_save_sched(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
 	char *raw_array = NULL;
 	static int sched_savetm_fnum;
 	static int fnums_inited = 0;
-	int rc;
 
 	SET_PARAM_STR(conn, psch->sched_name, 0);
 
@@ -188,15 +187,17 @@ pg_db_save_sched(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
 	else
 		stmt = STMT_INSERT_SCHED;
 
-	rc = pg_db_cmd_ret(conn, stmt, params);
-	if (rc == 0) {
-		if (fnums_inited == 0) {
-			sched_savetm_fnum = PQfnumber(conn->conn_resultset, "sched_savetm");
-			fnums_inited = 1;
-		}
-		GET_PARAM_BIGINT(conn->conn_resultset, 0, psch->sched_savetm, sched_savetm_fnum);
-		PQclear(conn->conn_resultset);
+	if (pg_db_cmd_ret(conn, stmt, params) != 0) {
+		free(raw_array);
+		return -1;
 	}
+
+	if (fnums_inited == 0) {
+		sched_savetm_fnum = PQfnumber(conn->conn_resultset, "sched_savetm");
+		fnums_inited = 1;
+	}
+	GET_PARAM_BIGINT(conn->conn_resultset, 0, psch->sched_savetm, sched_savetm_fnum);
+	PQclear(conn->conn_resultset);
 
 	free(raw_array);
 
@@ -376,8 +377,10 @@ pg_db_del_attr_sched(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, void *obj_id, 
 
 	SET_PARAM_BIN(conn, raw_array, len, 1);
 
-	if (pg_db_cmd_ret(conn, STMT_REMOVE_SCHEDATTRS, 2) != 0)
+	if (pg_db_cmd_ret(conn, STMT_REMOVE_SCHEDATTRS, 2) != 0) {
+		free(raw_array);
 		return -1;
+	}
 
 	/*
 	if (fnums_inited == 0) {

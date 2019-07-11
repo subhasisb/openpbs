@@ -772,8 +772,10 @@ pg_db_del_attr_job(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, void *obj_id, pb
 
 	SET_PARAM_BIN(conn, raw_array, len, 1);
 
-	if (pg_db_cmd_ret(conn, STMT_REMOVE_JOBATTRS, 2) !=0)
+	if (pg_db_cmd_ret(conn, STMT_REMOVE_JOBATTRS, 2) !=0) {
+		free(raw_array);
 		return -1;
+	}
 
 	/*
 	if (fnums_inited == 0) {
