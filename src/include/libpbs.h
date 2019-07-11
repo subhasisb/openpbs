@@ -310,7 +310,7 @@ extern int is_compose_cmd(int stream, int command, char **msgid);
 extern void PBS_free_aopl(struct attropl * aoplp);
 extern void advise(char *, ...);
 extern int PBSD_rdytocmt(int connect, char *jobid, int rpp, char **msgid);
-extern int PBSD_commit(int connect, char *jobid, int rpp, char **msgid);
+extern char *PBSD_commit(int connect, char *jobid, int rpp, char **msgid);
 extern int PBSD_jcred(int connect, int type, char *buf, int len, int rpp, char **msgid);
 extern int PBSD_user_migrate(int connect, char *tohost);
 extern int PBSD_jscript(int connect, char *script_file, int rpp, char **msgid);

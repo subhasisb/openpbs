@@ -1598,20 +1598,13 @@ set_max_job_sequence_id(attribute *pattr, void *pobject, int actmode)
 			return (PBSE_INVALID_MAX_JOB_SEQUENCE_ID);
 		}
 		svr_max_job_sequence_id = pattr->at_val.at_ll;
-		/* If the max_job_sequence_id is set to something smaller than current job id,
-		 * then it will wrap to 0(ZERO)*/
-		if (server.sv_qs.sv_jobidnumber > svr_max_job_sequence_id) {
-			(void)reset_svr_sequence_window();/* wrap it*/
-			sprintf(log_buffer, "svr_max_job_sequence_id wrapped to 0");
-			log_event(PBSEVENT_ADMIN, PBS_EVENTCLASS_SERVER,
+		
+		sprintf(log_buffer, "svr_max_job_sequence_id set to val %lld",
+				svr_max_job_sequence_id);
+		log_event(PBSEVENT_ADMIN, PBS_EVENTCLASS_SERVER,
 				LOG_NOTICE, msg_daemonname, log_buffer);
-		} else {
-			sprintf(log_buffer, "svr_max_job_sequence_id set to val %lld",
-					svr_max_job_sequence_id);
-			log_event(PBSEVENT_ADMIN, PBS_EVENTCLASS_SERVER,
-					LOG_NOTICE, msg_daemonname, log_buffer);
-		}
-	}
+	
+}
 	return (PBSE_NONE);
 }
 
@@ -1624,14 +1617,7 @@ void
 unset_max_job_sequence_id(void)
 {
 	svr_max_job_sequence_id = SVR_MAX_JOB_SEQ_NUM_DEFAULT;
-	/* If the max_job_sequence_id is set to something smaller than current job id,
-	 * then it will wrap to 0(ZERO)*/
-	if (server.sv_qs.sv_jobidnumber >= svr_max_job_sequence_id) {
-		(void)reset_svr_sequence_window();/* wrap it*/
-		sprintf(log_buffer, "svr_max_job_sequence_id wrapped to 0");
-		log_event(PBSEVENT_ADMIN, PBS_EVENTCLASS_SERVER,
-			LOG_NOTICE, msg_daemonname, log_buffer);
-	}
+	
 	sprintf(log_buffer,
 		"svr_max_job_sequence_id reverting back to default val %lld",
 		svr_max_job_sequence_id);

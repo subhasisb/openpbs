@@ -249,12 +249,13 @@ PBSD_rdytocmt(int connect, char *jobid, int rpp, char **msgid)
  *
  */
 
-int
+char *
 PBSD_commit(int connect, char *jobid, int rpp, char **msgid)
 {
 	struct batch_reply *reply;
 	int rc;
 	int sock;
+	char * return_jobid = NULL;
 
 	if (!rpp) {
 		sock = connection[connect].ch_socket;
@@ -262,7 +263,7 @@ PBSD_commit(int connect, char *jobid, int rpp, char **msgid)
 	} else {
 		sock = connect;
 		if ((rc = is_compose_cmd(sock, IS_CMD, msgid)) != DIS_SUCCESS)
-			return rc;
+			return NULL;
 	}
 
 	if ((rc = encode_DIS_ReqHdr(sock, PBS_BATCH_Commit, pbs_current_user)) ||
@@ -270,28 +271,44 @@ PBSD_commit(int connect, char *jobid, int rpp, char **msgid)
 		(rc = encode_DIS_ReqExtend(sock, NULL))) {
 		if (!rpp) {
 			connection[connect].ch_errtxt = strdup(dis_emsg[rc]);
-			if (connection[connect].ch_errtxt == NULL)
-				return (pbs_errno = PBSE_SYSTEM);
+			if (connection[connect].ch_errtxt == NULL) {
+				pbs_errno = PBSE_SYSTEM;
+				return NULL;
+			}
 		}
-		return (pbs_errno = PBSE_PROTOCOL);
+		pbs_errno = PBSE_PROTOCOL;
+		return NULL;
 	}
 
 	if (rpp) {
 		pbs_errno = PBSE_NONE;
 		if (rpp_flush(sock))
 			pbs_errno = PBSE_PROTOCOL;
-		return pbs_errno;
+		return NULL;
 	}
 
 	if (DIS_tcp_wflush(sock)) {
-		return (pbs_errno = PBSE_PROTOCOL);
+		pbs_errno = PBSE_PROTOCOL;
+		return NULL;
 	}
 
 	reply = PBSD_rdrpy(connect);
+	if (reply == NULL) {
+		pbs_errno = PBSE_PROTOCOL;
+	} else if (reply->brp_choice &&
+		reply->brp_choice != BATCH_REPLY_CHOICE_Text &&
+		reply->brp_choice != BATCH_REPLY_CHOICE_Commit) {
+		pbs_errno = PBSE_PROTOCOL;
+	} else if (connection[connect].ch_errno == 0) {
+		return_jobid = strdup(reply->brp_un.brp_jid);
+		if (return_jobid == NULL) {
+			pbs_errno = PBSE_SYSTEM;
+		}
+	}
 
 	PBSD_FreeReply(reply);
 
-	return connection[connect].ch_errno;
+	return return_jobid;
 }
 
 /**

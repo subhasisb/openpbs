@@ -157,6 +157,7 @@ __pbs_submit(int c, struct attropl  *attrib, char *script, char *destination, ch
 {
 	struct attropl		*pal;
 	char			*return_jobid = NULL;
+	char			*final_jobid = NULL;
 	int			rc;
 	struct pbs_client_thread_context *ptr;
 	struct cred_info	*cred_info = NULL;
@@ -231,14 +232,18 @@ __pbs_submit(int c, struct attropl  *attrib, char *script, char *destination, ch
 		}
 	}
 
-	if (PBSD_commit(c, return_jobid, 0, NULL) != 0)
+	if ((final_jobid = PBSD_commit(c, return_jobid, 0, NULL)) == NULL) {
+		free(return_jobid);
 		goto error;
+	}
+
+	free(return_jobid);
 
 	/* unlock the thread lock and update the thread context data */
 	if (pbs_client_thread_unlock_connection(c) != 0)
 		return NULL;
 
-	return return_jobid;
+	return final_jobid;
 error:
 	(void)pbs_client_thread_unlock_connection(c);
 	return NULL;

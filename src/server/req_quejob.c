@@ -182,6 +182,7 @@ extern char *msg_max_no_minwt;
 extern char *msg_min_gt_maxwt;
 extern char *msg_nostf_resv;
 extern char *msg_nostf_jobarray;
+extern long long get_next_hash(long long);
 #endif
 
 
@@ -420,9 +421,9 @@ req_quejob(struct batch_request *preq)
 		}
 
 		{
-			static seq = 0;
+			static int seq = 0;
 			static time_t laststamp = 0;
-			time_t now = time();
+			time_t now = time(0);
 
 			if (now == laststamp) 
 				seq++;
@@ -432,9 +433,9 @@ req_quejob(struct batch_request *preq)
 			}
 			created_here = JOB_SVFLG_HERE;
 			if (i == 0) {	/* Normal job */
-				(void)sprintf(jidbuf, "%lld_%d.%s", now, seq, server_name);
+				(void)sprintf(jidbuf, "%ld_%d.%s", now, seq, server_name);
 			} else {	/* Array Job */
-				(void)sprintf(jidbuf, "%lld_%d[].%s", now, seq, server_name);
+				(void)sprintf(jidbuf, "%ld_%d[].%s", now, seq, server_name);
 			}
 		}
 		jid = jidbuf;
@@ -1952,7 +1953,7 @@ req_commit(struct batch_request *preq)
 		return;
 	}
 
-	server.sv_qs.sv_jobidnumber = nextid;
+	server.sv_qs.sv_jobidnumber = nextid; /* actually need to store it in server_instance table, not server table */
 	if (svr_save_db(&server, SVR_SAVE_FULL) != 0 ) {
 		job_purge(pj);
 		req_reject(PBSE_SYSTEM, 0, preq);
@@ -2108,6 +2109,7 @@ req_resvSub(struct batch_request *preq)
 	char		*fmt = "%a %b %d %H:%M:%S %Y";
 	char		 tbuf1[256] = {0};
 	char		 tbuf2[256] = {0};
+	long long	next_svr_sequence_id;
 
 	switch (process_hooks(preq, hook_msg, sizeof(hook_msg),
 			pbs_python_set_interrupt)) {
@@ -3235,15 +3237,13 @@ validate_place_req_of_job_in_reservation(job *pj)
  * @retval	-1	: database error
  *
  */
-
-static
-long long get_next_hash(int curr)
+long long get_next_hash(long long curr)
 {
 	static int max_servers = 10; /* in future load from pbs.conf */
 	static int my_index = -1;
 
 	if (my_index == -1) {
-		my_index = pbs_conf.batch_service_port - 15000;
+		my_index = pbs_conf.batch_service_port - 15000; /* read from pbs.conf in future */
 	}
 
 	if (curr == -1) {
@@ -3252,10 +3252,10 @@ long long get_next_hash(int curr)
 
 	curr += max_servers;
 	/* If server job limit is over, reset back to zero */
-	if (cur > svr_max_job_sequence_id) {
-		cur -= svr_max_job_sequence_id;
+	if (curr > svr_max_job_sequence_id) {
+		curr -= svr_max_job_sequence_id;
 	}
-	return cur;
+	return curr;
 }
 
 #endif	/*SERVER ONLY*/
