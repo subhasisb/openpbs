@@ -1857,7 +1857,6 @@ req_commit(struct batch_request *preq)
 	 * job structure and attributes already set up.
 	 */
 
-	//pbs_db_begin_trx(conn, 0, 0);
 	pque = find_queuebyname(pj->ji_qs.ji_queue, 1);
 	rc = svr_chkque(pj, pque, preq->rq_host, MOVE_TYPE_Move);
 	if (rc) {

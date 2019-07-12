@@ -292,6 +292,7 @@ find_queuebyname(char *quename, int lock)
 	}
 	if (pc)
 		*pc = '@';	/* restore '@' server portion */
+		
 	return que_recov_db(quename, pque, lock);
 }
 #ifdef NAS /* localmod 075 */

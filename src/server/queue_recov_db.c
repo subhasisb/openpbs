@@ -239,7 +239,10 @@ que_recov_db(char *qname, pbs_queue *pq, int lock)
 
 	strncpy(dbque.qu_name, qname, sizeof(dbque.qu_name));
 
-	if (!pq) {
+	if (pq) {
+		if (memcache_good(&pq->trx_status, lock))
+			return pq;
+	} else {
 		pq = que_alloc(qname);  /* allocate & init queue structure space */
 		oldque = 0;
 		if (pq == NULL) {
@@ -250,17 +253,17 @@ que_recov_db(char *qname, pbs_queue *pq, int lock)
 
 	/* read in job fixed sub-structure */
 	rc = pbs_db_load_obj(conn, &obj, lock);
-	if (rc == -1){
+	if (rc == -1) {
 		goto db_err;
 	}
 
-	if (rc == -2){
+	if (rc == -2) {
+		memcache_update_state(&pq->trx_status, lock);	
 		return pq;
 	}
 
-	if (oldque){
-			/* remove any malloc working attribute space */
-
+	if (oldque) {
+		/* remove any malloc working attribute space */
 		for (i=0; i < (int)QA_ATR_LAST; i++) {
 			pdef  = &que_attr_def[i];
 			pattr = &pq->qu_attr[i];
@@ -273,8 +276,7 @@ que_recov_db(char *qname, pbs_queue *pq, int lock)
 		goto db_err;
 
 	pbs_db_reset_obj(&obj);
-	if (pq)
-		log_err(-1, "que_recov", "pq returned successfully");
+	memcache_update_state(&pq->trx_status, lock);
 	
 	/* all done recovering the queue */
 	return (pq);
