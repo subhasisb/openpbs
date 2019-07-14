@@ -336,7 +336,7 @@ decr_single_subjob_usage(job *parent)
 {
 	parent->ji_qs.ji_svrflags &= ~JOB_SVFLG_ArrayJob; /* small hack to decrement usage for a single un-instantiated subjob */
 	account_entity_limit_usages(parent, NULL, NULL, DECR, ETLIM_ACC_ALL); /* for server limit */
-	account_entity_limit_usages(parent, find_queuebyname(parent->ji_qs.ji_queue, 0), NULL, DECR, ETLIM_ACC_ALL); /* for queue limit */
+	account_entity_limit_usages(parent, parent->ji_qhdr, NULL, DECR, ETLIM_ACC_ALL); /* for queue limit */
 	parent->ji_qs.ji_svrflags |= JOB_SVFLG_ArrayJob; /* setting arrayjob flag back */
 }
 
@@ -427,6 +427,7 @@ req_deletejob(struct batch_request *preq)
 			req_reject(PBSE_NOHISTARRAYSUBJOB, 0, preq);
 			return;
 		} else if ((pjob = parent->ji_ajtrk->tkm_tbl[offset].trk_psubjob)) {
+			pjob->ji_qhdr = parent->ji_qhdr;
 			/*
 			 * If the request is to also purge the history of the sub job then set ji_deletehistory to 1
 			 */
@@ -470,6 +471,7 @@ req_deletejob(struct batch_request *preq)
 			if ((sjst == JOB_STATE_EXITING) && !forcedel)
 				continue;
 			if ((pjob = parent->ji_ajtrk->tkm_tbl[i].trk_psubjob)) {
+				pjob->ji_qhdr = parent->ji_qhdr;
 				if (delhist)
 					pjob->ji_deletehistory = 1;
 				if (pjob->ji_qs.ji_state == JOB_STATE_EXPIRED) {
@@ -546,6 +548,7 @@ req_deletejob(struct batch_request *preq)
 			if ((sjst == JOB_STATE_EXITING) && !forcedel)
 				continue;
 			if ((pjob = parent->ji_ajtrk->tkm_tbl[i].trk_psubjob)) {
+				pjob->ji_qhdr = parent->ji_qhdr;
 				if (delhist)
 					pjob->ji_deletehistory = 1;
 				if (pjob->ji_qs.ji_state == JOB_STATE_EXPIRED) {
@@ -1284,6 +1287,7 @@ resend:
 				return;
 			}
 
+			pjob->ji_qhdr = find_queuebyname(pjob->ji_qs.ji_queue, 0);
 			/* MOM claims no knowledge, so just purge it */
 			acct_del_write(pjob->ji_qs.ji_jobid, pjob, preq_clt, 0);
 			/* removed the resources assigned to job */
@@ -1304,6 +1308,7 @@ resend:
 		/* Mom running a site supplied Terminate Job script   */
 		/* Put job into special Exiting state and we are done */
 
+		pjob->ji_qhdr = find_queuebyname(pjob->ji_qs.ji_queue, 0);
 		(void) svr_setjobstate(pjob, JOB_STATE_EXITING, JOB_SUBSTATE_TERM);
 		return;
 	}

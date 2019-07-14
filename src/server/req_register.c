@@ -212,6 +212,7 @@ req_register(struct batch_request *preq)
 		return;
 	}
 
+	pjob->ji_qhdr = find_queuebyname(pjob->ji_qs.ji_queue, 0);
 	pattr = &pjob->ji_wattr[(int)JOB_ATR_depend];
 	type = preq->rq_ind.rq_register.rq_dependtype;
 	pjob->ji_modified = 1;
@@ -446,6 +447,7 @@ post_doq(struct work_task *pwt)
 			(void)strcat(log_buffer, msg);
 		}
 		if (pjob) {
+			pjob->ji_qhdr = find_queuebyname(pjob->ji_qs.ji_queue, 0);
 			if (preq->rq_reply.brp_code == PBSE_JOB_MOVED) {
 				/* Creating a separate log buffer because if we end up aborting the submitted job
 				 * we don't want to change what goes into accounting log via job_abt
@@ -564,8 +566,8 @@ depend_on_que(attribute *pattr, void *pobj, int mode)
 	job           *pjob = (job *)pobj;
 
 	if (((mode != ATR_ACTION_ALTER) && (mode != ATR_ACTION_NOOP)) ||
-		(find_queuebyname(pjob->ji_qs.ji_queue, 0) == 0) ||
-		(find_queuebyname(pjob->ji_qs.ji_queue, 0)->qu_qs.qu_type != QTYPE_Execution))
+		(pjob->ji_qhdr == 0) ||
+		(pjob->ji_qhdr->qu_qs.qu_type != QTYPE_Execution))
 		return (0);
 
 

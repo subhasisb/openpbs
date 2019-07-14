@@ -168,6 +168,7 @@ cnvrt_qmove(resc_resv  *presv)
 		(void)resv_purge(presv);
 		return (-1);
 	}
+	pjob->ji_qhdr = find_queuebyname(pjob->ji_qs.ji_queue, 0);
 	if ((reqcnvrt = alloc_br(PBS_BATCH_MoveJob)) == NULL) {
 		(void)resv_purge(presv);
 		return (-1);

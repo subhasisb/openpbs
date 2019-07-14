@@ -580,6 +580,7 @@ struct job {
 #else					/* END Mom ONLY -  start Server ONLY */
 	struct batch_request *ji_prunreq; /* outstanding runjob request */
 	pbs_list_head	ji_svrtask;	/* links to svr work_task list */
+	struct pbs_queue  *ji_qhdr;	/* pointer to current queue object cache */
 	struct resc_resv  *ji_resvp;	/* !=0 reservation job;see job_purge */
 	struct resc_resv  *ji_myResv;	/* !=0 job belongs to a reservation */
 	/* see also, attribute JOB_ATR_myResv */

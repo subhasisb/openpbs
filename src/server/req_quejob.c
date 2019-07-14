@@ -1974,7 +1974,7 @@ req_commit(struct batch_request *preq)
 	 * to the user.
 	 */
 
-	pque = find_queuebyname(pj->ji_qs.ji_queue, 0);
+	pque = pj->ji_qhdr;
 
 	if ((preq->rq_fromsvr == 0) &&
 		(pque->qu_qs.qu_type == QTYPE_RoutePush) &&

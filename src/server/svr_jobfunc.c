@@ -315,6 +315,8 @@ svr_enquejob(job *pjob)
 
 	/* place into queue in order of queue rank starting at end */
 
+	pjob->ji_qhdr = pque;
+
 	pjcur = (job *)GET_PRIOR(pque->qu_jobs);
 	while (pjcur) {
 		if ((unsigned long)pjob->ji_wattr[(int)JOB_ATR_qrank].
@@ -545,6 +547,7 @@ svr_dequejob(job *pjob)
 			if (--pque->qu_njstate[pjob->ji_qs.ji_state] < 0)
 				bad_ct = 1;
 		}
+		pjob->ji_qhdr = NULL;
 	}
 
 #ifndef NDEBUG
@@ -581,7 +584,7 @@ int
 svr_setjobstate(job *pjob, int newstate, int newsubstate)
 {
 	int    changed = 0;
-	pbs_queue *pque = find_queuebyname(pjob->ji_qs.ji_queue, 0);
+	pbs_queue *pque = pjob->ji_qhdr;
 	pbs_sched *psched;
 
 	/*
@@ -686,7 +689,7 @@ svr_setjobstate(job *pjob, int newstate, int newsubstate)
 	if (newstate == JOB_STATE_RUNNING) {
 		if (pjob->ji_etlimit_decr_queued == FALSE) {
 			account_entity_limit_usages(pjob, NULL, NULL, DECR, ETLIM_ACC_ALL_QUEUED);
-			account_entity_limit_usages(pjob, find_queuebyname(pjob->ji_qs.ji_queue, 0), NULL, DECR, ETLIM_ACC_ALL_QUEUED);
+			account_entity_limit_usages(pjob, pjob->ji_qhdr, NULL, DECR, ETLIM_ACC_ALL_QUEUED);
 			pjob->ji_etlimit_decr_queued = TRUE;
 		}
 	}
@@ -1442,7 +1445,7 @@ svr_chkque(job *pjob, pbs_queue *pque, char *hostname, int mtype)
 	}
 
 	/* after check unset defaults & reset based on current queue, if one */
-	if (find_queuebyname(pjob->ji_qs.ji_queue, 0)) {
+	if (pjob->ji_qhdr) {
 		clear_default_resc(pjob);
 		(void)set_resc_deflt(pjob, JOB_OBJECT, NULL);
 	}
@@ -1641,6 +1644,7 @@ job_wait_over(struct work_task *pwt)
 #endif
 	pjob->ji_qs.ji_svrflags &= ~JOB_SVFLG_HASWAIT;
 
+	pjob->ji_qhdr = find_queuebyname(pjob->ji_qs.ji_queue, 0);
 	/* clear the exectime attribute */
 	job_attr_def[(int)JOB_ATR_exectime].
 	at_free(&pjob->ji_wattr[(int)JOB_ATR_exectime]);
@@ -2358,7 +2362,7 @@ set_resc_deflt(void *pobj, int objtype, pbs_queue *pque)
 			pjob = (job *)pobj;
 			assert(pjob != NULL);
 			if (pque == NULL)
-				pque = find_queuebyname(pjob->ji_qs.ji_queue, 0);
+				pque = pjob->ji_qhdr;
 			assert(pque != NULL);
 			pdest = &pjob->ji_wattr[(int)JOB_ATR_resource];
 			psched = &pjob->ji_wattr[(int)JOB_ATR_SchedSelect];
@@ -2377,7 +2381,7 @@ set_resc_deflt(void *pobj, int objtype, pbs_queue *pque)
 			assert(presv != NULL);
 			pjob = presv->ri_jbp;
 			assert(pjob != NULL);
-			pque = find_queuebyname(pjob->ji_qs.ji_queue, 0);
+			pque = pjob->ji_qhdr;
 			assert(pque != NULL);
 			pdest = &presv->ri_wattr[(int)RESV_ATR_resource];
 			break;
@@ -2581,7 +2585,7 @@ correct_ct(pbs_queue *pqj)
 		pjob = (job *)GET_NEXT(pjob->ji_alljobs)) {
 		server.sv_qs.sv_numjobs++;
 		server.sv_jobstates[pjob->ji_qs.ji_state]++;
-		pque = find_queuebyname(pjob->ji_qs.ji_queue, 0);
+		pque = pjob->ji_qhdr;
 		if (pque) {
 			pque->qu_numjobs++;
 			pque->qu_njstate[pjob->ji_qs.ji_state]++;
@@ -2884,6 +2888,7 @@ Time4resv(struct work_task *ptask)
 		if (presv->ri_qs.ri_type == RESV_JOB_OBJECT &&
 			(pjob = presv->ri_jbp)) {
 
+			pjob->ji_qhdr = find_queuebyname(pjob->ji_qs.ji_queue, 0);
 			svr_evaljobstate(pjob, &state, &sub, 0);
 			(void)svr_setjobstate(pjob, state, sub);
 		}
@@ -3390,8 +3395,10 @@ delete_occurrence_jobs(resc_resv *presv)
 		 * of job_abt
 		 */
 		pnxj = (job *)GET_NEXT(pjob->ji_jobque);
-		if (pjob->ji_qs.ji_state == JOB_STATE_RUNNING && pjob->ji_qs.ji_substate != JOB_SUBSTATE_ABORT)
+		if (pjob->ji_qs.ji_state == JOB_STATE_RUNNING && pjob->ji_qs.ji_substate != JOB_SUBSTATE_ABORT) {
+			pjob->ji_qhdr = find_queuebyname(pjob->ji_qs.ji_queue, 0);
 			(void) job_abt(pjob, "Deleting running job at end of reservation occurrence");
+		}
 
 		pjob = pnxj;
 	}
@@ -5375,7 +5382,7 @@ svr_setjob_histinfo(job *pjob, histjob_type type)
 		(pjob->ji_qs.ji_state != JOB_STATE_FINISHED)) {
 		account_entity_limit_usages(pjob, NULL, NULL, DECR,
 				pjob->ji_etlimit_decr_queued ? ETLIM_ACC_ALL_MAX : ETLIM_ACC_ALL);
-		account_entity_limit_usages(pjob, find_queuebyname(pjob->ji_qs.ji_queue, 0), NULL, DECR,
+		account_entity_limit_usages(pjob, pjob->ji_qhdr, NULL, DECR,
 				pjob->ji_etlimit_decr_queued ? ETLIM_ACC_ALL_MAX : ETLIM_ACC_ALL);
 	}
 

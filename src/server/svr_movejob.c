@@ -378,6 +378,7 @@ post_routejob(struct work_task *pwt)
 			jobp->ji_qs.ji_jobid, log_buffer);
 	}
 
+	jobp->ji_qhdr = find_queuebyname(jobp->ji_qs.ji_queue, 0);
 	switch (r) {
 		case SEND_JOB_OK:		/* normal return, job was routed */
 
@@ -461,6 +462,7 @@ post_movejob(struct work_task *pwt)
 
 	}
 
+	jobp->ji_qhdr = find_queuebyname(jobp->ji_qs.ji_queue, 0);
 	if (WIFEXITED(stat)) {
 		r = WEXITSTATUS(stat);
 		if (r == SEND_JOB_OK) {	/* purge server's job structure */

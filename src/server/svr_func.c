@@ -371,8 +371,8 @@ set_resc_assigned(void *pobj, int objtype, enum batch_op op)
 	if (!objtype) {
 		pjob = (job *)pobj;
 
-		if ((find_queuebyname(pjob->ji_qs.ji_queue, 0) == 0) ||
-			(find_queuebyname(pjob->ji_qs.ji_queue, 0)->qu_qs.qu_type != QTYPE_Execution))
+		if ((pjob->ji_qhdr == 0) ||
+			(pjob->ji_qhdr->qu_qs.qu_type != QTYPE_Execution))
 			return;
 
 		if (op == INCR) {
@@ -415,7 +415,7 @@ set_resc_assigned(void *pobj, int objtype, enum batch_op op)
 				rescp = (resource *) GET_NEXT(pjob->ji_wattr[(int) JOB_ATR_resc_released_list].at_val.at_list);
 		}
 		sysru = &server.sv_attr[(int)SRV_ATR_resource_assn];
-		queru = &find_queuebyname(pjob->ji_qs.ji_queue, 0)->qu_attr[(int)QE_ATR_ResourceAssn];
+		queru = &pjob->ji_qhdr->qu_attr[(int)QE_ATR_ResourceAssn];
 
 		if (pjob->ji_resvp || (pjob->ji_myResv &&
 			(pjob->ji_myResv->ri_qs.ri_state == RESV_RUNNING ||
@@ -5230,6 +5230,7 @@ fail_vnode_job(struct prov_vnode_info * prov_vnode_info, int hold_or_que)
 	if (!pjob)
 		return;
 
+	pjob->ji_qhdr = find_queuebyname(pjob->ji_qs.ji_queue, 0);
 	/* add accounting log for provision failure for job */
 	set_job_ProvAcctRcd(pjob, time_now, PROVISIONING_FAILURE);
 
@@ -5539,6 +5540,8 @@ check_and_run_jobs(struct prov_vnode_info * prov_vnode_info)
 	if (pjob == NULL)
 		return;
 
+	pjob->ji_qhdr = find_queuebyname(pjob->ji_qs.ji_queue, 0);
+
 	rc = is_runnable(pjob, prov_vnode_info);
 
 
@@ -5700,6 +5703,7 @@ prov_startjob(struct work_task *ptask)
 
 	assert(ptask->wt_parm1 != NULL);
 	pjob = (job *) ptask->wt_parm1;
+	pjob->ji_qhdr = find_queuebyname(pjob->ji_qs.ji_queue, 0);
 	if (do_sync_mom_hookfiles || sync_mom_hookfiles_proc_running) {
 
 		/**

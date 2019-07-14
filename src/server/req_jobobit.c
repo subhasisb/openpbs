@@ -761,6 +761,7 @@ on_job_exit(struct work_task *ptask)
 		mom_tasklist_ptr = &(((mom_svrinfo_t *)(pmom->mi_data))->msr_deferred_cmds);
 	}
 
+	pjob->ji_qhdr = find_queuebyname(pjob->ji_qs.ji_queue, 0);
 	switch (pjob->ji_qs.ji_substate) {
 
 		case JOB_SUBSTATE_EXITING:
@@ -1191,6 +1192,7 @@ on_job_rerun(struct work_task *ptask)
 		mom_tasklist_ptr = &(((mom_svrinfo_t *)(pmom->mi_data))->msr_deferred_cmds);
 	}
 
+	pjob->ji_qhdr = find_queuebyname(pjob->ji_qs.ji_queue, 0);
 	switch (pjob->ji_qs.ji_substate) {
 
 
@@ -1729,6 +1731,7 @@ job_obit(struct resc_used_update *pruu, int stream)
 	log_event(PBSEVENT_DEBUG, PBS_EVENTCLASS_JOB, LOG_INFO,
 		pruu->ru_pjobid, log_buffer);
 
+	pjob->ji_qhdr = find_queuebyname(pjob->ji_qs.ji_queue, 0);
 	if (pjob->ji_qs.ji_state != JOB_STATE_RUNNING) {
 		DBPRT(("%s: job %s not in running state!\n",
 			__func__, pruu->ru_pjobid))

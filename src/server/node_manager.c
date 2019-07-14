@@ -680,6 +680,7 @@ node_down_requeue(struct work_task *pwt)
 					nname = parse_servername(
 						pj->ji_wattr[(int)JOB_ATR_exec_vnode].at_val.at_str, NULL);
 					if (nname && (strcasecmp(np->nd_name, nname) == 0)) {
+						pj->ji_qhdr = find_queuebyname(pj->ji_qs.ji_queue, 0);
 						/* node is Mother Superior for job */
 						pj->ji_wattr[(int)JOB_ATR_exit_status].at_val.at_long = JOB_EXEC_RERUN_MS_FAIL;
 						pj->ji_wattr[(int)JOB_ATR_exit_status].at_flags |=
@@ -1007,9 +1008,13 @@ momptr_down(mominfo_t *pmom, char *why)
 							}
 						}
 
-						for (i = 0; i < nj; ++i)
-							if (*(parray+i))
-								post_discard_job(*(parray+i), pmom, JDCD_DOWN);
+						for (i = 0; i < nj; ++i) {
+							job *pjob = *(parray+i);
+							if (pjob) {
+								pjob->ji_qhdr = find_queuebyname(pjob->ji_qs.ji_queue, 0);
+								post_discard_job(pjob, pmom, JDCD_DOWN);
+							}
+						}
 
 						free(parray);
 						parray = NULL;
@@ -2338,6 +2343,7 @@ stat_update(int stream)
 			char		*cur_execvnode = NULL;
 			char		*cur_schedselect = NULL;
 
+			pjob->ji_qhdr = find_queuebyname(pjob->ji_qs.ji_queue, 0);
 			if (pjob->ji_wattr[(int)JOB_ATR_exec_vnode].at_flags & ATR_VFLAG_SET)
 				cur_execvnode = pjob->ji_wattr[(int)JOB_ATR_exec_vnode].at_val.at_str;
 
@@ -5205,6 +5211,7 @@ found:
 			pjob = find_job(jid);
 			if (pjob &&
 				(pjob->ji_wattr[(int)JOB_ATR_run_version].at_val.at_long==j)) {
+				pjob->ji_qhdr = find_queuebyname(pjob->ji_qs.ji_queue, 0);
 				post_discard_job(pjob, pmom, JDCD_REPLIED);
 			}
 			free(jid);
@@ -5245,6 +5252,7 @@ found:
 					((pjob->ji_qs.ji_state == JOB_STATE_RUNNING) ||
 					(pjob->ji_qs.ji_state == JOB_STATE_EXITING))  &&
 					(pjob->ji_wattr[(int)JOB_ATR_run_version].at_val.at_long == runct)) {
+					pjob->ji_qhdr = find_queuebyname(pjob->ji_qs.ji_queue, 0);
 					/* set the Exit_status job attribute */
 					/* to be later checked in job_obit() */
 					if (hact == JOB_ACT_REQ_REQUEUE) {
@@ -7962,7 +7970,7 @@ update_job_node_rassn(job *pjob, attribute *pexech, enum batch_op op)
 		(pexech == &pjob->ji_wattr[(int) JOB_ATR_exec_vnode_deallocated])) {
 		char *pc;
 		sysru = &server.sv_attr[(int)SRV_ATR_resource_assn];
-		queru = &find_queuebyname(pjob->ji_qs.ji_queue, 0)->qu_attr[(int)QE_ATR_ResourceAssn];
+		queru = &pjob->ji_qhdr->qu_attr[(int)QE_ATR_ResourceAssn];
 
 		pc = pexech->at_val.at_str;
 		while (*pc != '\0') {

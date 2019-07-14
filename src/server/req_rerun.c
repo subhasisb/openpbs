@@ -104,6 +104,7 @@ post_rerun(struct work_task *pwt)
 	preq = (struct batch_request *)pwt->wt_parm1;
 	if (preq->rq_reply.brp_code != 0) {
 		if ((pjob = find_job(preq->rq_ind.rq_signal.rq_jid)) != NULL) {
+			pjob->ji_qhdr = find_queuebyname(pjob->ji_qs.ji_queue, 0);
 			(void)sprintf(log_buffer, "rerun signal reject by mom: %d",
 				preq->rq_reply.brp_code);
 			log_event(PBSEVENT_JOB, PBS_EVENTCLASS_JOB, LOG_INFO,
@@ -253,6 +254,7 @@ req_rerunjob(struct batch_request *preq)
 			return;
 		} else if (i == JOB_STATE_RUNNING) {
 			if ((pjob = parent->ji_ajtrk->tkm_tbl[offset].trk_psubjob)) {
+				pjob->ji_qhdr = parent->ji_qhdr;
 				req_rerunjob2(preq, pjob);
 			} else {
 				req_reject(PBSE_BADSTATE, 0, preq);
@@ -284,6 +286,7 @@ req_rerunjob(struct batch_request *preq)
 
 		for (i=0; i<parent->ji_ajtrk->tkm_ct; i++) {
 			if ((pjob = parent->ji_ajtrk->tkm_tbl[i].trk_psubjob)) {
+				pjob->ji_qhdr = parent->ji_qhdr;
 				if (pjob->ji_qs.ji_state == JOB_STATE_RUNNING)
 					dup_br_for_subjob(preq, pjob, req_rerunjob2);
 				else
@@ -351,6 +354,7 @@ req_rerunjob(struct batch_request *preq)
 
 			if (get_subjob_state(parent, i) == JOB_STATE_RUNNING) {
 				if ((pjob = parent->ji_ajtrk->tkm_tbl[i].trk_psubjob)) {
+					pjob->ji_qhdr = parent->ji_qhdr;
 					dup_br_for_subjob(preq, pjob, req_rerunjob2);
 				}
 			}

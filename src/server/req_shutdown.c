@@ -204,6 +204,7 @@ svr_shutdown(int type)
 			pjob->ji_qs.ji_svrflags |= JOB_SVFLG_HOTSTART;
 			pjob->ji_qs.ji_svrflags |= JOB_SVFLG_HASRUN;
 			pattr = &pjob->ji_wattr[(int)JOB_ATR_chkpnt];
+			pjob->ji_qhdr = find_queuebyname(pjob->ji_qs.ji_queue, 0);
 			if ((pattr->at_val.at_str) &&
 				(*pattr->at_val.at_str != 'n')) {
 				/* do checkpoint of job */
@@ -355,6 +356,7 @@ post_chkpt(struct work_task *ptask)
 	pjob = find_job(preq->rq_ind.rq_hold.rq_orig.rq_objname);
 	if (!preq || !pjob)
 		return;
+	pjob->ji_qhdr = find_queuebyname(pjob->ji_qs.ji_queue, 0);
 	if (preq->rq_reply.brp_code == 0) {
 		/* checkpointed ok */
 		if (preq->rq_reply.brp_auxcode) { /* chkpt can be moved */

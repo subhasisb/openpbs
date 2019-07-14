@@ -342,6 +342,7 @@ req_preemptjobs(struct batch_request *preq)
 
 		pjob->ji_pmt_preq = preq;
 
+		pjob->ji_qhdr = find_queuebyname(pjob->ji_qs.ji_queue, 0);
 		pjob->preempt_order = svr_get_preempt_order(pjob, psched);
 		pjob->preempt_order_index = 0;
 		if (issue_preempt_request((int)pjob->preempt_order[0].order[0], pjob, preq))

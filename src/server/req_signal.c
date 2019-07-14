@@ -157,6 +157,7 @@ req_signaljob(struct batch_request *preq)
 			return;
 		} else if (i == JOB_STATE_RUNNING) {
 			if ((pjob = parent->ji_ajtrk->tkm_tbl[offset].trk_psubjob)) {
+				pjob->ji_qhdr = parent->ji_qhdr;
 				req_signaljob2(preq, pjob);
 			} else {
 				req_reject(PBSE_BADSTATE, 0, preq);
@@ -184,6 +185,7 @@ req_signaljob(struct batch_request *preq)
 		for (i=0; i<parent->ji_ajtrk->tkm_ct; i++) {
 			if (get_subjob_state(parent, i) == JOB_STATE_RUNNING) {
 				if ((pjob = parent->ji_ajtrk->tkm_tbl[i].trk_psubjob)) {
+					pjob->ji_qhdr = parent->ji_qhdr;
 					/* if suspending,  skip those already suspended,  */
 					if (suspend && (pjob->ji_qs.ji_svrflags & JOB_SVFLG_Suspend))
 						continue;
@@ -255,6 +257,7 @@ req_signaljob(struct batch_request *preq)
 
 			if (get_subjob_state(parent, i) == JOB_STATE_RUNNING) {
 				if ((pjob = parent->ji_ajtrk->tkm_tbl[i].trk_psubjob)) {
+					pjob->ji_qhdr = parent->ji_qhdr;
 					dup_br_for_subjob(preq, pjob, req_signaljob2);
 				}
 			}
@@ -439,6 +442,7 @@ post_signal_req(struct work_task *pwt)
 	preq->rq_conn = preq->rq_orgconn;  /* restore client socket */
 	pjob = preq->rq_extra;
 
+	pjob->ji_qhdr = find_queuebyname(pjob->ji_qs.ji_queue, 0);
 	if(strcmp(preq->rq_ind.rq_signal.rq_signame, SIG_SUSPEND)==0 ||
 			strcmp(preq->rq_ind.rq_signal.rq_signame, SIG_ADMIN_SUSPEND) == 0)
 		suspend = 1;

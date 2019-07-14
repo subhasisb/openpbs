@@ -483,6 +483,7 @@ chk_job_request(char *jobid, struct batch_request *preq, int *rc)
 		if ((preq->rq_type == PBS_BATCH_DeleteJob) &&
 			(preq->rq_extend != NULL) &&
 			(strcmp(preq->rq_extend, "force") == 0)) {
+			pjob->ji_qhdr = find_queuebyname(pjob->ji_qs.ji_queue, 0);
 			return (pjob);
 		}
 
@@ -494,6 +495,7 @@ chk_job_request(char *jobid, struct batch_request *preq, int *rc)
 		return NULL;
 	}
 
+	pjob->ji_qhdr = find_queuebyname(pjob->ji_qs.ji_queue, 0);
 	return (pjob);
 }
 

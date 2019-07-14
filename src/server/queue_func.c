@@ -233,7 +233,9 @@ que_purge(pbs_queue *pque)
 			/*
 			 * All are history jobs, unlink all of them from queue.
 			 * Update the number of jobs in the queue and their state
-			 * count as the queue is going to be purged.
+			 * count as the queue is going to be purged. No job(s)
+			 * should point to the queue to be purged, make the queue
+			 * header pointer of job(pjob->ji_qhdr) to NULL.
 			 */
 			pjob = (job *)GET_NEXT(pque->qu_jobs);
 			while (pjob) {
@@ -241,6 +243,7 @@ que_purge(pbs_queue *pque)
 				delete_link(&pjob->ji_jobque);
 				--pque->qu_numjobs;
 				--pque->qu_njstate[pjob->ji_qs.ji_state];
+				pjob->ji_qhdr = NULL;
 				pjob = nxpjob;
 			}
 		} else {

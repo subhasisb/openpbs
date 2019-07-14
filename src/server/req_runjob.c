@@ -329,7 +329,7 @@ req_runjob(struct batch_request *preq)
 
 	/* the job must be in an execution queue */
 
-	if (find_queuebyname(parent->ji_qs.ji_queue, 0)->qu_qs.qu_type != QTYPE_Execution) {
+	if (parent->ji_qhdr->qu_qs.qu_type != QTYPE_Execution) {
 		req_reject(PBSE_IVALREQ, 0, preq);
 		return;
 	}
@@ -750,6 +750,7 @@ post_stagein(struct work_task *pwt)
 
 	if (pjob != NULL) {
 
+		pjob->ji_qhdr = find_queuebyname(pjob->ji_qs.ji_queue, 0);
 		if (code != 0) {
 
 			/* stage in failed - "wait" job */
@@ -913,7 +914,7 @@ svr_startjob(job *pjob, struct batch_request *preq)
 	int   f;
 	int   rc;
 	char *nspec;
-	pbs_queue *pque = find_queuebyname(pjob->ji_qs.ji_queue, 0);
+	pbs_queue *pque = pjob->ji_qhdr;
 	long delay = 10; /* Default value for kill_delay */
 
 	/* if not already setup, transfer the control/script file basename */
@@ -1118,6 +1119,7 @@ complete_running(job *jobp)
 		/* if this is first subjob to run, mark */
 		/* parent Array as state "Begun"	*/
 		parent = jobp->ji_parentaj;
+		parent->ji_qhdr = jobp->ji_qhdr;
 		if (parent->ji_qs.ji_state == JOB_STATE_QUEUED ||
 			(parent->ji_qs.ji_state == JOB_STATE_BEGUN && parent->ji_qs.ji_stime == 0)) {
 			svr_setjobstate(parent, JOB_STATE_BEGUN, JOB_SUBSTATE_BEGUN);
@@ -1447,6 +1449,7 @@ post_sendmom(struct work_task *pwt)
 			jobp->ji_qs.ji_jobid, log_buffer);
 	}
 
+	jobp->ji_qhdr = find_queuebyname(jobp->ji_qs.ji_queue, 0);
 	switch (r) {
 
 		case SEND_JOB_OK:		/* send to MOM went ok */
