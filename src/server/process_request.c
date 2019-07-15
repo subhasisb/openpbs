@@ -590,6 +590,14 @@ memcache_reset_state(struct memcache_state *ts)
 	ts->locked = 0;
 }
 
+void
+memcache_roll_srv_trx()
+{
+	curr_svr_trx_id++;
+	if (curr_svr_trx_id > 10000)
+		curr_svr_trx_id = 0;
+}
+
 /**
  * @brief
  * 		Determine the request type and invoke the corresponding
@@ -624,9 +632,7 @@ dispatch_request(int sfds, struct batch_request *request)
 		}
 	}
 
-	curr_svr_trx_id++;
-	if (curr_svr_trx_id > 10000)
-		curr_svr_trx_id = 0;
+	memcache_roll_srv_trx(); /* mark a new server transaction, used by memory cache */
 
 	switch (request->rq_type) {
 

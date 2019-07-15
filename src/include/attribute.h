@@ -602,6 +602,7 @@ struct memcache_state {
 extern int  memcache_good(struct memcache_state *ts, int lock);
 extern void memcache_update_state(struct memcache_state *ts, int lock);
 extern void memcache_reset_state(struct memcache_state *ts);
+extern void memcache_roll_srv_trx();
 
 /* "type" to pass to acl_check() */
 #define ACL_Host  1
