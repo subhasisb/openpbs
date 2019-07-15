@@ -268,7 +268,7 @@ action_sched_priv(attribute *pattr, void *pobj, int actmode)
 	if (pobj == dflt_scheduler)
 		return PBSE_SCHED_OP_NOT_PERMITTED;
 
-	if (actmode == ATR_ACTION_NEW || actmode == ATR_ACTION_ALTER || actmode == ATR_ACTION_RECOV) {
+	if (actmode == ATR_ACTION_NEW || actmode == ATR_ACTION_ALTER || actmode != ATR_ACTION_RECOV) {
 		psched = (pbs_sched*) GET_NEXT(svr_allscheds);
 		while (psched != NULL) {
 			if (psched->sch_attr[SCHED_ATR_sched_priv].at_flags & ATR_VFLAG_SET) {
@@ -281,9 +281,9 @@ action_sched_priv(attribute *pattr, void *pobj, int actmode)
 			}
 			psched = (pbs_sched*) GET_NEXT(psched->sc_link);
 		}
-	}
-	if (actmode != ATR_ACTION_RECOV)
 		(void)contact_sched(SCH_ATTRS_CONFIGURE, NULL, psched->pbs_scheduler_addr, psched->pbs_scheduler_port);
+	}
+
 	return PBSE_NONE;
 }
 
@@ -309,7 +309,7 @@ action_sched_log(attribute *pattr, void *pobj, int actmode)
 	if (pobj == dflt_scheduler)
 		return PBSE_SCHED_OP_NOT_PERMITTED;
 
-	if (actmode == ATR_ACTION_NEW || actmode == ATR_ACTION_ALTER || actmode == ATR_ACTION_RECOV) {
+	if (actmode == ATR_ACTION_NEW || actmode == ATR_ACTION_ALTER || actmode != ATR_ACTION_RECOV) {
 		psched = (pbs_sched*) GET_NEXT(svr_allscheds);
 		while (psched != NULL) {
 			if (psched->sch_attr[SCHED_ATR_sched_log].at_flags & ATR_VFLAG_SET) {
@@ -322,9 +322,10 @@ action_sched_log(attribute *pattr, void *pobj, int actmode)
 			}
 			psched = (pbs_sched*) GET_NEXT(psched->sc_link);
 		}
-	}
-	if (actmode != ATR_ACTION_RECOV)
 		(void)contact_sched(SCH_ATTRS_CONFIGURE, NULL, psched->pbs_scheduler_addr, psched->pbs_scheduler_port);
+
+	}
+
 	return PBSE_NONE;
 }
 
@@ -344,7 +345,7 @@ action_sched_log(attribute *pattr, void *pobj, int actmode)
 int
 action_sched_iteration(attribute *pattr, void *pobj, int actmode)
 {
-	if (pobj == dflt_scheduler) {
+	if ((actmode != ATR_ACTION_RECOV) &&( pobj == dflt_scheduler)) {
 			server.sv_attr[SRV_ATR_scheduler_iteration].at_val.at_long = pattr->at_val.at_long;
 			server.sv_attr[SRV_ATR_scheduler_iteration].at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 			svr_save_db(&server, SVR_SAVE_FULL);
@@ -390,7 +391,7 @@ action_sched_user(attribute *pattr, void *pobj, int actmode)
 int
 poke_scheduler(attribute *pattr, void *pobj, int actmode)
 {
-	if (pobj == &server || pobj == dflt_scheduler) {
+	if ((actmode != ATR_ACTION_RECOV) && (pobj == &server || pobj == dflt_scheduler)) {
 		if (pobj == &server) {
 			/* set this attribute on main scheduler */
 			if (dflt_scheduler) {
@@ -501,26 +502,28 @@ action_sched_partition(attribute *pattr, void *pobj, int actmode)
 		return PBSE_SCHED_OP_NOT_PERMITTED;
 	pin_sched = (pbs_sched *) pobj;
 
-	for (i = 0; i < pattr->at_val.at_arst->as_usedptr; ++i) {
-		if (pattr->at_val.at_arst->as_string[i] == NULL)
-			continue;
-		for (psched = (pbs_sched*) GET_NEXT(svr_allscheds); psched; psched = (pbs_sched*) GET_NEXT(psched->sc_link)) {
-			if (psched == pobj) {
+	if (actmode != ATR_ACTION_RECOV) {
+		for (i = 0; i < pattr->at_val.at_arst->as_usedptr; ++i) {
+			if (pattr->at_val.at_arst->as_string[i] == NULL)
 				continue;
-			}
-			part_attr = &(psched->sch_attr[SCHED_ATR_partition]);
-			if (part_attr->at_flags & ATR_VFLAG_SET) {
-				for (k = 0; k < part_attr->at_val.at_arst->as_usedptr; k++) {
-					if ((part_attr->at_val.at_arst->as_string[k] != NULL)
-							&& (!strcmp(pattr->at_val.at_arst->as_string[i],
-									part_attr->at_val.at_arst->as_string[k])))
-						return PBSE_SCHED_PARTITION_ALREADY_EXISTS;
+			for (psched = (pbs_sched*) GET_NEXT(svr_allscheds); psched; psched = (pbs_sched*) GET_NEXT(psched->sc_link)) {
+				if (psched == pobj) {
+					continue;
+				}
+				part_attr = &(psched->sch_attr[SCHED_ATR_partition]);
+				if (part_attr->at_flags & ATR_VFLAG_SET) {
+					for (k = 0; k < part_attr->at_val.at_arst->as_usedptr; k++) {
+						if ((part_attr->at_val.at_arst->as_string[k] != NULL)
+								&& (!strcmp(pattr->at_val.at_arst->as_string[i],
+										part_attr->at_val.at_arst->as_string[k])))
+							return PBSE_SCHED_PARTITION_ALREADY_EXISTS;
+					}
 				}
 			}
 		}
-	}
-	if (actmode != ATR_ACTION_RECOV)
 		(void)contact_sched(SCH_ATTRS_CONFIGURE, NULL, pin_sched->pbs_scheduler_addr, pin_sched->pbs_scheduler_port);
+	}
+
 	return PBSE_NONE;
 }
 

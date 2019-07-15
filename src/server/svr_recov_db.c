@@ -269,6 +269,8 @@ svr_recov_db(int lock)
 		firsttime = 0;
 	} else {
 		dbsvr.sv_savetm = server.sv_qs.sv_savetm;
+		if (memcache_good(&server.trx_status, lock))
+			return 0;
 	}
 
 	/* read in job fixed sub-structure */
@@ -277,8 +279,10 @@ svr_recov_db(int lock)
 	if (rc == -1)
 		goto db_err;
 
-	if (rc == -2)
+	if (rc == -2) {
+		memcache_update_state(&server.trx_status, lock);
 		return 0;
+	}
  
  	/* free all the svr attributes */
 
@@ -293,6 +297,7 @@ svr_recov_db(int lock)
 		goto db_err;
 
 	pbs_db_reset_obj(&obj);
+	memcache_update_state(&server.trx_status, lock);
 
 	return (0);
 

@@ -138,11 +138,11 @@ enum queueattr {
 
 extern attribute_def que_attr_def[];
 
-
 /* at last we come to the queue definition itself	*/
 
 struct pbs_queue {
 	pbs_list_link	qu_link;		/* forward/backward links */
+	struct memcache_state trx_status;
 	pbs_list_head	qu_jobs;		/* jobs in this queue */
 	resc_resv	*qu_resvp;		/* !=NULL if que established */
 	/* to support a reservation */

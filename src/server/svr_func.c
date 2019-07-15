@@ -949,7 +949,7 @@ action_svr_iteration(attribute *pattr, void *pobj, int mode)
 {
 	/* set this attribute on main scheduler */
 	if (dflt_scheduler) {
-		if (mode == ATR_ACTION_NEW || mode == ATR_ACTION_ALTER || mode == ATR_ACTION_RECOV) {
+		if (mode == ATR_ACTION_NEW || mode == ATR_ACTION_ALTER || mode != ATR_ACTION_RECOV) {
 			dflt_scheduler->sch_attr[SCHED_ATR_schediteration].at_val.at_long = pattr->at_val.at_long;
 			dflt_scheduler->sch_attr[SCHED_ATR_schediteration].at_flags |=
 					ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;

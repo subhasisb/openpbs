@@ -134,6 +134,8 @@ static void freebr_cpyfile(struct rq_cpyfile *);
 static void freebr_cpyfile_cred(struct rq_cpyfile_cred *);
 static void close_quejob(int sfds);
 
+long curr_svr_trx_id;
+
 /**
  * @brief
  *		Return 1 if there is no credential, 0 if there is and -1 on error.
@@ -559,6 +561,43 @@ clear_non_blocking(conn_t *conn)
 }
 #endif	/* !PBS_MOM */
 
+int 
+memcache_good(struct memcache_state *ts, int lock)
+{
+	if (ts->last_loaded_srv_trx == curr_svr_trx_id) {
+		if (lock == 0)
+			return 0;
+		else if (ts->locked == 1)
+			return 0;
+	}
+	return 1;
+}
+
+void 
+memcache_update_state(struct memcache_state *ts, int lock)
+{
+	ts->last_loaded_srv_trx = curr_svr_trx_id; /* note down transaction id in the object to optimize loading */
+	if (lock)
+		ts->locked = 1;
+	else
+		ts->locked = 0;
+}
+
+void
+memcache_reset_state(struct memcache_state *ts)
+{
+	ts->last_loaded_srv_trx = curr_svr_trx_id;
+	ts->locked = 0;
+}
+
+void
+memcache_roll_srv_trx()
+{
+	curr_svr_trx_id++;
+	if (curr_svr_trx_id > 10000)
+		curr_svr_trx_id = 0;
+}
+
 /**
  * @brief
  * 		Determine the request type and invoke the corresponding
@@ -592,6 +631,8 @@ dispatch_request(int sfds, struct batch_request *request)
 			}
 		}
 	}
+
+	memcache_roll_srv_trx(); /* mark a new server transaction, used by memory cache */
 
 	switch (request->rq_type) {
 

@@ -592,6 +592,18 @@ extern int decode_attr_db(void *parent, pbs_db_attr_list_t *attr_list,
 
 extern int is_attr(int, char *, int);
 
+
+/* object cache status functionality */
+struct memcache_state {
+	long 			last_loaded_srv_trx;
+	char			locked;
+};
+
+extern int  memcache_good(struct memcache_state *ts, int lock);
+extern void memcache_update_state(struct memcache_state *ts, int lock);
+extern void memcache_reset_state(struct memcache_state *ts);
+extern void memcache_roll_srv_trx();
+
 /* "type" to pass to acl_check() */
 #define ACL_Host  1
 #define ACL_User  2

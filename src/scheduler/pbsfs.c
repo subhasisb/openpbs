@@ -173,6 +173,11 @@ main(int argc, char *argv[])
 		}
 
 		bs = pbs_statsched(pbs_sd, sched_name, NULL, NULL);
+		if (bs == NULL) {
+			fprintf(stderr, "Scheduler %s does not exist\n", sched_name);
+			exit(1);
+		}
+
 		for (cur_attrl = bs->attribs; cur_attrl != NULL; cur_attrl = cur_attrl->next) {
 			if (strcmp(cur_attrl->name, ATTR_sched_priv) == 0) {
 				strncpy(path_buf, cur_attrl->value, sizeof(path_buf));

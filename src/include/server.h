@@ -197,6 +197,7 @@ struct server {
 	struct prov_tracking *sv_prov_track; /* array of provision records */
 	int	  sv_cur_prov_records; /* number of provisiong requests
 					 currently running */
+	struct memcache_state trx_status;
 };
 
 
