@@ -1816,9 +1816,15 @@ req_commit(struct batch_request *preq)
 		return;
 	}
 
-
 	pbs_db_begin_trx(conn, 0, 0);
 	rc = svr_recov_db(1);
+
+	/* 
+	 * we know we are going to load and lock queue in some of the routines later, 
+	 * so load now itself with lock to make
+	 * further loads and locks unnecessary 
+	 **/
+	pque = find_queuebyname(pj->ji_qs.ji_queue, 1);
 
 	/* Set Server level entity usage */
 
