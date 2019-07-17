@@ -566,11 +566,11 @@ memcache_good(struct memcache_state *ts, int lock)
 {
 	if (ts->last_loaded_srv_trx == curr_svr_trx_id) {
 		if (lock == 0)
-			return 0;
+			return 1;
 		else if (ts->locked == 1)
-			return 0;
+			return 1;
 	}
-	return 1;
+	return 0;
 }
 
 void 
