@@ -559,6 +559,12 @@ refresh_job(char *jobid) {
 			job_attr_def[i].at_free(&stale_job_ptr->ji_wattr[i]);
 		}
 
+		/* db_to_svr_job makes call to decode_attr_db which further calls setup_arrjob_attrs through action function
+		* and there we are freeing the structure stale_job_ptr->ji_ajtrk
+		* resulting parent looses his control on it's subjobs
+		* Added a hack in setup_arrjob_attrs to fix the problem for time being only
+		*/
+
 		/* refresh all the job attributes */
 		if (db_to_svr_job(stale_job_ptr, &dbjob) != 0) {
 			snprintf(log_buffer, LOG_BUF_SIZE, "Failed to refresh job attribute %s", dbjob.ji_jobid);

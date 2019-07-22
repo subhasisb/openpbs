@@ -696,8 +696,13 @@ svr_setjobstate(job *pjob, int newstate, int newsubstate)
 			return (job_save(pjob, SAVEJOB_NEW));
 		else
 			return (job_save(pjob, SAVEJOB_FULL));
-	} else if (changed)
-		return (job_save(pjob, SAVEJOB_QUICK));
+	} else if (changed) {
+		/* this call saves the parent array job state and it's substate */
+		if (pjob->ji_qs.ji_svrflags & JOB_SVFLG_ArrayJob)
+		   return (job_save(pjob, SAVEJOB_FULL));
+		else
+		   return (job_save(pjob, SAVEJOB_QUICK));
+	}
 
 	return (0);
 }

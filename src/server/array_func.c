@@ -710,11 +710,13 @@ setup_arrayjob_attrs(attribute *pattr, void *pobj, int mode)
 
 	if ((mode == ATR_ACTION_NEW) || (mode == ATR_ACTION_RECOV)) {
 		int pbs_error = PBSE_BADATVAL;
-		if (pjob->ji_ajtrk)
-			free(pjob->ji_ajtrk);
-		if ((pjob->ji_ajtrk = mk_subjob_index_tbl(pjob->ji_wattr[(int)JOB_ATR_array_indices_submitted].at_val.at_str,
-			                                      JOB_STATE_QUEUED, &pbs_error)) == NULL)
-			return pbs_error;
+		/* it's just a hack to try not to free the pjob->ji_ajtrk structure when caller is refresh_job */
+		if (pjob->ji_ajtrk == NULL) {
+			//free(pjob->ji_ajtrk);
+			if ((pjob->ji_ajtrk = mk_subjob_index_tbl(pjob->ji_wattr[(int)JOB_ATR_array_indices_submitted].at_val.at_str,
+													  JOB_STATE_QUEUED, &pbs_error)) == NULL)
+				return pbs_error;
+		}
 	}
 
 	if (mode == ATR_ACTION_RECOV) {

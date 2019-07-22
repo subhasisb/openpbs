@@ -228,7 +228,7 @@ pg_db_prepare_job_sqls(pbs_db_conn_t *conn)
 			"ji_savetm, "
 			"ji_creattm, "
 			"hstore_to_array(attributes) as attributes "
-			"from pbs.job where ji_savetm > $1 "
+			"from pbs.job where ji_savetm >= $1 "
 			"order by ji_qrank ");
 		if (pg_prepare_stmt(conn, STMT_FINDJOBS_FROM_TIME, conn->conn_sql, 1) != 0)
 			return -1;
