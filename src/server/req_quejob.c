@@ -1887,7 +1887,7 @@ req_commit(struct batch_request *preq)
 		if (strchr(pj->ji_qs.ji_jobid, '[') == NULL) {	/* Normal job */
 			(void)sprintf(jidbuf, "%lld.%s", nextid, server_name);
 		} else {	/* Array Job */
-			(void)sprintf(jidbuf, "%lld.%s", nextid, server_name);
+			(void)sprintf(jidbuf, "%lld[].%s", nextid, server_name);
 		}
 		(void) strcpy(pj->ji_qs.ji_jobid, jidbuf);
 	}
