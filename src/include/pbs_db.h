@@ -223,11 +223,6 @@ typedef struct pbs_db_resv_info pbs_db_resv_info_t;
  *
  */
 struct pbs_db_svr_info {
-	INTEGER sv_numjobs;
-	INTEGER sv_numque;
-	BIGINT  sv_jobidnumber;
-	BIGINT  sv_svraddr; /* host addr of Server */
-	INTEGER sv_svrport; /* port of host server */
 	BIGINT  sv_creattm;
 	BIGINT  sv_savetm;
 	pbs_db_attr_list_t attr_list; /* list of attributes */
@@ -951,6 +946,9 @@ void pbs_db_free_conn_info(pbs_db_conn_t *conn);
  *
  */
 int pbs_db_get_schema_version(pbs_db_conn_t *conn, int *db_maj_ver, int *db_min_ver);
+
+int pbs_db_get_maxjobid(pbs_db_conn_t *conn,  long long * jobid);
+int pbs_db_get_statecounts(pbs_db_conn_t *conn, char *qname, int statesize, int *statearray);
 
 /**
  * @brief

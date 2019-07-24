@@ -172,23 +172,22 @@ extern long svr_history_duration;
 
 struct server {
 	struct server_qs {
-		int		sv_numjobs;	/* number of job owned by server   */
-		int		sv_numque;	/* nuber of queues managed          */
-		long long	sv_jobidnumber;	/* next number to use in new jobid  */
 		time_t		sv_savetm;	/* time of server db update         */
 	} sv_qs;
+	attribute sv_attr[SRV_ATR_LAST]; /* the server attributes 	    */
 
 	time_t	  sv_started;		/* time server started */
 	time_t	  sv_hotcycle;		/* if RECOV_HOT,time of last restart */
 	time_t	  sv_next_schedule;	/* when to next run scheduler cycle */
-	int	  sv_jobstates[PBS_NUMJOBSTATE];  /* # of jobs per state */
+	int       sv_numjobs;	/* number of job owned by server   */
+	int       sv_numque;	/* nuber of queues managed          */
+	int       sv_jobstates[PBS_NUMJOBSTATE];  /* # of jobs per state */
 	char	  sv_jobstbuf[150];
 	char	  sv_license_ct_buf[150]; /* license_count buffer */
 	int	  sv_nseldft;		/* num of elems in sv_seldft	    */
 	key_value_pair *sv_seldft;	/* defelts for job's -l select	    */
 
-	attribute sv_attr[SRV_ATR_LAST]; /* the server attributes 	    */
-
+	
 	int	  sv_trackmodifed;	/* 1 if tracking list modified	    */
 	int	  sv_tracksize;		/* total number of sv_track entries */
 	struct tracking *sv_track;	/* array of track job records	    */

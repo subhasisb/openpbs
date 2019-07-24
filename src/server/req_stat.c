@@ -784,7 +784,7 @@ req_stat_svr(struct batch_request *preq)
 
 	/* update count and state counts from sv_numjobs and sv_jobstates */
 
-	server.sv_attr[(int)SRV_ATR_TotalJobs].at_val.at_long = server.sv_qs.sv_numjobs;
+	server.sv_attr[(int)SRV_ATR_TotalJobs].at_val.at_long = server.sv_numjobs;
 	server.sv_attr[(int)SRV_ATR_TotalJobs].at_flags |= ATR_VFLAG_SET|ATR_VFLAG_MODCACHE;
 	update_state_ct(&server.sv_attr[(int)SRV_ATR_JobsByState],
 		server.sv_jobstates,

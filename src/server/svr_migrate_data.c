@@ -295,7 +295,6 @@ svr_migrate_data_from_fs(void)
 	int baselen;
 	struct dirent *pdirent;
 	DIR *dir;
-	int had;
 	char *job_suffix = JOB_FILE_SUFFIX;
 	int job_suf_len = strlen(job_suffix);
 	job *pjob = NULL;
@@ -394,8 +393,6 @@ svr_migrate_data_from_fs(void)
 		return (-1);
 	}
 
-	had = server.sv_qs.sv_numque;
-	server.sv_qs.sv_numque = 0;
 	dir = opendir(".");
 	if (dir == NULL) {
 		fprintf(stderr, "%s\n", msg_init_noqueues);
@@ -407,7 +404,6 @@ svr_migrate_data_from_fs(void)
 		if (chk_save_file(pdirent->d_name) == 0) {
 			if ((pque = que_recov_fs(pdirent->d_name)) !=
 				NULL) {
-				/* que_recov increments sv_numque */
 				fprintf(stderr, msg_init_recovque,
 					pque->qu_qs.qu_name);
 				fprintf(stderr, "\n");
@@ -434,10 +430,6 @@ svr_migrate_data_from_fs(void)
 		return (-1);
 	}
 	(void) closedir(dir);
-	if (had != server.sv_qs.sv_numque) {
-		fprintf(stderr, msg_init_expctq, had, server.sv_qs.sv_numque);
-		fprintf(stderr, "\n");
-	}
 
 	/* Open and read in node list if one exists */
 	if (setup_nodes_fs(0) == -1) {
@@ -505,7 +497,6 @@ svr_migrate_data_from_fs(void)
 		return (-1);
 	}
 
-	server.sv_qs.sv_numjobs = 0;
 	recovered = 0;
 	dir = opendir(".");
 	if (dir == NULL) {

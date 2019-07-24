@@ -266,9 +266,8 @@ svr_enquejob(job *pjob)
 	int		rc;
 	pbs_sched	*psched;
 
-	/* make sure queue is still there, there exist a small window ... */
-
-	pque = find_queuebyname(pjob->ji_qs.ji_queue, 1);
+	/* with multi-server, server limits/FGC limits will not work */
+	pque = find_queuebyname(pjob->ji_qs.ji_queue, 0);
 	if (pque == NULL) {
 			return (PBSE_UNKQUE);
 	}
@@ -306,10 +305,9 @@ svr_enquejob(job *pjob)
 	 */
 	svr_avljob_oper(pjob, 0);
 
-	//SHRINI_THOUGHTS: below should be atomically done for new jobs only
 	if (pjob->ji_newjob)
 	{
-		server.sv_qs.sv_numjobs++;
+		server.sv_numjobs++;
 		server.sv_jobstates[pjob->ji_qs.ji_state]++;
 	}
 
@@ -335,7 +333,6 @@ svr_enquejob(job *pjob)
 	}
 
 	/* update counts: queue and queue by state */
-	//SHRINI_THOUGHTS: below should be atomically done for new jobs only
 	if (pjob->ji_newjob)
 	{
 		pque->qu_numjobs++;
@@ -395,7 +392,6 @@ svr_enquejob(job *pjob)
 	 * set any "unspecified" resources which have default values,
 	 * first with queue defaults, then with server defaults
 	 */
-//SHRINI_THOUGHTS: hope set_resc_deflt() works for both new and reloaded jobs
 	rc = set_resc_deflt((void *)pjob, JOB_OBJECT, NULL);
 	if (rc)
 		return rc;
@@ -523,14 +519,14 @@ svr_dequejob(job *pjob)
 		 */
 		svr_avljob_oper(pjob, 1);
 
-		if (--server.sv_qs.sv_numjobs < 0)
+		if (--server.sv_numjobs < 0)
 			bad_ct = 1;
 
 		if (--server.sv_jobstates[pjob->ji_qs.ji_state] < 0)
-			bad_ct = 1;
+			bad_ct = 1;		
 	}
 
-	if ((pque = find_queuebyname(pjob->ji_qs.ji_queue, 1)) != NULL) {
+	if ((pque = find_queuebyname(pjob->ji_qs.ji_queue, 0)) != NULL) {
 
 		/* update any entity count and entity resources usage at que */
 
@@ -2550,9 +2546,8 @@ correct_ct(pbs_queue *pqj)
 	pbs_queue *pque;
 
 
-	(void)sprintf(log_buffer, "Job state counts incorrect, server %d: ",
-		server.sv_qs.sv_numjobs);
-	server.sv_qs.sv_numjobs = 0;
+	(void)sprintf(log_buffer, "Job state counts incorrect, server %d: ", server.sv_numjobs);
+	server.sv_numjobs = 0;
 	for (i=0; i<PBS_NUMJOBSTATE-4; ++i) {
 		pc = log_buffer + strlen(log_buffer);
 		(void)sprintf(pc, "%d ", server.sv_jobstates[i]);
@@ -2579,7 +2574,7 @@ correct_ct(pbs_queue *pqj)
 
 	for (pjob = (job *)GET_NEXT(svr_alljobs); pjob;
 		pjob = (job *)GET_NEXT(pjob->ji_alljobs)) {
-		server.sv_qs.sv_numjobs++;
+		server.sv_numjobs++;
 		server.sv_jobstates[pjob->ji_qs.ji_state]++;
 		pque = find_queuebyname(pjob->ji_qs.ji_queue, 0);
 		if (pque) {

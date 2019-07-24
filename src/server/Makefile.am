@@ -146,7 +146,8 @@ pbs_comm_LDADD = \
 	$(top_builddir)/src/lib/Libpbs/.libs/libpbs.a \
 	-lpthread \
 	@libz_lib@ \
-	@socket_lib@
+	@socket_lib@ \
+	-lm
 
 pbs_comm_SOURCES = pbs_comm.c
 

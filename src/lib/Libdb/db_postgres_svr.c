@@ -65,43 +65,22 @@ int
 pg_db_prepare_svr_sqls(pbs_db_conn_t *conn)
 {
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "insert into pbs.server( "
-		"sv_numjobs, "
-		"sv_numque, "
-		"sv_jobidnumber, "
-		"sv_svraddr, "
-		"sv_svrport, "
 		"sv_savetm, "
 		"sv_creattm, "
 		"attributes "
 		") "
 		"values "
-		"($1, $2, $3, $4, $5, localtimestamp, localtimestamp, hstore($6::text[])) "
+		"(localtimestamp, localtimestamp, hstore($1::text[])) "
 		"returning sv_savetm");
-	if (pg_prepare_stmt(conn, STMT_INSERT_SVR, conn->conn_sql, 6) != 0)
+	if (pg_prepare_stmt(conn, STMT_INSERT_SVR, conn->conn_sql, 1) != 0)
 		return -1;
 
 	/* replace all attributes for a FULL update */
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "update pbs.server set "
-		"sv_numjobs = $1, "
-		"sv_numque = $2, "
-		"sv_jobidnumber = $3, "
-		"sv_svraddr = $4, "
-		"sv_svrport = $5, "
 		"sv_savetm = localtimestamp, "
-		"attributes = hstore($6::text[]) "
+		"attributes = hstore($1::text[]) "
 		"returning sv_savetm");
-	if (pg_prepare_stmt(conn, STMT_UPDATE_SVR_FULL, conn->conn_sql, 6) != 0)
-		return -1;
-
-	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "update pbs.server set "
-		"sv_numjobs = $1, "
-		"sv_numque = $2, "
-		"sv_jobidnumber = $3, "
-		"sv_svraddr = $4, "
-		"sv_svrport = $5, "
-		"sv_savetm = localtimestamp "
-		"returning sv_savetm");
-	if (pg_prepare_stmt(conn, STMT_UPDATE_SVR_QUICK, conn->conn_sql, 5) != 0)
+	if (pg_prepare_stmt(conn, STMT_UPDATE_SVR_FULL, conn->conn_sql, 1) != 0)
 		return -1;
 
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "update pbs.server set "
@@ -112,9 +91,6 @@ pg_db_prepare_svr_sqls(pbs_db_conn_t *conn)
 		return -1;
 
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select "
-		"sv_numjobs, "
-		"sv_numque, "
-		"sv_jobidnumber, "
 		"sv_savetm, "
 		"sv_creattm, "
 		"hstore_to_array(attributes) as attributes "
@@ -187,29 +163,17 @@ pg_db_save_svr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
 	char *raw_array = NULL;
 	static int sv_savetm_fnum;
 	static int fnums_inited = 0;
+	int len = 0;
 
-	SET_PARAM_INTEGER(conn, ps->sv_numjobs, 0);
-	SET_PARAM_INTEGER(conn, ps->sv_numque, 1);
-	SET_PARAM_BIGINT(conn, ps->sv_jobidnumber, 2);
-	SET_PARAM_BIGINT(conn, ps->sv_svraddr, 3);
-	SET_PARAM_INTEGER(conn, ps->sv_svrport, 4);
+	/* convert attributes to postgres raw array format */
+	if ((len = convert_db_attr_list_to_array(&raw_array, &ps->attr_list)) <= 0)
+		return -1;
 
-	if (savetype == PBS_UPDATE_DB_QUICK) {
-		params = 5;
-	} else {
-		int len = 0;
-		/* convert attributes to postgres raw array format */
-		if ((len = convert_db_attr_list_to_array(&raw_array, &ps->attr_list)) <= 0)
-			return -1;
-
-		SET_PARAM_BIN(conn, raw_array, len, 5);
-		params = 6;
-	}
+	SET_PARAM_BIN(conn, raw_array, len, 0);
+	params = 1;
 
 	if (savetype == PBS_UPDATE_DB_FULL)
 		stmt = STMT_UPDATE_SVR_FULL;
-	else if (savetype == PBS_UPDATE_DB_QUICK)
-		stmt = STMT_UPDATE_SVR_QUICK;
 	else
 		stmt = STMT_INSERT_SVR;
 
@@ -253,8 +217,7 @@ pg_db_load_svr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int lock)
 	int rc;
 	char *raw_array;
 	pbs_db_svr_info_t *ps = obj->pbs_db_un.pbs_db_svr;
-	static int sv_numjobs_fnum, sv_numque_fnum, sv_jobidnumber_fnum, sv_savetm_fnum,
-	sv_creattm_fnum, attributes_fnum;
+	static int sv_savetm_fnum, sv_creattm_fnum, attributes_fnum;
 	static int fnums_inited = 0;
 	BIGINT db_savetm;
 
@@ -262,9 +225,6 @@ pg_db_load_svr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int lock)
 		return -1;
 
 	if (fnums_inited == 0) {
-		sv_numjobs_fnum = PQfnumber(res, "sv_numjobs");
-		sv_numque_fnum = PQfnumber(res, "sv_numque");
-		sv_jobidnumber_fnum = PQfnumber(res, "sv_jobidnumber");
 		sv_savetm_fnum = PQfnumber(res, "sv_savetm");
 		sv_creattm_fnum = PQfnumber(res, "sv_creattm");
 		attributes_fnum = PQfnumber(res, "attributes");
@@ -278,9 +238,6 @@ pg_db_load_svr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int lock)
 		return -2;
 	}
 	ps->sv_savetm = db_savetm; /* update the save timestamp */
-	GET_PARAM_INTEGER(res, 0, ps->sv_numjobs, sv_numjobs_fnum);
-	GET_PARAM_INTEGER(res, 0, ps->sv_numque, sv_numque_fnum);
-	GET_PARAM_BIGINT(res, 0, ps->sv_jobidnumber, sv_jobidnumber_fnum);
 	GET_PARAM_BIGINT(res, 0, ps->sv_creattm, sv_creattm_fnum);
 	GET_PARAM_BIN(res, 0, raw_array, attributes_fnum);
 
@@ -354,8 +311,6 @@ pg_db_del_attr_svr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, void *obj_id, pb
 {
 	char *raw_array = NULL;
 	int len = 0;
-	//static int sv_savetm_fnum;
-	//static int fnums_inited = 0;
 
 	if ((len = convert_db_attr_list_to_array(&raw_array, attr_list)) <= 0)
 		return -1;
@@ -367,14 +322,6 @@ pg_db_del_attr_svr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, void *obj_id, pb
 		return -1;
 	}
 
-	/* 
-	if (fnums_inited == 0) {
-		sv_savetm_fnum = PQfnumber(conn->conn_resultset, "sv_savetm");
-		fnums_inited = 1;
-	}
-	GET_PARAM_BIGINT(conn->conn_resultset, 0, ps->sv_savetm, sv_savetm_fnum);
-	PQclear(conn->conn_resultset);
-	*/
 	free(raw_array);
 
 	return 0;

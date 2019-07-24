@@ -182,7 +182,6 @@ extern char *msg_max_no_minwt;
 extern char *msg_min_gt_maxwt;
 extern char *msg_nostf_resv;
 extern char *msg_nostf_jobarray;
-extern long long get_next_hash(long long);
 #endif
 
 
@@ -1817,17 +1816,10 @@ req_commit(struct batch_request *preq)
 	}
 
 	pbs_db_begin_trx(conn, 0, 0);
-	rc = svr_recov_db(1);
-
-	/* 
-	 * we know we are going to load and lock queue in some of the routines later, 
-	 * so load now itself with lock to make
-	 * further loads and locks unnecessary 
-	 **/
-	pque = find_queuebyname(pj->ji_qs.ji_queue, 1);
+	rc = svr_recov_db(0); /* why lock here? */
+	pque = find_queuebyname(pj->ji_qs.ji_queue, 0); /* why lock here? */
 
 	/* Set Server level entity usage */
-
 	if ((rc = account_entity_limit_usages(pj, NULL, NULL, INCR, ETLIM_ACC_ALL)) != 0) {
 		job_purge(pj);
 		req_reject(rc, 0, preq);
@@ -1862,8 +1854,6 @@ req_commit(struct batch_request *preq)
 	 * svr_chkque is called way down here because it needs to have the
 	 * job structure and attributes already set up.
 	 */
-
-	pque = find_queuebyname(pj->ji_qs.ji_queue, 1);
 	rc = svr_chkque(pj, pque, preq->rq_host, MOVE_TYPE_Move);
 	if (rc) {
 		if (pj->ji_clterrmsg)
@@ -1882,7 +1872,7 @@ req_commit(struct batch_request *preq)
 	{
 		char jidbuf[PBS_MAXSVRJOBID+1];
 
-		nextid = get_next_hash(svr_jobidnumber);
+		nextid = get_next_hash(svr_jobidnumber, svr_max_job_sequence_id);
 
 		if (strchr(pj->ji_qs.ji_jobid, '[') == NULL) {	/* Normal job */
 			(void)sprintf(jidbuf, "%lld.%s", nextid, server_name);
@@ -1950,21 +1940,10 @@ req_commit(struct batch_request *preq)
 		free(pj->ji_script);
 		pj->ji_script = NULL;
 	}
-	
-	if (que_save_db(pque, QUE_SAVE_FULL) != 0) {
-		job_purge(pj);
-		req_reject(PBSE_SYSTEM, 0, preq);
-		(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
-		return;
-	}
 
-	server.sv_qs.sv_jobidnumber = nextid; /* actually need to store it in server_instance table, not server table */
-	if (svr_save_db(&server, SVR_SAVE_FULL) != 0 ) {
-		job_purge(pj);
-		req_reject(PBSE_SYSTEM, 0, preq);
-		(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
-		return;
-	}
+	/* dont save the server or the queue since the counts can be counted in other ways
+	 * also, we will make use of server instance rows, but that too does not have to be saved here
+	 */
 
 	if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0) {
 		job_purge(pj);
@@ -2165,7 +2144,7 @@ req_resvSub(struct batch_request *preq)
 	resc_access_perm = preq->rq_perm | ATR_DFLAG_Creat;
 
 	/* get reseravtion id/queue name locally */
-	if ((next_svr_sequence_id = get_next_hash(svr_jobidnumber)) == -1) {
+	if ((next_svr_sequence_id = get_next_hash(svr_jobidnumber, svr_max_job_sequence_id) == -1)) {
 		req_reject(PBSE_SYSTEM, 0, preq);
 		return;
 	}
@@ -3229,38 +3208,6 @@ validate_place_req_of_job_in_reservation(job *pj)
 		return 0;
 
 	return 1;
-}
-
-/**
- * @brief
- * 		Provides the next job id
- *
- * @param[in] void
- *
- * @return	long long
- * @retval (>=0 to <= max_job_sequence_id): Success
- * @retval	-1	: database error
- *
- */
-long long get_next_hash(long long curr)
-{
-	static int max_servers = 10; /* in future load from pbs.conf */
-	static int my_index = -1;
-
-	if (my_index == -1) {
-		my_index = pbs_conf.batch_service_port - 15000; /* read from pbs.conf in future */
-	}
-
-	if (curr == -1) {
-		return my_index;
-	}
-
-	curr += max_servers;
-	/* If server job limit is over, reset back to zero */
-	if (curr > svr_max_job_sequence_id) {
-		curr -= svr_max_job_sequence_id;
-	}
-	return curr;
 }
 
 #endif	/*SERVER ONLY*/

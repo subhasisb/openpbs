@@ -2141,18 +2141,6 @@ try_db_again:
 
 		if (*state == SV_STATE_SHUTSIG)
 			(void)svr_shutdown(SHUT_SIG);	/* caught sig */
-
-		/*
-		 * if in process of shuting down and all running jobs
-		 * and all children are done, change state to DOWN
-		 */
-
-		if ((*state > SV_STATE_RUN) &&
-			(*state < SV_STATE_SECIDLE) &&
-			(server.sv_jobstates[JOB_STATE_RUNNING] == 0) &&
-			(server.sv_jobstates[JOB_STATE_EXITING] == 0) &&
-			((void *)GET_NEXT(task_list_event) == NULL))
-			*state = SV_STATE_DOWN;
 	}
 	DBPRT(("Server out of main loop, state is %ld\n", *state))
 

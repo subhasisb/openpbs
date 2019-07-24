@@ -158,9 +158,6 @@ static int
 svr_to_db_svr(struct server *ps, pbs_db_svr_info_t *pdbsvr, int updatetype)
 {
 	memset(pdbsvr, 0, sizeof(pbs_db_svr_info_t));
-	pdbsvr->sv_numjobs = ps->sv_qs.sv_numjobs;
-	pdbsvr->sv_numque = ps->sv_qs.sv_numque;
-	pdbsvr->sv_jobidnumber = ps->sv_qs.sv_jobidnumber;
 
 	if (updatetype != PBS_UPDATE_DB_QUICK) {
 		if ((encode_attr_db(svr_attr_def,
@@ -185,17 +182,8 @@ svr_to_db_svr(struct server *ps, pbs_db_svr_info_t *pdbsvr, int updatetype)
 int
 db_to_svr_svr(struct server *ps, pbs_db_svr_info_t *pdbsvr)
 {
-	ps->sv_qs.sv_numjobs = pdbsvr->sv_numjobs;
-	ps->sv_qs.sv_numque = pdbsvr->sv_numque;
-	ps->sv_qs.sv_savetm = pdbsvr->sv_savetm;
-	ps->sv_qs.sv_jobidnumber = pdbsvr->sv_jobidnumber;
-
-	if ((decode_attr_db(ps, &pdbsvr->attr_list, svr_attr_def,
-		ps->sv_attr,
-		(int) SRV_ATR_LAST, 0)) != 0)
+	if ((decode_attr_db(ps, &pdbsvr->attr_list, svr_attr_def, ps->sv_attr, (int) SRV_ATR_LAST, 0)) != 0)
 		return -1;
-
-	//ps->sv_attr[(int)SRV_ATR_State].at_val.at_long = SV_STATE_RUN;
 
 	return 0;
 }

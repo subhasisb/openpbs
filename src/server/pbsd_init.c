@@ -359,12 +359,10 @@ pbsd_init(int type)
 	struct dirent *pdirent;
 	DIR	*dir;
 	int	 fd;
-	int	 had;
 	int	 i = 0;
 	char	 zone_dir[MAXPATHLEN];
 	char	*hook_suffix = HOOK_FILE_SUFFIX;
 	int	hook_suf_len = strlen(hook_suffix);
-	int	 logtype;
 	hook	*phook, *phook_current;
 	pbs_queue *pque;
 	resc_resv *presv;
@@ -668,11 +666,21 @@ pbsd_init(int type)
 			log_err(rc, __func__, msg_init_baddb);
 			return (-1);
 		}
+
 		/*
 		 * Retrieve the jobidnumber from the database and use it to generate jobid's locally
 		 * see: get_next_svr_sequence_id(void)
 		 */
-		svr_jobidnumber = server.sv_qs.sv_jobidnumber;
+		{
+			long long njobid = -1;
+			if (pbs_db_get_maxjobid(conn, &njobid) == -1) {
+				log_err(-1, __func__, "Failed to query last used jobid from datastore");
+				return (-1);
+			}
+			
+			svr_jobidnumber = get_last_hash(njobid);
+		}
+
 		if (server.sv_attr[(int)SRV_ATR_resource_assn].at_flags &
 			ATR_VFLAG_SET) {
 			svr_attr_def[(int)SRV_ATR_resource_assn].at_free(
@@ -796,8 +804,10 @@ pbsd_init(int type)
 	 *    If a create, remove any queues that might be there.
 	 */
 
-	had = server.sv_qs.sv_numque;
-	server.sv_qs.sv_numque = 0;
+	for(i = 0; i < PBS_NUMJOBSTATE; i++) {
+		server.sv_jobstates[i] = 0;
+		server.sv_numjobs =0;
+	}
 
 	/* start a transaction */
 	if (pbs_db_begin_trx(conn, 0, 0) != 0)
@@ -818,7 +828,6 @@ pbsd_init(int type)
 	while ((rc = pbs_db_cursor_next(conn, state, &obj)) == 0) {
 		/* recover queue */
 		if ((pque = que_recov_db(dbque.qu_name, NULL, 0)) != NULL) {
-			/* que_recov increments sv_numque */
 			sprintf(log_buffer, msg_init_recovque,
 				pque->qu_qs.qu_name);
 			log_event(PBSEVENT_SYSTEM | PBSEVENT_ADMIN |
@@ -829,8 +838,22 @@ pbsd_init(int type)
 				que_attr_def[(int) QE_ATR_ResourceAssn].at_free(
 					&pque->qu_attr[(int) QE_ATR_ResourceAssn]);
 			}
+
+			/* load the queue counts */
+			if (pbs_db_get_statecounts(conn, pque->qu_qs.qu_name, PBS_NUMJOBSTATE, pque->qu_njstate) == -1) {
+				log_err(-1, __func__, "Failed to retreieve queue counts");
+				pbs_db_cursor_close(conn, state);
+				(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
+				return (-1);
+			}
+
+			for(i = 0; i < PBS_NUMJOBSTATE; i++) {
+				server.sv_jobstates[i] += pque->qu_njstate[i];
+				server.sv_numjobs += pque->qu_njstate[i];
+			}
 		}
 		pbs_db_reset_obj(&obj);
+		server.sv_numque++;
 	}
 
 	pbs_db_cursor_close(conn, state);
@@ -838,15 +861,6 @@ pbsd_init(int type)
 	/* end the transaction */
 	if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0)
 		return (-1);
-
-	if ((had != server.sv_qs.sv_numque) && (type != RECOV_CREATE))
-		logtype = PBSEVENT_ERROR | PBSEVENT_SYSTEM;
-	else
-		logtype = PBSEVENT_SYSTEM;
-	sprintf(log_buffer, msg_init_expctq, had, server.sv_qs.sv_numque);
-	log_event(logtype, PBS_EVENTCLASS_SERVER, LOG_INFO,
-		msg_daemonname, log_buffer);
-
 
 	/* Open and read in node list if one exists */
 	if ((rc = setup_nodes()) == -1) {
@@ -926,8 +940,6 @@ pbsd_init(int type)
 		return (-1);
 	}
 	avl_create_index(AVL_jctx, AVL_NO_DUP_KEYS, 0);
-
-	server.sv_qs.sv_numjobs = 0;
 
 	/* close transaction */
 	if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0)

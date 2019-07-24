@@ -3339,21 +3339,21 @@ _pps_helper_get_queue(pbs_queue *pque, const char *que_name)
 
 	object_counter++;
 
-	if (server.sv_qs.sv_numque > 0) {
+	if (server.sv_numque > 0) {
 
 		if (py_hook_pbsque == NULL) {
-			py_hook_pbsque = (PyObject **)calloc(server.sv_qs.sv_numque,
+			py_hook_pbsque = (PyObject **)calloc(server.sv_numque,
 				sizeof(PyObject *));
 			if (py_hook_pbsque == NULL) {
 				log_err(errno, __func__,
 					"Failed to calloc array of cached pbs queue objects");
 				goto ERROR_EXIT;
 			}
-			py_hook_pbsque_max = server.sv_qs.sv_numque;
-		} else if (server.sv_qs.sv_numque > py_hook_pbsque_max) {
+			py_hook_pbsque_max = server.sv_numque;
+		} else if (server.sv_numque > py_hook_pbsque_max) {
 			PyObject **py_hook_pbsque_tmp;
 			py_hook_pbsque_tmp =  (PyObject **)realloc(py_hook_pbsque,
-				server.sv_qs.sv_numque*sizeof(PyObject *));
+				server.sv_numque*sizeof(PyObject *));
 			if (py_hook_pbsque_tmp == NULL) {
 				log_err(errno, __func__,
 					"Failed to realloc array of cached pbs queue objects");
@@ -3366,11 +3366,11 @@ _pps_helper_get_queue(pbs_queue *pque, const char *que_name)
 				goto ERROR_EXIT;
 			}
 			py_hook_pbsque = py_hook_pbsque_tmp;
-			for (i=py_hook_pbsque_max; i < server.sv_qs.sv_numque; i++) {
+			for (i=py_hook_pbsque_max; i < server.sv_numque; i++) {
 				py_hook_pbsque[i] = NULL;
 			}
 
-			py_hook_pbsque_max = server.sv_qs.sv_numque;
+			py_hook_pbsque_max = server.sv_numque;
 		}
 	}
 
@@ -3453,7 +3453,7 @@ _pps_helper_get_server(void)
 	/* update count and state counts from sv_numjobs and sv_jobstates */
 
 	server.sv_attr[(int)SRV_ATR_TotalJobs].at_val.at_long = \
-					server.sv_qs.sv_numjobs;
+					server.sv_numjobs;
 	server.sv_attr[(int)SRV_ATR_TotalJobs].at_flags |= \
 					ATR_VFLAG_SET|ATR_VFLAG_MODCACHE;
 	update_state_ct(&server.sv_attr[(int)SRV_ATR_JobsByState],

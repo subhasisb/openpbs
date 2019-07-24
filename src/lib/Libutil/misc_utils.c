@@ -76,6 +76,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <pwd.h>
+#include <math.h>
 #ifndef WIN32
 #include <dlfcn.h>
 #include <grp.h>
@@ -1411,5 +1412,66 @@ get_mem_info(void) {
 	}
 	return buf;
 }
+
+/* hashing functions, move this to hasing.c later */
+int 
+get_max_servers()
+{
+	static int max_servers = 10; /* in future load from pbs.conf */
+
+	return max_servers;
+}
+
+int 
+get_my_index()
+{
+	static int my_index = -1;
+
+	if (my_index == -1) {
+		my_index = pbs_conf.batch_service_port - 15001; /* read from pbs.conf in future */
+	}
+
+	return my_index;
+}
+
+long long 
+get_next_hash(long long curr, long long max_id)
+{
+	int my_index = get_my_index();
+
+	if (curr == -1) {
+		return my_index;
+	}
+
+	curr += get_max_servers();
+	/* If server job limit is over, reset back to zero */
+	if (curr > max_id) {
+		curr -= max_id;
+	}
+	return curr;
+}
+
+long long 
+get_last_hash(long long njobid)
+{
+	int my_index = get_my_index();
+	if (njobid == -1)
+		return njobid;
+
+	return (ceil(njobid / get_max_servers())*get_max_servers() + my_index);
+}
+
+char * 
+get_server_shard(long long njobid, int *port)
+{
+	int ind = 0;
+	ind = njobid % get_max_servers();
+
+	/* return the server name and port of the server at the ind-th index in the pbs.conf PBS_SERVER_INSTANCES line (or default) */
+	printf("%d", ind); /* just using ind */
+
+	return NULL;
+}
+
 #endif /* malloc_info */
 #endif /* WIN32 */

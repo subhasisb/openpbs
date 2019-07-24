@@ -59,7 +59,8 @@ EXTRA_PROGRAMS = \
 common_libs = \
 	$(top_builddir)/src/lib/Libpbs/.libs/libpbs.a \
 	-lpthread \
-	@socket_lib@
+	@socket_lib@ \
+	-lm
 
 pbs_sleep_LDFLAGS = -all-static
 pbs_sleep_SOURCES = pbs_sleep.c
@@ -79,7 +80,8 @@ pbs_ds_monitor_LDADD = \
 	@database_ldflags@ \
 	@database_lib@ \
 	-lssl \
-	-lcrypto
+	-lcrypto \
+	-lm
 
 pbs_ds_monitor_SOURCES = pbs_ds_monitor.c
 
@@ -184,7 +186,8 @@ printjob_svr_bin_LDADD = \
 	@database_ldflags@ \
 	@database_lib@ \
 	-lssl \
-	-lcrypto
+	-lcrypto \
+	-lm
 
 printjob_svr_bin_SOURCES = printjob.c
 

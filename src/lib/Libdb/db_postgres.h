@@ -105,6 +105,9 @@ typedef unsigned __int64 uint64_t;
 #define STMT_SELECT_JOBSCR  "select_jobscr"
 #define STMT_SELECT_JOBSCR_LOCKED  "select_jobscr_locked"
 #define STMT_DELETE_JOBSCR  "delete_jobscr"
+#define STMT_GET_MAXJOBID  "get_maxjobid"
+#define STMT_GET_STATECOUNTS "get_statecounts"
+#define STMT_GET_STATECOUNTS_BYQUE "get_statecounts_byque"
 
 
 
@@ -123,7 +126,6 @@ typedef unsigned __int64 uint64_t;
 /* server & seq statement names */
 #define STMT_INSERT_SVR "insert_svr"
 #define STMT_UPDATE_SVR_FULL "update_svr_full"
-#define STMT_UPDATE_SVR_QUICK "update_svr_quick"
 #define STMT_SELECT_SVR "select_svr"
 #define STMT_SELECT_SVR_LOCKED "select_svr_locked"
 #define STMT_SELECT_DBVER "select_dbver"

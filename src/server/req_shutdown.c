@@ -11,7 +11,7 @@
  * Software Foundation, either version 3 of the License, or (at your option) any
  * later version.
  *
- * PBS Pro is distributed in the hope that it will be useful, but WITHOUT ANY
+ * PBS Pro is distributed in the hope that it will be useful, but WITHOU8T ANY
  * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
  * FOR A PARTICULAR PURPOSE.
  * See the GNU Affero General Public License for more details.
@@ -132,10 +132,6 @@ svr_shutdown(int type)
 
 	/* Lets start by logging shutdown and saving everything */
 
-      /* Saving server jobid number to the database as server is going to shutdown.
-	 * Once server will come up then it will start jobid/resvid from this number onwards.
-	 */
-	server.sv_qs.sv_jobidnumber = svr_jobidnumber;
 	state = &server.sv_attr[(int)SRV_ATR_State].at_val.at_long;
 	(void)strcpy(log_buffer, msg_shutdown_start);
 

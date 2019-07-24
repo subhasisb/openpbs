@@ -123,7 +123,7 @@ que_alloc(char *name)
 
 	snprintf(pq->qu_qs.qu_name, sizeof(pq->qu_qs.qu_name), "%s", name);
 	append_link(&svr_queues, &pq->qu_link, pq);
-	server.sv_qs.sv_numque++;
+	server.sv_numque++;
 
 	/* set the working attributes to "unspecified" */
 
@@ -172,7 +172,7 @@ que_free(pbs_queue *pq)
 
 	/* now free the main structure */
 
-	server.sv_qs.sv_numque--;
+	server.sv_numque--;
 	delete_link(&pq->qu_link);
 	(void)free((char *)pq);
 }

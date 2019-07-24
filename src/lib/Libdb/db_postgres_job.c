@@ -336,6 +336,17 @@ pg_db_prepare_job_sqls(pbs_db_conn_t *conn)
 	if (pg_prepare_stmt(conn, STMT_DELETE_JOBSCR, conn->conn_sql, 1) != 0)
 		return -1;
 
+	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select GREATEST(to_number(ji_jobid, '9999999.'))::bigint as last_jobid from pbs.job where ji_creattm = (select max(ji_creattm) from pbs.job)");
+	if (pg_prepare_stmt(conn, STMT_GET_MAXJOBID, conn->conn_sql, 0) != 0)
+		return -1;
+
+	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select ji_state, count(*) as jobcount from pbs.job group by ji_state");
+	if (pg_prepare_stmt(conn, STMT_GET_STATECOUNTS, conn->conn_sql, 0) != 0)
+		return -1;
+
+	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select ji_state, count(*) as jobcount from pbs.job where ji_queue = $1 group by ji_state");
+	if (pg_prepare_stmt(conn, STMT_GET_STATECOUNTS_BYQUE, conn->conn_sql, 0) != 0)
+		return -1;
 
 	return 0;
 }
@@ -805,3 +816,56 @@ pg_db_reset_job(pbs_db_obj_info_t *obj)
 	free_db_attr_list(&(obj->pbs_db_un.pbs_db_job->attr_list));
 }
 
+int
+pbs_db_get_maxjobid(pbs_db_conn_t *conn,  long long *jobid)
+{
+	PGresult *res;
+	long long last_jobid;
+	int rc;
+	
+	if ((rc = pg_db_query(conn, STMT_GET_MAXJOBID, 0, 0, &res)) != 0)
+		return rc;
+
+	GET_PARAM_BIGINT(res, 0, last_jobid, PQfnumber(res, "last_jobid"));
+
+	PQclear(res);
+
+	*jobid = last_jobid;
+
+	return 0;
+}
+
+int
+pbs_db_get_statecounts(pbs_db_conn_t *conn, char *qname, int statesize, int *statearray)
+{
+	PGresult *res;
+	int rc;
+	int i;
+	int state;
+	long long jobcount;
+	
+	for(i = 0; i < statesize; i++) {
+		statearray[i] = 0;
+	}
+
+	if (qname == NULL)
+		rc = pg_db_query(conn, STMT_GET_STATECOUNTS, 0, 0, &res);
+	else {
+		SET_PARAM_STR(conn, qname, 0);
+		rc = pg_db_query(conn, STMT_GET_STATECOUNTS_BYQUE, 1, 0, &res);
+	}
+
+	if (rc != 0)
+		return rc;
+
+	for (i =0; i < PQntuples(res); i++) {
+		GET_PARAM_INTEGER(res, i, state, PQfnumber(res, "ji_state"));
+		if (state < statesize) {
+			GET_PARAM_BIGINT(res, i, jobcount, PQfnumber(res, "jobcount"));
+			statearray[state] = jobcount;
+		}
+	}
+	PQclear(res);
+
+	return 0;
+}

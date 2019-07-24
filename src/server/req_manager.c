@@ -1381,7 +1381,7 @@ mgr_queue_delete(struct batch_request *preq)
 	if (type == 0) {
 		pque = find_queuebyname(name, 0);
 	} else {
-		problem_queues = (struct pbs_queue **)malloc(server.sv_qs.sv_numque * sizeof(struct pbs_queue *));
+		problem_queues = (struct pbs_queue **)malloc(server.sv_numque * sizeof(struct pbs_queue *));
 		if (problem_queues == NULL) {
 			log_err(ENOMEM, __func__, "out of memory");
 			req_reject(PBSE_SYSTEM, 0, preq);
@@ -1398,7 +1398,7 @@ mgr_queue_delete(struct batch_request *preq)
 		return;
 	}
 
-	total_queues = server.sv_qs.sv_numque;
+	total_queues = server.sv_numque;
 
 	for (j=0; (pque != NULL) && (j<total_queues); j++) {
 		rc = 0;
