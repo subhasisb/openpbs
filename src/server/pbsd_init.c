@@ -677,11 +677,15 @@ pbsd_init(int type)
 				log_err(-1, __func__, "Failed to query last used jobid from datastore");
 				return (-1);
 			}
-			
-			svr_jobidnumber = get_last_hash(njobid);
-			if (svr_jobidnumber == -1) {
-				log_err(-1, __func__, "Failed to compute svr_jobidnumber");
-				return (-1);
+
+			if (njobid == -1)
+				svr_jobidnumber = -1;
+			else {
+				svr_jobidnumber = get_last_hash(njobid);
+				if (svr_jobidnumber == -1) {
+					log_err(-1, __func__, "Failed to compute svr_jobidnumber");
+					return (-1);
+				}
 			}
 		}
 
