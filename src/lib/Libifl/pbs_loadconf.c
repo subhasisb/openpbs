@@ -93,6 +93,9 @@ struct pbs_config pbs_conf = {
 	NULL,					/* pbs_exec_path */
 	NULL,					/* pbs_server_name */
 	NULL,					/* PBS server id */
+	1,						/* single pbs server instance by default */
+	1,						/* single pbs server instance by default */
+	NULL,					/* pbs_server_instances */
 	NULL,					/* scp_path */
 	NULL,					/* rcp_path */
 	NULL,					/* pbs_demux_path */
@@ -247,6 +250,94 @@ parse_config_line(FILE *fp, char **key, char **val)
 	} while (0);
 
 	return ret;
+}
+
+int 
+parse_psi(char * conf_value)
+{
+	char *token = NULL;
+	char *rest;
+	char *tmp;
+	char *host;
+	int port;
+	int count = 0;
+	free(pbs_conf.psi);
+
+	if (!(tmp = strdup(conf_value))) {
+		fprintf(stderr, "Ran out of memory parsing configuration %s", conf_value);
+		return -1;
+	}
+
+	rest = tmp;
+	token = strtok_r(tmp, ",", &rest);
+	while (token) {
+		/* should be a host:port pair, later things can be made more fluid */
+		count++;
+		token = strtok_r(NULL, ",", &rest);
+	}
+	free(tmp);
+	if (!(pbs_conf.psi = calloc(count, sizeof(struct pbs_server_instance)))) {
+		fprintf(stderr, "Ran out of memory parsing configuration %s", conf_value);
+		return -1;
+	}
+	
+	if (!(tmp = strdup(conf_value))) {
+		fprintf(stderr, "Ran out of memory parsing configuration %s", conf_value);
+		return -1;
+	}
+	rest = tmp;
+	count = 0;
+	token = strtok_r(tmp, ",", &rest);
+	while (token) {
+		char *p;
+		/* should be a host:port pair, later things can be made more fluid */
+		port = PBS_BATCH_SERVICE_PORT;
+		if ((p = strchr(token, ':'))) {
+			*p = '\0';
+			port = atol(p);
+		}
+		host = token;
+		if (*host == ':') {
+			host = pbs_conf.pbs_server_name;
+		}
+
+		if (!(pbs_conf.psi[count] = calloc(1, sizeof(struct pbs_server_instance)))) {
+			fprintf(stderr, "Ran out of memory parsing configuration %s", conf_value);
+			return -1;
+		}
+		pbs_conf.psi[count]->name = strdup(host);
+		pbs_conf.psi[count]->port = port;
+
+		token = strtok_r(NULL, ",", &rest);
+		count++;
+	}
+	free(tmp);
+
+	pbs_conf.pbs_current_servers = count;
+	return 0;
+}
+
+void free_psi()
+{
+	int i;
+
+	/* ignore any PBS_SERVER_INSTANCES and default fill */
+	if (pbs_conf.psi) {
+		for(i = 0; i < pbs_conf.pbs_current_servers; i++) {
+			free(pbs_conf.psi[i]);
+			pbs_conf.psi[i] = NULL;
+		}
+		free(pbs_conf.psi);
+		pbs_conf.psi = NULL;
+		pbs_conf.pbs_current_servers = 1;
+	}
+}
+
+int
+set_default_psi()
+{
+	free_psi();
+	return(parse_psi(pbs_conf.pbs_server_name));
 }
 
 /**
@@ -500,6 +591,14 @@ pbs_loadconf(int reload)
 				free(pbs_conf.pbs_server_name);
 				pbs_conf.pbs_server_name = strdup(conf_value);
 			}
+			else if (!strcmp(conf_name, PBS_CONF_MAX_SERVERS)) {
+				sscanf(conf_value, "%u", &uvalue);
+				pbs_conf.pbs_max_servers = uvalue;
+			}
+			else if (!strcmp(conf_name, PBS_CONF_SERVER_INSTANCES)) {
+				if (parse_psi(conf_value) != 0)
+					goto err;
+			}
 			else if (!strcmp(conf_name, PBS_CONF_RCP)) {
 				free(pbs_conf.rcp_path);
 				pbs_conf.rcp_path = shorten_and_cleanup_path(conf_value);
@@ -672,6 +771,13 @@ pbs_loadconf(int reload)
 		if ((pbs_conf.pbs_server_name = strdup(gvalue)) == NULL) {
 			goto err;
 		}
+	}
+	if ((gvalue = getenv(PBS_CONF_MAX_SERVERS)) != NULL) {
+		sscanf(gvalue, "%u", &uvalue);
+		pbs_conf.pbs_max_servers = uvalue;
+	}
+	if ((gvalue = getenv(PBS_CONF_SERVER_INSTANCES)) != NULL) {
+		parse_psi(gvalue);
 	}
 	if ((gvalue = getenv(PBS_CONF_RCP)) != NULL) {
 		free(pbs_conf.rcp_path);
@@ -865,6 +971,12 @@ pbs_loadconf(int reload)
 		goto err;
 	}
 
+	/* check sanity of multi server instances */
+	if (pbs_conf.pbs_max_servers == 1) {
+		if (set_default_psi() != 0)
+			goto err;
+	}
+
 	/*
 	 * Finally, fill in the blanks for variables with inferred values.
 	 */
@@ -1035,6 +1147,8 @@ err:
 		free(pbs_conf.pbs_license_file_location);
 		pbs_conf.pbs_license_file_location = NULL;
 	}
+
+	free_psi();
 
 	pbs_conf.load_failed = 1;
 	(void)pbs_client_thread_unlock_conf();

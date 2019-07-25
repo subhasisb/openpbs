@@ -679,6 +679,10 @@ pbsd_init(int type)
 			}
 			
 			svr_jobidnumber = get_last_hash(njobid);
+			if (svr_jobidnumber == -1) {
+				log_err(-1, __func__, "Failed to compute svr_jobidnumber");
+				return (-1);
+			}
 		}
 
 		if (server.sv_attr[(int)SRV_ATR_resource_assn].at_flags &

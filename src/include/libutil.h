@@ -295,7 +295,7 @@ int get_max_servers();
 int get_my_index();
 long long get_next_hash(long long curr, long long max_id);
 long long get_last_hash(long long njobid);
-char * get_server_shard(long long njobid, int *port);
+char * get_server_shard(char * jobid, int *port);
 
 #ifdef  __cplusplus
 }

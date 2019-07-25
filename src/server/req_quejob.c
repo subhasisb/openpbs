@@ -1873,6 +1873,10 @@ req_commit(struct batch_request *preq)
 		char jidbuf[PBS_MAXSVRJOBID+1];
 
 		nextid = get_next_hash(svr_jobidnumber, svr_max_job_sequence_id);
+		if (nextid == -1) {
+			log_err(-1, __func__, "Failed to compute next hash for jobid");
+			exit(0);
+		}
 
 		if (strchr(pj->ji_qs.ji_jobid, '[') == NULL) {	/* Normal job */
 			(void)sprintf(jidbuf, "%lld.%s", nextid, server_name);

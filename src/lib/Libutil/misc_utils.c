@@ -1417,18 +1417,30 @@ get_mem_info(void) {
 int 
 get_max_servers()
 {
-	static int max_servers = 10; /* in future load from pbs.conf */
+	return pbs_conf.pbs_max_servers;
+}
 
-	return max_servers;
+int 
+get_conf_servers()
+{
+	return pbs_conf.pbs_current_servers;
 }
 
 int 
 get_my_index()
 {
 	static int my_index = -1;
+	int i;
 
 	if (my_index == -1) {
-		my_index = pbs_conf.batch_service_port - 15001; /* read from pbs.conf in future */
+		if (pbs_conf.pbs_current_servers > 1) {
+			/* find my index */
+			for(i = 0; i < pbs_conf.pbs_current_servers; i++) {
+				if (pbs_conf.batch_service_port == pbs_conf.psi[i]->port)
+					my_index = i;
+			}
+		} else 
+			return 0;
 	}
 
 	return my_index;
@@ -1438,6 +1450,8 @@ long long
 get_next_hash(long long curr, long long max_id)
 {
 	int my_index = get_my_index();
+	if (my_index == -1) 
+		return -1;
 
 	if (curr == -1) {
 		return my_index;
@@ -1455,6 +1469,9 @@ long long
 get_last_hash(long long njobid)
 {
 	int my_index = get_my_index();
+	if (my_index == -1) 
+		return -1;
+
 	if (njobid == -1)
 		return njobid;
 
@@ -1462,14 +1479,30 @@ get_last_hash(long long njobid)
 }
 
 char * 
-get_server_shard(long long njobid, int *port)
+get_server_shard(char *jobid, int *port)
 {
-	int ind = 0;
-	ind = njobid % get_max_servers();
+	int ind;
+	int njobid;
+	static int seeded = 0;
 
-	/* return the server name and port of the server at the ind-th index in the pbs.conf PBS_SERVER_INSTANCES line (or default) */
-	printf("%d", ind); /* just using ind */
+	*port = -1;
 
+	if (jobid) {
+		njobid = strtoull(jobid, NULL, 10);
+		ind = njobid % get_max_servers();
+		if (pbs_conf.psi) {
+			if (pbs_conf.psi[ind]) {
+				*port = pbs_conf.psi[ind]->port;
+				return pbs_conf.psi[ind]->name;
+			}
+		}
+	} else {
+		if (!seeded) {
+			srand(time(0)); /* seed the random generator */
+			seeded = 1;
+		}
+		ind = rand() % get_max_servers();
+	}
 	return NULL;
 }
 
