@@ -188,6 +188,8 @@ new_resource_resv()
 	resresv->node_set_str = NULL;
 	resresv->node_set = NULL;
 	resresv->resresv_ind = -1;
+	resresv->run_event = NULL;
+	resresv->end_event = NULL;
 
 	return resresv;
 }
@@ -1314,8 +1316,12 @@ update_resresv_on_end(resource_resv *resresv, char *job_state)
 			free_selspec(resresv->execselect);
 			resresv->execselect = NULL;
 		}
+
+		/* We need to correct our calendar */
+		if (resresv->end_event != NULL)
+			set_timed_event_disabled(resresv->end_event, 1);
 	}
-	else if (resresv->is_resv && resresv->resv !=NULL) {
+	else if (resresv->is_resv && resresv->resv != NULL) {
 		resresv->resv->resv_state = RESV_DELETED;
 
 		resv_queue = find_queue_info(resresv->server->queues,
@@ -1485,7 +1491,7 @@ add_resresv_to_array(resource_resv **resresv_arr,
 		return NULL;
 
 	if (resresv_arr == NULL && resresv != NULL) {
-		new_arr = malloc(2*sizeof(resource_resv *));
+		new_arr = malloc(2 * sizeof(resource_resv *));
 		if (new_arr == NULL)
 			return NULL;
 		new_arr[0] = resresv;
