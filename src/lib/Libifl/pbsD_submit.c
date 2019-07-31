@@ -200,6 +200,8 @@ __pbs_submit(int c, struct attropl  *attrib, char *script, char *destination, ch
 	for (pal = attrib; pal; pal = pal->next)
 		pal->op = SET;		/* force operator to SET */
 
+	set_new_shard_context(c);
+	
 	/* Queue job with null string for job id */
 	return_jobid = PBSD_queuejob(c, "", destination, attrib, extend, 0, NULL);
 	if (return_jobid == NULL)

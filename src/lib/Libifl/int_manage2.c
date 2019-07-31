@@ -78,7 +78,14 @@ PBSD_mgr_put(int c, int function, int command, int objtype, char *objname,
 	int sock;
 
 	if (!rpp) {
-		sock = connection[c].ch_socket;
+		char *shardhint = NULL;
+		if (objtype == MGR_OBJ_JOB || objtype == MGR_OBJ_RESV)
+			shardhint = objname;
+
+		sock = get_svr_shard_connection(c, function, shardhint);
+		if (sock == -1) {
+			return (pbs_errno = PBSE_NOSERVER);
+		}
 		DIS_tcp_setup(sock);
 	} else {
 		sock = c;

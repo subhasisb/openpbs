@@ -48,6 +48,33 @@
 #include "pbs_ecl.h"
 
 
+int
+send_terminate(int sock, int manner, char *extend)
+{
+	struct batch_reply *reply;
+	int rc = 0;
+	
+	/* setup DIS support routines for following DIS calls */
+	DIS_tcp_setup(sock);
+
+	if ((rc=encode_DIS_ReqHdr(sock, PBS_BATCH_Shutdown, pbs_current_user)) ||
+		(rc = encode_DIS_ShutDown(sock, manner)) ||
+		(rc = encode_DIS_ReqExtend(sock, extend))) {
+		return PBSE_PROTOCOL;
+	}
+	if (DIS_tcp_wflush(sock)) {
+		pbs_errno = PBSE_PROTOCOL;
+		return pbs_errno;
+	}
+
+	/* read in reply */
+	reply = PBSD_rdrpy_sock(sock, &rc);
+
+	PBSD_FreeReply(reply);
+
+	return rc;
+}
+
 /**
  * @brief
  *	-send termination batch_request to server.
@@ -64,52 +91,49 @@
 int
 __pbs_terminate(int c, int manner, char *extend)
 {
-	struct batch_reply *reply;
 	int rc = 0;
 	int sock;
-
-	/* send request */
-
-	sock = connection[c].ch_socket;
-
-	/* initialize the thread context data, if not already initialized */
-	if (pbs_client_thread_init_thread_context() != 0)
-		return pbs_errno;
+	int i;
+	int count = 0;
 
 	/* lock pthread mutex here for this connection */
 	/* blocking call, waits for mutex release */
 	if (pbs_client_thread_lock_connection(c) != 0)
 		return pbs_errno;
 
-	/* setup DIS support routines for following DIS calls */
+	/* initialize the thread context data, if not already initialized */
+	if (pbs_client_thread_init_thread_context() != 0)
+		return pbs_errno;
 
-	DIS_tcp_setup(sock);
-
-	if ((rc=encode_DIS_ReqHdr(sock, PBS_BATCH_Shutdown, pbs_current_user)) ||
-		(rc = encode_DIS_ShutDown(sock, manner)) ||
-		(rc = encode_DIS_ReqExtend(sock, extend))) {
-		connection[c].ch_errtxt = strdup(dis_emsg[rc]);
-		if (connection[c].ch_errtxt == NULL) {
-			pbs_errno = PBSE_SYSTEM;
-		} else {
-			pbs_errno = PBSE_PROTOCOL;
+	/* send request to all servers that are up */
+	if (get_max_servers() > 1) {
+		for (i = 0; i < get_current_servers(); i++) {
+			if (connection[c].ch_shards[i]->state == SHARD_CONN_STATE_CONNECTED)
+				sock = connection[c].ch_shards[i]->sd;
+			else {
+				/* attempt connection to instance */
+				sock = internal_tcp_connect(c, pbs_conf.psi[i]->name, pbs_conf.psi[i]->port, NULL);
+			}
+			if (sock != -1) {
+				if ((rc = send_terminate(sock, manner, extend)) != 0) 
+					goto err;
+				count++;
+			}
 		}
-		(void)pbs_client_thread_unlock_connection(c);
-		return pbs_errno;
+		if (count == 0) {
+			/* could not send to any servers, all down */
+			rc = PBSE_NOSERVER;
+		}
+	} else {
+		sock = connection[c].ch_socket;
+		rc = send_terminate(sock, manner, extend);
 	}
-	if (DIS_tcp_wflush(sock)) {
-		pbs_errno = PBSE_PROTOCOL;
-		(void)pbs_client_thread_unlock_connection(c);
-		return pbs_errno;
-	}
 
-	/* read in reply */
-
-	reply = PBSD_rdrpy(c);
-	rc = connection[c].ch_errno;
-
-	PBSD_FreeReply(reply);
-
+err:
+	connection[c].ch_errno = rc;
+	if (rc == PBSE_PROTOCOL)
+		connection[c].ch_errtxt = strdup(dis_emsg[rc]);
+		
 	/* unlock the thread lock and update the thread context data */
 	if (pbs_client_thread_unlock_connection(c) != 0)
 		return pbs_errno;

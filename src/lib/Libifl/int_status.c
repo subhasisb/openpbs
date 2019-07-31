@@ -79,6 +79,8 @@ PBSD_status(int c, int function, char *objid, struct attrl *attrib, char *extend
 	if (objid == NULL)
 		objid = "";	/* set to null string for encoding */
 
+	set_new_shard_context(c);
+	
 	rc = PBSD_status_put(c, function, objid, attrib, extend, 0, NULL);
 	if (rc) {
 		return NULL;

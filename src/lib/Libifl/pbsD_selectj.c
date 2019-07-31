@@ -93,6 +93,8 @@ __pbs_selectjob(int c, struct attropl *attrib, char *extend)
 	if (pbs_client_thread_lock_connection(c) != 0)
 		return NULL;
 
+	set_new_shard_context(c);
+
 	if (PBSD_select_put(c, PBS_BATCH_SelectJobs, attrib, NULL, extend) == 0)
 		ret = PBSD_select_get(c);
 
@@ -141,6 +143,7 @@ __pbs_selstat(int c, struct attropl *attrib, struct attrl   *rattrib, char *exte
 	if (pbs_client_thread_lock_connection(c) != 0)
 		return NULL;
 
+	set_new_shard_context(c);
 
 	if (PBSD_select_put(c, PBS_BATCH_SelStat, attrib, rattrib, extend) == 0)
 		ret = PBSD_status_get(c);
@@ -175,7 +178,10 @@ PBSD_select_put(int c, int type, struct attropl *attrib,
 	int rc;
 	int sock;
 
-	sock = connection[c].ch_socket;
+	sock = get_svr_shard_connection(c, type, NULL);
+	if (sock == -1) {
+		return (pbs_errno = PBSE_NOSERVER);
+	}
 
 	/* setup DIS support routines for following DIS calls */
 

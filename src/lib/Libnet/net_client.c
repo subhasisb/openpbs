@@ -492,27 +492,4 @@ client_to_svr_extend(pbs_net_t hostaddr, unsigned int port, int authport_flags, 
 	return (PBS_NET_RC_FATAL);
 }
 
-/**
- * @brief
- *      This function sets socket options to TCP_NODELAY
- * @param fd
- * @return 0 for SUCCESS
- *        -1 for FAILURE
- */
-int
-set_nodelay(int fd)
-{
-	int opt;
-	pbs_socklen_t optlen;
-
-	optlen = sizeof(opt);
-	if (getsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &opt, &optlen) == -1)
-		return 0;
-
-	if (opt == 1)
-		return 0;
-
-	opt = 1;
-	return setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &opt, sizeof(opt));
-}
 

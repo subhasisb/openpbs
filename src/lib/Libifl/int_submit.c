@@ -342,7 +342,10 @@ PBSD_scbuf(int c, int reqtype, int seq, char *buf, int len, char *jobid,
 	int	sock;
 
 	if (!rpp) {
-		sock = connection[c].ch_socket;
+		sock = get_svr_shard_connection(c, reqtype, NULL);
+		if (sock == -1) {
+			return (pbs_errno = PBSE_NOSERVER);
+		}
 		DIS_tcp_setup(sock);
 	} else {
 		sock = c;
@@ -514,6 +517,7 @@ PBSD_jobfile(int c, int req_type, char *path, char *jobid,
 	}
 	i = 0;
 	cc = read(fd, s_buf, SCRIPT_CHUNK_Z);
+	set_new_shard_context(c);
 	while ((cc > 0) &&
 		((rc = PBSD_scbuf(c, req_type, i, s_buf, cc, jobid, which, rpp, msgid)) == 0)) {
 		i++;
@@ -557,7 +561,11 @@ PBSD_queuejob(int connect, char *jobid, char *destin, struct attropl *attrib, ch
 	int    sock;
 
 	if (!rpp) {
-		sock = connection[connect].ch_socket;
+		sock = get_svr_shard_connection(connect, PBS_BATCH_QueueJob, NULL);
+		if (sock == -1) {
+			pbs_errno = PBSE_NOSERVER;
+			return NULL;
+		}
 		DIS_tcp_setup(sock);
 	} else {
 		sock = connect;

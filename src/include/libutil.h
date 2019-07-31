@@ -292,10 +292,11 @@ char * get_mem_info(void);
 void convert_duration_to_str(time_t duration, char* buf, int bufsize);
 
 int get_max_servers();
+int get_current_servers();
 int get_my_index();
 long long get_next_hash(long long curr, long long max_id);
 long long get_last_hash(long long njobid);
-char * get_server_shard(char * jobid, int *port);
+int get_server_shard(char * shard_hint);
 
 #ifdef  __cplusplus
 }

@@ -81,6 +81,15 @@
 #include <dlfcn.h>
 #include <grp.h>
 #endif
+#ifndef WIN32
+#include <unistd.h>
+#include <fcntl.h>
+#include <poll.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+#endif
 #include "pbs_error.h"
 
 #ifdef HAVE_MALLOC_INFO
@@ -1420,6 +1429,12 @@ get_max_servers()
 	return pbs_conf.pbs_max_servers;
 }
 
+int
+get_current_servers()
+{
+	return pbs_conf.pbs_current_servers;
+}
+
 int 
 get_conf_servers()
 {
@@ -1478,32 +1493,48 @@ get_last_hash(long long njobid)
 	return (ceil(njobid / get_max_servers())*get_max_servers() + my_index);
 }
 
-char * 
-get_server_shard(char *jobid, int *port)
+int
+get_server_shard(char *shard_hint)
 {
 	int ind;
-	int njobid;
+	int nshardid;
 	static int seeded = 0;
 
-	*port = -1;
-
-	if (jobid) {
-		njobid = strtoull(jobid, NULL, 10);
-		ind = njobid % get_max_servers();
-		if (pbs_conf.psi) {
-			if (pbs_conf.psi[ind]) {
-				*port = pbs_conf.psi[ind]->port;
-				return pbs_conf.psi[ind]->name;
-			}
-		}
+	if (shard_hint) {
+		nshardid = strtoull(shard_hint, NULL, 10);
+		ind = nshardid % get_max_servers();
 	} else {
 		if (!seeded) {
 			srand(time(0)); /* seed the random generator */
 			seeded = 1;
 		}
-		ind = rand() % get_max_servers();
+		ind = rand() % get_current_servers();
 	}
-	return NULL;
+	return ind;
+}
+
+/**
+ * @brief
+ *      This function sets socket options to TCP_NODELAY
+ * @param fd
+ * @return 0 for SUCCESS
+ *        -1 for FAILURE
+ */
+int
+set_nodelay(int fd)
+{
+	int opt;
+	pbs_socklen_t optlen;
+
+	optlen = sizeof(opt);
+	if (getsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &opt, &optlen) == -1)
+		return 0;
+
+	if (opt == 1)
+		return 0;
+
+	opt = 1;
+	return setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &opt, sizeof(opt));
 }
 
 #endif /* malloc_info */

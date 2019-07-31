@@ -76,7 +76,11 @@ __pbs_movejob(int c, char *jobid, char *destin, char *extend)
 	if (destin == NULL)
 		destin = "";
 
-	sock = connection[c].ch_socket;
+	set_new_shard_context(c);
+	sock = get_svr_shard_connection(c, PBS_BATCH_MoveJob, NULL);
+	if (sock == -1) {
+		return (pbs_errno = PBSE_NOSERVER);
+	}
 
 	/* initialize the thread context data, if not already initialized */
 	if (pbs_client_thread_init_thread_context() != 0)
