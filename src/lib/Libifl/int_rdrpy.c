@@ -122,7 +122,11 @@ PBSD_rdrpy(int c)
 		connection[c].ch_errtxt = NULL;
 	}
 
-	sock = connection[c].ch_socket;
+	sock = get_svr_shard_connection(c, -1, NULL);
+	if (sock == -1) {
+		pbs_errno = PBSE_NOSERVER;
+		return NULL;
+	}
 	reply = PBSD_rdrpy_sock(sock, &rc);
 	if (reply == NULL) {
 		connection[c].ch_errno = PBSE_PROTOCOL;

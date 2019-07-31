@@ -94,7 +94,7 @@ struct pbs_config pbs_conf = {
 	NULL,					/* pbs_server_name */
 	NULL,					/* PBS server id */
 	1,						/* single pbs server instance by default */
-	1,						/* single pbs server instance by default */
+	0,						/* single pbs server instance by default */
 	NULL,					/* pbs_server_instances */
 	NULL,					/* scp_path */
 	NULL,					/* rcp_path */
@@ -294,10 +294,10 @@ parse_psi(char * conf_value)
 		port = PBS_BATCH_SERVICE_PORT;
 		if ((p = strchr(token, ':'))) {
 			*p = '\0';
-			port = atol(p);
+			port = atol(p+1);
 		}
 		host = token;
-		if (*host == ':') {
+		if (*host == '\0') {
 			host = pbs_conf.pbs_server_name;
 		}
 
@@ -972,7 +972,7 @@ pbs_loadconf(int reload)
 	}
 
 	/* check sanity of multi server instances */
-	if (pbs_conf.pbs_max_servers == 1) {
+	if (pbs_conf.pbs_max_servers == 1 || pbs_conf.pbs_current_servers == 0) {
 		if (set_default_psi() != 0)
 			goto err;
 	}

@@ -77,7 +77,12 @@ __pbs_locjob(int c, char *jobid, char *extend)
 		return (ploc);
 	}
 
-	sock = connection[c].ch_socket;
+	//set_new_shard_context(c);
+	sock = get_svr_shard_connection(c, PBS_BATCH_LocateJob, jobid);
+	if (sock == -1) {
+		pbs_errno = PBSE_NOSERVER;
+		return NULL;
+	}
 
 	/* initialize the thread context data, if not already initialized */
 	if (pbs_client_thread_init_thread_context() != 0)

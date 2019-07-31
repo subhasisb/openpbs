@@ -420,21 +420,16 @@ req_quejob(struct batch_request *preq)
 		}
 
 		{
-			static int seq = 0;
-			static time_t laststamp = 0;
-			time_t now = time(0);
-
-			if (now == laststamp) 
-				seq++;
-			else {
-				seq = 0;
-				laststamp = now;
+			svr_jobidnumber = get_next_hash(svr_jobidnumber, svr_max_job_sequence_id);
+			if (svr_jobidnumber == -1) {
+				log_err(-1, __func__, "Failed to compute next hash for jobid");
+				exit(0);
 			}
 			created_here = JOB_SVFLG_HERE;
 			if (i == 0) {	/* Normal job */
-				(void)sprintf(jidbuf, "%ld_%d.%s", now, seq, server_name);
+				(void)sprintf(jidbuf, "%lld.%s", svr_jobidnumber, server_name);
 			} else {	/* Array Job */
-				(void)sprintf(jidbuf, "%ld_%d[].%s", now, seq, server_name);
+				(void)sprintf(jidbuf, "%lld[].%s", svr_jobidnumber, server_name);
 			}
 		}
 		jid = jidbuf;
@@ -1716,7 +1711,6 @@ req_commit(struct batch_request *preq)
 {
 	job			*pj;
 #ifndef	PBS_MOM
-	long long	nextid;
 	int			newstate;
 	int			newsub;
 	resc_resv	*presv;
@@ -1865,27 +1859,6 @@ req_commit(struct batch_request *preq)
 		return;
 	}
 
-	/* 
-	* about to enquejob which will add to avl tree, so find jobid based on hashing algo here 
-	* In future we can provide a switch to not keep queued jobs in memory
-	*/
-	{
-		char jidbuf[PBS_MAXSVRJOBID+1];
-
-		nextid = get_next_hash(svr_jobidnumber, svr_max_job_sequence_id);
-		if (nextid == -1) {
-			log_err(-1, __func__, "Failed to compute next hash for jobid");
-			exit(0);
-		}
-
-		if (strchr(pj->ji_qs.ji_jobid, '[') == NULL) {	/* Normal job */
-			(void)sprintf(jidbuf, "%lld.%s", nextid, server_name);
-		} else {	/* Array Job */
-			(void)sprintf(jidbuf, "%lld[].%s", nextid, server_name);
-		}
-		(void) strcpy(pj->ji_qs.ji_jobid, jidbuf);
-	}
-
 	if ((rc = svr_enquejob(pj)) != 0) {
 		job_purge(pj);
 		req_reject(rc, 0, preq);
@@ -1954,7 +1927,6 @@ req_commit(struct batch_request *preq)
 		req_reject(PBSE_SYSTEM, 0, preq);
 		return;
 	}
-	svr_jobidnumber = nextid;
 
 	/*
 	 * if the job went into a Route (push) queue that has been started,

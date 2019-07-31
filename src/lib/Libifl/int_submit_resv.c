@@ -72,7 +72,11 @@ PBSD_submit_resv(int connect, char *resv_id, struct attropl *attrib, char *exten
 	int    rc;
 	int    sock;
 
-	sock = connection[connect].ch_socket;
+	sock = get_svr_shard_connection(connect, PBS_BATCH_SubmitResv, NULL);
+	if (sock == -1) {
+		pbs_errno = PBSE_NOSERVER;
+		return NULL;
+	}
 	DIS_tcp_setup(sock);
 
 	/* first, set up the body of the Submit Reservation request */

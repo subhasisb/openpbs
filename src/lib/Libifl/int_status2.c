@@ -76,7 +76,10 @@ PBSD_status_put(int c, int function, char *id, struct attrl *attrib,
 	int sock;
 
 	if (!rpp) {
-		sock = connection[c].ch_socket;
+		sock = get_svr_shard_connection(c, function, NULL);
+		if (sock == -1) {
+			return (pbs_errno = PBSE_NOSERVER);
+		}
 		DIS_tcp_setup(sock);
 	} else {
 		sock = c;

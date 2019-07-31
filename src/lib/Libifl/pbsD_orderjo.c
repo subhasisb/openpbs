@@ -86,6 +86,12 @@ __pbs_orderjob(int c, char *job1, char *job2, char *extend)
 	if (pbs_client_thread_lock_connection(c) != 0)
 		return pbs_errno;
 
+	set_new_shard_context(c);
+	sock = get_svr_shard_connection(c, PBS_BATCH_OrderJob, job1);
+	if (sock == -1) {
+		return (pbs_errno = PBSE_NOSERVER);
+	}
+
 	/* setup DIS support routines for following DIS calls */
 
 	DIS_tcp_setup(sock);

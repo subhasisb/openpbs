@@ -2807,7 +2807,11 @@ job_no_args:
 #else
 						(void)tcl_stat("job", NULL, f_opt);
 #endif /* localmod 071 */
-						if (pbs_errno != PBSE_NONE && pbs_errno != PBSE_HISTJOBID) {
+						if (pbs_errno == PBSE_NOSERVER) {
+							fprintf(stderr, "qstat: cannot connect to server %s (errno=%d)\n",
+								pbs_server, pbs_errno);
+							any_failed = pbs_errno;
+						} else if (pbs_errno != PBSE_NONE && pbs_errno != PBSE_HISTJOBID) {
 							if (pbs_errno == PBSE_ATTRRO && alt_opt & ALT_DISPLAY_T)
 								fprintf(stderr, "qstat: -T option is unavailable.\n");
 							else

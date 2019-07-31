@@ -538,6 +538,10 @@ extern int usepool(int, int);
 
 extern enum vnode_sharing place_sharing_type(char *, enum vnode_sharing);
 
+extern int get_svr_shard_connection(int channel, int req_type, void *shard_hint);
+extern void set_new_shard_context(int channel);
+int internal_tcp_connect(int channel, char *server, int port, char *extend_data);
+
 /* This was added to pbs_ifl.h for use by AIF */
 extern int 	pbs_isexecutable(char *);
 extern char 	*pbs_ispbsdir(char *, char *);

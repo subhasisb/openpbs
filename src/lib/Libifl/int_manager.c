@@ -93,6 +93,8 @@ PBSD_manager(int c, int function, int command, int objtype, char *objname, struc
 	if (pbs_client_thread_lock_connection(c) != 0)
 		return pbs_errno;
 
+	set_new_shard_context(c);
+
 	/* send the manage request */
 	i = PBSD_mgr_put(c, function, command, objtype, objname, aoplp, extend, 0, NULL);
 	if (i) {

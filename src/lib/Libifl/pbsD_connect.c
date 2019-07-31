@@ -76,6 +76,8 @@ extern struct connect_handle connection[NCONNECTS];
 
 #define ERR_BUF_SIZE 4096
 
+#define DBG_TRACE_SHARD(x) { if (getenv("DBG_TRACE_SHARD")) { fprintf x;}}
+
 /**
  * @brief
  *	-returns the default server name.
@@ -536,6 +538,231 @@ get_hostsockaddr(char *host, struct sockaddr_in *sap)
 	return -1;
 }
 
+int
+internal_tcp_connect(int channel, char *server, int port, char *extend_data)
+{
+	int sd;
+	int i;
+	int rc;
+	struct sockaddr_in sockname;
+	pbs_socklen_t	 socknamelen;
+	struct sockaddr_in server_addr;
+	struct sockaddr_in my_sockaddr;
+	struct batch_reply	*reply;
+
+	DBG_TRACE_SHARD((stderr, "Trying host=%s:%d, ", server, port))
+	
+	sd = socket(AF_INET, SOCK_STREAM, 0);
+	strcpy(pbs_server, server); /* set for error messages from commands */
+
+	/* If a specific host name is defined which the client should use */
+	if (pbs_conf.pbs_public_host_name) {
+		/* my address will be in my_sockaddr,  bind the socket to it */
+		my_sockaddr.sin_port = 0;
+		if (bind(sd, (struct sockaddr *)&my_sockaddr, sizeof(my_sockaddr)) != 0) {
+			return -1;
+		}
+	}
+
+	if (get_hostsockaddr(server, &server_addr) != 0)
+		return -1;
+
+	server_addr.sin_port = htons(port);
+	if (connect(sd, (struct sockaddr *)&server_addr, sizeof(struct sockaddr)) != 0) {
+		/* connect attempt failed */
+		CLOSESOCKET(sd);
+		pbs_errno = errno;
+		return -1;
+	}
+
+#if !defined(PBS_SECURITY ) || (PBS_SECURITY == STD )
+	DIS_tcp_setup(sd);
+	if ((i = encode_DIS_ReqHdr(sd, PBS_BATCH_Connect, pbs_current_user)) ||
+		(i = encode_DIS_ReqExtend(sd, extend_data))) {
+		pbs_errno = PBSE_SYSTEM;
+		return -1;
+	}
+	if (DIS_tcp_wflush(sd)) {
+		pbs_errno = PBSE_SYSTEM;
+		return -1;
+	}
+
+	connection[channel].ch_socket = sd; /* use the same socket for replies etc. */
+
+	reply = PBSD_rdrpy_sock(sd, &rc);
+	PBSD_FreeReply(reply);
+	if (rc != DIS_SUCCESS) {
+		CLOSESOCKET(sd);
+		return -1;
+	}
+
+#endif	/* PBS_SECURITY ... */
+
+	/*do configured authentication (kerberos, pbs_iff, whatever)*/
+	/*Get the socket port for engage_authentication() */
+	socknamelen = sizeof(sockname);
+	if (getsockname(sd, (struct sockaddr *)&sockname, &socknamelen)) {
+		CLOSESOCKET(sd);
+		pbs_errno = PBSE_SYSTEM;
+		return -1;
+	}
+
+	if (engage_authentication(sd, server, port, &sockname) == -1) {
+		CLOSESOCKET(sd);
+		pbs_errno = PBSE_PERM;
+		return -1;
+	}
+
+	/* setup DIS support routines for following pbs_* calls */
+	DIS_tcp_setup(sd);
+	pbs_tcp_timeout = PBS_DIS_TCP_TIMEOUT_VLONG;	/* set for 3 hours */
+
+	/*
+	 * Disable Nagle's algorithm on the TCP connection to server.
+	 * Nagle's algorithm is hurting cmd-server communication.
+	 */
+	if (set_nodelay(sd) == -1) {
+		CLOSESOCKET(sd);
+		pbs_errno = PBSE_SYSTEM;
+		return -1;
+	}
+
+	return sd;
+}
+
+void
+set_new_shard_context(int channel)
+{
+	connection[channel].shard_context = -1;
+	DBG_TRACE_SHARD((stderr, "*** Set new shard ***\n"))
+}
+
+
+void 
+load_failed_connections(int channel)
+{
+	int fd;
+	int i;
+	char flname[100];
+	int state;
+	int count=0;
+
+	sprintf(flname, "/tmp/failed_%u", getuid());
+	if ((fd = open(flname, O_RDONLY)) != -1) {
+		for(i = 0; i < get_current_servers(); i++) {
+			read(fd, &state, sizeof(int));
+			connection[channel].ch_shards[i]->state = state;
+			if (connection[channel].ch_shards[i]->state != SHARD_CONN_STATE_FAILED)
+				connection[channel].ch_shards[i]->state = SHARD_CONN_STATE_DOWN;
+			else 
+				count++;
+		}
+		if (count == get_current_servers()) {
+			for(i = 0; i < get_current_servers(); i++)
+			connection[channel].ch_shards[i]->state = SHARD_CONN_STATE_DOWN;
+		}
+	}
+}
+
+void
+save_failed_connections(int channel)
+{
+	int fd;
+	int i;
+	char flname[100];
+
+	sprintf(flname, "/tmp/failed_%u", getuid());
+	if ((fd = open(flname, O_CREAT | O_TRUNC | O_WRONLY, 0600)) != -1) {
+		for(i = 0; i < get_current_servers(); i++)
+			write(fd, &(connection[channel].ch_shards[i]->state), sizeof(int));
+
+		close(fd);
+	}
+}
+
+
+int 
+get_svr_shard_connection(int channel, int req_type, void *shard_hint)
+{
+	int srv_index;
+	int sd;
+	int first_index = -1;
+
+	if (pbs_conf.pbs_max_servers > 1) {
+		if (connection[channel].shard_context == -1) {
+			srv_index = get_server_shard(shard_hint);
+			connection[channel].shard_context = srv_index; /* reuse the same server in case of a dialogue */
+		} else {
+			srv_index = connection[channel].shard_context;
+		}
+
+tryagain:
+		if (first_index > -1) {
+			srv_index++;
+			if (srv_index >= get_current_servers()) {
+				srv_index = 0;
+			}
+			if (srv_index == first_index) {
+				DBG_TRACE_SHARD((stderr, "No nonfailed server, bailing out\n"))
+				connection[channel].ch_socket = -1;
+				return -1;
+			}
+		} else {
+			first_index = srv_index;
+		}
+
+		DBG_TRACE_SHARD((stderr, "Selected server index %d, srv=%s:%d, state=%d, ", srv_index, pbs_conf.psi[srv_index]->name, pbs_conf.psi[srv_index]->port, connection[channel].ch_shards[srv_index]->state))
+
+		if (connection[channel].ch_shards[srv_index]->state == SHARD_CONN_STATE_FAILED) {
+
+			if (time(0) - connection[channel].ch_shards[srv_index]->state_change_time > 60) {
+				/* it is possible service is back up now, reset state try again */
+				connection[channel].ch_shards[srv_index]->state = SHARD_CONN_STATE_DOWN;
+				connection[channel].ch_shards[srv_index]->state_change_time = time(0);
+			} 
+			connection[channel].ch_shards[srv_index]->sd = -1;
+
+			connection[channel].shard_context = -1;
+			DBG_TRACE_SHARD((stderr, "Failed!\n"))
+			
+			goto tryagain;
+
+		} else if (connection[channel].ch_shards[srv_index]->state == SHARD_CONN_STATE_DOWN) {
+			/* connect and authenticate */
+			
+			sd = internal_tcp_connect(channel, pbs_conf.psi[srv_index]->name, pbs_conf.psi[srv_index]->port, NULL);
+			if (sd == -1) {
+				DBG_TRACE_SHARD((stderr, "Connect returned -1\n"))
+			   /* connection failed, check the error return 
+				* TODO: if shard is down, try the next, if shard returned error, do not try next
+				* we need to note down about the failure, so we do not try all the time
+				*/
+				connection[channel].ch_shards[srv_index]->state = SHARD_CONN_STATE_FAILED;
+				connection[channel].ch_shards[srv_index]->sd = -1;
+				connection[channel].ch_shards[srv_index]->state_change_time = time(0);
+
+				connection[channel].shard_context = -1;
+				
+				goto tryagain;
+			}
+
+			DBG_TRACE_SHARD((stderr, "Connected!\n"))
+			/* success */
+			connection[channel].ch_shards[srv_index]->state = SHARD_CONN_STATE_CONNECTED;
+			connection[channel].ch_shards[srv_index]->sd = sd;
+			connection[channel].ch_shards[srv_index]->state_change_time = time(0);
+			connection[channel].ch_socket = sd;
+		} else if (connection[channel].ch_shards[srv_index]->state == SHARD_CONN_STATE_CONNECTED) {
+			DBG_TRACE_SHARD((stderr, "already connected!\n"))
+		}
+	}
+
+	sd = connection[channel].ch_socket;
+
+	return sd;
+}
+
+
 /**
  * @brief
  *	Makes a PBS_BATCH_Connect request to 'server'.
@@ -551,18 +778,14 @@ get_hostsockaddr(char *host, struct sockaddr_in *sap)
 int
 __pbs_connect_extend(char *server, char *extend_data)
 {
-	struct sockaddr_in server_addr;
-	struct sockaddr_in my_sockaddr;
 	int out;
 	int i;
 	int f;
 	char  *altservers[2];
 	int    have_alt = 0;
-	struct batch_reply	*reply;
-	char server_name[PBS_MAXSERVERNAME+1];
 	unsigned int server_port;
-	struct sockaddr_in sockname;
-	pbs_socklen_t	 socknamelen;
+	char server_name[PBS_MAXSERVERNAME+1];
+
 #ifdef WIN32
 	struct sockaddr_in to_sock;
 	struct sockaddr_in from_sock;
@@ -581,14 +804,69 @@ __pbs_connect_extend(char *server, char *extend_data)
 	if (pbs_loadconf(0) == 0)
 		return -1;
 
-	/* get server host and port	*/
+	/* Reserve a connection state record */
+	if (pbs_client_thread_lock_conntable() != 0)
+		return -1;
 
-	server = PBS_get_server(server, server_name, &server_port);
-	if (server == NULL) {
-		pbs_errno = PBSE_NOSERVER;
+	out = -1;
+	for (i=1;i<NCONNECTS;i++) {
+		if (connection[i].ch_inuse) continue;
+		out = i;
+		connection[out].ch_errno = 0;
+		connection[out].ch_socket= -1;
+		connection[out].ch_errtxt = NULL;
+		connection[out].shard_context = -1;
+		connection[out].ch_inuse = 1; /* reserve the socket */
+		break;
+	}
+
+	if (pbs_client_thread_unlock_conntable() != 0)
+		return -1; /* pbs_errno set by the function */
+
+	if (out < 0) {
+		pbs_errno = PBSE_NOCONNECTS;
 		return -1;
 	}
 
+	/* setup connection level thread context */
+	if (pbs_client_thread_init_connect_context(out) != 0) {
+		connection[out].ch_inuse = 0;
+		/* pbs_errno set by the pbs_connect_init_context routine */
+		return -1;
+	}
+
+	/* get server host and port	*/
+	server = PBS_get_server(server, server_name, &server_port);
+	if (server == NULL) {
+		pbs_errno = PBSE_NOSERVER;
+		connection[out].ch_inuse = 0;
+		return -1;
+	}
+	strcpy(pbs_server, server);
+
+	DBG_TRACE_SHARD((stderr, "\npbs_connect() called for %s\n", server))
+	DBG_TRACE_SHARD((stderr, "=====================================\n"))
+
+	if ((strcmp(server,pbs_default()) == 0) && pbs_conf.pbs_max_servers > 1) {
+		/* can't use failover for now, take a different path */
+		
+		if (!(connection[out].ch_shards = calloc(get_current_servers(), sizeof(struct shard_conn *)))) {
+			pbs_errno = PBSE_SYSTEM;
+			connection[out].ch_inuse = 0;
+			return -1;
+		}
+
+		for (i = 0; i < get_current_servers(); i++) {
+			connection[out].ch_shards[i] = malloc(sizeof(struct shard_conn));
+			connection[out].ch_shards[i]->sd = -1;
+			connection[out].ch_shards[i]->state = SHARD_CONN_STATE_DOWN;
+		}
+
+		load_failed_connections(out);
+		return out; /* actual connects happen when client tries to send a request first */
+	}
+
+	/* FAILOVER - regular code path */
 	if (pbs_conf.pbs_primary && pbs_conf.pbs_secondary) {
 		/* failover configuered ...   */
 		if (hostnmcmp(server, pbs_conf.pbs_primary) == 0) {
@@ -620,36 +898,6 @@ __pbs_connect_extend(char *server, char *extend_data)
 		}
 	}
 
-	/* if specific host name declared for the host on which */
-	/* this client is running,  get its address */
-	if (pbs_conf.pbs_public_host_name) {
-		if (get_hostsockaddr(pbs_conf.pbs_public_host_name, &my_sockaddr) != 0)
-			return -1; /* pbs_errno was set */
-	}
-
-	/* Reserve a connection state record */
-	if (pbs_client_thread_lock_conntable() != 0)
-		return -1;
-
-	out = -1;
-	for (i=1;i<NCONNECTS;i++) {
-		if (connection[i].ch_inuse) continue;
-		out = i;
-		connection[out].ch_errno = 0;
-		connection[out].ch_socket= -1;
-		connection[out].ch_errtxt = NULL;
-		connection[out].ch_inuse = 1; /* reserve the socket */
-		break;
-	}
-
-	if (pbs_client_thread_unlock_conntable() != 0)
-		return -1; /* pbs_errno set by the function */
-
-	if (out < 0) {
-		pbs_errno = PBSE_NOCONNECTS;
-		return -1;
-	}
-
 	/*
 	 * connect to server ...
 	 * If attempt to connect fails and if Failover configured and
@@ -657,63 +905,12 @@ __pbs_connect_extend(char *server, char *extend_data)
 	 *   if attempting to connect to Secondary, try the Primary
 	 */
 	for (i=0; i<(have_alt+1); ++i) {
-
-		/* get socket	*/
-
-#ifdef WIN32
-		/* the following lousy hack is needed since the socket call needs */
-		/* SYSTEMROOT env variable properly set! */
-		if (getenv("SYSTEMROOT") == NULL) {
-			setenv("SYSTEMROOT", "C:\\WINNT", 1);
-			setenv("SystemRoot", "C:\\WINNT", 1);
-		}
-		connection[out].ch_socket = socket(AF_INET, SOCK_STREAM, 0);
-		if (connection[out].ch_socket < 0) {
-			setenv("SYSTEMROOT", "C:\\WINDOWS", 1);
-			setenv("SystemRoot", "C:\\WINDOWS", 1);
-			connection[out].ch_socket = socket(AF_INET, SOCK_STREAM, 0);
-
-		}
-#else
-		connection[out].ch_socket = socket(AF_INET, SOCK_STREAM, 0);
-#endif
-		if (connection[out].ch_socket < 0) {
-			connection[out].ch_inuse = 0;
-			pbs_errno = errno;
-			return -1;
-		}
-
-		/* and connect... */
-
-		if (have_alt) {
+		if (have_alt)
 			server = altservers[i];
-		}
-		strcpy(pbs_server, server); /* set for error messages from commands */
 
-		/* If a specific host name is defined which the client should use */
-
-		if (pbs_conf.pbs_public_host_name) {
-			/* my address will be in my_sockaddr,  bind the socket to it */
-			my_sockaddr.sin_port = 0;
-			if (bind(connection[out].ch_socket, (struct sockaddr *)&my_sockaddr, sizeof(my_sockaddr)) != 0) {
-				return -1;
-			}
-		}
-
-		if (get_hostsockaddr(server, &server_addr) != 0)
-			return -1;
-
-		server_addr.sin_port = htons(server_port);
-		if (connect(connection[out].ch_socket,
-			(struct sockaddr *)&server_addr,
-			sizeof(struct sockaddr)) == 0) {
-
-				break;
-		} else {
-			/* connect attempt failed */
-			CLOSESOCKET(connection[out].ch_socket);
-			pbs_errno = errno;
-		}
+		connection[out].ch_socket = internal_tcp_connect(out, server, server_port, extend_data);
+		if (connection[out].ch_socket >= 0)
+			break;
 	}
 	if (i >= (have_alt+1)) {
 		connection[out].ch_inuse = 0;
@@ -734,85 +931,6 @@ __pbs_connect_extend(char *server, char *extend_data)
 		}
 	}
 #endif
-
-	/* setup connection level thread context */
-	if (pbs_client_thread_init_connect_context(out) != 0) {
-		CLOSESOCKET(connection[out].ch_socket);
-		connection[out].ch_inuse = 0;
-		/* pbs_errno set by the pbs_connect_init_context routine */
-		return -1;
-	}
-
-	/*
-	 * No need for global lock now on, since rest of the code
-	 * is only communication on a connection handle.
-	 * But we dont need to lock the connection handle, since this
-	 * connection handle is not yet been returned to the client
-	 */
-
-	/* The following code was originally  put in for HPUX systems to deal
-	 * with the issue where returning from the connect() call doesn't
-	 * mean the connection is complete.  However, this has also been
-	 * experienced in some Linux ppc64 systems like js-2. Decision was
-	 * made to enable this harmless code for all architectures.
-	 * FIX: Need to use the socket to send
-	 * a message to complete the process.  For IFF authentication there is
-	 * no leading authentication message needing to be sent on the client
-	 * socket, so will send a "dummy" message and discard the replyback.
-	 */
-
-#if !defined(PBS_SECURITY ) || (PBS_SECURITY == STD )
-
-	DIS_tcp_setup(connection[out].ch_socket);
-	if ((i = encode_DIS_ReqHdr(connection[out].ch_socket,
-		PBS_BATCH_Connect, pbs_current_user)) ||
-		(i = encode_DIS_ReqExtend(connection[out].ch_socket,
-		extend_data))) {
-		pbs_errno = PBSE_SYSTEM;
-		return -1;
-	}
-	if (DIS_tcp_wflush(connection[out].ch_socket)) {
-		pbs_errno = PBSE_SYSTEM;
-		return -1;
-	}
-
-	reply = PBSD_rdrpy(out);
-	PBSD_FreeReply(reply);
-
-#endif	/* PBS_SECURITY ... */
-
-	/*do configured authentication (kerberos, pbs_iff, whatever)*/
-
-	/*Get the socket port for engage_authentication() */
-	socknamelen = sizeof(sockname);
-	if (getsockname(connection[out].ch_socket, (struct sockaddr *)&sockname, &socknamelen))
-		return -1;
-
-	if (engage_authentication(connection[out].ch_socket,
-		server,
-		server_port,
-		&sockname) == -1) {
-		CLOSESOCKET(connection[out].ch_socket);
-		connection[out].ch_inuse = 0;
-		pbs_errno = PBSE_PERM;
-		return -1;
-	}
-
-	/* setup DIS support routines for following pbs_* calls */
-
-	DIS_tcp_setup(connection[out].ch_socket);
-	pbs_tcp_timeout = PBS_DIS_TCP_TIMEOUT_VLONG;	/* set for 3 hours */
-
-	/*
-	 * Disable Nagle's algorithm on the TCP connection to server.
-	 * Nagle's algorithm is hurting cmd-server communication.
-	 */
-	if (pbs_connection_set_nodelay(out) == -1) {
-		CLOSESOCKET(connection[out].ch_socket);
-		connection[out].ch_inuse = 0;
-		pbs_errno = PBSE_SYSTEM;
-		return -1;
-	}
 
 	return out;
 }
@@ -868,6 +986,29 @@ __pbs_connect(char *server)
 	return (pbs_connect_extend(server, NULL));
 }
 
+void
+close_tcp_connection(int sock)
+{
+	char x;
+
+	DIS_tcp_setup(sock);
+	if ((encode_DIS_ReqHdr(sock, PBS_BATCH_Disconnect,
+		pbs_current_user) == 0) &&
+		(DIS_tcp_wflush(sock) == 0)) {
+		for (;;) {	/* wait for server to close connection */
+#ifdef WIN32
+			if (recv(sock, &x, 1, 0) < 1)
+#else
+			if (read(sock, &x, 1) < 1)
+#endif
+				break;
+		}
+	}
+
+	CS_close_socket(sock);
+	CLOSESOCKET(sock);
+}
+
 /**
  * @brief
  *	-send close connection batch request
@@ -882,8 +1023,7 @@ __pbs_connect(char *server)
 int
 __pbs_disconnect(int connect)
 {
-	int  sock;
-	char x;
+	int i;
 
 	if (connect < 0 || NCONNECTS <= connect)
 		return 0;
@@ -912,25 +1052,19 @@ __pbs_disconnect(int connect)
 	}
 
 	/* send close-connection message */
-
-	sock = connection[connect].ch_socket;
-
-	DIS_tcp_setup(sock);
-	if ((encode_DIS_ReqHdr(sock, PBS_BATCH_Disconnect,
-		pbs_current_user) == 0) &&
-		(DIS_tcp_wflush(sock) == 0)) {
-		for (;;) {	/* wait for server to close connection */
-#ifdef WIN32
-			if (recv(sock, &x, 1, 0) < 1)
-#else
-			if (read(sock, &x, 1) < 1)
-#endif
-				break;
+	if (pbs_conf.pbs_max_servers > 1) {
+		for(i = 0; i < pbs_conf.pbs_current_servers; i++) {
+			if (connection[connect].ch_shards[i] && 
+				connection[connect].ch_shards[i]->sd >=0 && 
+				connection[connect].ch_shards[i]->state == SHARD_CONN_STATE_CONNECTED) {
+					close_tcp_connection(connection[connect].ch_shards[i]->sd);
+			}
 		}
+		save_failed_connections(connect);
+	} else {
+		close_tcp_connection(connection[connect].ch_socket);
 	}
-
-	CS_close_socket(sock);
-	CLOSESOCKET(sock);
+	connection[connect].ch_socket = -1;
 
 	if (connection[connect].ch_errtxt != NULL) {
 		free(connection[connect].ch_errtxt);

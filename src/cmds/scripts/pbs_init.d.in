@@ -81,7 +81,7 @@ getpid() {
 # update_pids may cause an I/O read to block if PBS_HOME is on a shared 
 # mount, it is called selectively after sanity checks are performed
 update_pids() {
-	pbs_server_pid=`getpid ${PBS_HOME}/server_priv/server.lock`
+	pbs_server_pid=`getpid ${PBS_HOME}/server_priv/server_15001.lock`
 	pbs_secondary_server_pid=`getpid ${PBS_HOME}/server_priv/server.lock.secondary`
 	pbs_mom_pid=`getpid ${PBS_MOM_HOME}/mom_priv/mom.lock`
 	pbs_sched_pid=`getpid ${PBS_HOME}/sched_priv/sched.lock`

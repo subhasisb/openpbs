@@ -75,7 +75,10 @@ PBSD_sig_put(int c, char *jobid, char *signal, char *extend, int rpp, char **msg
 	int rc = 0;
 
 	if (!rpp) {
-		sock = connection[c].ch_socket;
+		sock = get_svr_shard_connection(c, PBS_BATCH_SignalJob, jobid);
+		if (sock == -1) {
+			return (pbs_errno = PBSE_NOSERVER);
+		}
 		DIS_tcp_setup(sock);
 	} else {
 		sock = c;

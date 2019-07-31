@@ -136,13 +136,27 @@ extern int * __pbs_tcperrno_location(void);
 extern char pbs_current_group[];
 
 #define NCONNECTS 50
+
+#define SHARD_CONN_STATE_DOWN 			 0
+#define SHARD_CONN_STATE_CONNECTED 		 1
+#define SHARD_CONN_STATE_FAILED			-1
+
+struct shard_conn {
+	int 	sd;
+	int		state;
+	time_t	state_change_time;
+	time_t 	last_used;
+};
+
 struct connect_handle {
 	int		ch_inuse;  /* 1 if in use, 0 otherwis */
 	int		ch_socket; /* file descriptor for the open socket */
-	void		*ch_stream;
+	void	*ch_stream;
 	int		ch_errno;  /* last error on this connection */
-	char		*ch_errtxt;/* pointer to last server error text	*/
+	char	*ch_errtxt;/* pointer to last server error text	*/
 	pthread_mutex_t ch_mutex;  /* serialize connection between threads */
+	struct shard_conn **ch_shards; /* handles to multiple sharded servers */
+	int 	shard_context; /* last server to which dialogue was going on */
 };
 extern struct connect_handle connection[];
 #define PBS_MAX_CONNECTIONS        5000  /* Max connections in the connections array */
