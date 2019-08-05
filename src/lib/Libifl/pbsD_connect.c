@@ -637,50 +637,6 @@ set_new_shard_context(int channel)
 	DBG_TRACE_SHARD((stderr, "*** Set new shard ***\n"))
 }
 
-
-void 
-load_failed_connections(int channel)
-{
-	int fd;
-	int i;
-	char flname[100];
-	int state;
-	int count=0;
-
-	sprintf(flname, "/tmp/failed_%u", getuid());
-	if ((fd = open(flname, O_RDONLY)) != -1) {
-		for(i = 0; i < get_current_servers(); i++) {
-			read(fd, &state, sizeof(int));
-			connection[channel].ch_shards[i]->state = state;
-			if (connection[channel].ch_shards[i]->state != SHARD_CONN_STATE_FAILED)
-				connection[channel].ch_shards[i]->state = SHARD_CONN_STATE_DOWN;
-			else 
-				count++;
-		}
-		if (count == get_current_servers()) {
-			for(i = 0; i < get_current_servers(); i++)
-			connection[channel].ch_shards[i]->state = SHARD_CONN_STATE_DOWN;
-		}
-	}
-}
-
-void
-save_failed_connections(int channel)
-{
-	int fd;
-	int i;
-	char flname[100];
-
-	sprintf(flname, "/tmp/failed_%u", getuid());
-	if ((fd = open(flname, O_CREAT | O_TRUNC | O_WRONLY, 0600)) != -1) {
-		for(i = 0; i < get_current_servers(); i++)
-			write(fd, &(connection[channel].ch_shards[i]->state), sizeof(int));
-
-		close(fd);
-	}
-}
-
-
 int 
 get_svr_shard_connection(int channel, int req_type, void *shard_hint)
 {
@@ -861,8 +817,6 @@ __pbs_connect_extend(char *server, char *extend_data)
 			connection[out].ch_shards[i]->sd = -1;
 			connection[out].ch_shards[i]->state = SHARD_CONN_STATE_DOWN;
 		}
-
-		load_failed_connections(out);
 		return out; /* actual connects happen when client tries to send a request first */
 	}
 
@@ -1060,7 +1014,6 @@ __pbs_disconnect(int connect)
 					close_tcp_connection(connection[connect].ch_shards[i]->sd);
 			}
 		}
-		save_failed_connections(connect);
 	} else {
 		close_tcp_connection(connection[connect].ch_socket);
 	}

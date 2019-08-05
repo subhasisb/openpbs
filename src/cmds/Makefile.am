@@ -227,7 +227,7 @@ qstop_LDADD = ${common_libs}
 qstop_SOURCES = qstop.c
 
 qsub_CPPFLAGS = -I$(top_srcdir)/src/include
-qsub_LDADD = ${common_libs}
+qsub_LDADD = ${common_libs} -lssl -lcrypto
 qsub_SOURCES = qsub.c
 
 qterm_CPPFLAGS = -I$(top_srcdir)/src/include

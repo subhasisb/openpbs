@@ -336,7 +336,7 @@ pg_db_prepare_job_sqls(pbs_db_conn_t *conn)
 	if (pg_prepare_stmt(conn, STMT_DELETE_JOBSCR, conn->conn_sql, 1) != 0)
 		return -1;
 
-	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select GREATEST(to_number(ji_jobid, '9999999.'))::bigint as last_jobid from pbs.job where ji_creattm = (select max(ji_creattm) from pbs.job)");
+	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select coalesce(max(to_number(ji_jobid, '9999999.')), -1)::bigint as last_jobid from pbs.job;");
 	if (pg_prepare_stmt(conn, STMT_GET_MAXJOBID, conn->conn_sql, 0) != 0)
 		return -1;
 

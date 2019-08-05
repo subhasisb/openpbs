@@ -419,18 +419,16 @@ req_quejob(struct batch_request *preq)
 			psatl = (svrattrl *)GET_NEXT(psatl->al_link);
 		}
 
-		{
-			svr_jobidnumber = get_next_hash(svr_jobidnumber, svr_max_job_sequence_id);
-			if (svr_jobidnumber == -1) {
-				log_err(-1, __func__, "Failed to compute next hash for jobid");
-				exit(0);
-			}
-			created_here = JOB_SVFLG_HERE;
-			if (i == 0) {	/* Normal job */
-				(void)sprintf(jidbuf, "%lld.%s", svr_jobidnumber, server_name);
-			} else {	/* Array Job */
-				(void)sprintf(jidbuf, "%lld[].%s", svr_jobidnumber, server_name);
-			}
+		svr_jobidnumber = get_next_hash(svr_jobidnumber, svr_max_job_sequence_id);
+		if (svr_jobidnumber == -1) {
+			log_err(-1, __func__, "Failed to compute next hash for jobid");
+			exit(0);
+		}
+		created_here = JOB_SVFLG_HERE;
+		if (i == 0) {	/* Normal job */
+			(void)sprintf(jidbuf, "%lld.%s", svr_jobidnumber, server_name);
+		} else {	/* Array Job */
+			(void)sprintf(jidbuf, "%lld[].%s", svr_jobidnumber, server_name);
 		}
 		jid = jidbuf;
 	}

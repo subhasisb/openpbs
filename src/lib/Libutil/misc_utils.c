@@ -1488,7 +1488,7 @@ get_last_hash(long long njobid)
 		return -1;
 
 	if (njobid == -1)
-		return njobid;
+		return 0;
 
 	return (ceil(njobid / get_max_servers())*get_max_servers() + my_index);
 }

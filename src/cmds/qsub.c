@@ -85,6 +85,7 @@
 #include <signal.h>
 #include <termios.h>
 #include <assert.h>
+#include <openssl/md5.h>
 #ifndef WIN32
 #include <sys/un.h>
 #include <syslog.h>
@@ -5238,19 +5239,31 @@ again:
 static void
 get_comm_filename(char *fname)
 {
+	char flbuf[2*MAXPATHLEN + 1];
+	char md[16];
+	char out[33];
+	int n;
 	char *env_svr = getenv(PBS_CONF_SERVER_NAME);
+	char *env_insts = getenv(PBS_CONF_SERVER_INSTANCES);
 	char *env_port = getenv(PBS_CONF_BATCH_SERVICE_PORT);
 
-	sprintf(fname, "%s/pbs_%.16s_%lu_%.8s_%.32s_%.16s_%.5s",
-		tmpdir,
-		((server_out == NULL || server_out[0] == 0) ?
-		"default" : server_out),
+	snprintf(flbuf, sizeof(flbuf), "%s_%lu_%s_%s_%s_%s_%s",
+		((server_out == NULL || server_out[0] == 0) ? "default" : server_out),
 		(unsigned long int)getuid(),
 		cred_name,
 		get_conf_path(),
 		(env_svr == NULL)?"":env_svr,
-		(env_port == NULL)?"":env_port
-		);
+		(env_insts == NULL)?"":env_insts,
+		(env_port == NULL)?"":env_port);
+
+	if (MD5((const unsigned char *) flbuf, strlen(flbuf), (unsigned char *) md)) {
+		for (n = 0; n < 16; ++n)
+			snprintf(&(out[n*2]), 16*2, "%02x", (unsigned int)md[n]);
+
+		out[sizeof(out) - 1] = '\0';
+		
+		sprintf(fname, "%s/pbs_%s", tmpdir, out);
+	}
 }
 
 /**
@@ -5305,7 +5318,6 @@ do_daemon_stuff(void)
 	socklen_t fromlen;
 	int rc;
 	fd_set readset;
-	fd_set workset;
 	struct timeval timeout;
 	int n, maxfd;
 	mode_t cmask = 0077;
@@ -5333,21 +5345,14 @@ do_daemon_stuff(void)
 	if (bind(bindfd, (const struct sockaddr *) &s_un, sizeof(s_un)) == -1)
 		exit(1); /* dont go to error */
 
-	FD_ZERO(&readset);
-	svr_sock = pbs_connection_getsocket(sd_svr);
 	if (listen(bindfd, 1) != 0) {
 		err_op = "listen";
 		goto error;
 	}
 
-	FD_SET(bindfd, &readset);
-	FD_SET(svr_sock, &readset);
-	maxfd = (bindfd > svr_sock) ? bindfd : svr_sock;
 	while (1) {
 
 		err_op = "";
-
-		memcpy(&workset, &readset, sizeof(readset));
 
 		timeout.tv_usec = 0;
 		/* since timeout gets reset on Linux */
@@ -5355,7 +5360,14 @@ do_daemon_stuff(void)
 			timeout.tv_sec = QSUB_DMN_TIMEOUT_SHORT; /* Short timeout to allow any foreground process to finsih before exiting */
 		else
 			timeout.tv_sec = QSUB_DMN_TIMEOUT_LONG;
-		n = select(maxfd + 1, &workset, NULL, NULL, &timeout);
+
+		svr_sock = pbs_connection_getsocket(sd_svr);
+		FD_ZERO(&readset);
+		FD_SET(bindfd, &readset);
+		FD_SET(svr_sock, &readset);
+		maxfd = (bindfd > svr_sock) ? bindfd : svr_sock;
+
+		n = select(maxfd + 1, &readset, NULL, NULL, &timeout);
 		if (n == 0)
 			goto out; /* daemon timed out waiting for connect from foreground */
 		else if (n == -1) {
@@ -5374,7 +5386,7 @@ do_daemon_stuff(void)
 			cred_timeout = 1;
 		}
 
-		if (FD_ISSET(svr_sock, &workset)) {
+		if (FD_ISSET(svr_sock, &readset)) {
 			if (recv(svr_sock, &rc, 1, MSG_OOB) < 1)
 				goto out;
 		}

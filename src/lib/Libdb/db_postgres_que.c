@@ -145,7 +145,7 @@ static int
 load_que(PGresult *res, pbs_db_que_info_t *pq, int row)
 {
 	char *raw_array;
-	BIGINT db_savetm;
+	BIGINT db_savetm = 0;
 	static int qu_name_fnum, qu_type_fnum, qu_ctime_fnum, qu_mtime_fnum, attributes_fnum;
 	static int fnums_inited = 0;
 

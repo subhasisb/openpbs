@@ -277,7 +277,7 @@ tcp_read(int fd)
 		timeout = pbs_tcp_timeout;
 
 		pollfds[0].fd = fd;
-		pollfds[0].events = POLLIN;
+		pollfds[0].events = POLLIN | POLLHUP;
 		pollfds[0].revents = 0;
 
 		i = poll(pollfds, 1, timeout * 1000);

@@ -1028,9 +1028,16 @@ main(int argc, char **argv)
 		return (-1);
 	}
 
-	sprintf(daemonname, "Server@%s_%d", server_host, pbs_conf.batch_service_port);
+	sprintf(daemonname, "Server@%s", server_host);
 	if ((pc = strchr(daemonname, (int)'.')) != NULL)
 		*pc = '\0';
+
+	if (get_max_servers() > 1) {
+		char buf[PBS_MAXHOSTNAME+8];
+
+		sprintf(buf, "%s_%d", daemonname, pbs_conf.batch_service_port);
+		strcpy(daemonname, buf);
+	}
 
 	if(set_msgdaemonname(daemonname)) {
 		fprintf(stderr, "Out of memory\n");
@@ -1949,8 +1956,6 @@ try_db_again:
 		*state = SV_STATE_HOT;
 	else
 		*state = SV_STATE_RUN;
-
-	//svr_save_db(&server, SVR_SAVE_FULL);
 
 
 	/* Can start the python interpreter this late, before the main loop,*/

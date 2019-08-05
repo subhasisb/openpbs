@@ -202,6 +202,7 @@ extern int		brought_up_db;
 extern pbs_db_conn_t	*svr_db_conn;
 
 extern	pbs_list_head	svr_allhooks;
+extern long long svr_jobidnumber;
 
 
 #ifdef WIN32
@@ -382,6 +383,7 @@ pbsd_init(int type)
 	pbs_db_conn_t	*conn = (pbs_db_conn_t *) svr_db_conn;
 	char *buf = NULL;
 	int buf_len = 0;
+	long long njobid = -1;
 
 
 #ifndef WIN32
@@ -671,21 +673,19 @@ pbsd_init(int type)
 		 * Retrieve the jobidnumber from the database and use it to generate jobid's locally
 		 * see: get_next_svr_sequence_id(void)
 		 */
-		{
-			long long njobid = -1;
-			if (pbs_db_get_maxjobid(conn, &njobid) == -1) {
-				log_err(-1, __func__, "Failed to query last used jobid from datastore");
-				return (-1);
-			}
+		
+		if (pbs_db_get_maxjobid(conn, &njobid) == -1) {
+			log_err(-1, __func__, "Failed to query last used jobid from datastore");
+			return (-1);
+		}
 
-			if (njobid == -1)
-				svr_jobidnumber = -1;
-			else {
-				svr_jobidnumber = get_last_hash(njobid);
-				if (svr_jobidnumber == -1) {
-					log_err(-1, __func__, "Failed to compute svr_jobidnumber");
-					return (-1);
-				}
+		if (njobid == -1)
+			svr_jobidnumber = -1;
+		else {
+			svr_jobidnumber = get_last_hash(njobid);
+			if (svr_jobidnumber == -1) {
+				log_err(-1, __func__, "Failed to compute svr_jobidnumber");
+				return (-1);
 			}
 		}
 
