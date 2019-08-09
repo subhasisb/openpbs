@@ -2102,7 +2102,7 @@ req_resvSub(struct batch_request *preq)
 	char		*fmt = "%a %b %d %H:%M:%S %Y";
 	char		 tbuf1[256] = {0};
 	char		 tbuf2[256] = {0};
-	long long	next_svr_sequence_id;
+	long long	next_svr_sequence_id = -1;
 
 	switch (process_hooks(preq, hook_msg, sizeof(hook_msg),
 			pbs_python_set_interrupt)) {
@@ -2153,10 +2153,14 @@ req_resvSub(struct batch_request *preq)
 	resc_access_perm = preq->rq_perm | ATR_DFLAG_Creat;
 
 	/* get reseravtion id/queue name locally */
-	if ((next_svr_sequence_id = get_next_hash(svr_jobidnumber, svr_max_job_sequence_id) == -1)) {
+	if (((next_svr_sequence_id = get_next_hash(svr_jobidnumber, svr_max_job_sequence_id)) == -1)) {
+		sprintf(log_buffer,"1.Failed to compute hash(resvid) for reservation, svr_jobidnumber=%lld and returned from get_next_hash=%lld",
+				svr_jobidnumber, next_svr_sequence_id);
+		log_err(-1, __func__,log_buffer);
 		req_reject(PBSE_SYSTEM, 0, preq);
 		return;
 	}
+
 	/*
 	 * if the reservation ID is supplied, the request had better be
 	 * from another server

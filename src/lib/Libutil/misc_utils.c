@@ -1475,7 +1475,7 @@ get_next_hash(long long curr, long long max_id)
 	curr += get_max_servers();
 	/* If server job limit is over, reset back to zero */
 	if (curr > max_id) {
-		curr -= max_id;
+		curr -= max_id + 1;
 	}
 	return curr;
 }
