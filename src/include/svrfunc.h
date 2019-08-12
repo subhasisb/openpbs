@@ -94,7 +94,6 @@ extern void  write_node_state(void);
 extern int   write_single_node_state(struct pbsnode *);
 extern int   setup_nodes(void);
 extern int   setup_resc(int);
-extern void  update_job_node_rassn(job *, attribute *, enum batch_op);
 extern void  mark_node_down(char *, char *);
 extern void  mark_node_offline_by_mom(char *, char *);
 extern void  clear_node_offline_by_mom(char *, char *);
@@ -291,7 +290,8 @@ extern int   setup_arrayjob_attrs(attribute *, void *, int);
 extern int   deflt_chunk_action(attribute *pattr, void *pobj, int mode);
 extern int   action_svr_iteration(attribute *pattr, void *pobj, int mode);
 extern void  update_node_rassn(attribute *, enum batch_op);
-extern void  update_job_node_rassn(job *, attribute *, enum batch_op);
+extern void  update_job_node_rassn(void
+ *, int, attribute *, enum batch_op);
 extern int   cvt_nodespec_to_select(char *, char **, size_t *, attribute *);
 extern int is_valid_resource(attribute *pattr, void *pobject, int actmode);
 extern int   queuestart_action(attribute *pattr, void *pobject, int actmode);

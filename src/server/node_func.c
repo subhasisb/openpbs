@@ -1189,6 +1189,21 @@ struct pbssubn *create_subnode(struct pbsnode *pnode, struct pbssubn *lstsn)
 
 /**
  * @brief
+ * 	Free nodejob object
+ * 
+ * @return void
+ */
+void
+free_nodejob(struct nodejob * pnodejob)
+{
+	free(pnodejob->job_id);
+	free(pnodejob->nd_name);
+	free(pnodejob->resc_assn);
+	free(pnodejob);
+}
+
+/**
+ * @brief
  *		Read the file, "nodes", containing the list of properties for each node.
  *		The list of nodes is formed with pbsndlist as the head.
  *		Return -1 on error, 0 otherwise.

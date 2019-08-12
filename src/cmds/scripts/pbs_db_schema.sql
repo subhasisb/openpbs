@@ -109,6 +109,21 @@ CREATE TABLE pbs.node (
 CREATE INDEX nd_creattm_idx ON pbs.node(nd_creattm);
 CREATE INDEX nd_savetm_idx ON pbs.node(nd_savetm);
 
+/*
+ * Table pbs.node_job holds information getting updated by jobs which are specific to node
+ */
+ CREATE TABLE pbs.node_job (
+    job_id		    TEXT	NOT NULL,
+    nd_name		    TEXT	NOT NULL,
+    is_resv		    INTEGER,
+    subnode_ct		    INTEGER,
+    admn_suspend		INTEGER,
+    nj_creattm      TIMESTAMP	NOT NULL,
+    nj_savetm		TIMESTAMP	NOT NULL,
+    attributes		hstore		NOT NULL default '',
+    CONSTRAINT node_job_pk PRIMARY KEY (job_id, nd_name)
+);
+
 ---------------------- QUEUE -------------------------------
 
 /*

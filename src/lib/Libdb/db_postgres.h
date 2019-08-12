@@ -156,6 +156,10 @@ typedef unsigned __int64 uint64_t;
 #define STMT_SELECT_MOMINFO_TIME "select_mominfo_time"
 #define STMT_INSERT_MOMINFO_TIME "insert_mominfo_time"
 #define STMT_UPDATE_MOMINFO_TIME "update_mominfo_time"
+#define STMT_UPDATE_NODEJOBATTRS "update_nodejob_attrs"
+#define STMT_SELECT_NODEJOB "select_nodejob"
+#define STMT_INSERT_NODEJOB "insert_nodejob"
+#define STMT_UPDATE_NODEJOB "update_nodejob"
 
 /* scheduler statement names */
 #define STMT_INSERT_SCHED "insert_sched"
@@ -393,6 +397,14 @@ int pg_db_del_attr_svr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, void *obj_id
 int pg_db_del_attr_que(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, void *obj_id, pbs_db_attr_list_t *attr_list);
 int pg_db_del_attr_node(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, void *obj_id, pbs_db_attr_list_t *attr_list);
 int pg_db_add_update_attr_node(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, void *obj_id, pbs_db_attr_list_t *attr_list);
+
+/* nodejob functions */
+int pg_db_add_update_attr_nodejob(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, void *node_id, pbs_db_attr_list_t *attr_list);
+void pg_db_reset_nodejob(pbs_db_obj_info_t *obj);
+int pg_db_load_nodejob(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int lock);
+int pg_db_save_nodejob(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype);
+
+/* reset functions */
 void pg_db_reset_job(pbs_db_obj_info_t *obj);
 void pg_db_reset_svr(pbs_db_obj_info_t *obj);
 void pg_db_reset_que(pbs_db_obj_info_t *obj);

@@ -129,7 +129,6 @@ pg_db_fn_t db_fn_arr[PBS_DB_NUM_TYPES] =
 		NULL,
 		pg_db_reset_sched
 	},
-
 	{ /* PBS_DB_MOMINFO_TIME */
 		pg_db_save_mominfo_tm,
 		NULL,
@@ -139,6 +138,16 @@ pg_db_fn_t db_fn_arr[PBS_DB_NUM_TYPES] =
 		NULL,
 		NULL,
 		pg_db_reset_mominfo
+	},
+	{ /* PBS_DB_NODEJOB */
+		pg_db_save_nodejob,
+		NULL,
+		pg_db_load_nodejob,
+		NULL,
+		NULL,
+		NULL,
+		pg_db_add_update_attr_nodejob,
+		pg_db_reset_nodejob
 	}
 };
 

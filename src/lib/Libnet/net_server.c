@@ -580,7 +580,7 @@ wait_request(time_t waittime, void *priority_context)
 #endif /* WIN32 */
                 	for (i = 0; i < pnfds; i++) {
                         	em_pfd = EM_GET_FD(pevents, i);
-				log_event(PBSEVENT_DEBUG3, PBS_EVENTCLASS_SERVER,
+				log_event(PBSEVENT_DEBUG4, PBS_EVENTCLASS_SERVER,
                                         LOG_DEBUG, __func__, "processing priority socket");
 				if (process_socket(em_pfd) == -1) {
                                 	log_event(PBSEVENT_DEBUG, PBS_EVENTCLASS_SERVER,

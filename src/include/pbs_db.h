@@ -283,6 +283,23 @@ typedef struct pbs_db_node_info pbs_db_node_info_t;
 
 /**
  * @brief
+ *  Structure used to map database node-job structure to C
+ *
+ */
+struct pbs_db_nodejob_info {
+	char	job_id[PBS_MAXSVRJOBID+1];
+	char	nd_name[PBS_MAXSERVERNAME+1];
+	INTEGER is_resv;
+	INTEGER	subnode_ct;
+	INTEGER	admn_suspend;
+	BIGINT nj_creattm;
+	BIGINT nj_savetm;
+	pbs_db_attr_list_t attr_list; /* list of attributes */
+};
+typedef struct pbs_db_nodejob_info pbs_db_nodejob_info_t;
+
+/**
+ * @brief
  *  Structure used to map database mominfo_time structure to C
  *
  */
@@ -327,7 +344,8 @@ typedef struct pbs_db_query_options pbs_db_query_options_t;
 #define PBS_DB_JOBSCR			5
 #define PBS_DB_SCHED			6
 #define PBS_DB_MOMINFO_TIME		7
-#define PBS_DB_NUM_TYPES		8
+#define PBS_DB_NODEJOB			8
+#define PBS_DB_NUM_TYPES		9
 
 
 /* connection error code */
@@ -371,6 +389,7 @@ struct pbs_db_obj_info {
 		pbs_db_node_info_t	*pbs_db_node;
 		pbs_db_sched_info_t	*pbs_db_sched;
 		pbs_db_mominfo_time_t	*pbs_db_mominfo_tm;
+		pbs_db_nodejob_info_t	*pbs_db_nodejob;
 	} pbs_db_un;
 };
 typedef struct pbs_db_obj_info pbs_db_obj_info_t;
