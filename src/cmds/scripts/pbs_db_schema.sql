@@ -54,7 +54,7 @@ CREATE TABLE pbs.info (
     pbs_schema_version TEXT 		NOT NULL
 );
 
-INSERT INTO pbs.info values('1.4.0'); /* schema version */
+INSERT INTO pbs.info values('2.0.0'); /* schema version */
 
 ---------------------- SERVER ------------------------------
 
@@ -87,28 +87,27 @@ CREATE TABLE pbs.scheduler (
  */
 CREATE TABLE pbs.mominfo_time (
     mit_time		BIGINT,
-    mit_gen		INTEGER
+    mit_gen		    INTEGER
 );
 
 /*
  * Table pbs.node holds information about PBS nodes
  */
 CREATE TABLE pbs.node (
-    nd_name		TEXT		NOT NULL,
+    nd_name		    TEXT		NOT NULL,
     mom_modtime		BIGINT,
     nd_hostname		TEXT		NOT NULL,
     nd_state		INTEGER		NOT NULL,
     nd_ntype		INTEGER		NOT NULL,
-    nd_pque		TEXT,
+    nd_pque		    TEXT,
     nd_index		INTEGER		NOT NULL,
     nd_savetm		TIMESTAMP	NOT NULL,
     nd_creattm		TIMESTAMP	NOT NULL,
     attributes		hstore		NOT NULL default '',
     CONSTRAINT pbsnode_pk PRIMARY KEY (nd_name)
 );
-CREATE INDEX nd_idx_cr
-ON pbs.node
-( nd_creattm );
+CREATE INDEX nd_idx_cr ON pbs.node(nd_creattm);
+CREATE INDEX nd_savetm_idx ON pbs.node(nd_savetm);
 
 ---------------------- QUEUE -------------------------------
 
@@ -116,16 +115,15 @@ ON pbs.node
  * Table pbs.queue holds queue information
  */
 CREATE TABLE pbs.queue (
-    qu_name		TEXT		NOT NULL,
-    qu_type		INTEGER		NOT NULL,
+    qu_name		    TEXT		NOT NULL,
+    qu_type		    INTEGER		NOT NULL,
     qu_ctime		TIMESTAMP	NOT NULL,
     qu_mtime		TIMESTAMP	NOT NULL,
     attributes		hstore		NOT NULL default '',
     CONSTRAINT queue_pk PRIMARY KEY (qu_name)
 );
-CREATE INDEX que_idx_cr
-ON pbs.queue
-( qu_ctime );
+CREATE INDEX que_idx_cr ON pbs.queue(qu_ctime);
+CREATE INDEX qu_mtime_idx ON pbs.queue(qu_mtime);
 
 
 ---------------------- RESERVATION -------------------------
@@ -138,7 +136,7 @@ CREATE TABLE pbs.resv (
     ri_queue		TEXT		NOT NULL,
     ri_state		INTEGER		NOT NULL,
     ri_substate		INTEGER		NOT NULL,
-    ri_type		INTEGER		NOT NULL,
+    ri_type		    INTEGER		NOT NULL,
     ri_stime		BIGINT		NOT NULL,
     ri_etime		BIGINT		NOT NULL,
     ri_duration		BIGINT		NOT NULL,
@@ -154,6 +152,7 @@ CREATE TABLE pbs.resv (
     attributes		hstore		NOT NULL default '',
     CONSTRAINT resv_pk PRIMARY KEY (ri_resvID)
 );
+CREATE INDEX ri_savetm_idx ON pbs.resv(ri_savetm);
 
 
 ---------------------- JOB ---------------------------------
@@ -181,8 +180,8 @@ CREATE TABLE pbs.job (
     ji_rteretry		BIGINT,
     ji_fromsock		INTEGER,
     ji_fromaddr		BIGINT,
-    ji_4jid		TEXT,
-    ji_4ash		TEXT,
+    ji_4jid		    TEXT,
+    ji_4ash		    TEXT,
     ji_credtype		INTEGER,
     ji_qrank		INTEGER		NOT NULL,
     ji_savetm		TIMESTAMP	NOT NULL,
@@ -190,18 +189,15 @@ CREATE TABLE pbs.job (
     attributes		hstore		NOT NULL default '',
     CONSTRAINT jobid_pk PRIMARY KEY (ji_jobid)
 );
-
-CREATE INDEX job_rank_idx
-ON pbs.job
-( ji_qrank );
-
+CREATE INDEX job_rank_idx ON pbs.job(ji_qrank);
+CREATE INDEX job_savetm_idx ON pbs.job(ji_savetm);
 
 /*
  * Table pbs.job_scr holds the job script 
  */
 CREATE TABLE pbs.job_scr (
-    ji_jobid		TEXT		NOT NULL,
-    script		TEXT
+    ji_jobid	    TEXT		NOT NULL,
+    script		    TEXT
 );
 CREATE INDEX job_scr_idx ON pbs.job_scr (ji_jobid);
 

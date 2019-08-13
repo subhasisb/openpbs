@@ -816,6 +816,8 @@ __pbs_connect_extend(char *server, char *extend_data)
 			connection[out].ch_shards[i] = malloc(sizeof(struct shard_conn));
 			connection[out].ch_shards[i]->sd = -1;
 			connection[out].ch_shards[i]->state = SHARD_CONN_STATE_DOWN;
+			connection[out].ch_shards[i]->state_change_time = 0;
+			connection[out].ch_shards[i]->last_used = 0;
 		}
 		return out; /* actual connects happen when client tries to send a request first */
 	}

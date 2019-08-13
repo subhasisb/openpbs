@@ -1585,6 +1585,8 @@ setup_nodes()
 
 	obj.pbs_db_obj_type = PBS_DB_NODE;
 	obj.pbs_db_un.pbs_db_node = &dbnode;
+	dbnode.attr_list.attributes = NULL;
+	
 	state = pbs_db_cursor_init(conn, &obj, NULL);
 	if (state == NULL) {
 		sprintf(log_buffer, "%s", (char *) conn->conn_db_err);

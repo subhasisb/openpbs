@@ -120,8 +120,7 @@ extern int svr_chk_histjob(job *);
 
 static int bad;
 /*-------for stat server----------*/
-static time_t from_time; /* Timestamp at update of qstat cache */
-job *refresh_job(char *);
+job *refresh_job(pbs_db_job_info_t *dbjob, int *refreshed);
 resc_resv *refresh_resv(char *);
 
 /* The following private support functions are included */
@@ -319,8 +318,10 @@ void req_stat_job(struct batch_request *preq)
 
 	/*---------for stat server-----------*/
 	db_rc = get_all_db_jobs();
-	if (db_rc)
+	if (db_rc) {
 		req_reject(db_rc, bad, preq);
+		return;
+	}
 	/*--------------------------------*/
 
 	if (preq->rq_extend) {
@@ -423,24 +424,32 @@ void req_stat_job(struct batch_request *preq)
  */
 
 static int
-get_all_db_jobs() {
-
-	job		*pj = NULL;
+get_all_db_jobs() 
+{
+	job	*pj = NULL;
 	pbs_db_job_info_t dbjob;
 	pbs_db_obj_info_t obj;
 	pbs_db_conn_t *conn = svr_db_conn;
-	void		*state = NULL;
-	int		    rc_cur = 0;
+	void *state = NULL;
+	int rc_cur = 0;
 	pbs_db_query_options_t opts;
+	int refreshed;
+	int count = 0;
+	static char from_time[DB_TIMESTAMP_LEN + 1] = {0};
 
 	if (pbs_db_begin_trx(conn, 0, 0) !=0) {
 		(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
 		return (1);
 	}
 
+	/* fill in options */
+	opts.flags = 0;
 	opts.timestamp = from_time;
+
 	obj.pbs_db_obj_type = PBS_DB_JOB;
 	obj.pbs_db_un.pbs_db_job = &dbjob;
+	dbjob.attr_list.attributes = NULL;
+
 	state = pbs_db_cursor_init(conn, &obj, &opts);
 
 	if (state == NULL) {
@@ -450,24 +459,28 @@ get_all_db_jobs() {
 		(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
 		return (1);
 	}
-	/* load jobs from db */
+	
 	while ((rc_cur = pbs_db_cursor_next(conn, state, &obj)) == 0) {
-		if (dbjob.ji_savetm > from_time) {
-			from_time = dbjob.ji_savetm;
+		if ((pj = refresh_job(&dbjob, &refreshed)) == NULL) {
+			sprintf(log_buffer, "Failed to refresh job %s", dbjob.ji_jobid);
+			log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_NOTICE, msg_daemonname, log_buffer);
 		}
-		if ((pj = refresh_job(dbjob.ji_jobid)) == NULL) {
-				sprintf(log_buffer, "Failed to refresh job %s", dbjob.ji_jobid);
-				log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_NOTICE,
-						msg_daemonname, log_buffer);
-			continue;
-		}
-		pbs_db_reset_obj(&obj);
-	} /* END while */
+		if (refreshed)
+			count++;
 
-	/* close the connection */
+		pbs_db_reset_obj(&obj);
+	}
+
 	pbs_db_cursor_close(conn, state);
 	if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0)
 		return (1);
+
+	sprintf(log_buffer, "Refreshed %d jobs", count);
+	log_err(-1, __func__, log_buffer);
+
+	if (pj)
+		strcpy(from_time, pj->ji_savetm);
+
 	return 0;
 }
 
@@ -933,6 +946,8 @@ req_stat_sched(struct batch_request *preq)
 
 		obj.pbs_db_obj_type = PBS_DB_SCHED;
 		obj.pbs_db_un.pbs_db_sched = &dbsched;
+		dbsched.attr_list.attributes = NULL;
+
 		qry_options.flags = 3;
 
 		state = pbs_db_cursor_init(conn, &obj, &qry_options);
@@ -1123,8 +1138,10 @@ req_stat_resv(struct batch_request * preq)
 
 	/*---------for updating/adding all reservations-----------*/
 	db_rc = get_all_db_resv();
-	if (db_rc)
+	if (db_rc) {
 		req_reject(db_rc, bad, preq);
+		return;
+	}
 	/*--------------------------------*/
 
 	name = preq->rq_ind.rq_status.rq_id;
@@ -1194,6 +1211,8 @@ get_all_db_resv() {
 	//opts.timestamp = from_time;
 	obj.pbs_db_obj_type = PBS_DB_RESV;
 	obj.pbs_db_un.pbs_db_resv = &dbresv;
+	dbresv.attr_list.attributes = NULL;
+	
 	state = pbs_db_cursor_init(conn, &obj, NULL);
 
 	if (state == NULL) {

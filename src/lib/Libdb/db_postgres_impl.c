@@ -212,12 +212,12 @@ pbs_db_cursor_init(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj,
 	if (!st)
 		return st;
 
-	ret = db_fn_arr[obj->pbs_db_obj_type].pg_db_find_obj(
-		conn, st, obj, opts);
+	ret = db_fn_arr[obj->pbs_db_obj_type].pg_db_find_obj(conn, st, obj, opts);
 	if (ret == -1) { /* error in executing the sql */
 		pg_destroy_state(st);
 		return NULL;
 	}
+	pbs_db_reset_obj(obj);
 	return st;
 }
 
@@ -246,11 +246,12 @@ pbs_db_cursor_next(pbs_db_conn_t *conn, void *st, pbs_db_obj_info_t *obj)
 	int ret;
 
 	if (state->row < state->count) {
-		ret = db_fn_arr[obj->pbs_db_obj_type].pg_db_next_obj(conn,
-			st, obj);
+		ret = db_fn_arr[obj->pbs_db_obj_type].pg_db_next_obj(conn, st, obj);
 		state->row++;
+
 		return ret;
 	}
+
 	return 1; /* no more rows */
 }
 
@@ -688,7 +689,7 @@ pbs_db_connect_async(pbs_db_conn_t *conn)
 	int rc;
 
 	tv.tv_sec = 0;
-	tv.tv_usec = 100; /* 100 usec timeout in select, so as not to burn the CPU */
+	tv.tv_usec = 1; /* 1 usec timeout in select, so as not to burn the CPU */
 
 	switch (conn->conn_state) {
 		case PBS_DB_CONNECT_STATE_NOT_CONNECTED: /* start connection */

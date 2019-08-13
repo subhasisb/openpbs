@@ -176,8 +176,8 @@ static int last_rc = -1; /* we need to reset db_oper_failed_times for each state
 static int db_delay = 0;
 static int touch_db_stop_file(void);
 static void log_tppmsg(int level, const char *objname, char *mess);
-#define MAX_DB_RETRIES			5
-#define MAX_DB_LOOP_DELAY		10
+#define MAX_DB_RETRIES			20
+#define MAX_DB_LOOP_DELAY		1000000
 #define HOT_START_PING_RATE		15
 
 /* Global Data Items */
@@ -1552,10 +1552,10 @@ try_db_again:
 				return (-1);
 			}
 		}
-		db_delay = (int)(1 + db_oper_failed_times * 1.5);
+		db_delay = (int)(1000 + db_oper_failed_times * 2);
 		if (db_delay > MAX_DB_LOOP_DELAY)
 			db_delay = MAX_DB_LOOP_DELAY; /* limit to MAX_DB_LOOP_DELAY secs */
-		sleep(db_delay);     /* dont burn the CPU looping too fast */
+		usleep(db_delay);     /* dont burn the CPU looping too fast */
 		update_svrlive();    /* indicate we are alive */
 #ifndef DEBUG
 #ifndef WIN32
@@ -2187,7 +2187,7 @@ try_db_again:
 	}
 
 	/* if brought up the DB, take it down */
-	stop_db();
+	//stop_db();
 
 	if (are_primary == FAILOVER_SECONDARY) {
 		/* we are the secondary server */
@@ -3069,10 +3069,10 @@ stop_db()
 		db_oper_failed_times++;
 
 		/* try stopping after some time again */
-		db_delay = (int)(1 + db_oper_failed_times * 1.5);
+		db_delay = (int)(1000 + db_oper_failed_times * 2);
 		if (db_oper_failed_times > MAX_DB_LOOP_DELAY)
 			db_delay = MAX_DB_LOOP_DELAY; /* limit to MAX_DB_LOOP_DELAY secs */
-		sleep(db_delay); /* don't burn the CPU looping too fast */
+		usleep(db_delay); /* don't burn the CPU looping too fast */
 	}
 }
 /**

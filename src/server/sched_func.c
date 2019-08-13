@@ -91,7 +91,7 @@ sched_alloc(char *sched_name, int append)
 	psched->svr_do_sched_high = SCH_SCHEDULE_NULL;
 	psched->scheduler_sock = -1;
 	psched->scheduler_sock2 = -1;
-	psched->sch_svtime = 0;
+	psched->sch_svtime[0] = '\0';
 	if (append)
 		append_link(&svr_allscheds, &psched->sc_link, psched);
 

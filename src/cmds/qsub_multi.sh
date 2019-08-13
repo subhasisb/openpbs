@@ -9,7 +9,7 @@ function submit_jobs {
 	port=$1
 	njobs=$2
 
-	export PBS_BATCH_SERVICE_PORT=$port
+	export PBS_SERVER_INSTANCES=:$port
 	echo "Port = $port"
 
 	for i in $(seq 1 $njobs)

@@ -135,8 +135,8 @@ db_to_svr_que(pbs_queue *pque, pbs_db_que_info_t *pdbque)
 	pque->qu_qs.qu_name[sizeof(pque->qu_qs.qu_name) - 1] = '\0';
 	strncpy(pque->qu_qs.qu_name, pdbque->qu_name, sizeof(pque->qu_qs.qu_name));
 	pque->qu_qs.qu_type = pdbque->qu_type;
-	pque->qu_qs.qu_ctime = pdbque->qu_ctime;
-	pque->qu_qs.qu_mtime = pdbque->qu_mtime;
+	strcpy(pque->qu_ctime, pdbque->qu_ctime);
+	strcpy(pque->qu_mtime, pdbque->qu_mtime);
 
 	if ((decode_attr_db(pque, &pdbque->attr_list, que_attr_def,
 		pque->qu_attr, (int) QA_ATR_LAST, 0)) != 0)
@@ -184,7 +184,7 @@ que_save_db(pbs_queue *pque, int mode)
 	    goto db_err;
 	}
 
-	pque->qu_qs.qu_mtime = dbque.qu_mtime;
+	strcpy(pque->qu_mtime, dbque.qu_mtime);
 
 	pbs_db_reset_obj(&obj);
 
@@ -233,9 +233,9 @@ que_recov_db(char *qname, pbs_queue *pq, int lock)
 	/* load server_qs */
 	dbque.qu_name[sizeof(dbque.qu_name) - 1] = '\0';
 	if (pq)
-		dbque.qu_mtime = pq->qu_qs.qu_mtime;
+		strcpy(dbque.qu_mtime, pq->qu_mtime);
 	else
-		dbque.qu_mtime = 0;
+		dbque.qu_mtime[0] = '\0';
 
 	strncpy(dbque.qu_name, qname, sizeof(dbque.qu_name));
 

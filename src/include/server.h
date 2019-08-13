@@ -171,9 +171,7 @@ extern long svr_history_duration;
 
 
 struct server {
-	struct server_qs {
-		time_t		sv_savetm;	/* time of server db update         */
-	} sv_qs;
+	char	  sv_savetm[DB_TIMESTAMP_LEN + 1];
 	attribute sv_attr[SRV_ATR_LAST]; /* the server attributes 	    */
 
 	time_t	  sv_started;		/* time server started */

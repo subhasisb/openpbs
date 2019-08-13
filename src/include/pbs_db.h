@@ -83,6 +83,8 @@ extern "C" {
 #define PBS_UPDATE_DB_QUICK 1
 #define PBS_INSERT_DB 2
 
+#define DB_TIMESTAMP_LEN 50
+
 /**
  * @brief
  *  Structure used to maintain the database connection information
@@ -184,8 +186,8 @@ struct pbs_db_job_info {
 	char     ji_4ash[8];
 	INTEGER  ji_credtype;
 	INTEGER  ji_qrank;
-	BIGINT   ji_savetm;
-	BIGINT   ji_creattm;
+	char     ji_savetm[DB_TIMESTAMP_LEN + 1];
+	char     ji_creattm[DB_TIMESTAMP_LEN + 1];
 	pbs_db_attr_list_t attr_list; /* list of attributes */
 };
 typedef struct pbs_db_job_info pbs_db_job_info_t;
@@ -211,8 +213,8 @@ struct pbs_db_resv_info {
 	INTEGER ri_un_type;
 	INTEGER ri_fromsock;
 	BIGINT  ri_fromaddr;
-	BIGINT  ri_creattm;
-	BIGINT  ri_savetm;
+	char    ri_creattm[DB_TIMESTAMP_LEN + 1];
+	char    ri_savetm[DB_TIMESTAMP_LEN + 1];
 	pbs_db_attr_list_t attr_list; /* list of attributes */
 };
 typedef struct pbs_db_resv_info pbs_db_resv_info_t;
@@ -223,8 +225,8 @@ typedef struct pbs_db_resv_info pbs_db_resv_info_t;
  *
  */
 struct pbs_db_svr_info {
-	BIGINT  sv_creattm;
-	BIGINT  sv_savetm;
+	char  sv_creattm[DB_TIMESTAMP_LEN + 1];
+	char  sv_savetm[DB_TIMESTAMP_LEN + 1];
 	pbs_db_attr_list_t attr_list; /* list of attributes */
 };
 typedef struct pbs_db_svr_info pbs_db_svr_info_t;
@@ -237,8 +239,8 @@ typedef struct pbs_db_svr_info pbs_db_svr_info_t;
 struct pbs_db_sched_info {
 	char    sched_name[PBS_MAXSCHEDNAME+1];
 	char    partition_name[PBS_MAXSCHEDNAME+1];
-	BIGINT  sched_creattm;
-	BIGINT  sched_savetm;
+	char    sched_creattm[DB_TIMESTAMP_LEN + 1];
+	char    sched_savetm[DB_TIMESTAMP_LEN + 1];
 	pbs_db_attr_list_t attr_list; /* list of attributes */
 };
 typedef struct pbs_db_sched_info pbs_db_sched_info_t;
@@ -251,8 +253,8 @@ typedef struct pbs_db_sched_info pbs_db_sched_info_t;
 struct pbs_db_que_info {
 	char    qu_name[PBS_MAXQUEUENAME +1];
 	INTEGER qu_type;
-	BIGINT  qu_ctime;
-	BIGINT  qu_mtime;
+	char    qu_ctime[DB_TIMESTAMP_LEN + 1];
+	char    qu_mtime[DB_TIMESTAMP_LEN + 1];
 	pbs_db_attr_list_t attr_list; /* list of attributes */
 };
 typedef struct pbs_db_que_info pbs_db_que_info_t;
@@ -270,8 +272,8 @@ struct pbs_db_node_info {
 	INTEGER nd_state;
 	INTEGER nd_ntype;
 	char	nd_pque[PBS_MAXSERVERNAME+1];
-	BIGINT  nd_creattm;
-	BIGINT  nd_svtime;
+	char    nd_creattm[DB_TIMESTAMP_LEN + 1];
+	char    nd_svtime[DB_TIMESTAMP_LEN + 1];
 	pbs_db_attr_list_t attr_list; /* list of attributes */
 };
 typedef struct pbs_db_node_info pbs_db_node_info_t;
@@ -310,7 +312,7 @@ typedef struct pbs_db_jobscr_info pbs_db_jobscr_info_t;
  */
 struct pbs_db_query_options {
 	int	flags;
-	time_t	timestamp;
+	char *timestamp;
 };
 typedef struct pbs_db_query_options pbs_db_query_options_t;
 

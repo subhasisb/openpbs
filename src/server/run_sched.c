@@ -666,9 +666,9 @@ recov_sched_from_db(char *partition, char *sched_name, int lock)
 	}
 
 	if (old_sched) {
-		dbsched.sched_savetm = old_sched->sch_svtime;
+		strcpy(dbsched.sched_savetm, old_sched->sch_svtime);
 	} else {
-		dbsched.sched_savetm = 0;
+		dbsched.sched_savetm[0] = '\0';
 	}
 
 	/* recover sched */
@@ -719,7 +719,7 @@ db_to_svr_sched(struct pbs_sched *ps, pbs_db_sched_info_t *pdbsched)
 {
 	/* Following code is for the time being only */
 	strcpy(ps->sc_name, pdbsched->sched_name);
-	ps->sch_svtime = pdbsched->sched_savetm;
+	strcpy(ps->sch_svtime, pdbsched->sched_savetm);
 	/* since we dont need the sched_name and sched_sv_name free here */
 	if ((decode_attr_db(ps, &pdbsched->attr_list, sched_attr_def,
 		ps->sch_attr,

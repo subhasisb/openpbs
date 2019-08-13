@@ -182,7 +182,7 @@ svr_to_db_svr(struct server *ps, pbs_db_svr_info_t *pdbsvr, int updatetype)
 int
 db_to_svr_svr(struct server *ps, pbs_db_svr_info_t *pdbsvr)
 {
-	ps->sv_qs.sv_savetm = pdbsvr->sv_savetm;
+	strcpy(ps->sv_savetm, pdbsvr->sv_savetm);
 
 	if ((decode_attr_db(ps, &pdbsvr->attr_list, svr_attr_def, ps->sv_attr, (int) SRV_ATR_LAST, 0)) != 0)
 		return -1;
@@ -254,9 +254,9 @@ svr_recov_db(int lock)
 	obj.pbs_db_un.pbs_db_svr = &dbsvr;
 
 	if (!server.loaded) {
-		dbsvr.sv_savetm = 0;
+		dbsvr.sv_savetm[0] = '\0';
 	} else {
-		dbsvr.sv_savetm = server.sv_qs.sv_savetm;
+		strcpy(dbsvr.sv_savetm, server.sv_savetm);
 		if (memcache_good(&server.trx_status, lock))
 			return 0;
 	}
@@ -325,8 +325,6 @@ svr_save_db(struct server *ps, int mode)
 	int savetype = PBS_UPDATE_DB_FULL;
 	int rc;
 
-	ps->sv_qs.sv_savetm = time_now;
-
 	/* as part of the server save, update svrlive file now,
 	 * used in failover
 	 */
@@ -349,7 +347,7 @@ svr_save_db(struct server *ps, int mode)
 		savetype = PBS_INSERT_DB;
 		rc = pbs_db_save_obj(conn, &obj, savetype);
 	}
-	server.sv_qs.sv_savetm = dbsvr.sv_savetm;
+	strcpy(server.sv_savetm, dbsvr.sv_savetm);
 
 	pbs_db_reset_obj(&obj);
 
@@ -412,14 +410,13 @@ sched_save_db(pbs_sched *ps, int mode)
 	obj.pbs_db_obj_type = PBS_DB_SCHED;
 	obj.pbs_db_un.pbs_db_sched = &dbsched;
 
-
 	rc = pbs_db_save_obj(conn, &obj, savetype);
 	if (rc != 0) {
 		savetype = PBS_INSERT_DB;
 		rc = pbs_db_save_obj(conn, &obj, savetype);
 	}
 
-	ps->sch_svtime = dbsched.sched_savetm;
+	strcpy(ps->sch_svtime, dbsched.sched_savetm);
 	
 	/* free the attribute list allocated by encode_attrs */
 	pbs_db_reset_obj(&obj);

@@ -997,14 +997,26 @@ job_purge(job *pjob)
  * @return	pointer to job struct
  * @retval NULL	- if job by jobid not found.
  */
+#ifndef PBS_MOM
 job *
-find_job(char *jobid) {
-	return(find_job_avl(jobid));
+find_job_avl(char *jobid) 
+{
+	AVL_IX_REC *pkey;
+	job  *pj = NULL;
+
+	if ((AVL_jctx != NULL) && ((pkey = svr_avlkey_create(jobid)) != NULL)) {
+		if (avl_find_key(pkey, AVL_jctx) == AVL_IX_OK)
+			pj = (job *) pkey->recptr;
+		free(pkey);
+	}
+
+	return pj;
 }
+#endif
 
 /**
  * @brief
- * 		find_job_avl() - find job by jobid
+ * 		find_job() - find job by jobid
  *
  *		Search list of all server jobs for one with same job id
  *		Return NULL if not found or pointer to job struct if found.
@@ -1024,19 +1036,20 @@ find_job(char *jobid) {
  */
 
 job *
-find_job_avl(char *jobid)
+find_job(char *jobid)
 {
 #ifndef PBS_MOM
 	size_t len;
-	AVL_IX_REC *pkey;
+	
 	char *host_dot;
 	char *serv_dot;
 	char *host;
-#endif
 	char *at;
-	job  *pj = NULL;
 	char buf[PBS_MAXSVRJOBID+1];
+#endif
+	job  *pj = NULL;
 
+#ifndef PBS_MOM
 	/* Make a copy of the job ID string before we modify it. */
 	snprintf(buf, sizeof(buf), "%s", jobid);
 	/*
@@ -1048,7 +1061,6 @@ find_job_avl(char *jobid)
 	if ((at = strchr(buf, (int)'@')) != NULL)
 		*at = '\0';
 
-#ifndef PBS_MOM
 	/*
 	 * Avl tree search cannot find partially formed jobid's.
 	 * While storing we supplied the full jobid.
@@ -1110,24 +1122,21 @@ find_job_avl(char *jobid)
 		strcat(buf, server_name);
 	}
 
-	if ((AVL_jctx != NULL) && ((pkey = svr_avlkey_create(buf)) != NULL)) {
-		if (avl_find_key(pkey, AVL_jctx) == AVL_IX_OK)
-			pj = (job *) pkey->recptr;
-		else {
-			/* search, load and add to avl from db if available */
-			if((pj = job_recov_db(buf, NULL, 0)))
-			{
-				if (svr_enquejob(pj))
-				{
-					free(pkey);
-					return NULL;
-				}
+	/* first check avl tree, if not found, load from DB */
+	if (!(pj = find_job_avl(buf))) {
+		if ((pj = job_recov_db(jobid, NULL, 0))) {
+			/* TODO_MULTI: A lot more logic will go in here about sharding and job migration and locking server_instances */
+			if (svr_enquejob(pj)) {
+				job_free(pj);
+				return NULL;
 			}
 		}
-		free(pkey);
-		return (pj);
 	}
-#endif
+	return pj;
+
+#else
+/* MOM - MOM */
+
 	pj = (job *)GET_NEXT(svr_alljobs);
 	while (pj != NULL) {
 		if (!strncasecmp(jobid, pj->ji_qs.ji_jobid, sizeof(pj->ji_qs.ji_jobid)))
@@ -1135,6 +1144,7 @@ find_job_avl(char *jobid)
 		pj = (job *)GET_NEXT(pj->ji_alljobs);
 	}
 	return (pj);  /* may be a null pointer */
+#endif
 }
 
 /**

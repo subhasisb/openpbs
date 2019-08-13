@@ -151,10 +151,11 @@ struct pbs_queue {
 	struct queuefix {
 		int	qu_modified;		/* != 0 => update disk file */
 		int	qu_type;		/* queue type: exec, route */
-		time_t	qu_ctime;		/* time queue created */
-		time_t	qu_mtime;		/* time queue last modified */
 		char	qu_name[PBS_MAXQUEUENAME + 1]; /* queue name */
 	} qu_qs;
+
+	char		qu_ctime[DB_TIMESTAMP_LEN + 1];		/* time queue created */
+	char		qu_mtime[DB_TIMESTAMP_LEN + 1];		/* time queue last modified */
 
 	int	qu_numjobs;			/* current numb jobs in queue */
 	int	qu_njstate[PBS_NUMJOBSTATE];	/* # of jobs per state */

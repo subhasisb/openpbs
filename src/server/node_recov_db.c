@@ -183,7 +183,7 @@ svr_to_db_node(struct pbsnode *pnode, pbs_db_node_info_t *pdbnd)
 	if (pnode->nd_name)
 		strcpy(pdbnd->nd_name, pnode->nd_name);
 	else
-		pdbnd->nd_name[0]=0;
+		pdbnd->nd_name[0]='\0';
 
 	/* node_index is used to sort vnodes upon recovery.
 	 * For Cray multi-MoM'd vnodes, we ensure that natural vnodes come

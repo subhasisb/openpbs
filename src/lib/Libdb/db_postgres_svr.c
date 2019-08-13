@@ -71,7 +71,7 @@ pg_db_prepare_svr_sqls(pbs_db_conn_t *conn)
 		") "
 		"values "
 		"(localtimestamp, localtimestamp, hstore($1::text[])) "
-		"returning sv_savetm");
+		"returning to_char(sv_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as sv_savetm");
 	if (pg_prepare_stmt(conn, STMT_INSERT_SVR, conn->conn_sql, 1) != 0)
 		return -1;
 
@@ -79,20 +79,20 @@ pg_db_prepare_svr_sqls(pbs_db_conn_t *conn)
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "update pbs.server set "
 		"sv_savetm = localtimestamp, "
 		"attributes = hstore($1::text[]) "
-		"returning sv_savetm");
+		"returning to_char(sv_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as sv_savetm");
 	if (pg_prepare_stmt(conn, STMT_UPDATE_SVR_FULL, conn->conn_sql, 1) != 0)
 		return -1;
 
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "update pbs.server set "
 		"sv_savetm = localtimestamp,"
 		"attributes = attributes - hstore($1::text[]) "
-		"returning sv_savetm");
+		"returning to_char(sv_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as sv_savetm");
 	if (pg_prepare_stmt(conn, STMT_REMOVE_SVRATTRS, conn->conn_sql, 1) != 0)
 		return -1;
 
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select "
-		"sv_savetm, "
-		"sv_creattm, "
+		"to_char(sv_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as sv_savetm, "
+		"to_char(sv_creattm, 'YYYY-MM-DD HH24:MI:SS.US') as sv_creattm, "
 		"hstore_to_array(attributes) as attributes "
 		"from "
 		"pbs.server ");
@@ -186,7 +186,7 @@ pg_db_save_svr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
 		sv_savetm_fnum = PQfnumber(conn->conn_resultset, "sv_savetm");
 		fnums_inited = 1;
 	}
-	GET_PARAM_BIGINT(conn->conn_resultset, 0, ps->sv_savetm, sv_savetm_fnum);
+	GET_PARAM_STR(conn->conn_resultset, 0, ps->sv_savetm, sv_savetm_fnum);
 	PQclear(conn->conn_resultset);
 
 	free(raw_array);
@@ -219,7 +219,7 @@ pg_db_load_svr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int lock)
 	pbs_db_svr_info_t *ps = obj->pbs_db_un.pbs_db_svr;
 	static int sv_savetm_fnum, sv_creattm_fnum, attributes_fnum;
 	static int fnums_inited = 0;
-	BIGINT db_savetm;
+	char db_savetm[DB_TIMESTAMP_LEN + 1];
 
 	if ((rc = pg_db_query(conn, STMT_SELECT_SVR, 0, lock, &res)) != 0)
 		return -1;
@@ -231,14 +231,14 @@ pg_db_load_svr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int lock)
 		fnums_inited = 1;
 	}
 	
-	GET_PARAM_BIGINT(res, 0, db_savetm, sv_savetm_fnum);
-	if (ps->sv_savetm == db_savetm) {
+	GET_PARAM_STR(res, 0, db_savetm, sv_savetm_fnum);
+	if (strcmp(ps->sv_savetm, db_savetm) == 0) {
 		/* data same as read last time, so no need to read any further, return success from here */
 		/* however since we loaded data from the database, the row is locked if a lock was requested */
 		return -2;
 	}
-	ps->sv_savetm = db_savetm; /* update the save timestamp */
-	GET_PARAM_BIGINT(res, 0, ps->sv_creattm, sv_creattm_fnum);
+	strcpy(ps->sv_savetm, db_savetm); /* update the save timestamp */
+	GET_PARAM_STR(res, 0, ps->sv_creattm, sv_creattm_fnum);
 	GET_PARAM_BIN(res, 0, raw_array, attributes_fnum);
 
 	/* convert attributes from postgres raw array format */
@@ -341,4 +341,5 @@ void
 pg_db_reset_svr(pbs_db_obj_info_t *obj)
 {
 	free_db_attr_list(&(obj->pbs_db_un.pbs_db_svr->attr_list));
+	obj->pbs_db_un.pbs_db_svr->sv_savetm[0] = '\0';
 }

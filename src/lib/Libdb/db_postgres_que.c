@@ -72,7 +72,7 @@ pg_db_prepare_que_sqls(pbs_db_conn_t *conn)
 		") "
 		"values "
 		"($1, $2,  localtimestamp, localtimestamp, hstore($3::text[])) "
-		"returning qu_mtime");
+		"returning to_char(qu_mtime, 'YYYY-MM-DD HH24:MI:SS.US') as qu_mtime");
 
 	if (pg_prepare_stmt(conn, STMT_INSERT_QUE, conn->conn_sql, 3) != 0)
 		return -1;
@@ -83,7 +83,7 @@ pg_db_prepare_que_sqls(pbs_db_conn_t *conn)
 			"qu_mtime = localtimestamp, "
 			"attributes = hstore($3::text[])"
 			" where qu_name = $1 "
-			"returning qu_mtime");
+			"returning to_char(qu_mtime, 'YYYY-MM-DD HH24:MI:SS.US') as qu_mtime");
 	if (pg_prepare_stmt(conn, STMT_UPDATE_QUE_FULL, conn->conn_sql, 3) != 0)
 		return -1;
 
@@ -92,14 +92,14 @@ pg_db_prepare_que_sqls(pbs_db_conn_t *conn)
 		"qu_mtime = localtimestamp,"
 		"attributes = attributes - hstore($2::text[]) "
 		"where qu_name = $1 "
-		"returning qu_mtime");
+		"returning to_char(qu_mtime, 'YYYY-MM-DD HH24:MI:SS.US') as qu_mtime");
 	if (pg_prepare_stmt(conn, STMT_REMOVE_QUEATTRS, conn->conn_sql, 2) != 0)
 		return -1;
 
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select qu_name, "
 			"qu_type, "
-			"qu_ctime, "
-			"qu_mtime, "
+			"to_char(qu_ctime, 'YYYY-MM-DD HH24:MI:SS.US') as qu_ctime, "
+			"to_char(qu_mtime, 'YYYY-MM-DD HH24:MI:SS.US') as qu_mtime, "
 			"hstore_to_array(attributes) as attributes "
 			"from pbs.queue "
 			"where qu_name = $1");
@@ -113,8 +113,8 @@ pg_db_prepare_que_sqls(pbs_db_conn_t *conn)
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select "
 			"qu_name, "
 			"qu_type, "
-			"qu_ctime, "
-			"qu_mtime, "
+			"to_char(qu_ctime, 'YYYY-MM-DD HH24:MI:SS.US') as qu_ctime, "
+			"to_char(qu_mtime, 'YYYY-MM-DD HH24:MI:SS.US') as qu_mtime, "
 			"hstore_to_array(attributes) as attributes "
 			"from pbs.queue order by qu_ctime");
 	if (pg_prepare_stmt(conn, STMT_FIND_QUES_ORDBY_CREATTM, conn->conn_sql, 0) != 0)
@@ -145,7 +145,7 @@ static int
 load_que(PGresult *res, pbs_db_que_info_t *pq, int row)
 {
 	char *raw_array;
-	BIGINT db_savetm = 0;
+	char db_savetm[DB_TIMESTAMP_LEN + 1];
 	static int qu_name_fnum, qu_type_fnum, qu_ctime_fnum, qu_mtime_fnum, attributes_fnum;
 	static int fnums_inited = 0;
 
@@ -158,17 +158,17 @@ load_que(PGresult *res, pbs_db_que_info_t *pq, int row)
 		fnums_inited = 1;
 	}
 
-	GET_PARAM_BIGINT(res, row, db_savetm, qu_mtime_fnum);
-	if (pq->qu_mtime == db_savetm) {
+	GET_PARAM_STR(res, row, db_savetm, qu_mtime_fnum);
+	if (strcmp(pq->qu_mtime, db_savetm) == 0) {
 		/* data same as read last time, so no need to read any further, return success from here */
 		/* however since we loaded data from the database, the row is locked if a lock was requested */
 		return -2;
 	}
-	pq->qu_mtime = db_savetm; /* update the save timestamp */
+	strcpy(pq->qu_mtime, db_savetm); /* update the save timestamp */
 
 	GET_PARAM_STR(res, row, pq->qu_name, qu_name_fnum);
 	GET_PARAM_INTEGER(res, row, pq->qu_type, qu_type_fnum);
-	GET_PARAM_BIGINT(res, row, pq->qu_ctime, qu_ctime_fnum);
+	GET_PARAM_STR(res, row, pq->qu_ctime, qu_ctime_fnum);
 	GET_PARAM_BIN(res, row, raw_array, attributes_fnum);
 
 	/* convert attributes from postgres raw array format */
@@ -226,7 +226,7 @@ pg_db_save_que(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
 		qu_mtime_fnum = PQfnumber(conn->conn_resultset, "qu_mtime");
 		fnums_inited = 1;
 	}
-	GET_PARAM_BIGINT(conn->conn_resultset, 0, pq->qu_mtime, qu_mtime_fnum);
+	GET_PARAM_STR(conn->conn_resultset, 0, pq->qu_mtime, qu_mtime_fnum);
 	PQclear(conn->conn_resultset);
 
 	free(raw_array);
@@ -365,8 +365,9 @@ pg_db_del_attr_que(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, void *obj_id, pb
 {
 	char *raw_array = NULL;
 	int len = 0;
-	//static int qu_mtime_fnum;
-	//static int fnums_inited = 0;
+	static int qu_mtime_fnum;
+	static int fnums_inited = 0;
+	pbs_db_que_info_t *pq = obj->pbs_db_un.pbs_db_que;
 
 	if ((len = convert_db_attr_list_to_array(&raw_array, attr_list)) <= 0)
 		return -1;
@@ -379,15 +380,14 @@ pg_db_del_attr_que(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, void *obj_id, pb
 		return -1;
 	}
 
-	/*
 	if (fnums_inited == 0) {
 		qu_mtime_fnum = PQfnumber(conn->conn_resultset, "qu_mtime");
 		fnums_inited = 1;
 	}
-	GET_PARAM_BIGINT(conn->conn_resultset, 0, pq->qu_mtime, qu_mtime_fnum);
+	GET_PARAM_STR(conn->conn_resultset, 0, pq->qu_mtime, qu_mtime_fnum);
 
 	PQclear(conn->conn_resultset);
-	*/
+
 	free(raw_array);
 
 	return 0;
@@ -406,4 +406,6 @@ void
 pg_db_reset_que(pbs_db_obj_info_t *obj)
 {
 	free_db_attr_list(&(obj->pbs_db_un.pbs_db_que->attr_list));
+	obj->pbs_db_un.pbs_db_que->qu_name[0] = '\0';
+	obj->pbs_db_un.pbs_db_que->qu_mtime[0] = '\0';
 }

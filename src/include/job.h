@@ -58,6 +58,10 @@ extern "C" {
 #include "server_limits.h"
 #endif
 
+#ifndef PBS_MOM
+#include "pbs_db.h"
+#endif
+
 /*
  * Dependent Job Structures
  *
@@ -624,7 +628,7 @@ struct job {
 	 * is decremented when the job is run*/
 	int             ji_etlimit_decr_queued;
 
-	time_t	ji_savetm;
+	char			ji_savetm[DB_TIMESTAMP_LEN + 1];
 
 #endif					/* END SERVER ONLY */
 

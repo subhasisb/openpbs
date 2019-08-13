@@ -125,7 +125,7 @@ extern time_t time_now;
 
 #ifndef PBS_MOM
 
-extern job *refresh_job(char *);
+extern job *refresh_job(pbs_db_job_info_t *dbjob, int *refreshed);
 extern resc_resv *refresh_resv(char *);
 extern pbs_list_head	svr_allresvs;
 
@@ -207,7 +207,7 @@ db_to_svr_job(job *pjob,  pbs_db_job_info_t *dbjob)
 {
 	/* Variables assigned constant values are not stored in the DB */
 	pjob->ji_qs.ji_jsversion = JSVERSION;
-	pjob->ji_savetm = dbjob->ji_savetm;
+	strcpy(pjob->ji_savetm, dbjob->ji_savetm);
 	strcpy(pjob->ji_qs.ji_jobid, dbjob->ji_jobid);
 	pjob->ji_qs.ji_state = dbjob->ji_state;
 	pjob->ji_qs.ji_substate = dbjob->ji_substate;
@@ -337,7 +337,7 @@ db_to_svr_resv(resc_resv *presv, pbs_db_resv_info_t *pdresv)
 	presv->ri_qs.ri_svrflags = pdresv->ri_svrflags;
 	presv->ri_qs.ri_tactive = pdresv->ri_tactive;
 	presv->ri_qs.ri_type = pdresv->ri_type;
-	presv->ri_savetm = pdresv->ri_savetm;
+	strcpy(presv->ri_savetm, pdresv->ri_savetm);
 
 	if ((decode_attr_db(presv, &pdresv->attr_list, resv_attr_def,
 		presv->ri_wattr,
@@ -455,7 +455,7 @@ job_save_db(job *pjob, int updatetype)
 	if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0)
 		goto db_err;
 
-	pjob->ji_savetm = dbjob.ji_savetm; /* update savetm when we save a job, so that we do not save multiple times */
+	strcpy(pjob->ji_savetm, dbjob.ji_savetm); /* update savetm when we save a job, so that we do not save multiple times */
 
 	pbs_db_reset_obj(&obj);
 	pjob->ji_modified = 0;
@@ -523,72 +523,58 @@ db_err:
  *
  */
 job *
-refresh_job(char *jobid) {
+refresh_job(pbs_db_job_info_t *dbjob, int *refreshed) 
+{
 	int i;
-	job	*new_job_ptr = NULL;
-	job *stale_job_ptr = NULL;
-	pbs_db_conn_t *conn = svr_db_conn;
-	pbs_db_obj_info_t obj;
-	pbs_db_job_info_t dbjob;
 	char comment_buffer[LOG_BUF_SIZE] = {'\0'}; /* for backing up the comment */
 	int cmnt_flag = 0;
+	job *pj = NULL;
+	
+	*refreshed = 0;
 
 	/* get the old pointer of the job, if job is in AVL tree */
-	stale_job_ptr = find_job_avl(jobid);
+	if (!(pj = find_job_avl(dbjob->ji_jobid))) {
+		if (!(pj = job_recov_db_spl(dbjob))) /* if job is not in AVL tree, load the job from database */
+			goto err;
+		
+		svr_enquejob(pj); /* add job into AVL tree */
 
-	if(stale_job_ptr == NULL) {
-		/* if job is not in AVL tree, load the job from database */
-		new_job_ptr = job_recov_db(jobid, stale_job_ptr, 0);
-		if (new_job_ptr == NULL) {
-			snprintf(log_buffer, LOG_BUF_SIZE, "Failed to recover job from db %s", jobid);
-			log_err(-1, "refresh_job", log_buffer);
-			return NULL;
-		}
-		/* add job into AVL tree */
-		svr_enquejob(new_job_ptr);
-		return new_job_ptr;
-	} else {
-		strcpy(dbjob.ji_jobid, jobid);
-		obj.pbs_db_obj_type = PBS_DB_JOB;
-		obj.pbs_db_un.pbs_db_job = &dbjob;
-
-		if (pbs_db_load_obj(conn, &obj, 0) != 0) {
-			snprintf(log_buffer, LOG_BUF_SIZE, "Failed to load job %s", dbjob.ji_jobid);
-			log_err(-1, "refresh_job", log_buffer);
-			pbs_db_reset_obj(&obj);
-			return NULL;
-		}
+		*refreshed = 1;
+		
+	} else if (strcmp(dbjob->ji_savetm, pj->ji_savetm) != 0) { /* if the job had really changed in the DB */
 
 		/* job comment backup */
-		if(stale_job_ptr->ji_wattr[JOB_ATR_Comment].at_val.at_str != NULL) {
-			sprintf(comment_buffer, "%s", stale_job_ptr->ji_wattr[JOB_ATR_Comment].at_val.at_str);
+		if (pj->ji_wattr[JOB_ATR_Comment].at_val.at_str != NULL) {
+			sprintf(comment_buffer, "%s", pj->ji_wattr[JOB_ATR_Comment].at_val.at_str);
 			cmnt_flag = 1;
 		}
 		/* remove any malloc working job attribute space */
-		for (i=0; i < (int)JOB_ATR_LAST; i++) {
-			job_attr_def[i].at_free(&stale_job_ptr->ji_wattr[i]);
-		}
+		for (i=0; i < (int)JOB_ATR_LAST; i++)
+			job_attr_def[i].at_free(&pj->ji_wattr[i]);
 
 		/* db_to_svr_job makes call to decode_attr_db which further calls setup_arrayjob_attrs through action function
-		* and there we are freeing the structure stale_job_ptr->ji_ajtrk
-		* resulting parent looses his control on it's subjobs
-		* Added a hack in setup_arrayjob_attrs to fix the problem for time being only
-		*/
+		 * and there we are freeing the structure stale_job_ptr->ji_ajtrk
+		 * resulting parent looses his control on it's subjobs
+		 * Added a hack in setup_arrayjob_attrs to fix the problem for time being only
+		 */
 
 		/* refresh all the job attributes */
-		if (db_to_svr_job(stale_job_ptr, &dbjob) != 0) {
-			snprintf(log_buffer, LOG_BUF_SIZE, "Failed to refresh job attribute %s", dbjob.ji_jobid);
-			log_err(-1, "refresh_job", log_buffer);
-			pbs_db_reset_obj(&obj);
-			return NULL;
-		}
+		if (db_to_svr_job(pj, dbjob) != 0)
+			goto err;
+
 		/* assigned job comment again to the job */
 		if(cmnt_flag)
-			job_attr_def[(int)JOB_ATR_Comment].at_decode(&stale_job_ptr->ji_wattr[(int)JOB_ATR_Comment],
-					NULL, NULL, comment_buffer);
-		pbs_db_reset_obj(&obj);
-		return stale_job_ptr;
+			job_attr_def[(int)JOB_ATR_Comment].at_decode(&pj->ji_wattr[(int)JOB_ATR_Comment], NULL, NULL, comment_buffer);
+
+		*refreshed = 1;
 	}
+
+	return pj;
+
+err:
+	snprintf(log_buffer, LOG_BUF_SIZE, "Failed to refresh job attribute %s", dbjob->ji_jobid);
+	log_err(-1, __func__, log_buffer);
+	return NULL;
 }
 
 /**
@@ -687,9 +673,9 @@ job_recov_db(char *jid, job *pjob, int lock)
 
 	strcpy(dbjob.ji_jobid, jid);
 	if (pjob)
-		dbjob.ji_savetm = pjob->ji_savetm;
+		strcpy(dbjob.ji_savetm, pjob->ji_savetm);
 	else
-		dbjob.ji_savetm = 0;
+		dbjob.ji_savetm[0] = '\0';
 	
 	obj.pbs_db_obj_type = PBS_DB_JOB;
 	obj.pbs_db_un.pbs_db_job = &dbjob;
@@ -836,9 +822,9 @@ resv_recov_db(char *resvid, resc_resv  *presv, int lock)
 	obj.pbs_db_un.pbs_db_resv = &dbresv;
 
 	if (presv)
-		dbresv.ri_savetm = presv->ri_savetm;
+		strcpy(dbresv.ri_savetm, presv->ri_savetm);
 	else
-		dbresv.ri_savetm = 0;
+		dbresv.ri_savetm[0] = '\0';
 
 	if (!presv) {
 		presv = resc_resv_alloc();

@@ -830,6 +830,7 @@ pbsd_init(int type)
 	/* get jobs from DB for this instance of server, by port and address */
 	obj.pbs_db_obj_type = PBS_DB_QUEUE;
 	obj.pbs_db_un.pbs_db_que = &dbque;
+	dbque.attr_list.attributes = NULL;
 
 	state = pbs_db_cursor_init(conn, &obj, NULL);
 	if (state == NULL) {
@@ -904,6 +905,8 @@ pbsd_init(int type)
 	/* load reservations */
 	obj.pbs_db_obj_type = PBS_DB_RESV;
 	obj.pbs_db_un.pbs_db_resv = &dbresv;
+	dbresv.attr_list.attributes = NULL;
+
 	state = pbs_db_cursor_init(conn, &obj, NULL);
 	if (state == NULL) {
 		sprintf(log_buffer, "%s", (char *) conn->conn_db_err);

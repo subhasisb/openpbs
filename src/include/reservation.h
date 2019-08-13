@@ -232,7 +232,7 @@ struct resc_resv {
 	struct work_task	*resv_start_task;
 	struct work_task	*resv_end_task;
 
-	time_t	ri_savetm;
+	char			ri_savetm[DB_TIMESTAMP_LEN + 1];
 
 	/*
 	 * fixed size internal data - maintained via "quick save"

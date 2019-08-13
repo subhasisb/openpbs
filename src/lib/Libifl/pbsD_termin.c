@@ -107,6 +107,8 @@ __pbs_terminate(int c, int manner, char *extend)
 
 	/* send request to all servers that are up */
 	if (get_max_servers() > 1) {
+		int errd = 0;
+		int rc_errd = 0;
 		for (i = 0; i < get_current_servers(); i++) {
 			if (connection[c].ch_shards[i]->state == SHARD_CONN_STATE_CONNECTED)
 				sock = connection[c].ch_shards[i]->sd;
@@ -115,21 +117,25 @@ __pbs_terminate(int c, int manner, char *extend)
 				sock = internal_tcp_connect(c, pbs_conf.psi[i]->name, pbs_conf.psi[i]->port, NULL);
 			}
 			if (sock != -1) {
-				if ((rc = send_terminate(sock, manner, extend)) != 0) 
-					goto err;
-				count++;
+				if ((rc = send_terminate(sock, manner, extend)) != 0) {
+					errd++;
+					rc_errd = rc;
+				} else
+					count++;
 			}
 		}
 		if (count == 0) {
 			/* could not send to any servers, all down */
 			rc = PBSE_NOSERVER;
 		}
+		if (errd > 0) {
+			rc = rc_errd;
+		}
 	} else {
 		sock = connection[c].ch_socket;
 		rc = send_terminate(sock, manner, extend);
 	}
 
-err:
 	connection[c].ch_errno = rc;
 	if (rc == PBSE_PROTOCOL)
 		connection[c].ch_errtxt = strdup(dis_emsg[rc]);

@@ -140,18 +140,6 @@ svr_recov_fs(char *svrfile)
 	setmode(sdb, O_BINARY);
 #endif
 
-	/* read in server structure */
-
-	i = read(sdb, (char *)&server.sv_qs, sizeof(struct server_qs));
-	if (i != sizeof(struct server_qs)) {
-		if (i < 0)
-			log_err(errno, "svr_recov", "read of serverdb failed");
-		else
-			log_err(errno, "svr_recov", "short read of serverdb");
-		(void)close(sdb);
-		return (-1);
-	}
-
 	/* read in server attributes */
 
 	if (recov_attr_fs(sdb, &server, svr_attr_def, server.sv_attr,
@@ -235,13 +223,9 @@ svr_save_fs(struct server *ps, int mode)
 		secure_file(path_svrdb_new, "Administrators", READS_MASK|WRITES_MASK|STANDARD_RIGHTS_REQUIRED);
 		setmode(sdb, O_BINARY);
 #endif
-		ps->sv_qs.sv_savetm = time_now;
+		ps->sv_savetm[0] = '\0';
 
 		save_setup(sdb);
-		if (save_struct((char *)&ps->sv_qs, sizeof(struct server_qs)) != 0) {
-			(void)close(sdb);
-			return (-1);
-		}
 
 		if (save_attr_fs(svr_attr_def, ps->sv_attr, (int)SRV_ATR_LAST) !=0) {
 			(void)close(sdb);
