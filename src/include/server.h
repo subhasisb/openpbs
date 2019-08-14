@@ -277,6 +277,7 @@ extern void			set_sched_default(pbs_sched *, int unset_flag);
 extern pbs_sched *		find_scheduler(char *sched_name);
 extern pbs_sched *		find_scheduler_by_partition(char *partition);
 void				copy_sched_misc_not_in_db(pbs_sched *target, pbs_sched *src);
+int				is_conn_from_sched(int conn);
 extern void			set_attr_svr(attribute *pattr, attribute_def *pdef, char *value);
 extern int			license_sanity_check(void);
 extern void			memory_debug_log(struct work_task *ptask);

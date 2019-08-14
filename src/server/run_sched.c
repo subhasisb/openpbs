@@ -215,29 +215,21 @@ find_assoc_sched_pque(pbs_queue *pq, pbs_sched **target_sched)
 		return 0;
 
 	if (pq->qu_attr[QA_ATR_partition].at_flags & ATR_VFLAG_SET) {
-		*target_sched = find_scheduler_by_partition(pq->qu_attr[QA_ATR_partition].at_val.at_str);
-
+		*target_sched = recov_sched_from_db(pq->qu_attr[QA_ATR_partition].at_val.at_str, NULL, 0);
 		if (*target_sched == NULL) {
-			*target_sched = recov_sched_from_db(pq->qu_attr[QA_ATR_partition].at_val.at_str, NULL, 0);
-			if (*target_sched == NULL) {
-				return 0;
-			} else
-				return 1;
+			return 0;
 		} else
 			return 1;
 	} else {
-		dflt_scheduler = *target_sched = find_scheduler("default");
+		dflt_scheduler = *target_sched = recov_sched_from_db(NULL, "default", 0);
 		if (!dflt_scheduler) {
-			dflt_scheduler = *target_sched = recov_sched_from_db(NULL, "default", 0);
-			if (!dflt_scheduler) {
-				dflt_scheduler = sched_alloc(PBS_DFLT_SCHED_NAME, 1);
-				set_sched_default(dflt_scheduler, 0);
-				(void)sched_save_db(dflt_scheduler, SVR_SAVE_NEW);
-				*target_sched = dflt_scheduler;
-			}
-			dflt_scheduler->pbs_scheduler_addr = pbs_scheduler_addr;
-			dflt_scheduler->pbs_scheduler_port = pbs_scheduler_port;
+			dflt_scheduler = sched_alloc(PBS_DFLT_SCHED_NAME, 1);
+			set_sched_default(dflt_scheduler, 0);
+			(void)sched_save_db(dflt_scheduler, SVR_SAVE_NEW);
+			*target_sched = dflt_scheduler;
 		}
+		dflt_scheduler->pbs_scheduler_addr = pbs_scheduler_addr;
+		dflt_scheduler->pbs_scheduler_port = pbs_scheduler_port;
 		return 1;
 	}
 	return 0;
@@ -360,8 +352,15 @@ int
 schedule_high(pbs_sched *psched)
 {
 	int s;
+	extern int sched_trx_chk;
 
 	if (psched == NULL)
+		return -1;
+
+	memcache_roll_sched_trx();
+
+	sched_trx_chk = SCHED_TRX_CHK;
+	if ((psched = recov_sched_from_db(NULL, psched->sc_name, 0)))
 		return -1;
 
 	if (psched->scheduler_sock == -1) {
@@ -408,6 +407,7 @@ schedule_jobs(pbs_sched *psched)
 	static int first_time = 1;
 	struct deferred_request *pdefr;
 	char  *jid = NULL;
+	extern int sched_trx_chk;
 
 	if (psched == NULL)
 		return -1;
@@ -442,6 +442,12 @@ schedule_jobs(pbs_sched *psched)
 			}
 			pdefr = (struct deferred_request *)GET_NEXT(pdefr->dr_link);
 		}
+
+		memcache_roll_sched_trx();
+
+		sched_trx_chk = SCHED_TRX_CHK;
+		if ((psched = recov_sched_from_db(NULL, psched->sc_name, 0)) == NULL)
+			return -1;
 
 		if ((s = contact_sched(cmd, jid, psched->pbs_scheduler_addr, psched->pbs_scheduler_port)) < 0) {
 			set_attr_svr(&(psched->sch_attr[(int) SCHED_ATR_sched_state]), &sched_attr_def[(int) SCHED_ATR_sched_state], SC_DOWN);
@@ -635,7 +641,7 @@ set_scheduler_flag(int flag, pbs_sched *psched)
 pbs_sched *
 recov_sched_from_db(char *partition, char *sched_name, int lock)
 {
-	int ret;
+	int ret = 0;
 	int append = 1;
 	pbs_db_sched_info_t dbsched;
 	pbs_db_obj_info_t obj;
@@ -667,6 +673,8 @@ recov_sched_from_db(char *partition, char *sched_name, int lock)
 
 	if (old_sched) {
 		strcpy(dbsched.sched_savetm, old_sched->sch_svtime);
+		if (memcache_good(&old_sched->trx_status, 0))
+			goto db_err;
 	} else {
 		dbsched.sched_savetm[0] = '\0';
 	}
@@ -674,7 +682,7 @@ recov_sched_from_db(char *partition, char *sched_name, int lock)
 	/* recover sched */
 	ret = pbs_db_load_obj(conn, &obj, lock);
 
-	if ((ret == -2) || (ret != 0)) {
+	if (ret == -2 || ret != 0) {
 		goto db_err;
 	}
 
@@ -698,11 +706,14 @@ recov_sched_from_db(char *partition, char *sched_name, int lock)
 			append_link(&svr_allscheds, &ps->sc_link, ps);
 		}
 	}
+	memcache_update_state(&ps->trx_status, lock);
 	return (ps);
 
 db_err:
 	if (ps)
 		free(ps);
+	if (ret == -2)
+		memcache_update_state(&old_sched->trx_status, lock);
 	return old_sched;
 }
 

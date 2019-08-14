@@ -135,6 +135,8 @@ static void freebr_cpyfile_cred(struct rq_cpyfile_cred *);
 static void close_quejob(int sfds);
 
 long curr_svr_trx_id;
+long curr_sched_trx_id;
+int sched_trx_chk  = SCHED_TRX_NOCHK;
 
 /**
  * @brief
@@ -564,6 +566,15 @@ clear_non_blocking(conn_t *conn)
 int 
 memcache_good(struct memcache_state *ts, int lock)
 {
+	if (sched_trx_chk) {
+		if (ts->last_loaded_sched_trx == curr_sched_trx_id) {
+			if (lock == 0)
+				return 1;
+			else if (ts->locked == 1)
+				return 1;
+		}
+		return 0;
+	}
 	if (ts->last_loaded_srv_trx == curr_svr_trx_id) {
 		if (lock == 0)
 			return 1;
@@ -576,11 +587,17 @@ memcache_good(struct memcache_state *ts, int lock)
 void 
 memcache_update_state(struct memcache_state *ts, int lock)
 {
-	ts->last_loaded_srv_trx = curr_svr_trx_id; /* note down transaction id in the object to optimize loading */
-	if (lock)
-		ts->locked = 1;
-	else
-		ts->locked = 0;
+	if (ts) {
+		ts->last_loaded_srv_trx = curr_svr_trx_id; /* note down transaction id in the object to optimize loading */
+		if (lock)
+			ts->locked = 1;
+		else
+			ts->locked = 0;
+	}
+	if (sched_trx_chk) {
+		ts->last_loaded_sched_trx = curr_sched_trx_id; /* note down transaction id in the object to optimize loading */
+	} else
+		ts->last_loaded_sched_trx = 0;
 }
 
 void
@@ -596,6 +613,14 @@ memcache_roll_srv_trx()
 	curr_svr_trx_id++;
 	if (curr_svr_trx_id > 10000)
 		curr_svr_trx_id = 0;
+}
+
+void
+memcache_roll_sched_trx()
+{
+	curr_sched_trx_id++;
+	if (curr_sched_trx_id > 10000)
+		curr_sched_trx_id = 0;
 }
 
 /**
@@ -633,6 +658,13 @@ dispatch_request(int sfds, struct batch_request *request)
 	}
 
 	memcache_roll_srv_trx(); /* mark a new server transaction, used by memory cache */
+
+#ifndef PBS_MOM
+	if (is_conn_from_sched(request->rq_conn))
+		sched_trx_chk = SCHED_TRX_CHK;
+	else
+		sched_trx_chk = SCHED_TRX_NOCHK;
+#endif
 
 	switch (request->rq_type) {
 

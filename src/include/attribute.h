@@ -596,6 +596,7 @@ extern int is_attr(int, char *, int);
 /* object cache status functionality */
 struct memcache_state {
 	long 			last_loaded_srv_trx;
+	long			last_loaded_sched_trx;
 	char			locked;
 };
 
@@ -603,6 +604,7 @@ extern int  memcache_good(struct memcache_state *ts, int lock);
 extern void memcache_update_state(struct memcache_state *ts, int lock);
 extern void memcache_reset_state(struct memcache_state *ts);
 extern void memcache_roll_srv_trx();
+extern void memcache_roll_sched_trx();
 
 /* "type" to pass to acl_check() */
 #define ACL_Host  1

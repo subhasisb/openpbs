@@ -910,7 +910,7 @@ req_stat_sched(struct batch_request *preq)
 	if(strlen(preq->rq_ind.rq_status.rq_id) != 0) {
 		psched = recov_sched_from_db(NULL,preq->rq_ind.rq_status.rq_id, 0);
 
-		if (strcmp(psched->sch_attr[(int) SCHED_ATR_sched_state].at_val.at_str, SC_DOWN) != 0) {
+		if (psched && strcmp(psched->sch_attr[(int) SCHED_ATR_sched_state].at_val.at_str, SC_DOWN) != 0) {
 			/* derive the scheduler state as this is transient and not going to save this in db */
 			if (psched->sch_attr[(int) SCHED_ATR_scheduling].at_val.at_long == 0)
 				set_attr_svr(&(psched->sch_attr[(int) SCHED_ATR_sched_state]),

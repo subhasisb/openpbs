@@ -592,3 +592,15 @@ copy_sched_misc_not_in_db(pbs_sched *target, pbs_sched *src)
 	}
 }
 
+int
+is_conn_from_sched(int conn)
+{
+	pbs_sched *psched;
+	for (psched = (pbs_sched*) GET_NEXT(svr_allscheds); psched; psched = (pbs_sched*) GET_NEXT(psched->sc_link)) {
+		if (psched->scheduler_sock == conn)
+			return 1;
+	}
+	return 0;
+}
+
+

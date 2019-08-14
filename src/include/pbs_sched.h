@@ -64,6 +64,9 @@ extern "C" {
 
 #define SC_STATUS_LEN 	10
 
+#define SCHED_TRX_CHK 1
+#define SCHED_TRX_NOCHK 0
+
 /*attributes for the server's sched object*/
 enum sched_atr {
 	SCHED_ATR_SchedHost,
@@ -102,6 +105,7 @@ typedef struct pbs_sched {
 	time_t sch_next_schedule;		/* when to next run scheduler cycle */
 	char sc_name[PBS_MAXSCHEDNAME + 1];
 	char sch_svtime[DB_TIMESTAMP_LEN + 1];
+	struct memcache_state trx_status;
 	/* sched object's attributes  */
 	attribute sch_attr[SCHED_ATR_LAST];
 } pbs_sched;
