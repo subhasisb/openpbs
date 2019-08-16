@@ -239,12 +239,12 @@ load_node(PGresult *res, pbs_db_node_info_t *pnd, int row)
 	}
 
 	GET_PARAM_STR(res, row, db_savetm,  nd_svtime_fnum);
-	if (strcmp(pnd->nd_svtime, db_savetm) == 0) {
+	if (strcmp(pnd->nd_savetm, db_savetm) == 0) {
 		/* data same as read last time, so no need to read any further, return success from here */
 		/* however since we loaded data from the database, the row is locked if a lock was requested */
 		return -2;
 	}
-	strcpy(pnd->nd_svtime, db_savetm);  /* update the save timestamp */
+	strcpy(pnd->nd_savetm, db_savetm);  /* update the save timestamp */
 
 	GET_PARAM_STR(res, row, pnd->nd_name, nd_name_fnum);
 	GET_PARAM_BIGINT(res, row, pnd->mom_modtime, mom_modtime_fnum);
@@ -315,7 +315,7 @@ pg_db_save_node(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
 		nd_svtime_fnum = PQfnumber(conn->conn_resultset, "nd_savetm");
 		fnums_inited = 1;
 	}
-	GET_PARAM_STR(conn->conn_resultset, 0, pnd->nd_svtime, nd_svtime_fnum);
+	GET_PARAM_STR(conn->conn_resultset, 0, pnd->nd_savetm, nd_svtime_fnum);
 	PQclear(conn->conn_resultset);
 
 	free(raw_array);
@@ -455,17 +455,26 @@ pg_db_del_attr_node(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, void *obj_id, p
 {
 	char *raw_array = NULL;
 	int len = 0;
+	static int nd_savetm_fnum;
+	static int fnums_inited = 0;
+	pbs_db_node_info_t *pnd = obj->pbs_db_un.pbs_db_node;
 
 	if ((len = convert_db_attr_list_to_array(&raw_array, attr_list)) <= 0)
 		return -1;
-	SET_PARAM_STR(conn, obj_id, 0);
 
+	SET_PARAM_STR(conn, obj_id, 0);
 	SET_PARAM_BIN(conn, raw_array, len, 1);
 
-	if (pg_db_cmd(conn, STMT_REMOVE_NODEATTRS, 2) != 0) {
+	if (pg_db_cmd_ret(conn, STMT_REMOVE_NODEATTRS, 2) != 0) {
 		free(raw_array);
 		return -1;
 	}
+
+	if (fnums_inited == 0) {
+		nd_savetm_fnum = PQfnumber(conn->conn_resultset, "nd_savetm");
+	}
+	GET_PARAM_STR(conn->conn_resultset, 0, pnd->nd_savetm, nd_savetm_fnum);
+	PQclear(conn->conn_resultset);
 
 	free(raw_array);
 
@@ -574,7 +583,7 @@ void
 pg_db_reset_mominfo(pbs_db_obj_info_t *obj)
 {
 	obj->pbs_db_un.pbs_db_node->nd_name[0] = '\0';
-	obj->pbs_db_un.pbs_db_node->nd_svtime[0] = '\0';
+	obj->pbs_db_un.pbs_db_node->nd_savetm[0] = '\0';
 	return ;
 }
 

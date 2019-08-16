@@ -311,6 +311,10 @@ pg_db_del_attr_svr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, void *obj_id, pb
 {
 	char *raw_array = NULL;
 	int len = 0;
+	static int sv_savetm_fnum;
+	static int fnums_inited = 0;
+	pbs_db_svr_info_t *ps = obj->pbs_db_un.pbs_db_svr;
+
 
 	if ((len = convert_db_attr_list_to_array(&raw_array, attr_list)) <= 0)
 		return -1;
@@ -321,6 +325,13 @@ pg_db_del_attr_svr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, void *obj_id, pb
 		free(raw_array);
 		return -1;
 	}
+
+	if (fnums_inited == 0) {
+		sv_savetm_fnum = PQfnumber(conn->conn_resultset, "sv_savetm");
+		fnums_inited = 1;
+	}
+	GET_PARAM_STR(conn->conn_resultset, 0, ps->sv_savetm, sv_savetm_fnum);
+	PQclear(conn->conn_resultset);
 
 	free(raw_array);
 

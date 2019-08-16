@@ -374,8 +374,8 @@ pg_db_del_attr_sched(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, void *obj_id, 
 
 	if ((len = convert_db_attr_list_to_array(&raw_array, attr_list)) <= 0)
 		return -1;
-	SET_PARAM_STR(conn, obj_id, 0);
 
+	SET_PARAM_STR(conn, obj_id, 0);
 	SET_PARAM_BIN(conn, raw_array, len, 1);
 
 	if (pg_db_cmd_ret(conn, STMT_REMOVE_SCHEDATTRS, 2) != 0) {

@@ -106,7 +106,7 @@ CREATE TABLE pbs.node (
     attributes		hstore		NOT NULL default '',
     CONSTRAINT pbsnode_pk PRIMARY KEY (nd_name)
 );
-CREATE INDEX nd_idx_cr ON pbs.node(nd_creattm);
+CREATE INDEX nd_creattm_idx ON pbs.node(nd_creattm);
 CREATE INDEX nd_savetm_idx ON pbs.node(nd_savetm);
 
 ---------------------- QUEUE -------------------------------
@@ -117,13 +117,13 @@ CREATE INDEX nd_savetm_idx ON pbs.node(nd_savetm);
 CREATE TABLE pbs.queue (
     qu_name		    TEXT		NOT NULL,
     qu_type		    INTEGER		NOT NULL,
-    qu_ctime		TIMESTAMP	NOT NULL,
-    qu_mtime		TIMESTAMP	NOT NULL,
+    qu_creattm		TIMESTAMP	NOT NULL,
+    qu_savetm		TIMESTAMP	NOT NULL,
     attributes		hstore		NOT NULL default '',
     CONSTRAINT queue_pk PRIMARY KEY (qu_name)
 );
-CREATE INDEX que_idx_cr ON pbs.queue(qu_ctime);
-CREATE INDEX qu_mtime_idx ON pbs.queue(qu_mtime);
+CREATE INDEX que_creattm_idx ON pbs.queue(qu_creatm);
+CREATE INDEX qu_savetm_idx ON pbs.queue(qu_savetm);
 
 
 ---------------------- RESERVATION -------------------------

@@ -462,15 +462,25 @@ pg_db_del_attr_resv(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, void *obj_id, p
 {
 	char *raw_array = NULL;
 	int len = 0;
+	static int nd_savetm_fnum;
+	static int fnums_inited = 0;
+	pbs_db_node_info_t *pnd = obj->pbs_db_un.pbs_db_node;
 
 	if ((len = convert_db_attr_list_to_array(&raw_array, attr_list)) <= 0)
 		return -1;
-	SET_PARAM_STR(conn, obj_id, 0);
 
+	SET_PARAM_STR(conn, obj_id, 0);
 	SET_PARAM_BIN(conn, raw_array, len, 1);
 
-	if (pg_db_cmd(conn, STMT_REMOVE_RESVATTRS, 2) != 0)
+	if (pg_db_cmd_ret(conn, STMT_REMOVE_RESVATTRS, 2) != 0)
 		return -1;
+
+	if (fnums_inited == 0) {
+		nd_savetm_fnum = PQfnumber(conn->conn_resultset, "nd_savetm");
+		fnums_inited = 1;
+	}
+	GET_PARAM_STR(conn->conn_resultset, 0, pnd->nd_savetm, nd_savetm_fnum);
+	PQclear(conn->conn_resultset);
 
 	free(raw_array);
 

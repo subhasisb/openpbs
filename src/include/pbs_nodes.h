@@ -282,6 +282,8 @@ struct	pbsnode {
 	unsigned short		 nd_accted;	/* resc recorded in job acct */
 	struct pbs_queue	*nd_pque;	/* queue to which it belongs */
 	int			 nd_modified;	/* flag indicating whether state update is required */
+	char		nd_creatm[DB_TIMESTAMP_LEN + 1];		/* time queue created */
+	char		nd_savetm[DB_TIMESTAMP_LEN + 1];		/* time queue last modified */
 	attribute		 nd_attr[ND_ATR_LAST];
 };
 

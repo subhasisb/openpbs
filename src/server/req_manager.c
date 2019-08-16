@@ -1076,7 +1076,14 @@ mgr_unset_attr(attribute *pattr, attribute_def *pdef, int limit, svrattrl *plist
 	struct pbsnode *pnode = pobj;
 	pbs_db_conn_t *conn = (pbs_db_conn_t *) svr_db_conn;
 	pbs_db_obj_info_t obj;
-	obj.pbs_db_un.pbs_db_job = NULL;
+	pbs_db_job_info_t dbjob;
+	pbs_db_resv_info_t dbresv;
+	pbs_db_que_info_t dbque;
+	pbs_db_node_info_t dbnode;
+	pbs_db_sched_info_t dbsched;
+	pbs_db_svr_info_t dbsvr;
+	char *src_savetm_ptr = NULL;
+	char *dest_savetm_ptr = NULL;
 
 	/* first check the attribute exists and we have privilege to set */
 	ord = 0;
@@ -1151,37 +1158,57 @@ mgr_unset_attr(attribute *pattr, attribute_def *pdef, int limit, svrattrl *plist
 		switch (ptype) {
 			case PARENT_TYPE_SERVER:
 				obj.pbs_db_obj_type = PBS_DB_SVR;
+				obj.pbs_db_un.pbs_db_svr = &dbsvr;
+				src_savetm_ptr = dbsvr.sv_savetm;
+				dest_savetm_ptr = server.sv_savetm;
 				parent_id = 0;
 				break;
 
 			case PARENT_TYPE_SCHED:
 				obj.pbs_db_obj_type = PBS_DB_SCHED;
+				obj.pbs_db_un.pbs_db_sched = &dbsched;
 				parent_id = ((pbs_sched *) pobj)->sc_name;
+				src_savetm_ptr = dbsched.sched_savetm;
+				dest_savetm_ptr = ((pbs_sched *) pobj)->sch_svtime;
 				break;
 
 			case PARENT_TYPE_NODE:
 				obj.pbs_db_obj_type = PBS_DB_NODE;
+				obj.pbs_db_un.pbs_db_node = &dbnode;
 				parent_id = pnode->nd_name;
+				src_savetm_ptr = dbnode.nd_savetm;
+				dest_savetm_ptr = pnode->nd_savetm;
 				break;
 
 			case PARENT_TYPE_QUE_ALL:
 				obj.pbs_db_obj_type = PBS_DB_QUEUE;
+				obj.pbs_db_un.pbs_db_que = &dbque;
 				parent_id = ((pbs_queue *) pobj)->qu_qs.qu_name;
+				src_savetm_ptr = dbque.qu_savetm;
+				dest_savetm_ptr = ((pbs_queue *) pobj)->qu_savetm;
 				break;
 
 			case PARENT_TYPE_JOB:
 				obj.pbs_db_obj_type = PBS_DB_JOB;
+				obj.pbs_db_un.pbs_db_job = &dbjob;
 				parent_id = ((job *) pobj)->ji_qs.ji_jobid;
+				src_savetm_ptr = dbjob.ji_savetm;
+				dest_savetm_ptr = ((job *) pobj)->ji_savetm;
 				break;
 
 			case PARENT_TYPE_RESV:
 				obj.pbs_db_obj_type = PBS_DB_RESV;
+				obj.pbs_db_un.pbs_db_resv = &dbresv;
 				parent_id = ((resc_resv *) pobj)->ri_qs.ri_resvID;
+				src_savetm_ptr = dbresv.ri_savetm;
+				dest_savetm_ptr = ((resc_resv *) pobj)->ri_savetm;
 				break;
 		}
 
 		if (pbs_db_delete_attr_obj(conn, &obj, parent_id, &attr_list) != 0)
 			return -1;
+
+		strcpy(dest_savetm_ptr, src_savetm_ptr);
 
 		if (((pdef+index)->at_type == ATR_TYPE_RESC) &&
 			(plist->al_resc != NULL)) {

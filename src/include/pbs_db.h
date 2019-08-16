@@ -253,8 +253,8 @@ typedef struct pbs_db_sched_info pbs_db_sched_info_t;
 struct pbs_db_que_info {
 	char    qu_name[PBS_MAXQUEUENAME +1];
 	INTEGER qu_type;
-	char    qu_ctime[DB_TIMESTAMP_LEN + 1];
-	char    qu_mtime[DB_TIMESTAMP_LEN + 1];
+	char    qu_creattm[DB_TIMESTAMP_LEN + 1];
+	char    qu_savetm[DB_TIMESTAMP_LEN + 1];
 	pbs_db_attr_list_t attr_list; /* list of attributes */
 };
 typedef struct pbs_db_que_info pbs_db_que_info_t;
@@ -273,7 +273,7 @@ struct pbs_db_node_info {
 	INTEGER nd_ntype;
 	char	nd_pque[PBS_MAXSERVERNAME+1];
 	char    nd_creattm[DB_TIMESTAMP_LEN + 1];
-	char    nd_svtime[DB_TIMESTAMP_LEN + 1];
+	char    nd_savetm[DB_TIMESTAMP_LEN + 1];
 	pbs_db_attr_list_t attr_list; /* list of attributes */
 };
 typedef struct pbs_db_node_info pbs_db_node_info_t;
