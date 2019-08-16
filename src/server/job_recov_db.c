@@ -127,7 +127,7 @@ extern time_t time_now;
 #ifndef PBS_MOM
 
 extern job *refresh_job(pbs_db_job_info_t *dbjob, int *refreshed);
-extern resc_resv *refresh_resv(char *);
+extern resc_resv *refresh_resv(pbs_db_resv_info_t *dbresv, int *refreshed);
 extern pbs_list_head	svr_allresvs;
 
 /**
@@ -253,9 +253,7 @@ db_to_svr_job(job *pjob,  pbs_db_job_info_t *dbjob)
 #endif
 	pjob->ji_extended.ji_ext.ji_credtype = dbjob->ji_credtype;
 
-	if ((decode_attr_db(pjob, &dbjob->attr_list, job_attr_def,
-				pjob->ji_wattr,
-				(int)JOB_ATR_LAST, (int) JOB_ATR_UNKN)) != 0)
+	if ((decode_attr_db(pjob, &dbjob->attr_list, job_attr_def, pjob->ji_wattr, (int)JOB_ATR_LAST, (int) JOB_ATR_UNKN)) != 0)
 		return -1;
 
 	return 0;
@@ -527,14 +525,10 @@ db_err:
 job *
 refresh_job(pbs_db_job_info_t *dbjob, int *refreshed) 
 {
-	int i;
-	char comment_buffer[LOG_BUF_SIZE] = {'\0'}; /* for backing up the comment */
-	int cmnt_flag = 0;
 	job *pj = NULL;
 	
 	*refreshed = 0;
 
-	/* get the old pointer of the job, if job is in AVL tree */
 	if (!(pj = find_job_avl(dbjob->ji_jobid))) {
 		if (!(pj = job_recov_db_spl(dbjob))) /* if job is not in AVL tree, load the job from database */
 			goto err;
@@ -544,29 +538,8 @@ refresh_job(pbs_db_job_info_t *dbjob, int *refreshed)
 		*refreshed = 1;
 		
 	} else if (strcmp(dbjob->ji_savetm, pj->ji_savetm) != 0) { /* if the job had really changed in the DB */
-
-		/* job comment backup */
-		if (pj->ji_wattr[JOB_ATR_Comment].at_val.at_str != NULL) {
-			sprintf(comment_buffer, "%s", pj->ji_wattr[JOB_ATR_Comment].at_val.at_str);
-			cmnt_flag = 1;
-		}
-		/* remove any malloc working job attribute space */
-		for (i=0; i < (int)JOB_ATR_LAST; i++)
-			job_attr_def[i].at_free(&pj->ji_wattr[i]);
-
-		/* db_to_svr_job makes call to decode_attr_db which further calls setup_arrayjob_attrs through action function
-		 * and there we are freeing the structure stale_job_ptr->ji_ajtrk
-		 * resulting parent looses his control on it's subjobs
-		 * Added a hack in setup_arrayjob_attrs to fix the problem for time being only
-		 */
-
-		/* refresh all the job attributes */
 		if (db_to_svr_job(pj, dbjob) != 0)
 			goto err;
-
-		/* assigned job comment again to the job */
-		if(cmnt_flag)
-			job_attr_def[(int)JOB_ATR_Comment].at_decode(&pj->ji_wattr[(int)JOB_ATR_Comment], NULL, NULL, comment_buffer);
 
 		*refreshed = 1;
 	}
@@ -641,66 +614,49 @@ refresh_queue(pbs_db_que_info_t *dbque, int *refreshed) {
  *
  */
 resc_resv *
-refresh_resv(char *resvid) {
-	int i;
-	resc_resv *new_resv_ptr = NULL;
-	resc_resv *stale_resv_ptr = NULL;
-	pbs_db_conn_t *conn = svr_db_conn;
-	pbs_db_obj_info_t obj;
-	pbs_db_resv_info_t dbresv;
-
-	/* get the old pointer of the resv, if resv is in svr list */
+refresh_resv(pbs_db_resv_info_t *dbresv, int *refreshed) 
+{
+	resc_resv *presv = NULL;
 	char *at;
-	if ((at = strchr(resvid, (int)'@')) != 0)
+	
+	if ((at = strchr(dbresv->ri_resvid, (int)'@')) != 0)
 		*at = '\0';	/* strip of @server_name */
-	stale_resv_ptr = (resc_resv *)GET_NEXT(svr_allresvs);
-	while (stale_resv_ptr != NULL) {
-		if (!strcmp(resvid, stale_resv_ptr->ri_qs.ri_resvID))
+
+	presv = (resc_resv *)GET_NEXT(svr_allresvs);
+	while (presv != NULL) {
+		if (!strcmp(dbresv->ri_resvid, presv->ri_qs.ri_resvID))
 			break;
-		stale_resv_ptr = (resc_resv *)GET_NEXT(stale_resv_ptr->ri_allresvs);
+		presv = (resc_resv *)GET_NEXT(presv->ri_allresvs);
 	}
 
 	if (at)
 		*at = '@';	/* restore @server_name */
 
-	if(stale_resv_ptr == NULL) {
+	if (presv == NULL) {
 		/* if resv is not in list, load the resv from database */
-		new_resv_ptr = resv_recov_db(resvid, stale_resv_ptr, 0);
-		if (new_resv_ptr == NULL) {
-			snprintf(log_buffer, LOG_BUF_SIZE, "Failed to recover reservation from db %s", resvid);
-			log_err(-1, "refresh_resv", log_buffer);
-			return NULL;
-		}
+		presv = resv_recov_db(dbresv->ri_resvid, presv, 0);
+		if (presv == NULL)
+			goto err;
+
 		/* add resv to server list */
-		append_link(&svr_allresvs, &new_resv_ptr->ri_allresvs, new_resv_ptr);
-		return new_resv_ptr;
-	} else {
-		strcpy(dbresv.ri_resvid, resvid);
-		obj.pbs_db_obj_type = PBS_DB_RESV;
-		obj.pbs_db_un.pbs_db_resv = &dbresv;
+		append_link(&svr_allresvs, &presv->ri_allresvs, presv);
+		
+		*refreshed = 1;
 
-		if (pbs_db_load_obj(conn, &obj, 0) != 0) {
-			snprintf(log_buffer, LOG_BUF_SIZE, "Failed to load resv %s", dbresv.ri_resvid);
-			log_err(-1, "refresh_resv", log_buffer);
-			pbs_db_reset_obj(&obj);
-			return NULL;
-		}
-
-		/* remove any malloc working resv attribute space */
-		for (i=0; i < (int)RESV_ATR_LAST; i++) {
-			resv_attr_def[i].at_free(&stale_resv_ptr->ri_wattr[i]);
-		}
-
-		/* refresh all the resv attributes */
-		if (db_to_svr_resv(stale_resv_ptr, &dbresv) != 0) {
-			snprintf(log_buffer, LOG_BUF_SIZE, "Failed to refresh resv attribute %s", dbresv.ri_resvid);
-			log_err(-1, "refresh_resv", log_buffer);
-			pbs_db_reset_obj(&obj);
-			return NULL;
-		}
-		pbs_db_reset_obj(&obj);
-		return stale_resv_ptr;
+	} else if (strcmp(dbresv->ri_savetm, presv->ri_savetm) != 0) { /* if the job had really changed in the DB */
+		if (db_to_svr_resv(presv, dbresv) != 0)
+			goto err;
+		
+		*refreshed = 1;
 	}
+
+	return presv;
+
+err:
+	snprintf(log_buffer, LOG_BUF_SIZE, "Failed to refresh resv attribute %s", dbresv->ri_resvid);
+	log_err(-1, __func__, log_buffer);
+	return NULL;
+
 }
 
 /**
@@ -748,6 +704,9 @@ job_recov_db(char *jid, job *pjob, int lock)
 	return (pj);
 
 db_err:
+	sprintf(log_buffer, "Failed to load job %s", jid);
+	log_err(-1, __func__, log_buffer);
+	
 	if (pj)
 		job_free(pj);
 
@@ -861,26 +820,22 @@ db_err:
 resc_resv *
 resv_recov_db(char *resvid, resc_resv  *presv, int lock)
 {
-	//resc_resv               *presv;
 	pbs_db_resv_info_t	dbresv;
 	pbs_db_obj_info_t       obj;
 	pbs_db_conn_t *conn = svr_db_conn;
 	int rc = 0;
-	int i;
-	int oldresv = 1;
 
 	strcpy(dbresv.ri_resvid, resvid);
 	obj.pbs_db_obj_type = PBS_DB_RESV;
 	obj.pbs_db_un.pbs_db_resv = &dbresv;
 
-	if (presv)
+	if (presv) {
+		if (memcache_good(&presv->trx_status, lock))
+			return presv;
 		strcpy(dbresv.ri_savetm, presv->ri_savetm);
-	else
+	} else {
 		dbresv.ri_savetm[0] = '\0';
-
-	if (!presv) {
 		presv = resc_resv_alloc();
-		oldresv = 0;
 		if (presv == NULL) {
 			log_err(-1, "resv_recov", "resc_resv_alloc failed");
 			return NULL;
@@ -892,22 +847,19 @@ resv_recov_db(char *resvid, resc_resv  *presv, int lock)
 	if (rc == -1)
 		goto db_err;
 
-	if (rc == -2)
+	if (rc == -2) {
+		memcache_update_state(&presv->trx_status, lock);
 		return presv;
-
-	if (oldresv) {
-		/* remove any malloc working attribute space */
-		for (i = 0; i < (int)RESV_ATR_LAST; i++) {
-			resv_attr_def[i].at_free(&presv->ri_wattr[i]);
-		}
 	}
 
 	if (db_to_svr_resv(presv, &dbresv) != 0)
 		goto db_err;
 
+	memcache_update_state(&presv->trx_status, lock);
 	pbs_db_reset_obj(&obj);
 
 	return (presv);
+
 db_err:
 	if (presv)
 		resv_free(presv);

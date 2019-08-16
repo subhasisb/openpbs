@@ -155,7 +155,6 @@ extern char	*path_nodestate;
 extern pbs_list_head svr_queues;
 extern unsigned int pbs_mom_port;
 extern unsigned int pbs_rm_port;
-extern mominfo_time_t  mominfo_time;
 extern char	*resc_in_err;
 extern char	server_host[];
 extern AVL_IX_DESC *node_tree;
@@ -1012,7 +1011,7 @@ int
 save_nodes_db(int changemodtime, void *p)
 {
 	struct pbsnode  *np;
-	pbs_db_mominfo_time_t mom_tm;
+	pbs_db_mominfo_time_t mom_tm = {0,0};
 	pbs_db_obj_info_t obj;
 	int           num;
 	attribute    *pattr;
@@ -1585,6 +1584,7 @@ setup_nodes()
 
 	obj.pbs_db_obj_type = PBS_DB_NODE;
 	obj.pbs_db_un.pbs_db_node = &dbnode;
+	dbnode.nd_savetm[0] = '\0';
 	dbnode.attr_list.attributes = NULL;
 	
 	state = pbs_db_cursor_init(conn, &obj, NULL);

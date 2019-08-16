@@ -178,6 +178,10 @@ encode_attr_db(struct attribute_def *padef, struct attribute *pattr, int numattr
 
 	j = 0;
 	for (i = 0; i < numattr; i++) {
+
+		if ((pattr+i)->at_flags & ATR_DFLAG_NOSAVM)
+			continue;
+
 		if (!((all == 1) || ((pattr+i)->at_flags & (ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE))))
 			continue;
 
@@ -280,13 +284,10 @@ decode_attr_db(
 	for (i = 0; i < attr_list->attr_count; i++) {
 		/* Below ensures that a server or queue resource is not set */
 		/* if that resource is not known to the current server. */
-		if ( (attrs[i].attr_resc != NULL) && \
-				(strlen(attrs[i].attr_resc) > 0) && \
-		     ((padef == svr_attr_def) || (padef == que_attr_def)) ) {
+		if ( (attrs[i].attr_resc != NULL) && (strlen(attrs[i].attr_resc) > 0) && ((padef == svr_attr_def) || (padef == que_attr_def)) ) {
 			resource_def	*prdef;
 
-			prdef = find_resc_def(svr_resc_def,
-			                      attrs[i].attr_resc, svr_resc_size);
+			prdef = find_resc_def(svr_resc_def, attrs[i].attr_resc, svr_resc_size);
 			if (prdef == (resource_def *)0) {
 				snprintf(log_buffer, sizeof(log_buffer),
 					"%s's unknown resource \"%s.%s\" ignored",
@@ -336,9 +337,7 @@ decode_attr_db(
 			if (unknown > 0) {
 				index = unknown;
 			} else {
-				snprintf(log_buffer,LOG_BUF_SIZE,
-					"unknown attribute \"%s\" discarded",
-					pal->al_name);
+				snprintf(log_buffer,LOG_BUF_SIZE, "unknown attribute \"%s\" discarded", pal->al_name);
 				log_err(-1, __func__, log_buffer);
 				(void)free(pal);
 				continue;
@@ -391,36 +390,32 @@ decode_attr_db(
 		 * the flag has ATR_VFLAG_SET
 		 *
 		 */
+
+		/* first free the existing attribute value, if any */
+		if (!(padef[index].at_flags & ATR_DFLAG_NOSAVM))
+			padef[index].at_free(&pattr[index]);
+
 		pal = palarray[index];
 		while (pal) {
-			if (((padef + index)->at_type == ATR_TYPE_ENTITY) &&
-				((pattr + index)->at_flags & ATR_VFLAG_SET)) {
-				attribute tmpa;
-				memset(&tmpa, 0, sizeof(attribute));
-				/* for INCR case of entity limit, decode locally */
-				if ((padef+index)->at_decode) {
-					(void)(padef+index)->at_decode(&tmpa,
-						pal->al_name,
-						pal->al_resc,
-						pal->al_value);
-					(void)(padef+index)->at_set(pattr+index,
-						&tmpa,
-						INCR);
-					(void)(padef+index)->at_free(&tmpa);
+			if (!(padef[index].at_flags & ATR_DFLAG_NOSAVM)) { /* dont load NOSAVM attributes, even if set in databae */
+				if ((padef[index].at_type == ATR_TYPE_ENTITY) && (pattr[index].at_flags & ATR_VFLAG_SET)) {
+					attribute tmpa;
+					memset(&tmpa, 0, sizeof(attribute));
+					/* for INCR case of entity limit, decode locally */
+					if (padef[index].at_decode) {
+						padef[index].at_decode(&tmpa, pal->al_name, pal->al_resc, pal->al_value);
+						padef[index].at_set(&pattr[index], &tmpa, INCR);
+						padef[index].at_free(&tmpa);
+					}
+				} else {
+					if (padef[index].at_decode) {
+						padef[index].at_decode(&pattr[index], pal->al_name, pal->al_resc, pal->al_value);
+						if (padef[index].at_action)
+							padef[index].at_action(&pattr[index], parent, ATR_ACTION_RECOV);
+					}
 				}
-			} else {
-				if ((padef+index)->at_decode) {
-					(void)(padef+index)->at_decode(pattr+index,
-						pal->al_name,
-						pal->al_resc,
-						pal->al_value);
-					if ((padef+index)->at_action)
-						(void)(padef+index)->at_action(
-							pattr+index, parent,
-							ATR_ACTION_RECOV);
-				}
+				pattr[index].at_flags = pal->al_flags & ~ATR_VFLAG_MODIFY;
 			}
-			(pattr+index)->at_flags = pal->al_flags & ~ATR_VFLAG_MODIFY;
 
 			tmp_pal = pal->al_sister;
 			(void)free(pal);

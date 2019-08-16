@@ -234,6 +234,8 @@ struct resc_resv {
 
 	char			ri_savetm[DB_TIMESTAMP_LEN + 1];
 
+	struct 			memcache_state trx_status;
+
 	/*
 	 * fixed size internal data - maintained via "quick save"
 	 * some of the items are copies of attributes, if so this

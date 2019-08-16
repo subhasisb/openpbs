@@ -844,8 +844,6 @@ main(int argc, char **argv)
 	char			lockfile[MAXPATHLEN+1];
 	char			**origevp;
 	char			*pc;
-	job			*pjob;
-	resc_resv		*presv;
 	pbs_queue		*pque;
 	char			*servicename;
 	time_t			svrlivetime;
@@ -1943,7 +1941,6 @@ try_db_again:
 	 * Now at last, we are read to do some batch work, the
 	 * following section constitutes the "main" loop of the server
 	 */
-	svr_recov_db(0);
 	state  = &server.sv_attr[(int)SRV_ATR_State].at_val.at_long;
 	if (server_init_type == RECOV_HOT)
 		*state = SV_STATE_HOT;
@@ -1993,7 +1990,6 @@ try_db_again:
 	 */
 	(void)contact_sched(SCH_CONFIGURE, NULL, pbs_scheduler_addr, pbs_scheduler_port);
 	(void)contact_sched(SCH_SCHEDULE_NULL, NULL, pbs_scheduler_addr, pbs_scheduler_port);
-
 
 	/*
 	 * main loop of server
@@ -2140,33 +2136,7 @@ try_db_again:
 		if (*state == SV_STATE_SHUTSIG)
 			(void)svr_shutdown(SHUT_SIG);	/* caught sig */
 	}
-	DBPRT(("Server out of main loop, state is %ld\n", *state))
-
-	svr_save_db(&server, SVR_SAVE_FULL);	/* final recording of server */
-	track_save(NULL);	/* save tracking data*/
-
-	/* save any jobs that need saving */
-	for (pjob = (job *)GET_NEXT(svr_alljobs);
-		pjob;
-		pjob = (job *)GET_NEXT(pjob->ji_alljobs)) {
-		if (pjob->ji_modified)
-			(void)job_save(pjob, SAVEJOB_FULLFORCE);
-	}
-
-	/* save any reservations that need saving */
-	for (presv = (resc_resv *)GET_NEXT(svr_allresvs);
-		presv;
-		presv = (resc_resv *)GET_NEXT(presv->ri_allresvs)) {
-
-		if (presv->ri_modified)
-			(void)job_or_resv_save((void *)presv,
-				SAVEJOB_FULL, RESC_RESV_OBJECT);
-	}
-
-	if (svr_chngNodesfile) {/*nodes created/deleted, or props changed and*/
-		/*update in req_manager failed; try again    */
-		(void)save_nodes_db(0, NULL);
-	}
+	
 
 	/* if brought up the Secondary Scheduler, take it down */
 
@@ -2187,7 +2157,8 @@ try_db_again:
 	}
 
 	/* if brought up the DB, take it down */
-	//stop_db();
+	if (get_max_servers() == 1)
+		stop_db();
 
 	if (are_primary == FAILOVER_SECONDARY) {
 		/* we are the secondary server */
@@ -2228,17 +2199,6 @@ try_db_again:
 	shutdown_ack();
 	net_close(-1);		/* close all network connections */
 	rpp_shutdown();
-
-	/*
-	 * SERVER is going to be shutdown, delete AVL tree using
-	 * avl_destroy_index() which was created in pbsd_init.c
-	 * by avl_create_index().
-	 */
-	if (AVL_jctx != NULL) {
-		avl_destroy_index(AVL_jctx);
-		free(AVL_jctx);
-		AVL_jctx = NULL;
-	}
 
 	{
 		int csret;

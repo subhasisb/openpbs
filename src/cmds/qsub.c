@@ -5247,9 +5247,10 @@ get_comm_filename(char *fname)
 	char *env_insts = getenv(PBS_CONF_SERVER_INSTANCES);
 	char *env_port = getenv(PBS_CONF_BATCH_SERVICE_PORT);
 
-	snprintf(flbuf, sizeof(flbuf), "%s_%lu_%s_%s_%s_%s_%s",
+	snprintf(flbuf, sizeof(flbuf), "%s_%lu_%lu_%s_%s_%s_%s_%s",
 		((server_out == NULL || server_out[0] == 0) ? "default" : server_out),
 		(unsigned long int)getuid(),
+		(unsigned long int)getsid(0),
 		cred_name,
 		get_conf_path(),
 		(env_svr == NULL)?"":env_svr,

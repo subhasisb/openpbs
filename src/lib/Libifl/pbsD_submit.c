@@ -158,7 +158,8 @@ __pbs_submit(int c, struct attropl  *attrib, char *script, char *destination, ch
 	struct attropl		*pal;
 	char			*return_jobid = NULL;
 	char			*final_jobid = NULL;
-	int			rc;
+	int             rc;
+	int             commit_done = 0;
 	struct pbs_client_thread_context *ptr;
 	struct cred_info	*cred_info = NULL;
 
@@ -203,9 +204,14 @@ __pbs_submit(int c, struct attropl  *attrib, char *script, char *destination, ch
 	set_new_shard_context(c);
 	
 	/* Queue job with null string for job id */
-	return_jobid = PBSD_queuejob(c, "", destination, attrib, extend, 0, NULL);
+	return_jobid = PBSD_queuejob(c, "", destination, attrib, extend, 0, NULL, &commit_done);
 	if (return_jobid == NULL)
 		goto error;
+
+	if (commit_done) {
+		final_jobid = return_jobid;
+		goto done;
+	}
 
 	/* send script across */
 
@@ -241,6 +247,7 @@ __pbs_submit(int c, struct attropl  *attrib, char *script, char *destination, ch
 
 	free(return_jobid);
 
+done:
 	/* unlock the thread lock and update the thread context data */
 	if (pbs_client_thread_unlock_connection(c) != 0)
 		return NULL;

@@ -235,6 +235,7 @@ pg_db_load_svr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int lock)
 	if (strcmp(ps->sv_savetm, db_savetm) == 0) {
 		/* data same as read last time, so no need to read any further, return success from here */
 		/* however since we loaded data from the database, the row is locked if a lock was requested */
+		PQclear(res);
 		return -2;
 	}
 	strcpy(ps->sv_savetm, db_savetm); /* update the save timestamp */

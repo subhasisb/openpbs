@@ -550,12 +550,14 @@ PBSD_jobfile(int c, int req_type, char *path, char *jobid,
  */
 
 char *
-PBSD_queuejob(int connect, char *jobid, char *destin, struct attropl *attrib, char *extend, int rpp, char **msgid)
+PBSD_queuejob(int connect, char *jobid, char *destin, struct attropl *attrib, char *extend, int rpp, char **msgid, int *commit_done)
 {
 	struct batch_reply *reply;
 	char  *return_jobid = NULL;
 	int    rc;
 	int    sock;
+
+	*commit_done = 0;
 
 	if (!rpp) {
 		sock = get_svr_shard_connection(connect, PBS_BATCH_QueueJob, NULL);
@@ -608,12 +610,15 @@ PBSD_queuejob(int connect, char *jobid, char *destin, struct attropl *attrib, ch
 		pbs_errno = PBSE_PROTOCOL;
 	} else if (reply->brp_choice &&
 		reply->brp_choice != BATCH_REPLY_CHOICE_Text &&
-		reply->brp_choice != BATCH_REPLY_CHOICE_Queue) {
+		reply->brp_choice != BATCH_REPLY_CHOICE_Queue &&
+		reply->brp_choice != BATCH_REPLY_CHOICE_Commit) {
 		pbs_errno = PBSE_PROTOCOL;
 	} else if (connection[connect].ch_errno == 0) {
 		return_jobid = strdup(reply->brp_un.brp_jid);
 		if (return_jobid == NULL) {
 			pbs_errno = PBSE_SYSTEM;
+		} else if (reply->brp_choice == BATCH_REPLY_CHOICE_Commit) {
+			*commit_done = 1;
 		}
 	}
 

@@ -357,7 +357,7 @@ extern struct batch_status *PBSD_status(int c, int function,
 
 extern struct batch_status *PBSD_status_get(int c);
 extern char * PBSD_queuejob(int c, char *j, char *d,
-	struct attropl *a, char *ex, int rpp, char **msgid);
+	struct attropl *a, char *ex, int rpp, char **msgid, int *commit_done);
 extern int decode_DIS_svrattrl(int sock, pbs_list_head *phead);
 extern int decode_DIS_attrl(int sock, struct attrl **ppatt);
 extern int decode_DIS_JobId(int socket, char *jobid);

@@ -276,6 +276,7 @@ main(int argc, char *argv[])
 	char            *credbuf = NULL;
 	size_t		credlen = 0;
 	int 		prot = PROT_TCP;
+	int 		commit_done = 0;
 	/*the real deal or output version and exit?*/
 
 	execution_mode(argc, argv);
@@ -523,7 +524,7 @@ main(int argc, char *argv[])
 			pqjatr = &((svrattrl *)GET_NEXT(attrl))->al_atopl;
 			destin = jobp->ji_qs.ji_destin;
 
-			if (PBSD_queuejob(con, jobp->ji_qs.ji_jobid, destin, pqjatr, NULL, prot, NULL)== 0) {
+			if (PBSD_queuejob(con, jobp->ji_qs.ji_jobid, destin, pqjatr, NULL, prot, NULL, &commit_done)== 0) {
 				if (pbs_errno == PBSE_JOBEXIST && move_type == MOVE_TYPE_Exec) {
 					/* already running, mark it so */
 					log_event(PBSEVENT_ERROR,
@@ -596,6 +597,9 @@ main(int argc, char *argv[])
 					continue;
 				}
 			}
+
+			if (commit_done)
+				goto ok_exit;
 
 			if (jobp->ji_qs.ji_svrflags & JOB_SVFLG_SCRIPT) {
 				if (PBSD_jscript(con, script_name, prot, NULL) != 0)

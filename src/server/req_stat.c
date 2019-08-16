@@ -122,7 +122,7 @@ static int bad;
 /*-------for stat server----------*/
 job *refresh_job(pbs_db_job_info_t *dbjob, int *refreshed);
 pbs_queue *refresh_queue(pbs_db_que_info_t *dbque, int *refreshed);
-resc_resv *refresh_resv(char *);
+resc_resv *refresh_resv(pbs_db_resv_info_t *dbresv, int *refreshed);
 
 /* The following private support functions are included */
 
@@ -453,7 +453,6 @@ get_all_db_jobs()
 	dbjob.attr_list.attributes = NULL;
 
 	state = pbs_db_cursor_init(conn, &obj, &opts);
-
 	if (state == NULL) {
 		sprintf(log_buffer, "%s", (char *) conn->conn_db_err);
 		log_err(-1, __func__, log_buffer);
@@ -1073,9 +1072,12 @@ req_stat_sched(struct batch_request *preq)
 				pbs_db_reset_obj(&obj);
 			 }
 		}
-                /* end the transaction */
-                 if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0)
-                         return;
+
+		pbs_db_cursor_close(conn, state);
+
+		/* end the transaction */
+		if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0)
+				return;
 
 	}
 
@@ -1273,28 +1275,33 @@ req_stat_resv(struct batch_request * preq)
  */
 
 static int
-get_all_db_resv() {
-
+get_all_db_resv() 
+{
 	resc_resv *presv = NULL;
 	pbs_db_resv_info_t dbresv;
 	pbs_db_obj_info_t obj;
 	pbs_db_conn_t *conn = svr_db_conn;
-	void		*state = NULL;
-	int		    rc_cur = 0;
-	//pbs_db_query_options_t opts;
+	void *state = NULL;
+	int rc_cur = 0;
+	int refreshed = 0;
+	int count = 0;
+	pbs_db_query_options_t opts;
+	static char from_time[DB_TIMESTAMP_LEN + 1] = {0};
 
 	if (pbs_db_begin_trx(conn, 0, 0) !=0) {
 		(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
 		return (1);
 	}
 
-	//opts.timestamp = from_time;
+	/* fill in options */
+	opts.flags = 0;
+	opts.timestamp = from_time;
+
 	obj.pbs_db_obj_type = PBS_DB_RESV;
 	obj.pbs_db_un.pbs_db_resv = &dbresv;
 	dbresv.attr_list.attributes = NULL;
 	
-	state = pbs_db_cursor_init(conn, &obj, NULL);
-
+	state = pbs_db_cursor_init(conn, &obj, &opts);
 	if (state == NULL) {
 		sprintf(log_buffer, "%s", (char *) conn->conn_db_err);
 		log_err(-1, __func__, log_buffer);
@@ -1302,25 +1309,28 @@ get_all_db_resv() {
 		(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
 		return (1);
 	}
-	/* load reservations from DB */
-	while ((rc_cur = pbs_db_cursor_next(conn, state, &obj)) == 0) {
-		/*	if (dbresv.ri_savetm > from_time) {
-			from_time = dbresv.ri_savetm;
-		}*/
-		/* For now Not comparing timestamp */
-		if ((presv = refresh_resv(dbresv.ri_resvid)) == NULL) {
-				sprintf(log_buffer, "Failed to refresh resv %s", dbresv.ri_resvid);
-				log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_NOTICE,
-				msg_daemonname, log_buffer);
-			continue;
-		}
-		pbs_db_reset_obj(&obj);
-	} /* END while */
 
-	/* close the connection */
+	while ((rc_cur = pbs_db_cursor_next(conn, state, &obj)) == 0) {
+		if ((presv = refresh_resv(&dbresv, &refreshed)) == NULL) {
+				sprintf(log_buffer, "Failed to refresh resv %s", dbresv.ri_resvid);
+				log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_NOTICE, msg_daemonname, log_buffer);
+		}
+		if (refreshed)
+			count++;
+
+		pbs_db_reset_obj(&obj);
+	}
+
 	pbs_db_cursor_close(conn, state);
 	if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0)
 		return (1);
+
+	sprintf(log_buffer, "Refreshed %d joresvsbs", count);
+	log_err(-1, __func__, log_buffer);
+
+	if (presv)
+		strcpy(from_time, presv->ri_savetm);
+
 	return 0;
 }
 

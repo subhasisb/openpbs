@@ -149,6 +149,9 @@ void post_sendmom(struct work_task *);
 void post_sendmom_inner(job *jobp, struct batch_request *preq, int wstat, int isrpp, char *err_msg);
 #endif	/* PBS_MOM */
 
+void
+req_commit_now(struct batch_request *preq, job *pj);
+
 /* Global Data Items: */
 
 #ifndef PBS_MOM
@@ -290,6 +293,7 @@ req_quejob(struct batch_request *preq)
 	int             rc;
 	int             sock = preq->rq_conn;
 	int             resc_access_perm_save;
+	int				job_executable = 0;
 #ifndef PBS_MOM
 	int              set_project = 0;
 	int		 i;
@@ -350,6 +354,14 @@ req_quejob(struct batch_request *preq)
 				return;
 			}
 		}
+
+		if (!strcasecmp(psatl->al_name, ATTR_executable) &&
+			((psatl->al_value != NULL) &&
+			(psatl->al_value[0] != '\0'))) {
+				job_executable = 1;
+		}
+
+
 		psatl = (svrattrl *)GET_NEXT(psatl->al_link);
 	}
 
@@ -1169,14 +1181,19 @@ req_quejob(struct batch_request *preq)
 
 	/* acknowledge the request with the job id */
 	if (!preq->isrpp) {
-		pj->ji_qs.ji_un.ji_newt.ji_fromaddr = get_connectaddr(sock);
-		/* acknowledge the request with the job id */
-		if (reply_jobid(preq, pj->ji_qs.ji_jobid, BATCH_REPLY_CHOICE_Queue) != 0) {
-			/* reply failed, purge the job and close the connection */
-
-			close_client(sock);
-			job_purge(pj);
+		if (job_executable) {
+			req_commit_now(preq, pj);
 			return;
+		} else {
+			pj->ji_qs.ji_un.ji_newt.ji_fromaddr = get_connectaddr(sock);
+			/* acknowledge the request with the job id */
+			if (reply_jobid(preq, pj->ji_qs.ji_jobid, BATCH_REPLY_CHOICE_Queue) != 0) {
+				/* reply failed, purge the job and close the connection */
+
+				close_client(sock);
+				job_purge(pj);
+				return;
+			}
 		}
 	} else {
 		struct sockaddr_in* addr = rpp_getaddr(sock);
@@ -1726,8 +1743,6 @@ req_mvjobfile(struct batch_request *preq)
 }
 #endif /* PBS_MOM */
 
-
-
 /**
  * @brief
  *		Commit ownership of job
@@ -1740,9 +1755,8 @@ req_mvjobfile(struct batch_request *preq)
  */
 
 void
-req_commit(struct batch_request *preq)
+req_commit_now(struct batch_request *preq, job *pj)
 {
-	job			*pj;
 #ifndef	PBS_MOM
 	int			newstate;
 	int			newsub;
@@ -1759,12 +1773,6 @@ req_commit(struct batch_request *preq)
 #endif
 	pbs_db_conn_t		*conn = (pbs_db_conn_t *) svr_db_conn;
 #endif
-
-	pj = locate_new_job(preq, preq->rq_ind.rq_commit);
-	if (pj == NULL) {
-		req_reject(PBSE_UNKJOBID, 0, preq);
-		return;
-	}
 
 	if (pj->ji_qs.ji_substate != JOB_SUBSTATE_TRANSIN) {
 		req_reject(PBSE_IVALREQ, 0, preq);
@@ -1935,18 +1943,18 @@ req_commit(struct batch_request *preq)
 		return;
 	}
 
-	strcpy(jobscr.ji_jobid, pj->ji_qs.ji_jobid);
-	jobscr.script = pj->ji_script;
-	obj.pbs_db_obj_type = PBS_DB_JOBSCR;
-	obj.pbs_db_un.pbs_db_jobscr = &jobscr;
-
-	if (pbs_db_save_obj(conn, &obj, PBS_INSERT_DB) != 0) {
-		job_purge(pj);
-		req_reject(PBSE_SYSTEM, 0, preq);
-		(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
-		return;
-	}
 	if (pj->ji_script) {
+		strcpy(jobscr.ji_jobid, pj->ji_qs.ji_jobid);
+		jobscr.script = pj->ji_script;
+		obj.pbs_db_obj_type = PBS_DB_JOBSCR;
+		obj.pbs_db_un.pbs_db_jobscr = &jobscr;
+
+		if (pbs_db_save_obj(conn, &obj, PBS_INSERT_DB) != 0) {
+			job_purge(pj);
+			req_reject(PBSE_SYSTEM, 0, preq);
+			(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
+			return;
+		}
 		free(pj->ji_script);
 		pj->ji_script = NULL;
 	}
@@ -2004,6 +2012,20 @@ req_commit(struct batch_request *preq)
 		issue_track(pj);	/* notify creator where job is */
 
 #endif		/* PBS_SERVER */
+}
+
+void
+req_commit(struct batch_request *preq)
+{
+	job			*pj;
+
+	pj = locate_new_job(preq, preq->rq_ind.rq_commit);
+	if (pj == NULL) {
+		req_reject(PBSE_UNKJOBID, 0, preq);
+		return;
+	}
+
+	req_commit_now(preq, pj);
 }
 
 /**

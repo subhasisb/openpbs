@@ -1,34 +1,29 @@
 #!/usr/bin/sh
 
-if [ $# -lt 4 ]
+if [ $# -lt 2 ]
 then
-	echo "Usage is: $0 <start/stop> <start> <end> <port no.>"
+	echo "Usage is: $0 <numsvrs> <start port no.>"
 	exit 
 fi
 
-cmd=$1
-n=$2
-l=$3
-port=$4
+n=$1
+port=$2
 
-echo "Servers required to be created are from $n to $l with port starting from $port"
+echo "Starting $n Servers with port starting from $port"
 
 . /etc/pbs.conf
 
 ulimit -n 10000
 ulimit -c unlimited
 
-while [ $n -le $l ]
+i=1
+while [ $i -le $n ]
 do
 	export PBS_BATCH_SERVICE_PORT=$port
-	if [ "$cmd" = "start" ]; then
-		echo starting Server $n
-		$PBS_EXEC/sbin/pbs_server
-	elif [ "$cmd" = "stop" ]; then
-		echo stopping Server $n
-		$PBS_EXEC/bin/qterm
-	fi
-	n=`expr $n + 1`
+	echo starting Server $i
+	$PBS_EXEC/sbin/pbs_server
+	
+	i=`expr $i + 1`
 	port=`expr $port + 1`
 done
 

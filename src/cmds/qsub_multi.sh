@@ -10,13 +10,20 @@ function submit_jobs {
 	njobs=$2
 
 	export PBS_SERVER_INSTANCES=:$port
-	echo "Port = $port"
+	echo "New thread submitting to Port = $port, jobs=$njobs"
 
 	for i in $(seq 1 $njobs)
 	do
 		qsub -- /bin/date > /dev/null
 	done
 }
+
+if [ "$1" = "submit" ]; then
+	port=$2
+	njobs=$3
+	submit_jobs $port $njobs
+	exit 0
+fi
 
 nthreads=$1
 njobs=$2
@@ -28,23 +35,26 @@ echo "parameters supplied: nthreads=$nthreads, njobs=$njobs, port_start=$port_st
 #assign each new thread a new port in a round robin fashion to distribute almost evenly
 #qsub background daemons will be created for each different server port, so connections would be persistent
 
-start_time=`date +%s`
+start_time=`date +%s%3N`
 
 port=$port_start
 for i in $(seq 1 $nthreads)
 do
-	echo "Starting thread $i with port $port"
-	submit_jobs $port $njobs &
+	setsid $0 submit $port $njobs &
 	port=$((port + 1))
 	if [ $port -gt $port_end ]; then
 		port=$port_start
 	fi
 done
 
-echo "Waiting for clients to finish"
 wait
 
-end_time=`date +%s`
-time_taken=$((end_time - start_time))
+end_time=`date +%s%3N`
 
-echo "Done. End_time=$end_time, Start_time=$start_time, time_taken=$time_taken"
+diff=`bc -l <<< "scale=3; ($end_time - $start_time) / 1000"`
+total_jobs=`bc -l <<< "$njobs * $nthreads"`
+perf=`bc -l <<< "scale=3; $total_jobs / $diff"`
+
+echo "Time(ms) started=$start_time, ended=$end_time"
+echo "Total jobs submitted=$total_jobs, time taken(secs.ms)=$diff, jobs/sec=$perf"
+

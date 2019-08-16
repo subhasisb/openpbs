@@ -221,55 +221,33 @@ que_recov_db(char *qname, pbs_queue *pq, int lock)
 	pbs_db_obj_info_t	obj;
 	pbs_db_conn_t		*conn = (pbs_db_conn_t *) svr_db_conn;
 	int rc;
-	int		 i;
-	int oldque;
-	attribute	*pattr;
-	attribute_def	*pdef;
 
 	obj.pbs_db_obj_type = PBS_DB_QUEUE;
 	obj.pbs_db_un.pbs_db_que = &dbque;
-	oldque = 1;
-
-	/* load server_qs */
-	dbque.qu_name[sizeof(dbque.qu_name) - 1] = '\0';
-	if (pq)
-		strcpy(dbque.qu_savetm, pq->qu_savetm);
-	else
-		dbque.qu_savetm[0] = '\0';
-
-	strncpy(dbque.qu_name, qname, sizeof(dbque.qu_name));
+		
+	strcpy(dbque.qu_name, qname);
 
 	if (pq) {
 		if (memcache_good(&pq->trx_status, lock))
 			return pq;
+		strcpy(dbque.qu_savetm, pq->qu_savetm);
 	} else {
 		pq = que_alloc(qname);  /* allocate & init queue structure space */
-		oldque = 0;
 		if (pq == NULL) {
 			log_err(-1, "que_recov", "que_alloc failed");
 			return NULL;
 		}
+		dbque.qu_savetm[0] = '\0';
 	}
 
 	/* read in job fixed sub-structure */
 	rc = pbs_db_load_obj(conn, &obj, lock);
-	if (rc == -1) {
+	if (rc == -1)
 		goto db_err;
-	}
 
 	if (rc == -2) {
 		memcache_update_state(&pq->trx_status, lock);	
 		return pq;
-	}
-
-	if (oldque) {
-		/* remove any malloc working attribute space */
-		for (i=0; i < (int)QA_ATR_LAST; i++) {
-			pdef  = &que_attr_def[i];
-			pattr = &pq->qu_attr[i];
-
-			pdef->at_free(pattr);
-		}
 	}
 	
 	if (db_to_svr_que(pq, &dbque) != 0)
@@ -282,8 +260,9 @@ que_recov_db(char *qname, pbs_queue *pq, int lock)
 	return (pq);
 
 db_err:
-	log_err(-1, "que_recov", "read of queuedb failed");
+	sprintf(log_buffer, "Failed to load queue %s", qname);
 	if (pq)
 		que_free(pq);
-	return 0;
+
+	return NULL;
 }
