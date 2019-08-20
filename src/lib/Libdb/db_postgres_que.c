@@ -106,6 +106,17 @@ pg_db_prepare_que_sqls(pbs_db_conn_t *conn)
 	if (pg_prepare_stmt(conn, STMT_SELECT_QUE, conn->conn_sql, 1) != 0)
 		return -1;
 
+	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select qu_name, "
+			"qu_type, "
+			"to_char(qu_creattm, 'YYYY-MM-DD HH24:MI:SS.US') as qu_creattm, "
+			"to_char(qu_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as qu_savetm, "
+			"hstore_to_array(attributes) as attributes "
+			"from pbs.queue "
+			"where qu_savetm > to_timestamp($1, 'YYYY-MM-DD HH24:MI:SS:US') "
+			"order by qu_savetm ");
+	if (pg_prepare_stmt(conn, STMT_SELECT_QUE_FROM_TIME, conn->conn_sql, 1) != 0)
+		return -1;
+
 	strcat(conn->conn_sql, " FOR UPDATE");
 	if (pg_prepare_stmt(conn, STMT_SELECT_QUE_LOCKED, conn->conn_sql, 1) != 0)
 		return -1;
@@ -287,12 +298,21 @@ pg_db_find_que(pbs_db_conn_t *conn, void *st, pbs_db_obj_info_t *obj, pbs_db_que
 	PGresult *res;
 	int rc;
 	pg_query_state_t *state = (pg_query_state_t *) st;
+	int params;
 
 	if (!state)
 		return -1;
 
-	strcpy(conn->conn_sql, STMT_FIND_QUES_ORDBY_CREATTM);
-	if ((rc = pg_db_query(conn, conn->conn_sql, 0, 0, &res)) != 0)
+	if (opts != NULL && opts->timestamp) {
+		SET_PARAM_STR(conn, opts->timestamp, 0);
+		params = 1;
+		strcpy(conn->conn_sql, STMT_SELECT_QUE_FROM_TIME);
+	} else {
+		strcpy(conn->conn_sql, STMT_FIND_QUES_ORDBY_CREATTM);
+		params = 0;
+	}
+
+	if ((rc = pg_db_query(conn, conn->conn_sql, params, 0, &res)) != 0)
 		return rc;
 
 	state->row = 0;

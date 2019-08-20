@@ -121,6 +121,7 @@ extern int svr_chk_histjob(job *);
 static int bad;
 /*-------for stat server----------*/
 job *refresh_job(pbs_db_job_info_t *dbjob, int *refreshed);
+pbs_queue *refresh_queue(pbs_db_que_info_t *dbque, int *refreshed);
 resc_resv *refresh_resv(char *);
 
 /* The following private support functions are included */
@@ -131,6 +132,7 @@ static int status_resv(resc_resv *, struct batch_request *, pbs_list_head *);
 extern pbs_sched *find_scheduler(char *sched_name);
 static int get_all_db_jobs();
 static int get_all_db_resv();
+static int get_all_db_queues();
 
 /**
  * @brief
@@ -435,7 +437,7 @@ get_all_db_jobs()
 	pbs_db_query_options_t opts;
 	int refreshed;
 	int count = 0;
-	static char from_time[DB_TIMESTAMP_LEN + 1] = {0};
+	static char jobs_from_time[DB_TIMESTAMP_LEN + 1] = {0};
 
 	if (pbs_db_begin_trx(conn, 0, 0) !=0) {
 		(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
@@ -444,7 +446,7 @@ get_all_db_jobs()
 
 	/* fill in options */
 	opts.flags = 0;
-	opts.timestamp = from_time;
+	opts.timestamp = jobs_from_time;
 
 	obj.pbs_db_obj_type = PBS_DB_JOB;
 	obj.pbs_db_un.pbs_db_job = &dbjob;
@@ -479,10 +481,78 @@ get_all_db_jobs()
 	log_err(-1, __func__, log_buffer);
 
 	if (pj)
-		strcpy(from_time, pj->ji_savetm);
+		strcpy(jobs_from_time, pj->ji_savetm);
 
 	return 0;
 }
+
+/**
+ * @brief
+ * 		Get all the queues from database which are newly added/modified
+ * 		by other servers after the given time interval.
+ *
+ * @return	0 - success
+ * 			1 - fail/error
+ */
+static int
+get_all_db_queues() {
+	pbs_db_que_info_t	dbque;
+	pbs_db_obj_info_t	dbobj;
+	pbs_db_conn_t		*conn = (pbs_db_conn_t *) svr_db_conn;
+	pbs_db_query_options_t opts;
+	static char ques_from_time[DB_TIMESTAMP_LEN + 1] = {0};
+	pbs_queue *pque = NULL;
+	void *cur_state = NULL;
+	int rc_cur = 0;
+	int refreshed;
+	int count = 0;
+
+	if (pbs_db_begin_trx(conn, 0, 0) !=0) {
+		(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
+		return (1);
+	}
+
+	/* fill in options */
+	opts.flags = 0;
+	opts.timestamp = ques_from_time;
+	dbobj.pbs_db_obj_type = PBS_DB_QUEUE;
+	dbobj.pbs_db_un.pbs_db_que = &dbque;
+	dbque.attr_list.attributes = NULL;
+
+	cur_state = pbs_db_cursor_init(conn, &dbobj, &opts);
+	if (cur_state == NULL) {
+		sprintf(log_buffer, "%s", (char *) conn->conn_db_err);
+		log_err(-1, __func__, log_buffer);
+		pbs_db_cursor_close(conn, cur_state);
+		(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
+		return (1);
+	}
+
+	while ((rc_cur = pbs_db_cursor_next(conn, cur_state, &dbobj)) == 0) {
+		if ((pque = refresh_queue(&dbque, &refreshed)) == NULL) {
+			sprintf(log_buffer, "Failed to refresh queue %s", dbque.qu_name);
+			log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_NOTICE, msg_daemonname, log_buffer);
+		}
+
+		if (refreshed)
+			count++;
+
+		pbs_db_reset_obj(&dbobj);
+	}
+
+	pbs_db_cursor_close(conn, cur_state);
+	if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0)
+		return (1);
+
+	sprintf(log_buffer, "Refreshed %d queues", count);
+	log_err(-1, __func__, log_buffer);
+
+	if (pque)
+		strcpy(ques_from_time, pque->qu_savetm);
+
+	return 0;
+}
+
 
 /**
  * @brief
@@ -502,6 +572,16 @@ req_stat_que(struct batch_request *preq)
 	struct batch_reply *preply;
 	int		    rc   = 0;
 	int		    type = 0;
+	int         db_rc = 0;
+
+	/* for multi server project, fetch queue from db if not in list else
+	 * refresh queue from db if it has old data.
+	 */
+	db_rc = get_all_db_queues();
+	if (db_rc) {
+		req_reject(db_rc, bad, preq);
+		return;
+	}
 
 	/*
 	 * first, validate the name of the requested object, either

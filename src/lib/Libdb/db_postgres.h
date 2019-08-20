@@ -140,6 +140,7 @@ typedef unsigned __int64 uint64_t;
 #define STMT_DELETE_QUE "delete_que"
 #define STMT_FIND_QUES_ORDBY_CREATTM "find_ques_ordby_creattm"
 #define STMT_REMOVE_QUEATTRS "remove_queattrs"
+#define STMT_SELECT_QUE_FROM_TIME "select_que_from_time"
 
 /* node statement names */
 #define STMT_INSERT_NODE "insert_node"
