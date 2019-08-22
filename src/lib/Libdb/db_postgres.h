@@ -119,9 +119,9 @@ typedef unsigned __int64 uint64_t;
 #define STMT_DELETE_RESV "delete_resv"
 #define STMT_REMOVE_RESVATTRS "remove_resvattrs"
 
-/* creattm is the table field that holds the creation time */
+/* creattm and savetm are the table fields that holds the creation time and save time respectively */
 #define STMT_FINDRESVS_ORDBY_CREATTM "findresvs_ordby_creattm"
-
+#define STMT_FINDRESVS_FROM_TIME_ORDBY_SAVETM "findresvs_from_time_ordby_savetm"
 
 /* server & seq statement names */
 #define STMT_INSERT_SVR "insert_svr"
@@ -140,7 +140,7 @@ typedef unsigned __int64 uint64_t;
 #define STMT_DELETE_QUE "delete_que"
 #define STMT_FIND_QUES_ORDBY_CREATTM "find_ques_ordby_creattm"
 #define STMT_REMOVE_QUEATTRS "remove_queattrs"
-#define STMT_SELECT_QUE_FROM_TIME "select_que_from_time"
+#define STMT_FIND_QUES_FROM_TIME_ORDBY_SAVETM "find_ques_from_time_ordby_savetm"
 
 /* node statement names */
 #define STMT_INSERT_NODE "insert_node"

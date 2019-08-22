@@ -142,6 +142,30 @@ pg_db_prepare_resv_sqls(pbs_db_conn_t *conn)
 	if (pg_prepare_stmt(conn, STMT_SELECT_RESV, conn->conn_sql, 1) != 0)
 		return -1;
 
+	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select "
+		"ri_resvID, "
+		"ri_queue, "
+		"ri_state, "
+		"ri_substate, "
+		"ri_type, "
+		"ri_stime, "
+		"ri_etime, "
+		"ri_duration, "
+		"ri_tactive, "
+		"ri_svrflags, "
+		"ri_numattr, "
+		"ri_resvTag, "
+		"ri_un_type, "
+		"ri_fromsock, "
+		"ri_fromaddr, "
+		"to_char(ri_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as ri_savetm, "
+		"to_char(ri_creattm, 'YYYY-MM-DD HH24:MI:SS.US') as ri_creattm, "
+		"hstore_to_array(attributes) as attributes "
+		"from pbs.resv where ri_savetm > to_timestamp($1, 'YYYY-MM-DD HH24:MI:SS:US') "
+		"order by ri_savetm ");
+	if (pg_prepare_stmt(conn, STMT_FINDRESVS_FROM_TIME_ORDBY_SAVETM, conn->conn_sql, 1) != 0)
+		return -1;
+
 	strcat(conn->conn_sql, " FOR UPDATE");
 	if (pg_prepare_stmt(conn, STMT_SELECT_RESV_LOCKED, conn->conn_sql, 1) != 0)
 		return -1;
@@ -381,14 +405,19 @@ pg_db_find_resv(pbs_db_conn_t *conn, void *st, pbs_db_obj_info_t *obj,
 	PGresult *res;
 	int rc;
 	int params;
-
 	pg_query_state_t *state = (pg_query_state_t *) st;
 
 	if (!state)
 		return -1;
 
-	params=0;
-	strcpy(conn->conn_sql, STMT_FINDRESVS_ORDBY_CREATTM);
+	if (opts != NULL && opts->timestamp) {
+		SET_PARAM_STR(conn, opts->timestamp, 0);
+		params = 1;
+		strcpy(conn->conn_sql, STMT_FINDRESVS_FROM_TIME_ORDBY_SAVETM);
+	} else {
+		params=0;
+		strcpy(conn->conn_sql, STMT_FINDRESVS_ORDBY_CREATTM);
+	}
 
 	if ((rc = pg_db_query(conn, conn->conn_sql, params, 0, &res)) != 0)
 		return rc;

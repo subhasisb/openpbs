@@ -131,7 +131,7 @@ static int status_node(struct pbsnode *, struct batch_request *, pbs_list_head *
 static int status_resv(resc_resv *, struct batch_request *, pbs_list_head *);
 extern pbs_sched *find_scheduler(char *sched_name);
 static int get_all_db_jobs();
-static int get_all_db_resv();
+static int get_all_db_resvs();
 static int get_all_db_queues();
 
 /**
@@ -1218,8 +1218,10 @@ req_stat_resv(struct batch_request * preq)
 	 * or a '\0' or "@..." for all reservations.
 	 */
 
-	/*---------for updating/adding all reservations-----------*/
-	db_rc = get_all_db_resv();
+	/* for multi server project, fetch reservations from db if not in the
+	 * list else refresh it from db if it has old data.
+	 */
+	db_rc = get_all_db_resvs();
 	if (db_rc) {
 		req_reject(db_rc, bad, preq);
 		return;
@@ -1268,25 +1270,24 @@ req_stat_resv(struct batch_request * preq)
 
 /**
  * @brief
- * 		Get all the reservations from database which are changed after given time.
+ * 		Get all the reservations from database which are newly added/modified
+ * 		by other servers after the given time interval.
  *
  * @return	0 - success
  * 			1 - fail/error
  */
-
 static int
-get_all_db_resv() 
-{
-	resc_resv *presv = NULL;
+get_all_db_resvs() {
 	pbs_db_resv_info_t dbresv;
-	pbs_db_obj_info_t obj;
-	pbs_db_conn_t *conn = svr_db_conn;
-	void *state = NULL;
-	int rc_cur = 0;
-	int refreshed = 0;
-	int count = 0;
+	pbs_db_obj_info_t dbobj;
+	pbs_db_conn_t		*conn = (pbs_db_conn_t *) svr_db_conn;
 	pbs_db_query_options_t opts;
-	static char from_time[DB_TIMESTAMP_LEN + 1] = {0};
+	static char resvs_from_time[DB_TIMESTAMP_LEN + 1] = {0};
+	resc_resv *presv = NULL;
+	void *cur_state = NULL;
+	int rc_cur = 0;
+	int refreshed;
+	int count = 0;
 
 	if (pbs_db_begin_trx(conn, 0, 0) !=0) {
 		(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
@@ -1295,41 +1296,41 @@ get_all_db_resv()
 
 	/* fill in options */
 	opts.flags = 0;
-	opts.timestamp = from_time;
-
-	obj.pbs_db_obj_type = PBS_DB_RESV;
-	obj.pbs_db_un.pbs_db_resv = &dbresv;
+	opts.timestamp = resvs_from_time;
+	dbobj.pbs_db_obj_type = PBS_DB_RESV;
+	dbobj.pbs_db_un.pbs_db_resv = &dbresv;
 	dbresv.attr_list.attributes = NULL;
 	
-	state = pbs_db_cursor_init(conn, &obj, &opts);
-	if (state == NULL) {
+	cur_state = pbs_db_cursor_init(conn, &dbobj, &opts);
+	if (cur_state == NULL) {
 		sprintf(log_buffer, "%s", (char *) conn->conn_db_err);
 		log_err(-1, __func__, log_buffer);
-		pbs_db_cursor_close(conn, state);
+		pbs_db_cursor_close(conn, cur_state);
 		(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
 		return (1);
 	}
 
-	while ((rc_cur = pbs_db_cursor_next(conn, state, &obj)) == 0) {
+	while ((rc_cur = pbs_db_cursor_next(conn, cur_state, &dbobj)) == 0) {
 		if ((presv = refresh_resv(&dbresv, &refreshed)) == NULL) {
-				sprintf(log_buffer, "Failed to refresh resv %s", dbresv.ri_resvid);
-				log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_NOTICE, msg_daemonname, log_buffer);
+			sprintf(log_buffer, "Failed to refresh reservation %s", dbresv.ri_resvid);
+			log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_NOTICE, msg_daemonname, log_buffer);
 		}
+
 		if (refreshed)
 			count++;
 
-		pbs_db_reset_obj(&obj);
+		pbs_db_reset_obj(&dbobj);
 	}
 
-	pbs_db_cursor_close(conn, state);
+	pbs_db_cursor_close(conn, cur_state);
 	if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0)
 		return (1);
 
-	sprintf(log_buffer, "Refreshed %d joresvsbs", count);
+	sprintf(log_buffer, "Refreshed %d reservations", count);
 	log_err(-1, __func__, log_buffer);
 
 	if (presv)
-		strcpy(from_time, presv->ri_savetm);
+		strcpy(resvs_from_time, presv->ri_savetm);
 
 	return 0;
 }

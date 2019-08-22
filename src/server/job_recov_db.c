@@ -604,13 +604,14 @@ refresh_queue(pbs_db_que_info_t *dbque, int *refreshed) {
 
 /**
  * @brief
- *	Refresh/retrieve reservation from database and add it into AVL tree if not present
+ *	Refresh/retrieve reservation from database and add it into list if not present
  *
- * @param[in]	resvid - Reservation id to refresh
+ *	@param[in]	dbresv - The pointer to the wrapper resv object of type pbs_db_resv_info_t
+ *  @param[in]  refreshed - To count the no. of reservation refreshed
  *
  * @return	The recovered reservation
  * @retval	NULL - Failure
- * @retval	!NULL - Success, pointer to resv structure recovered
+ * @retval	!NULL - Success, pointer to reservation structure recovered
  *
  */
 resc_resv *
@@ -628,7 +629,6 @@ refresh_resv(pbs_db_resv_info_t *dbresv, int *refreshed)
 			break;
 		presv = (resc_resv *)GET_NEXT(presv->ri_allresvs);
 	}
-
 	if (at)
 		*at = '@';	/* restore @server_name */
 
@@ -656,7 +656,6 @@ err:
 	snprintf(log_buffer, LOG_BUF_SIZE, "Failed to refresh resv attribute %s", dbresv->ri_resvid);
 	log_err(-1, __func__, log_buffer);
 	return NULL;
-
 }
 
 /**
