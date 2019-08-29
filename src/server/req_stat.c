@@ -89,6 +89,7 @@
 #include "pbs_sched.h"
 #include "pbs_share.h"
 
+#define QUE_REFRESH_TIME_PERIOD 86400
 
 /* Global Data Items: */
 
@@ -503,7 +504,7 @@ get_all_db_queues() {
 	pbs_queue *pque = NULL;
 	void *cur_state = NULL;
 	int rc_cur = 0;
-	int refreshed;
+	int refreshed = 0;
 	int count = 0;
 
 	if (pbs_db_begin_trx(conn, 0, 0) !=0) {
@@ -533,8 +534,9 @@ get_all_db_queues() {
 			log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_NOTICE, msg_daemonname, log_buffer);
 		}
 
-		if (refreshed)
+		if (refreshed) {
 			count++;
+		}
 
 		pbs_db_reset_obj(&dbobj);
 	}
@@ -572,6 +574,10 @@ req_stat_que(struct batch_request *preq)
 	int		    rc   = 0;
 	int		    type = 0;
 	int         db_rc = 0;
+	/* for multi server */
+	char bak_que_name[PBS_MAXQUEUENAME + 1]; /* back up the qname for logging error */
+	pbs_queue *bak_nxt_q_link; /* back up the next queue addr */
+	int que_removed = 0;
 
 	/* for multi server project, fetch queue from db if not in list else
 	 * refresh queue from db if it has old data.
@@ -614,6 +620,27 @@ req_stat_que(struct batch_request *preq)
 
 		pque = (pbs_queue *)GET_NEXT(svr_queues);
 		while (pque) {
+			if((time(0) - pque->qu_last_refresh_time) >= QUE_REFRESH_TIME_PERIOD) {
+				/* this que hasn't refreshed since from long time(24 hrs.) hence need to check it's existence.
+				 * If it's been deleted by other server instance then remove from this server as well
+				 * and remove all the related jobs as well.
+				 */
+				bak_nxt_q_link = (pbs_queue *)GET_NEXT(pque->qu_link);
+				strcpy(bak_que_name, pque->qu_qs.qu_name);
+				pque = que_recov_db(pque->qu_qs.qu_name, pque, 0);
+				if(pque == NULL) {
+					que_removed = 1;
+					/* This que has been deleted by other server! */
+					sprintf(log_buffer, "Now, Queue %s doesn't exist in the system", bak_que_name);
+					log_err(-1, __func__, log_buffer);
+				}
+			}
+			if(que_removed) {
+				pque = bak_nxt_q_link;
+				que_removed = 0;
+				continue;
+			}
+
 			rc = status_que(pque, preq, &preply->brp_un.brp_status);
 			if (rc != 0) {
 				if (rc == PBSE_PERM)

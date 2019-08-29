@@ -66,25 +66,36 @@ pg_db_prepare_que_sqls(pbs_db_conn_t *conn)
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "insert into pbs.queue("
 		"qu_name, "
 		"qu_type, "
+		"qu_deleted, "
 		"qu_creattm, "
 		"qu_savetm, "
 		"attributes "
 		") "
 		"values "
-		"($1, $2,  localtimestamp, localtimestamp, hstore($3::text[])) "
+		"($1, $2, $3, localtimestamp, localtimestamp, hstore($4::text[])) "
 		"returning to_char(qu_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as qu_savetm");
 
-	if (pg_prepare_stmt(conn, STMT_INSERT_QUE, conn->conn_sql, 3) != 0)
+	if (pg_prepare_stmt(conn, STMT_INSERT_QUE, conn->conn_sql, 4) != 0)
 		return -1;
 
 	/* rewrite all attributes for FULL update */
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "update pbs.queue set "
 			"qu_type = $2, "
+			"qu_deleted = $3, "
 			"qu_savetm = localtimestamp, "
-			"attributes = hstore($3::text[])"
+			"attributes = hstore($4::text[])"
 			" where qu_name = $1 "
 			"returning to_char(qu_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as qu_savetm");
-	if (pg_prepare_stmt(conn, STMT_UPDATE_QUE_FULL, conn->conn_sql, 3) != 0)
+	if (pg_prepare_stmt(conn, STMT_UPDATE_QUE_FULL, conn->conn_sql, 4) != 0)
+		return -1;
+
+	/* update a qu_deleted attribute only */
+	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "update pbs.queue set "
+			"qu_deleted = $2, "
+			"qu_savetm = localtimestamp "
+			"where qu_name = $1 "
+			"returning to_char(qu_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as qu_savetm");
+	if (pg_prepare_stmt(conn, STMT_UPDATE_QUE_AS_DELETED, conn->conn_sql, 2) != 0)
 		return -1;
 
 
@@ -98,6 +109,7 @@ pg_db_prepare_que_sqls(pbs_db_conn_t *conn)
 
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select qu_name, "
 			"qu_type, "
+			"qu_deleted, "
 			"to_char(qu_creattm, 'YYYY-MM-DD HH24:MI:SS.US') as qu_creattm, "
 			"to_char(qu_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as qu_savetm, "
 			"hstore_to_array(attributes) as attributes "
@@ -108,6 +120,7 @@ pg_db_prepare_que_sqls(pbs_db_conn_t *conn)
 
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select qu_name, "
 			"qu_type, "
+			"qu_deleted, "
 			"to_char(qu_creattm, 'YYYY-MM-DD HH24:MI:SS.US') as qu_creattm, "
 			"to_char(qu_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as qu_savetm, "
 			"hstore_to_array(attributes) as attributes "
@@ -124,6 +137,7 @@ pg_db_prepare_que_sqls(pbs_db_conn_t *conn)
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select "
 			"qu_name, "
 			"qu_type, "
+			"qu_deleted, "
 			"to_char(qu_creattm, 'YYYY-MM-DD HH24:MI:SS.US') as qu_creattm, "
 			"to_char(qu_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as qu_savetm, "
 			"hstore_to_array(attributes) as attributes "
@@ -157,18 +171,20 @@ load_que(PGresult *res, pbs_db_que_info_t *pq, int row)
 {
 	char *raw_array;
 	char db_savetm[DB_TIMESTAMP_LEN + 1];
-	static int qu_name_fnum, qu_type_fnum, qu_creattm_fnum, qu_savetm_fnum, attributes_fnum;
+	static int qu_name_fnum, qu_type_fnum, qu_deleted_fnum, qu_creattm_fnum, qu_savetm_fnum, attributes_fnum;
 	static int fnums_inited = 0;
 
 	if (fnums_inited == 0) {
 		qu_name_fnum = PQfnumber(res, "qu_name");
 		qu_type_fnum = PQfnumber(res, "qu_type");
+		qu_deleted_fnum = PQfnumber(res, "qu_deleted");
 		qu_creattm_fnum = PQfnumber(res, "qu_creattm");
 		qu_savetm_fnum = PQfnumber(res, "qu_savetm");
 		attributes_fnum = PQfnumber(res, "attributes");
 		fnums_inited = 1;
 	}
 
+	GET_PARAM_INTEGER(res, row, pq->qu_deleted, qu_deleted_fnum);
 	GET_PARAM_STR(res, row, db_savetm, qu_savetm_fnum);
 	if (strcmp(pq->qu_savetm, db_savetm) == 0) {
 		/* data same as read last time, so no need to read any further, return success from here */
@@ -207,29 +223,43 @@ pg_db_save_que(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
 	char *raw_array = NULL;
 	static int qu_savetm_fnum;
 	static int fnums_inited = 0;
+	int pgsql_err;
 
 	SET_PARAM_STR(conn, pq->qu_name, 0);
-	SET_PARAM_INTEGER(conn, pq->qu_type, 1);
 
-	if (savetype == PBS_UPDATE_DB_QUICK) {
+	if (savetype == PBS_UPDATE_DB_AS_DELETED) {
+		SET_PARAM_INTEGER(conn, pq->qu_deleted, 1);
 		params = 2;
+	} else if (savetype == PBS_UPDATE_DB_QUICK) {
+		SET_PARAM_INTEGER(conn, pq->qu_type, 1);
+		SET_PARAM_INTEGER(conn, pq->qu_deleted, 2);
+		params = 3;
 	} else {
+		SET_PARAM_INTEGER(conn, pq->qu_type, 1);
+		SET_PARAM_INTEGER(conn, pq->qu_deleted, 2);
 		int len = 0;
 		/* convert attributes to postgres raw array format */
 		if ((len = convert_db_attr_list_to_array(&raw_array, &pq->attr_list)) <= 0)
 			return -1;
 
-		SET_PARAM_BIN(conn, raw_array, len, 2);
-		params = 3;
+		SET_PARAM_BIN(conn, raw_array, len, 3);
+		params = 4;
 	}
 
-	if (savetype == PBS_UPDATE_DB_FULL)
+	if (savetype == PBS_UPDATE_DB_FULL) {
 		stmt = STMT_UPDATE_QUE_FULL;
-	else
+	} else if(savetype == PBS_UPDATE_DB_AS_DELETED) {
+		/* marking queue as deleted only, not actually deleting the queue from db */
+		stmt = STMT_UPDATE_QUE_AS_DELETED;
+	} else {
 		stmt = STMT_INSERT_QUE;
+	}
 
-	if (pg_db_cmd_ret(conn, stmt, params) != 0) {
+	pgsql_err = pg_db_cmd_ret(conn, stmt, params);
+	if (pgsql_err != 0) {
 		free(raw_array);
+		if (pgsql_err == UNIQUE_KEY_VIOLATION)
+				return UNIQUE_KEY_VIOLATION;
 		return -1;
 	}
 	

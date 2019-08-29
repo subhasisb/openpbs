@@ -210,7 +210,7 @@ int
 pg_db_query(pbs_db_conn_t *conn, char *stmt, int num_vars, int lock, PGresult **res)
 {
 	char stmt_tmp[100];
-
+	ExecStatusType res_rc;
 	if (lock) {
 		strcpy(stmt_tmp, stmt);
 		strcat(stmt_tmp, "_locked");
@@ -224,7 +224,8 @@ pg_db_query(pbs_db_conn_t *conn, char *stmt, int num_vars, int lock, PGresult **
 		((pg_conn_data_t *) conn->conn_data)->paramFormats,
 		conn->conn_result_format);
 
-	if (PQresultStatus(*res) != PGRES_TUPLES_OK) {
+	res_rc = PQresultStatus(*res);
+	if (res_rc != PGRES_TUPLES_OK) {
 		pg_set_error(conn, "Execution of Prepared statement", stmt);
 		PQclear(*res);
 		return -1;
@@ -836,6 +837,7 @@ int pg_db_cmd_ret(pbs_db_conn_t *conn, char *stmt, int num_vars)
 	PGresult *res;
 	char *rows_affected = NULL;
 	ExecStatusType res_rc;
+	char *sql_error;
 
 	res = PQexecPrepared((PGconn*) conn->conn_db_handle, stmt, num_vars,
 			((pg_conn_data_t *) conn->conn_data)->paramValues,
@@ -845,6 +847,13 @@ int pg_db_cmd_ret(pbs_db_conn_t *conn, char *stmt, int num_vars)
 
 	res_rc = PQresultStatus(res);
 	if (!(res_rc == PGRES_COMMAND_OK || res_rc == PGRES_TUPLES_OK)) {
+		sql_error = (char *)PQresultErrorField(res, PG_DIAG_SQLSTATE);
+		/* if sql_error returns value "23505" this means PBS is violating the unique key rule.
+		 * To fix this, try to delete the existing record and insert a new one */
+		if (UNIQUE_KEY_VIOLATION == atoi(sql_error)) {
+			PQclear(res);
+			return UNIQUE_KEY_VIOLATION;
+		}
 		pg_set_error(conn, "Execution of Prepared statement", stmt);
 		PQclear(res);
 		return -1;

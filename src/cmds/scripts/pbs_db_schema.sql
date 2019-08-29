@@ -115,8 +115,9 @@ CREATE INDEX nd_savetm_idx ON pbs.node(nd_savetm);
  * Table pbs.queue holds queue information
  */
 CREATE TABLE pbs.queue (
-    qu_name		    TEXT		NOT NULL,
-    qu_type		    INTEGER		NOT NULL,
+    qu_name		TEXT		NOT NULL,
+    qu_type		INTEGER		NOT NULL,
+    qu_deleted		INTEGER		NOT NULL,
     qu_creattm		TIMESTAMP	NOT NULL,
     qu_savetm		TIMESTAMP	NOT NULL,
     attributes		hstore		NOT NULL default '',

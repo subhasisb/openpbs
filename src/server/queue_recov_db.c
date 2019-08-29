@@ -109,6 +109,7 @@ svr_to_db_que(pbs_queue *pque, pbs_db_que_info_t *pdbque, int updatetype)
 	pdbque->qu_name[sizeof(pdbque->qu_name) - 1] = '\0';
 	strncpy(pdbque->qu_name, pque->qu_qs.qu_name, sizeof(pdbque->qu_name));
 	pdbque->qu_type = pque->qu_qs.qu_type;
+	pdbque->qu_deleted = pque->qu_qs.qu_deleted;
 
 	if (updatetype != PBS_UPDATE_DB_QUICK) {
 		if ((encode_attr_db(que_attr_def, pque->qu_attr,
@@ -135,6 +136,7 @@ db_to_svr_que(pbs_queue *pque, pbs_db_que_info_t *pdbque)
 	pque->qu_qs.qu_name[sizeof(pque->qu_qs.qu_name) - 1] = '\0';
 	strncpy(pque->qu_qs.qu_name, pdbque->qu_name, sizeof(pque->qu_qs.qu_name));
 	pque->qu_qs.qu_type = pdbque->qu_type;
+	pque->qu_qs.qu_deleted = pdbque->qu_deleted;
 	strcpy(pque->qu_creattm, pdbque->qu_creattm);
 	strcpy(pque->qu_savetm, pdbque->qu_savetm);
 
@@ -176,18 +178,35 @@ que_save_db(pbs_queue *pque, int mode)
 	obj.pbs_db_obj_type = PBS_DB_QUEUE;
 	obj.pbs_db_un.pbs_db_que = &dbque;
 
-	if (mode == QUE_SAVE_NEW)
+	if (mode == QUE_SAVE_NEW) {
 		savetype = PBS_INSERT_DB;
+	}
 
 	rc = pbs_db_save_obj(conn, &obj, savetype);
-	if (rc != 0){
-	    goto db_err;
+	if (rc != 0) {
+		if (rc == UNIQUE_KEY_VIOLATION) {
+			/* delete the existing queue with same name */
+			strcpy(dbque.qu_name, pque->qu_qs.qu_name);
+			if (pbs_db_delete_obj(conn, &obj) != 0) {
+				(void)sprintf(log_buffer,
+					"deletetion of que %s from datastore failed after unique key violation",
+					pque->qu_qs.qu_name);
+				log_err(errno, "que_save_db", log_buffer);
+				return -1;
+			}
+			pbs_db_reset_obj(&obj);
+			/* old queue entry has been deleted, now try to save again */
+			(void)que_save_db(pque, QUE_SAVE_NEW);
+		} else {
+			goto db_err;
+		}
 	}
 
 	strcpy(pque->qu_savetm, dbque.qu_savetm);
 
 	pbs_db_reset_obj(&obj);
 
+	pque->qu_last_refresh_time = time(NULL);
 	return (0);
 
 db_err:
@@ -245,8 +264,22 @@ que_recov_db(char *qname, pbs_queue *pq, int lock)
 	if (rc == -1)
 		goto db_err;
 
+	/* if queue is marked as deleted in db then remove it from cache also */
+	if(dbque.qu_deleted == 1) {
+		if(pq) {
+			sprintf(log_buffer, "Queue %s marked as deleted", qname);
+			log_err(-1, __func__, log_buffer);
+			/* TODO: Remove all the jobs, related to this queue in the system */
+			que_free(pq);
+			pbs_db_reset_obj(&obj);
+		}
+		return NULL;
+	}
+
 	if (rc == -2) {
-		memcache_update_state(&pq->trx_status, lock);	
+		memcache_update_state(&pq->trx_status, lock);
+		/* queue is refreshed now with latest data */
+		pq->qu_last_refresh_time = time(NULL);
 		return pq;
 	}
 	
@@ -255,14 +288,18 @@ que_recov_db(char *qname, pbs_queue *pq, int lock)
 
 	pbs_db_reset_obj(&obj);
 	memcache_update_state(&pq->trx_status, lock);
-	
+
+	/* queue is refreshed now with latest data */
+	pq->qu_last_refresh_time = time(NULL);
 	/* all done recovering the queue */
 	return (pq);
 
 db_err:
 	sprintf(log_buffer, "Failed to load queue %s", qname);
-	if (pq)
+	if (pq) {
+		/* TODO: Remove all the jobs, related to this queue in the system if exists */
 		que_free(pq);
+	}
 
 	return NULL;
 }

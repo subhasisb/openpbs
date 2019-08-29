@@ -61,6 +61,10 @@ extern "C" {
 #define QTYPE_RoutePush 2
 #define QTYPE_RoutePull 3
 
+/* for multi-server, given macros defines availability of queue */
+#define Q_Exist 0
+#define Q_Deleted 1
+
 /*
  * Attributes, including the various resource-lists are maintained in an
  * array in a "decoded or parsed" form for quick access to the value.
@@ -151,11 +155,13 @@ struct pbs_queue {
 	struct queuefix {
 		int	qu_modified;		/* != 0 => update disk file */
 		int	qu_type;		/* queue type: exec, route */
+		int	qu_deleted;		/* is queue exist or deleted, for multi-server */
 		char	qu_name[PBS_MAXQUEUENAME + 1]; /* queue name */
 	} qu_qs;
 
 	char		qu_creattm[DB_TIMESTAMP_LEN + 1];		/* time queue created */
 	char		qu_savetm[DB_TIMESTAMP_LEN + 1];		/* time queue last modified */
+	time_t		qu_last_refresh_time;				/* queue last refresh time */
 
 	int	qu_numjobs;			/* current numb jobs in queue */
 	int	qu_njstate[PBS_NUMJOBSTATE];	/* # of jobs per state */

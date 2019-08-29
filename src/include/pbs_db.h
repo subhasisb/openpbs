@@ -82,8 +82,10 @@ extern "C" {
 #define PBS_UPDATE_DB_FULL 0
 #define PBS_UPDATE_DB_QUICK 1
 #define PBS_INSERT_DB 2
+#define PBS_UPDATE_DB_AS_DELETED 3 /* mark in db as deleted but it's still in db */
 
 #define DB_TIMESTAMP_LEN 50
+#define UNIQUE_KEY_VIOLATION 23505 /* postgres throws this error code in case of primary key violation */
 
 /**
  * @brief
@@ -253,6 +255,7 @@ typedef struct pbs_db_sched_info pbs_db_sched_info_t;
 struct pbs_db_que_info {
 	char    qu_name[PBS_MAXQUEUENAME +1];
 	INTEGER qu_type;
+	INTEGER qu_deleted;
 	char    qu_creattm[DB_TIMESTAMP_LEN + 1];
 	char    qu_savetm[DB_TIMESTAMP_LEN + 1];
 	pbs_db_attr_list_t attr_list; /* list of attributes */

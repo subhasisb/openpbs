@@ -141,6 +141,7 @@ typedef unsigned __int64 uint64_t;
 #define STMT_FIND_QUES_ORDBY_CREATTM "find_ques_ordby_creattm"
 #define STMT_REMOVE_QUEATTRS "remove_queattrs"
 #define STMT_FIND_QUES_FROM_TIME_ORDBY_SAVETM "find_ques_from_time_ordby_savetm"
+#define STMT_UPDATE_QUE_AS_DELETED "update_que_status_as_deleted"
 
 /* node statement names */
 #define STMT_INSERT_NODE "insert_node"
