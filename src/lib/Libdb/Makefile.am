@@ -52,5 +52,6 @@ libdb_a_SOURCES = \
 	db_postgres_svr.c \
 	db_postgres_que.c \
 	db_postgres_node.c \
+	db_postgres_nodejob.c \
 	db_postgres_sched.c
 

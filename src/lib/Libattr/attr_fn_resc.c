@@ -51,6 +51,7 @@
 #include "attribute.h"
 #include "resource.h"
 #include "pbs_error.h"
+#include "pbs_share.h"
 
 
 /**
@@ -91,6 +92,7 @@ int comp_resc_eq;	/* count of resources compared = */
 int comp_resc_lt;	/* count of resources compared < */
 int comp_resc_nc;	/* count of resources not compared  */
 
+extern void from_size(struct size_value *psize, char *cvnbuf);
 
 /**
  * @brief
@@ -745,4 +747,52 @@ int
 action_resc_dflt_queue(attribute *pattr, void *pobj, int actmode)
 {
 	return (action_resc(pattr, pobj, PARENT_TYPE_QUE_ALL, actmode));
+}
+
+/**
+ * @brief
+ *      It is ideal to get the resource value in string format for consumable resources.
+ *
+ * @param[in]   prdef    -     resource defenition
+ * @param[in]   attr  -     attribute which contains the value
+ *
+ * @return      resc_value encoded in string
+ * @retval       NULL : error
+ *
+ * @par MT-safe: Yes
+ *
+ */
+char *
+get_resc_value(resource_def *prdef, attribute *attr)
+{
+	char *cvnbuf = NULL;
+	int CVNBUFSZ = 32;
+
+	if ((prdef == NULL) || (attr == NULL)) {
+		return NULL;
+	}
+
+	cvnbuf = (char *) malloc(sizeof(CVNBUFSZ));
+	if (!cvnbuf)
+		return NULL;
+
+	switch (prdef->rs_type) {
+		case ATR_TYPE_LONG:
+			(void)snprintf(cvnbuf, CVNBUFSZ, "%ld", attr->at_val.at_long);
+			break;
+		case ATR_TYPE_LL:
+			(void)snprintf(cvnbuf, CVNBUFSZ, "%lld", attr->at_val.at_ll);
+			break;
+		case ATR_TYPE_SHORT:
+			(void)snprintf(cvnbuf, CVNBUFSZ, "%d", attr->at_val.at_short);
+			break;
+		case ATR_TYPE_FLOAT:
+			(void)snprintf(cvnbuf, CVNBUFSZ, "%-.*f",
+				float_digits(attr->at_val.at_float, FLOAT_NUM_DIGITS),
+				attr->at_val.at_float);
+			break;
+		case ATR_TYPE_SIZE:
+			from_size(&attr->at_val.at_size, cvnbuf);
+	}
+	return cvnbuf;
 }

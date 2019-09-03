@@ -325,6 +325,7 @@ int pg_db_prepare_job_sqls(pbs_db_conn_t *conn);
 int pg_db_prepare_resv_sqls(pbs_db_conn_t *conn);
 int pg_db_prepare_svr_sqls(pbs_db_conn_t *conn);
 int pg_db_prepare_node_sqls(pbs_db_conn_t *conn);
+int pg_db_prepare_nodejob_sqls(pbs_db_conn_t *conn);
 int pg_db_prepare_sched_sqls(pbs_db_conn_t *conn);
 int pg_db_prepare_que_sqls(pbs_db_conn_t *conn);
 

@@ -115,139 +115,6 @@ extern int recov_attr_db_raw(pbs_db_conn_t *conn,
 
 extern int make_pbs_list_attr_db(void *parent, pbs_db_attr_list_t *attr_list, struct attribute_def *padef, pbs_list_head *phead, int limit, int unknown);
 
-/**
- * @brief
- *		Load a node job object from a database node object
- *
- * @param[out]	pnodejob - Address of the nodejob in the server
- * @param[in]	pdbnd - Address of the database nodejob object
- *
- * @return	Error code
- * @retval   0 - Success
- * @retval  -1 - Failure
- *
- */
-static int
-db_to_nodejob(struct nodejob *pnodejob, pbs_db_nodejob_info_t *pdbnj)
-{
-	if (pdbnj->job_id && pdbnj->job_id[0] != 0) {
-		pnodejob->job_id = strdup(pdbnj->job_id);
-		if (pnodejob->job_id == NULL)
-			return -1;
-	} else
-		pnodejob->job_id = NULL;
-
-	if (pdbnj->nd_name && pdbnj->nd_name[0] != 0) {
-		pnodejob->nd_name = strdup(pdbnj->nd_name);
-		if (pnodejob->nd_name == NULL)
-			return -1;
-	} else
-		pnodejob->nd_name = NULL;
-
-	pnodejob->is_resv = pdbnj->is_resv;
-	if (pnodejob->is_resv > 1) {
-		pnodejob->subnode_ct = -1;
-		pnodejob->admn_suspend = 0;
-		pnodejob->resc_assn = NULL;
-		return 0;
-	} else {
-		pnodejob->subnode_ct = pdbnj->subnode_ct;
-		pnodejob->admn_suspend = pdbnj->admn_suspend;
-	}
-
-	pnodejob->resc_assn = (attribute*) malloc(sizeof(attribute));
-	if (pnodejob->resc_assn)
-		return -1;
-
-	if ((decode_attr_db(pnodejob, &pdbnj->attr_list, node_attr_def,
-		pnodejob->resc_assn, (int) ND_ATR_LAST, 0)) != 0)
-		return -1;
-
-	return 0;
-}
-
-/**
- * @brief
- *		Load a database nodejob object from a server nodejob object
- *
- * @param[in]	pnode - Address of the nodejob in the server
- * @param[out]	pdbnd - Address of the database node object
- *
- * @return 0    Success
- * @return !=0  Failure
- */
-static int
-svr_to_db_nodejob(struct nodejob *pnodejob, pbs_db_nodejob_info_t *pdbnj)
-{
-	svrattrl *psvrl;
-	pbs_list_head wrtattr;
-	pbs_db_attr_info_t *attrs = NULL;
-	int numattr = 0;
-	int count = 0;
-
-	if (pnodejob->job_id)
-		strcpy(pdbnj->job_id, pnodejob->job_id);
-	else
-		pdbnj->job_id[0] = 0;
-
-	if (pnodejob->nd_name)
-		strcpy(pdbnj->nd_name, pnodejob->nd_name);
-	else
-		pdbnj->nd_name[0] = 0;
-
-	pdbnj->is_resv = pnodejob->is_resv;
-	pdbnj->subnode_ct = pnodejob->subnode_ct;
-	pdbnj->admn_suspend = pnodejob->admn_suspend;
-	
-	CLEAR_HEAD(wrtattr);
-
-	/* skip certain ones: no-save and default values */
-	if (!(node_attr_def[ND_ATR_ResourceAssn].at_flags & ATR_DFLAG_NOSAVM) &&
-			!(pnodejob->resc_assn->at_flags & ATR_VFLAG_DEFLT)) {
-
-		(void) node_attr_def[ND_ATR_ResourceAssn].at_encode(pnodejob->resc_assn,
-							&wrtattr,
-							node_attr_def[ND_ATR_ResourceAssn].at_name,
-							NULL,
-							ATR_ENCODE_SVR,
-							NULL);
-	}
-
-	psvrl = (svrattrl *)GET_NEXT(wrtattr);
-	while (psvrl) {
-		psvrl = (svrattrl *)GET_NEXT(psvrl->al_link);
-		numattr++;
-	}
-
-	pdbnj->attr_list.attributes = calloc(sizeof(pbs_db_attr_info_t), numattr);
-	if (!pdbnj->attr_list.attributes)
-			return -1;
-	pdbnj->attr_list.attr_count = 0;
-	attrs = pdbnj->attr_list.attributes;
-
-	while ((psvrl = (svrattrl *) GET_NEXT(wrtattr)) != NULL) {
-
-		/* every attribute to this point we write to database */
-		attrs[count].attr_name[sizeof(attrs[count].attr_name) - 1] = '\0';
-		strncpy(attrs[count].attr_name, psvrl->al_name, sizeof(attrs[count].attr_name));
-		if (psvrl->al_resc) {
-			attrs[count].attr_resc[sizeof(attrs[count].attr_resc) - 1] = '\0';
-			strncpy(attrs[count].attr_resc, psvrl->al_resc, sizeof(attrs[count].attr_resc));
-		}
-		else
-			strcpy(attrs[count].attr_resc, "");
-		attrs[count].attr_value = strdup(psvrl->al_value);
-		attrs[count].attr_flags = psvrl->al_flags;
-		count++;
-
-		delete_link(&psvrl->al_link);
-		(void)free(psvrl);
-	}
-
-	pdbnj->attr_list.attr_count = count;
-
-	return 0;
-}
 
 /**
  * @brief
@@ -427,47 +294,36 @@ svr_to_db_node(struct pbsnode *pnode, pbs_db_node_info_t *pdbnd)
  *
  * @param[in]	nj	- Information about the nodejob to recover
  *
- * @return	The recovered nodejob structure
- * @retval	NULL - Failure
- * @retval	!NULL - Success - address of recovered node returned
+ * @return	return code
+ * @retval	!0 - Failure
+ * @retval	0 - Success
  */
-struct nodejob *
+int
 nodejob_recov_db(void *nj)
 {
 	pbs_db_obj_info_t obj;
-	struct nodejob *pnodejob;
+	int rc = 0;
 	pbs_db_conn_t *conn = (pbs_db_conn_t *) svr_db_conn;
-	pbs_db_nodejob_info_t *dbnodejob =(pbs_db_nodejob_info_t *) nj;
 
-	pnodejob = (struct nodejob*)malloc(sizeof(struct nodejob));
-	if (pnodejob == NULL) {
-		log_err(errno, "node_recov", "error on recovering node attr");
-		return NULL;
-	}
 	obj.pbs_db_obj_type = PBS_DB_NODEJOB;
-	obj.pbs_db_un.pbs_db_nodejob = dbnodejob;
+	obj.pbs_db_un.pbs_db_nodejob = (pbs_db_nodejob_info_t *) nj;
 
-	if (pbs_db_begin_trx(conn, 0, 0) != 0)
+	if ((rc = pbs_db_begin_trx(conn, 0, 0)) != 0)
 		goto db_err;
 
-	if (pbs_db_load_obj(conn, &obj, 0) != 0)
+	if ((rc = pbs_db_load_obj(conn, &obj, 0)) < 0)
 		goto db_err;
 
-	if (db_to_nodejob(pnodejob, dbnodejob) != 0)
+	if ((rc = pbs_db_end_trx(conn, PBS_DB_COMMIT)) != 0)
 		goto db_err;
 
-	if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0)
-		goto db_err;
-
-	pbs_db_reset_obj(&obj);
-
-	return pnodejob;
+	return 0;
 
 db_err:
-	free(pnodejob);
 	log_err(-1, "nodejob_recov_db", "error on recovering nodejob table");
 	(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
-	return NULL;
+	pbs_db_reset_obj(&obj);
+	return rc;
 }
 
 
@@ -501,6 +357,34 @@ node_recov_db_raw(void *nd, pbs_list_head *phead)
 	return 0;
 }
 
+pbs_db_nodejob_info_t *
+initialize_nodejob_db_obj(char *nd_name, char *job_id, int is_resv) {
+	pbs_db_nodejob_info_t	*db_obj;
+
+	db_obj = (pbs_db_nodejob_info_t *) malloc(sizeof(pbs_db_nodejob_info_t));
+
+	strncpy(db_obj->job_id, job_id, PBS_MAXSVRJOBID);
+	strncpy(db_obj->nd_name, nd_name, PBS_MAXSERVERNAME);
+	db_obj->is_resv = is_resv;
+	db_obj->subnode_ct = -1;
+	db_obj->admn_suspend = 0;
+	db_obj->attr_list.attr_count = 0;
+	db_obj->attr_list.attributes = NULL;
+
+	return db_obj;
+}
+
+void
+clear_nodejob_dbobj(pbs_db_nodejob_info_t *db_obj)
+{
+	pbs_db_obj_info_t obj;
+
+	obj.pbs_db_obj_type = PBS_DB_NODEJOB;
+	obj.pbs_db_un.pbs_db_nodejob = db_obj;
+	pbs_db_reset_obj(&obj);
+	free(db_obj);
+}
+
 /**
  * @brief
  *	Save a nodejob attributes to the database.
@@ -513,23 +397,23 @@ node_recov_db_raw(void *nd, pbs_list_head *phead)
  *
  */
 int
-nodejob_update_attr_db(struct nodejob *pnodejob)
+nodejob_update_attr_db(pbs_db_nodejob_info_t *dbnode)
 {
-	pbs_db_nodejob_info_t dbnode;
 	pbs_db_obj_info_t obj;
 	pbs_db_conn_t *conn = (pbs_db_conn_t *) svr_db_conn;
 
-	svr_to_db_nodejob(pnodejob, &dbnode);
 	obj.pbs_db_obj_type = PBS_DB_NODEJOB;
-	obj.pbs_db_un.pbs_db_nodejob = &dbnode;
+	obj.pbs_db_un.pbs_db_nodejob = dbnode;
 
-	if (pbs_db_add_update_attr_obj(conn, &obj, pnodejob->nd_name, &dbnode.attr_list) != 0) {
+	DBPRT(("dbnode->nd_name: %s, dbnode->job_id: %s", dbnode->nd_name, dbnode->job_id))
+
+	if (pbs_db_add_update_attr_obj(conn, &obj, dbnode->nd_name, &dbnode->attr_list) != 0) {
 		if (pbs_db_save_obj(conn, &obj, PBS_INSERT_DB) != 0) {
 			goto db_err;
 		}
 	}
 
-	pbs_db_reset_obj(&obj);
+	clear_nodejob_dbobj(dbnode);
 
 	return (0);
 db_err:

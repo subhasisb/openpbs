@@ -383,6 +383,8 @@ pbs_db_prepare_sqls(pbs_db_conn_t *conn)
 		return -1;
 	if (pg_db_prepare_sched_sqls(conn) != 0)
 		return -1;
+	if (pg_db_prepare_nodejob_sqls(conn) != 0)
+		return -1;
 	return 0;
 }
 

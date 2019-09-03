@@ -132,6 +132,7 @@ extern int  parse_resc_type(char *val, int *resc_type_p);
 extern int  parse_resc_flags(char *val, int *flag_ir_p, int *resc_flag_p);
 extern int verify_resc_name(char *name);
 extern int verify_resc_type_and_flags(int resc_type, int *pflag_ir, int *presc_flag, char *rescname, char *buf, int buflen, int autocorrect);
+extern char *get_resc_value(resource_def *prdef, attribute *attr);
 extern void update_resc_sum(void);
 
 /* Defines for entity limit tracking */

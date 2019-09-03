@@ -287,17 +287,6 @@ struct	pbsnode {
 	attribute		 nd_attr[ND_ATR_LAST];
 };
 
-/*
- * Vnode structure
- */
-struct	nodejob {
-	char			*job_id;
-	char			*nd_name;
-	short			is_resv;
-	int			subnode_ct;	/* number of ncpus being utilized by the job_id in nd_name */
-	short			admn_suspend;	/* job is in admin suspend state? */
-	attribute		*resc_assn;
-};
 
 enum	warn_codes { WARN_none, WARN_ngrp_init, WARN_ngrp_ck, WARN_ngrp };
 enum	nix_flags { NIX_none, NIX_qnodes, NIX_nonconsume };
@@ -506,15 +495,15 @@ extern char *msg_daemonname;
 
 #ifndef PBS_MOM
 extern int node_save_db(struct pbsnode *pnode);
-extern int nodejob_save_db(struct nodejob *pnodejob);
-extern struct nodejob * nodejob_recov_db(void *nj);
-extern int nodejob_update_attr_db(struct nodejob *pnodejob);
+extern int nodejob_recov_db(void *nj);
+extern int nodejob_update_attr_db(pbs_db_nodejob_info_t *dbnode);
+extern pbs_db_nodejob_info_t * initialize_nodejob_db_obj(char *nd_name, char *job_id, int is_resv);
+extern void clear_nodejob_dbobj(pbs_db_nodejob_info_t *db_obj);
 extern int add_mom_to_pool(mominfo_t *);
 extern void remove_mom_from_pool(mominfo_t *);
 extern void reset_pool_inventory_mom(mominfo_t *);
 extern vnpool_mom_t *find_vnode_pool(mominfo_t *pmom);
 extern int  send_ip_addrs_to_mom(int);
-extern void free_nodejob(struct nodejob * pnodejob);
 #endif
 
 extern  int	   recover_vmap(void);

@@ -229,6 +229,8 @@ static void check_and_set_multivnode(struct pbsnode *);
 int write_single_node_mom_attr(struct pbsnode *np);
 void stream_eof(int stream, int ret, char *msg);
 
+extern void free_db_attr_list(pbs_db_attr_list_t *attr_list);
+
 static char *hook_privilege = "Not allowed to update vnodes or to request scheduler restart cycle, if run as a non-manager/operator user %s@%s";
 
 extern struct python_interpreter_data  svr_interp_data;
@@ -7394,36 +7396,36 @@ free_resvNodes(resc_resv *presv)
  * @return void
  */
 static void
-check_for_negative_resource(resource_def *prdef, resource *presc, char *noden)
+check_for_negative_resource(resource_def *prdef, attribute *rs_value, char *noden)
 {
 	int nerr = 0;
 
-	if ((prdef == NULL) || (presc == NULL)) {
+	if ((prdef == NULL) || (rs_value == NULL)) {
 		return;
 	}
 	/* make sure nothing in resources_assigned goes negative */
 	switch (prdef->rs_type) {
 		case ATR_TYPE_LONG:
-			if (presc->rs_value.at_val.at_long < 0) {
-				presc->rs_value.at_val.at_long = 0;
+			if (rs_value->at_val.at_long < 0) {
+				rs_value->at_val.at_long = 0;
 				nerr = 1;
 			}
 			break;
 		case ATR_TYPE_LL:
-			if (presc->rs_value.at_val.at_ll < 0) {
-				presc->rs_value.at_val.at_ll = 0;
+			if (rs_value->at_val.at_ll < 0) {
+				rs_value->at_val.at_ll = 0;
 				nerr = 1;
 			}
 			break;
 		case ATR_TYPE_SHORT:
-			if (presc->rs_value.at_val.at_short < 0) {
-				presc->rs_value.at_val.at_short = 0;
+			if (rs_value->at_val.at_short < 0) {
+				rs_value->at_val.at_short = 0;
 				nerr = 1;
 			}
 			break;
 		case ATR_TYPE_FLOAT:
-			if (presc->rs_value.at_val.at_float < 0.0) {
-				presc->rs_value.at_val.at_float = 0.0;
+			if (rs_value->at_val.at_float < 0.0) {
+				rs_value->at_val.at_float = 0.0;
 				nerr = 1;
 			}
 			break;
@@ -7466,14 +7468,15 @@ check_for_negative_resource(resource_def *prdef, resource *presc, char *noden)
 static int
 adj_resc_on_node(void *obj, int is_resv, char *noden, enum batch_op op, resource_def *prdef, char *val, int hop)
 {
-	resource	*presc;
-	attribute	*pattr;
 	int		 rc;
-	attribute	 *tmpattr;
-	pbs_db_nodejob_info_t	db_obj;
-	struct nodejob *pnodejob;
+	attribute	 tmpattr;
+	attribute	 rs_value;
+	pbs_db_nodejob_info_t	*db_obj;
+	int i;
+	pbs_db_attr_info_t *old_attr = NULL;
+	pbs_db_attr_info_t *new_attr = NULL;
 
-
+	DBPRT(("----------------Inside adj_resc_on_node()------------"))
 	/* make sure there isn't multiple levels of indirectness */
 	/* resource->resource->resource */
 
@@ -7486,56 +7489,60 @@ adj_resc_on_node(void *obj, int is_resv, char *noden, enum batch_op op, resource
 		return (PBSE_INDIRECTHOP);
 	}
 
+	DBPRT(("Job ID: %s, prdef->rs_name: %s, val: %s", ((job*)obj)->ji_qs.ji_jobid, prdef->rs_name, val))
 	if (is_resv)
-		strcpy(db_obj.job_id, ((resc_resv*)obj)->ri_qs.ri_resvID);
+		db_obj = initialize_nodejob_db_obj(noden, ((resc_resv*)obj)->ri_qs.ri_resvID, is_resv);
 	else
-		strcpy(db_obj.job_id, ((job*)obj)->ji_qs.ji_jobid);
-	strcpy(db_obj.nd_name, noden);
-	pnodejob = nodejob_recov_db(&db_obj);
-	if (pnodejob == NULL)
-		return PBSE_UNKNODE;
+		db_obj = initialize_nodejob_db_obj(noden, ((job*)obj)->ji_qs.ji_jobid, is_resv);
 
-	pnodejob->is_resv = is_resv;
+	if (nodejob_recov_db(db_obj) != 0)
+		return PBSE_INTERNAL;
 
 	/* find the resources_assigned resource for the node */
-
-	pattr = pnodejob->resc_assn;
-	if (pattr) {
-		if ((presc = find_resc_entry(pattr, prdef)) == NULL) {
-			presc = add_resource_entry(pattr, prdef);
-			if (presc == NULL)
-				return PBSE_INTERNAL;
+	for (i = 0; i < db_obj->attr_list.attr_count; i++) {
+		pbs_db_attr_info_t *pattr_info = &db_obj->attr_list.attributes[i];
+		if (!strncmp(pattr_info->attr_resc, prdef->rs_name, PBS_MAXATTRRESC)) {
+			old_attr = pattr_info;
+			DBPRT(("old_val: %s", old_attr->attr_value))
 		}
-		if ((presc->rs_value.at_flags & ATR_VFLAG_INDIRECT) &&
-			(*presc->rs_value.at_val.at_str == '@')) {
+	}
 
-			/* indirect reference to another vnode, recurse w/ that node */
+	if (old_attr && (old_attr->attr_flags & ATR_VFLAG_INDIRECT) &&
+		(old_attr->attr_value[0] == '@')) {
 
-			noden = presc->rs_value.at_val.at_str + 1;
-			return (adj_resc_on_node(obj, is_resv, noden, op, prdef, val, hop + 1));
-		}
+		/* indirect reference to another vnode, recurse w/ that node */
+
+		noden = old_attr->attr_value + 1;
+		clear_nodejob_dbobj(db_obj);
+		return (adj_resc_on_node(obj, is_resv, noden, op, prdef, val, hop + 1));
 	}
 
 	/* decode the resource value and +/- it to the attribute */
 
-	tmpattr = (attribute*) malloc(sizeof(attribute));
 	rc = 0;
-
-	if ((rc = prdef->rs_decode(tmpattr, ATTR_rescassn, prdef->rs_name, val)) != 0)
+	if ((rc = prdef->rs_decode(&tmpattr, ATTR_rescassn, prdef->rs_name, val)) != 0)
 		return rc;
-	if (pattr)
-		rc = prdef->rs_set(&presc->rs_value, tmpattr, op);
-	else
-		pnodejob->resc_assn = tmpattr;
+	if ((rc = prdef->rs_decode(&rs_value, ATTR_rescassn, prdef->rs_name,
+					old_attr ? old_attr->attr_value : NULL)) != 0)
+		return rc;
+	DBPRT(("Operation: %d", op))
+	rc = prdef->rs_set(&rs_value, &tmpattr, op);
 
-	nodejob_update_attr_db(pnodejob);
-	DBPRT(("prdef->rs_name: %s, val: %s", prdef->rs_name, val))
+	new_attr = (pbs_db_attr_info_t *) malloc(sizeof(pbs_db_attr_info_t));
+	strncpy(new_attr->attr_name, ATTR_rescassn, PBS_MAXATTRNAME);
+	strncpy(new_attr->attr_resc, prdef->rs_name, PBS_MAXATTRRESC);
+	new_attr->attr_flags = ATR_VFLAG_SET;
+	new_attr->attr_value = get_resc_value(prdef, &rs_value);
+	free_db_attr_list(&(db_obj->attr_list));
+	db_obj->attr_list.attr_count = 1;
+	db_obj->attr_list.attributes = new_attr;
 
-	if (op == DECR && pattr) {
-		check_for_negative_resource(prdef, presc, noden);
+	nodejob_update_attr_db(db_obj);
+
+	if (op == DECR) {
+		check_for_negative_resource(prdef, &rs_value, noden);
 	}
 
-	free_nodejob(pnodejob);
 	return rc;
 }
 
@@ -7640,7 +7647,7 @@ update_job_node_rassn(void *obj, int is_resv, attribute *pexech, enum batch_op o
 					}
 					prdef->rs_set(&pr->rs_value, &tmpattr, op);
 					if (op == DECR) {
-						check_for_negative_resource(prdef, pr, NULL);
+						check_for_negative_resource(prdef, &pr->rs_value, NULL);
 					}
 					sysru->at_flags |= ATR_VFLAG_MODCACHE;
 				}
@@ -7656,7 +7663,7 @@ update_job_node_rassn(void *obj, int is_resv, attribute *pexech, enum batch_op o
 					}
 					prdef->rs_set(&pr->rs_value, &tmpattr, op);
 					if (op == DECR) {
-						check_for_negative_resource(prdef, pr, NULL);
+						check_for_negative_resource(prdef, &pr->rs_value, NULL);
 					}
 					queru->at_flags |= ATR_VFLAG_MODCACHE;
 				}
@@ -7686,7 +7693,7 @@ update_job_node_rassn(void *obj, int is_resv, attribute *pexech, enum batch_op o
 
 			if (op == DECR) {
 				pr->rs_value.at_val.at_long -= nchunk;
-				check_for_negative_resource(prdef, pr, NULL);
+				check_for_negative_resource(prdef, &pr->rs_value, NULL);
 			} else {
 				pr->rs_value.at_val.at_long += nchunk;
 			}
@@ -7701,7 +7708,7 @@ update_job_node_rassn(void *obj, int is_resv, attribute *pexech, enum batch_op o
 		if (pr) {
 			if (op == DECR) {
 				pr->rs_value.at_val.at_long -= nchunk;
-				check_for_negative_resource(prdef, pr, NULL);
+				check_for_negative_resource(prdef, &pr->rs_value, NULL);
 			} else {
 				pr->rs_value.at_val.at_long += nchunk;
 			}
