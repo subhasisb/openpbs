@@ -1090,8 +1090,6 @@ free_server_info(server_info *sinfo)
 	if (sinfo->nodes_by_NASrank != NULL)
 		free(sinfo->nodes_by_NASrank);
 #endif
-
-	free(sinfo);
 }
 
 /**
@@ -1620,6 +1618,11 @@ free_server(server_info *sinfo, int free_objs_too)
 {
 	if (sinfo == NULL)
 		return;
+	/* We need to free the sinfo first to free the calendar. 
+	 * When the calendar is freed, the job events modify the jobs.  We can't
+	 * free the jobs before then.
+	 */
+	free_server_info(sinfo);
 
 	if (free_objs_too) {
 		free_queues(sinfo->queues, 1);
@@ -1630,7 +1633,7 @@ free_server(server_info *sinfo, int free_objs_too)
 #ifdef NAS /* localmod 053 */
 	site_restore_users();
 #endif /* localmod 053 */
-	free_server_info(sinfo);
+	free(sinfo);
 }
 
 /**
