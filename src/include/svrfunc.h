@@ -59,7 +59,7 @@ extern "C" {
 extern int   check_num_cpus(void);
 extern int   chk_hold_priv(long hold, int priv);
 extern void  close_client(int sfds);
-extern int   contact_sched(int, char *jobid, pbs_net_t pbs_scheduler_addr, unsigned int pbs_scheduler_port);
+extern int   contact_sched(int, char *jobid, pbs_sched *psched, enum towhich_conn which_conn);
 extern void  count_node_cpus(void);
 extern int   ctcpus(char *buf, int *hascpp);
 extern void  get_jobowner(char *from, char *to);
@@ -138,6 +138,7 @@ extern int direct_write_requested(job *pjob);
 extern void spool_filename(job *pjob, char *namebuf, char *suffix);
 extern enum failover_state are_we_primary(void);
 extern void license_more_nodes(void);
+void connect_to_scheduler(pbs_sched *psched);
 
 #ifdef	_PROVISION_H
 extern int find_prov_vnode_list(job *pjob, exec_vnode_listtype *prov_vnodes, char **aoe_name);

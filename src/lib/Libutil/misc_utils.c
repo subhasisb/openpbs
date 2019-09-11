@@ -1537,9 +1537,8 @@ set_nodelay(int fd)
 	return setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &opt, sizeof(opt));
 }
 
-
 int
-initialise_connection_table(int table_size)
+initialise_connection_slot(int table_size)
 {
 	int i;
 	int j;
@@ -1552,8 +1551,10 @@ initialise_connection_table(int table_size)
 				connection[i].ch_inuse = 1;
 				connection[i].ch_errno = 0;
 				connection[i].ch_socket= -1;
+				connection[i].ch_secondary_socket = -1;
 				connection[i].ch_errtxt = NULL;
 				connection[i].shard_context = -1;
+				connection[i].conn_exists = 1;
 
 				if (get_max_servers() > 1) {
 					if (connection[i].ch_shards == NULL) {
@@ -1565,6 +1566,7 @@ initialise_connection_table(int table_size)
 						for (j = 0; j < get_current_servers(); j++) {
 							connection[i].ch_shards[j] = malloc(sizeof(struct shard_conn));
 							connection[i].ch_shards[j]->sd = -1;
+							connection[i].ch_shards[j]->secondary_sd = -1;
 							connection[i].ch_shards[j]->state = SHARD_CONN_STATE_DOWN;
 							connection[i].ch_shards[j]->state_change_time = 0;
 							connection[i].ch_shards[j]->last_used = 0;

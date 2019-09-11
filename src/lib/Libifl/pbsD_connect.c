@@ -681,7 +681,8 @@ tryagain:
 
 		DBG_TRACE_SHARD((stderr, "Selected server index %d, srv=%s:%d, state=%d, ", srv_index, pbs_conf.psi[srv_index]->name, pbs_conf.psi[srv_index]->port, connection[channel].ch_shards[srv_index]->state))
 
-		if (connection[channel].ch_shards[srv_index]->state == SHARD_CONN_STATE_FAILED) {
+		if (!connection[channel].conn_exists) {
+			if (connection[channel].ch_shards[srv_index]->state == SHARD_CONN_STATE_FAILED) {
 
 			if (time(0) - connection[channel].ch_shards[srv_index]->state_change_time > 60) {
 				/* it is possible service is back up now, reset state try again */
@@ -710,9 +711,7 @@ tryagain:
 				connection[channel].ch_shards[srv_index]->state = SHARD_CONN_STATE_FAILED;
 				connection[channel].ch_shards[srv_index]->sd = -1;
 				connection[channel].ch_shards[srv_index]->state_change_time = time(0);
-
 				connection[channel].shard_context = -1;
-				
 				goto tryagain;
 			}
 
@@ -724,6 +723,14 @@ tryagain:
 			connection[channel].ch_socket = sd;
 		} else if (connection[channel].ch_shards[srv_index]->state == SHARD_CONN_STATE_CONNECTED) {
 			DBG_TRACE_SHARD((stderr, "already connected!\n"))
+		}
+	} else {
+		if ( connection[channel].ch_shards[srv_index]->state == SHARD_CONN_STATE_CONNECTED)
+			return  connection[channel].ch_shards[srv_index]->sd;
+		else {
+			connection[channel].conn_exists = 0;
+			goto tryagain;
+			}
 		}
 	}
 

@@ -83,6 +83,8 @@ extern char **__pbs_selectjob(int, struct attropl *, char *);
 
 extern int __pbs_sigjob(int, char *, char *, char *);
 
+extern int __pbs_sched_cycle_end(int c, char *scname, int start_or_end, char *extend);
+
 extern void __pbs_statfree(struct batch_status *);
 
 extern struct batch_status *__pbs_statrsc(int, char *, struct attrl *, char *);

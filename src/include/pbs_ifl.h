@@ -729,6 +729,8 @@ extern int pbs_delresv(int, char *, char *);
 
 extern int pbs_terminate(int, int, char *);
 
+extern int pbs_sched_cycle_end(int c, char *scname, int start_or_end, char *extend);
+
 extern char *pbs_modify_resv(int, char*, struct attropl *, char *);
 
 extern int (*internal_connect)(int, char *, int , char *);

@@ -851,6 +851,9 @@ dispatch_request(int sfds, struct batch_request *request)
 		case PBS_BATCH_SelStat:
 			req_selectjobs(request);
 			break;
+		case PBS_BATCH_SchedCycleEnd:
+			req_sched_cycle_end(request);
+			break;
 
 #endif /* !PBS_MOM */
 

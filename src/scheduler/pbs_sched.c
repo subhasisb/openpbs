@@ -111,11 +111,14 @@
 #include	"config.h"
 #include	"fifo.h"
 #include	"globals.h"
+#include	"pbs_sched.h"
+#include 	"misc.h"
 
 struct		connect_handle connection[NCONNECTS];
-int		connector;
+int		connector = -1;
 int		server_sock;
-int		second_connection = -1;
+int		second_sd = -1;
+fd_set		master_fdset;
 
 #define		START_CLIENTS	2	/* minimum number of clients */
 #define		MAX_PORT_NUM 65535
@@ -146,7 +149,7 @@ extern int do_soft_cycle_interrupt;
 extern int do_hard_cycle_interrupt;
 #endif /* localmod 030 */
 
-static int	engage_authentication(struct connect_handle *);
+static int	engage_authentication(int);
 
 extern char *msg_startup1;
 /**
@@ -285,31 +288,30 @@ server_disconnect(int connect)
  * @return	index,i	: if thread is unlocked
  * @retval	-1	: error, not able to connect.
  */
-int
-socket_to_conn(int sock)
+void
+socket_to_conn(int sock, int index)
 {
-	int     i;
+	if (get_max_servers() > 1) {
+		if (connection[connector].ch_shards[index]->sd == -1) {
+			connection[connector].ch_shards[index]->sd = sock;
+			FD_SET(sock, &master_fdset);
+		}
+		else
+			connection[connector].ch_shards[index]->secondary_sd = sock;
 
-	for (i=0; i<NCONNECTS; i++) {
-		if (connection[i].ch_inuse == 0) {
-
-			if (pbs_client_thread_lock_conntable() != 0)
-				return -1;
-
-			connection[i].ch_inuse = 1;
-			connection[i].ch_errno = 0;
-			connection[i].ch_socket= sock;
-			connection[i].ch_errtxt = NULL;
-
-			if (pbs_client_thread_unlock_conntable() != 0)
-				return -1;
-
-			return (i);
+		connection[connector].ch_shards[index]->state = SHARD_CONN_STATE_CONNECTED;
+		connection[connector].ch_shards[index]->state_change_time = time(0);
+	} else {
+		if (connection[connector].ch_socket != -1)
+			connection[connector].ch_secondary_socket = sock;
+		else {
+			connection[connector].ch_socket= sock;
+			FD_SET(sock, &master_fdset);
 		}
 	}
-	pbs_errno = PBSE_NOCONNECTS;
-	return (-1);
+
 }
+
 /**
  * @brief
  * 		add a new client to the list of clients.
@@ -547,17 +549,18 @@ badconn(char *msg)
  *		The returned *jid is a malloc-ed string which must be freed by the
  *		caller.
  */
+
 int
-server_command(char **jid)
+accept_client(int *max_sd)
 {
-	int		new_socket;
+	int		new_socket = -1;
 	pbs_socklen_t	slen;
 	int		i;
-	int		cmd;
 	pbs_net_t	addr;
-	extern	int	get_sched_cmd(int sock, int *val, char **jobid);
-	fd_set		fdset;
-	struct timeval  timeout;
+	int		client_port;
+	char		*svr_id = NULL;
+	int		cmd;
+	char		*endp;
 
 	slen = sizeof(saddr);
 	new_socket = accept(server_sock,
@@ -567,13 +570,17 @@ server_command(char **jid)
 		return SCH_ERROR;
 	}
 
+	if (new_socket > *max_sd)
+		*max_sd = new_socket;
+
 	if (set_nodelay(new_socket) == -1) {
 		snprintf(log_buffer, sizeof(log_buffer), "cannot set nodelay on primary socket connection %d (errno=%d)\n", new_socket, errno);
 		log_err(-1, __func__, log_buffer);
 		return SCH_ERROR;
 	}
 
-	if (ntohs(saddr.sin_port) >= IPPORT_RESERVED) {
+	client_port = ntohs(saddr.sin_port);
+	if (client_port >= IPPORT_RESERVED) {
 		badconn("non-reserved port");
 		close(new_socket);
 		return SCH_ERROR;
@@ -590,92 +597,37 @@ server_command(char **jid)
 		return SCH_ERROR;
 	}
 
-	if ((connector = socket_to_conn(new_socket)) < 0) {
-		log_err(errno, __func__, "socket_to_conn");
-		close(new_socket);
-		return SCH_ERROR;
-	}
+	i = 0;
 
-	if (engage_authentication(&connection [connector]) == -1) {
-		CS_close_socket(new_socket);
-		close(new_socket);
-		return SCH_ERROR;
-	}
-
-	/* get_sched_cmd() located in file get_4byte.c */
-	if (get_sched_cmd(new_socket, &cmd, jid) != 1) {
+	if (get_sched_cmd(new_socket, &cmd, &svr_id) != 1) {
 		log_err(errno, __func__, "get_sched_cmd");
 		CS_close_socket(new_socket);
 		close(new_socket);
 		return SCH_ERROR;
 	}
 
-	/* Obtain the second server socket connnection		*/
-	/* this second connection is for server to communicate	*/
-	/* "super" high priority command like			*/
-	/* SCH_SCHEDULE_RESTART_CYCLE				*/
-	/* This won't cause scheduling to quit if an error      */
-	/* resulted in obtaining this second connection.	*/
-	timeout.tv_usec = 0;
-	timeout.tv_sec  = 1;
-
-	FD_ZERO(&fdset);
-	FD_SET(server_sock, &fdset);
-	if ((select(FD_SETSIZE, &fdset, NULL, NULL,
-		&timeout) != -1)  && (FD_ISSET(server_sock, &fdset))) {
-		int	cmd2;
-		char	*jid2 = NULL;
-
-		second_connection = accept(server_sock,
-			(struct sockaddr *)&saddr, &slen);
-		if (second_connection == -1) {
-			log_err(errno, __func__,
-				"warning: failed to get second_connection");
-			return cmd; /* bail out early */
-		}
-
-		if (set_nodelay(second_connection) == -1) {
-			snprintf(log_buffer, sizeof(log_buffer), "cannot set nodelay on secondary socket connection %d (errno=%d)\n", second_connection, errno);
-			log_err(-1, __func__, log_buffer);
-			return cmd;
-		}
-
-		if (ntohs(saddr.sin_port) >= IPPORT_RESERVED) {
-			badconn("second_connection: non-reserved port");
-			close(second_connection);
-			second_connection = -1;
-			return cmd;
-		}
-
-		addr = (pbs_net_t)saddr.sin_addr.s_addr;
-		for (i=0; i<numclients; i++) {
-			if (addr == okclients[i])
-				break;
-		}
-
-		if (i == numclients) {
-			badconn("second_connection: unauthorized host");
-			close(second_connection);
-			second_connection = -1;
-			return cmd;
-		}
-
-		if (get_sched_cmd(second_connection, &cmd2, &jid2) != 1) {
-			log_err(errno, __func__, "get_sched_cmd");
-			close(second_connection);
-			second_connection = -1;
-		}
-
-		if (jid2 != NULL) {
-			free(jid2);
-		}
-	} else {
-		log_event(PBSEVENT_DEBUG, LOG_DEBUG,
-			PBS_EVENTCLASS_SERVER, __func__,
-			"warning: timed-out getting second_connection");
+	if (cmd == SCH_SVR_IDENTIFIER)
+		i = strtol(svr_id, &endp, 10);
+	else {
+		log_err(errno, __func__, "wrong server identifier");
+		close(new_socket);
+		return SCH_ERROR;
 	}
 
-	return cmd;
+	if (svr_id != NULL) {
+		free(svr_id);
+		svr_id = NULL;
+	}
+
+	socket_to_conn(new_socket, i);
+	if (engage_authentication(new_socket) == -1) {
+		CS_close_socket(new_socket);
+		close(new_socket);
+		return SCH_ERROR;
+	}
+
+	return 0;
+
 }
 
 /**
@@ -694,19 +646,18 @@ server_command(char **jid)
  *              information is closed out (freed).
  */
 static int
-engage_authentication(struct connect_handle *phandle)
+engage_authentication(int sock)
 {
 	int	ret;
-	int	sd;
 
-	if (phandle == NULL || (sd = phandle->ch_socket) <0) {
+	if (sock <0) {
 
 		cs_logerr(0, "engage_authentication",
 			"Bad arguments, unable to authenticate.");
 		return (-1);
 	}
 
-	if ((ret = CS_server_auth(sd)) == CS_SUCCESS)
+	if ((ret = CS_server_auth(sock)) == CS_SUCCESS)
 		return (0);
 
 	if (ret == CS_AUTH_CHECK_PORT) {
@@ -884,6 +835,7 @@ main(int argc, char *argv[])
 	int		t = 1;
 	pid_t		pid;
 	char		host[PBS_MAXHOSTNAME+1];
+	int 		max_sd;
 #ifndef DEBUG
 	char		*dbfile = "sched_out";
 #endif
@@ -893,7 +845,7 @@ main(int argc, char *argv[])
 	extern	int	optind, opterr;
 	char	       *runjobid = NULL;
 	extern	int	rpp_fd;
-	fd_set		fdset;
+	fd_set		read_fdset;
 	int		opt_no_restart = 0;
 #ifdef NAS /* localmod 031 */
 	time_t		now;
@@ -910,6 +862,7 @@ main(int argc, char *argv[])
 #ifdef  RLIMIT_CORE
 	int      	char_in_cname = 0;
 #endif  /* RLIMIT_CORE */
+	int 		j;
 
 	/*the real deal or show version and exit?*/
 
@@ -1177,7 +1130,7 @@ main(int argc, char *argv[])
 		}
 	}
 
-	if (listen(server_sock, 5) < 0) {
+	if (listen(server_sock, 100) < 0) {
 		log_err(errno, __func__, "listen");
 		die(0);
 	}
@@ -1397,19 +1350,34 @@ main(int argc, char *argv[])
 		}
 	}
 
-	FD_ZERO(&fdset);
-	for (go=1; go;) {
-		int	cmd;
+	connector = initialise_connection_slot(NCONNECTS);
+	if (connector == -1) {
+		log_err(-1, __func__, "connection table initialization failed");
+		die(0);
+	}
 
+	FD_ZERO(&master_fdset);
+	FD_SET(server_sock, &master_fdset);
+	max_sd = server_sock;
+
+	if ((pbs_conf.pbs_use_tcp == 0) && (rpp_fd != -1)) {
 		/*
 		 * with TPP, we don't need to drive rpp_io(), so
 		 * no need to add it to be monitored
 		 */
-		if (pbs_conf.pbs_use_tcp == 0 && rpp_fd != -1)
-			FD_SET(rpp_fd, &fdset);
+		FD_SET(rpp_fd, &master_fdset);
+		if (rpp_fd > server_sock)
+			max_sd = rpp_fd;
+	}
 
-		FD_SET(server_sock, &fdset);
-		if (select(FD_SETSIZE, &fdset, NULL, NULL, NULL) == -1) {
+	for (go=1; go;) {
+		int	cmd;
+		int	i;
+
+		FD_ZERO(&read_fdset);
+		memcpy(&read_fdset, &master_fdset, sizeof(master_fdset));
+
+		if (select(max_sd + 1, &read_fdset, NULL, NULL, NULL) < 0) {
 			if (errno != EINTR) {
 				log_err(errno, __func__, "select");
 				die(0);
@@ -1417,59 +1385,117 @@ main(int argc, char *argv[])
 			continue;
 		}
 
-		if (pbs_conf.pbs_use_tcp == 0 && rpp_fd != -1 && FD_ISSET(rpp_fd, &fdset)) {
+		if ((pbs_conf.pbs_use_tcp == 0) && (rpp_fd != -1) && FD_ISSET(rpp_fd, &read_fdset)) {
 			if (rpp_io() == -1)
 				log_err(errno, __func__, "rpp_io");
 		}
-		if (!FD_ISSET(server_sock, &fdset))
-			continue;
 
-		/* connector is set in server_connect() */
-		cmd = server_command(&runjobid);
-
-		if (connector >= 0) {
-			/* update sched object attributes on server */
-			update_svr_schedobj(connector, cmd, alarm_time);
-
-			if (sigprocmask(SIG_BLOCK, &allsigs, &oldsigs) == -1)
-				log_err(errno, __func__, "sigprocmask(SIG_BLOCK)");
-
-			/* Keep track of time to use in SIGSEGV handler */
-#ifdef NAS /* localmod 031 */
-			now = time(NULL);
-			if (!opt_no_restart)
-				segv_last_time = now;
-			{
-				strftime(log_buffer, sizeof(log_buffer),
-					"%Y-%m-%d %H:%M:%S", localtime(&now));
-				printf("%s Scheduler received command %d\n", log_buffer, cmd);
-			}
-#else
-			if (!opt_no_restart)
-				segv_last_time = time(NULL);
-
-			DBPRT(("Scheduler received command %d\n", cmd));
-#endif /* localmod 031 */
-
-			if (schedule(cmd, connector, runjobid)) /* magic happens here */ {
-				go = 0;
-			}
-			if (second_connection != -1) {
-				close(second_connection);
-				second_connection = -1;
-			}
-
-			if (server_disconnect(connector))
-				connector = -1;
-
-			if (runjobid != NULL) {
-				free(runjobid);
-				runjobid = NULL;
-			}
-
-			if (sigprocmask(SIG_SETMASK, &oldsigs, NULL) == -1)
-				log_err(errno, __func__, "sigprocmask(SIG_SETMASK)");
+		if (FD_ISSET(server_sock, &read_fdset)) {
+			if (accept_client(&max_sd) != 0)
+				die(0);
 		}
+
+		for (i = 0; i < get_current_servers(); i++) {
+			int sock_to_check;
+
+			if (get_max_servers() > 1) {
+				sock_to_check = connection[connector].ch_shards[i]->sd;
+			}
+			else
+				sock_to_check = connection[connector].ch_socket;
+
+			if ((sock_to_check != -1) && FD_ISSET(sock_to_check, &read_fdset)) {
+				int ret;
+				ret = get_sched_cmd(sock_to_check, &cmd, &runjobid);
+				if (ret != 1) {
+					CS_close_socket(sock_to_check);
+					close(sock_to_check);
+					FD_CLR(sock_to_check, &master_fdset);
+					if (get_max_servers() > 1) {
+						connection[connector].ch_shards[i]->sd = -1;
+						CS_close_socket(connection[connector].ch_shards[i]->secondary_sd);
+						close(connection[connector].ch_shards[i]->secondary_sd);
+						FD_CLR(connection[connector].ch_shards[i]->secondary_sd, &master_fdset);
+						connection[connector].ch_shards[i]->secondary_sd = -1;
+						connection[connector].ch_shards[i]->state = SHARD_CONN_STATE_DOWN;
+					}
+					else {
+						connection[connector].ch_socket = -1;
+						CS_close_socket(connection[connector].ch_secondary_socket);
+						close(connection[connector].ch_secondary_socket);
+						FD_CLR(connection[connector].ch_secondary_socket, &master_fdset);
+						connection[connector].ch_secondary_socket = -1;
+					}
+					log_err(errno, __func__, "get_sched_cmd");
+				} else {
+					if (connector >= 0) {
+						/* update sched object attributes on server */
+						update_svr_schedobj(connector, cmd, alarm_time);
+
+						if (sigprocmask(SIG_BLOCK, &allsigs, &oldsigs) == -1)
+							log_err(errno, __func__, "sigprocmask(SIG_BLOCK)");
+
+						/* Keep track of time to use in SIGSEGV handler */
+			#ifdef NAS /* localmod 031 */
+						now = time(NULL);
+						if (!opt_no_restart)
+							segv_last_time = now;
+						{
+							strftime(log_buffer, sizeof(log_buffer),
+								"%Y-%m-%d %H:%M:%S", localtime(&now));
+							printf("%s Scheduler received command %d\n", log_buffer, cmd);
+						}
+			#else
+						if (!opt_no_restart)
+							segv_last_time = time(NULL);
+
+						DBPRT(("Scheduler received command %d\n", cmd));
+			#endif /* localmod 031 */
+
+						if (get_max_servers()  > 1)
+							second_sd = connection[connector].ch_shards[i]->secondary_sd;
+						else
+							second_sd = connection[connector].ch_secondary_socket;
+
+						if (pbs_sched_cycle_end(connector, sc_name, 1, NULL)) {
+							char *errmsg;
+							errmsg = pbs_geterrmsg(connector);
+							if (errmsg == NULL)
+								errmsg = "";
+							sprintf(log_buffer, "pbs_sched_cycle_end while sending sched cycle start indication failed: %s (%d)",
+									errmsg, pbs_errno);
+							schdlog(PBSEVENT_SCHED, PBS_EVENTCLASS_SERVER, LOG_NOTICE, __func__,
+								log_buffer);
+						}
+
+						if (schedule(cmd, connector, runjobid))  /* magic happens here */ {
+							go = 0;
+						}
+
+						ret = pbs_sched_cycle_end(connector, sc_name, 0, NULL);
+						if (ret != 0) {
+							char *errmsg;
+							errmsg = pbs_geterrmsg(connector);
+							if (errmsg == NULL)
+								errmsg = "";
+							sprintf(log_buffer, "pbs_sched_cycle_end while sending sched cycle end indication failed : %s (%d)",
+									errmsg, pbs_errno);
+							schdlog(PBSEVENT_SCHED, PBS_EVENTCLASS_SERVER, LOG_NOTICE, __func__,
+								log_buffer);
+						}
+
+						if (runjobid != NULL) {
+							free(runjobid);
+							runjobid = NULL;
+						}
+						if (sigprocmask(SIG_SETMASK, &oldsigs, NULL) == -1)
+							log_err(errno, __func__, "sigprocmask(SIG_SETMASK)");
+					}
+
+				}
+			}
+		}
+
 	}
 
 	sprintf(log_buffer, "%s normal finish pid %ld", argv[0], (long)pid);
@@ -1477,5 +1503,18 @@ main(int argc, char *argv[])
 	lock_out(lockfds, F_UNLCK);
 
 	(void)close(server_sock);
+
+	if (connector != -1) {
+		if (get_max_servers() > 1) {
+			for (j = 0; j < get_current_servers(); j++) {
+				close(connection[connector].ch_shards[j]->sd);
+				close(connection[connector].ch_shards[j]->secondary_sd);
+			}
+		} else {
+			close(connection[connector].ch_socket);
+			close(connection[connector].ch_secondary_socket);
+		}
+	}
+
 	exit(0);
 }

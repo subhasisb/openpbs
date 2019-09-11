@@ -50,6 +50,9 @@
 #include <stdlib.h>
 #include "dis.h"
 #include "sched_cmds.h"
+#include "pbs_sched.h"
+#include "log.h"
+#include "misc.h"
 
 #ifndef WIN32
 #include <sys/types.h>
@@ -81,24 +84,25 @@
  */
 
 int
-get_sched_cmd(int sock, int *val, char **jid)
+get_sched_cmd(int sock, int *val, char **identifier)
 {
 	int	i;
 	int     rc = 0;
-	char	*jobid = NULL;
+	char	*id_num = NULL;
+
 
 	DIS_tcp_setup(sock);
 
 	i = disrsi(sock, &rc);
 	if (rc != 0)
 		goto err;
-	if (i == SCH_SCHEDULE_AJOB) {
-		jobid = disrst(sock, &rc);
+	if ((i == SCH_SCHEDULE_AJOB) || (i== SCH_SVR_IDENTIFIER)) {
+		id_num = disrst(sock, &rc);
 		if (rc != 0)
 			goto err;
-		*jid = jobid;
+		*identifier = id_num;
 	} else {
-		*jid = NULL;
+		*identifier = NULL;
 	}
 	*val = i;
 	return 1;
@@ -136,12 +140,13 @@ get_sched_cmd_noblk(int sock, int *val, char **jid)
 	fd_set		fdset;
 	timeout.tv_usec = 0;
 	timeout.tv_sec  = 0;
+	extern int second_sd;
 
 	FD_ZERO(&fdset);
-	FD_SET(sock, &fdset);
+	FD_SET(second_sd, &fdset);
 	if ((select(FD_SETSIZE, &fdset, NULL, NULL,
-		&timeout) != -1)  && (FD_ISSET(sock, &fdset))) {
-		return (get_sched_cmd(sock, val, jid));
+		&timeout) != -1)  && (FD_ISSET(second_sd, &fdset))) {
+		return (get_sched_cmd(second_sd, val, jid));
 	}
 	return (0);
 }

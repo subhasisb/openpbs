@@ -1931,7 +1931,7 @@ get_server_stream(char *svr, unsigned int port)
 	if (pbs_conf.pbs_max_servers > 1) {		
 		int conn_slot;
 		int *jobid = NULL;
-		if ((conn_slot = initialise_connection_table(NCONNECTS)) == -1) {
+		if ((conn_slot = initialise_connection_slot(NCONNECTS)) == -1) {
 			log_err(-1, __func__, "connection table initialization failed");
 			return -1;
 		}

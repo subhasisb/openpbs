@@ -162,6 +162,7 @@ libpbs_la_SOURCES = \
 	../Libifl/dec_RunJob.c \
 	../Libifl/dec_Shut.c \
 	../Libifl/dec_Sig.c \
+	../Libifl/dec_SchedCycleEnd.c \
 	../Libifl/dec_Status.c \
 	../Libifl/dec_Track.c \
 	../Libifl/dec_attrl.c \
@@ -186,6 +187,7 @@ libpbs_la_SOURCES = \
 	../Libifl/enc_RunJob.c \
 	../Libifl/enc_Shut.c \
 	../Libifl/enc_Sig.c \
+	../Libifl/enc_SchedCycleEnd.c \
 	../Libifl/enc_Status.c \
 	../Libifl/enc_Track.c \
 	../Libifl/enc_attrl.c \
@@ -255,12 +257,14 @@ libpbs_la_SOURCES = \
 	../Libifl/pbsD_defschreply.c \
 	../Libifl/pbsD_statrsc.c \
 	../Libifl/pbsD_modify_resv.c \
+	../Libifl/pbsD_cycle_end.c \
 	../Libifl/ifl_impl.c \
 	../Libifl/rpp.c \
 	../Libifl/strsep.c \
 	../Libifl/tcp_dis.c \
 	../Libifl/tm.c \
 	../Libifl/xml_encode_decode.c \
+	../Libifl/int_sched_cycle_end.c \
 	../Liblog/pbs_messages.c \
 	../Libsec/cs_standard.c \
 	../Libutil/misc_utils.c \

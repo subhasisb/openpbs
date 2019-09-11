@@ -67,6 +67,8 @@ extern "C" {
 #define SCHED_TRX_CHK 1
 #define SCHED_TRX_NOCHK 0
 
+#define MAX_SVR_INDEX 10
+
 /*attributes for the server's sched object*/
 enum sched_atr {
 	SCHED_ATR_SchedHost,
@@ -106,9 +108,15 @@ typedef struct pbs_sched {
 	char sc_name[PBS_MAXSCHEDNAME + 1];
 	char sch_svtime[DB_TIMESTAMP_LEN + 1];
 	struct memcache_state trx_status;
+	int sched_cycle_started;
 	/* sched object's attributes  */
 	attribute sch_attr[SCHED_ATR_LAST];
 } pbs_sched;
+
+
+enum towhich_conn {
+	PRIMARY,
+	SECONDARY,};
 
 
 extern pbs_sched *dflt_scheduler;
@@ -125,6 +133,7 @@ extern int sched_delete(pbs_sched *psched);
 extern pbs_sched *find_sched(char *sched_name, int lock);
 extern pbs_net_t pbs_scheduler_addr;
 extern unsigned int pbs_scheduler_port;
+extern int get_sched_cmd(int sock, int *val, char **identifier);
 
 #ifdef	__cplusplus
 }

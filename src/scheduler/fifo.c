@@ -128,7 +128,7 @@ static int last_running_size = 0;
 extern void win_toolong(void);
 #endif
 
-extern int	second_connection;
+extern int	second_sd;
 extern int	get_sched_cmd_noblk(int sock, int *val, char **jobid);
 
 /**
@@ -1081,11 +1081,11 @@ main_sched_loop(status *policy, int sd, server_info *sinfo, schd_error **rerr)
 		}
 
 		if (!end_cycle) {
-			if (second_connection != -1) {
+			if (sd != -1) {
 				char *jid = NULL;
 
 				/* get_sched_cmd_noblk() located in file get_4byte.c */
-				if ((get_sched_cmd_noblk(second_connection, &cmd, &jid) == 1) &&
+				if ((get_sched_cmd_noblk(sd, &cmd, &jid) == 1) &&
 					(cmd == SCH_SCHEDULE_RESTART_CYCLE)) {
 					schdlog(PBSEVENT_SCHED, PBS_EVENTCLASS_JOB, LOG_WARNING,
 						njob->name, "Leaving scheduling cycle as requested by server.");

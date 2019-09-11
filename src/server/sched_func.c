@@ -281,7 +281,7 @@ action_sched_priv(attribute *pattr, void *pobj, int actmode)
 			}
 			psched = (pbs_sched*) GET_NEXT(psched->sc_link);
 		}
-		(void)contact_sched(SCH_ATTRS_CONFIGURE, NULL, psched->pbs_scheduler_addr, psched->pbs_scheduler_port);
+		(void)contact_sched(SCH_ATTRS_CONFIGURE, NULL, psched, PRIMARY);
 	}
 
 	return PBSE_NONE;
@@ -322,7 +322,7 @@ action_sched_log(attribute *pattr, void *pobj, int actmode)
 			}
 			psched = (pbs_sched*) GET_NEXT(psched->sc_link);
 		}
-		(void)contact_sched(SCH_ATTRS_CONFIGURE, NULL, psched->pbs_scheduler_addr, psched->pbs_scheduler_port);
+		(void)contact_sched(SCH_ATTRS_CONFIGURE, NULL, psched, PRIMARY);
 
 	}
 
@@ -406,6 +406,7 @@ poke_scheduler(attribute *pattr, void *pobj, int actmode)
 			if (pattr->at_val.at_long)
 				set_scheduler_flag(SCH_SCHEDULE_CMD, dflt_scheduler);
 		}
+		server.sv_attr[(int)SRV_ATR_State].at_flags |= ATR_VFLAG_MODCACHE;
 	} else {
 		if (actmode == ATR_ACTION_ALTER) {
 			if (pattr->at_val.at_long)
@@ -521,7 +522,7 @@ action_sched_partition(attribute *pattr, void *pobj, int actmode)
 				}
 			}
 		}
-		(void)contact_sched(SCH_ATTRS_CONFIGURE, NULL, pin_sched->pbs_scheduler_addr, pin_sched->pbs_scheduler_port);
+		(void)contact_sched(SCH_ATTRS_CONFIGURE, NULL, pin_sched, PRIMARY);
 	}
 
 	return PBSE_NONE;

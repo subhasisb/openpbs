@@ -201,6 +201,13 @@ struct rq_signal {
 	char	rq_signame[PBS_SIGNAMESZ+1];
 };
 
+/* SchdCycleEnd */
+
+struct rq_sched_cycle_end {
+	char 	*rq_scname;
+	int	rq_start_or_stop;
+};
+
 /* Status (job, queue, server, hook) */
 
 struct rq_status {
@@ -365,6 +372,7 @@ struct batch_request {
 		struct rq_defschrpy     rq_defrpy;
 		struct rq_hookfile	rq_hookfile;
 		struct rq_momrestart	rq_momrestart;
+		struct rq_sched_cycle_end rq_sched_cycle_end;
 	} rq_ind;
 };
 
@@ -386,6 +394,7 @@ extern int   isode_request_read(int, struct batch_request *);
 extern void  req_stat_job(struct batch_request *);
 extern void  req_stat_resv(struct batch_request *);
 extern void  req_stat_resc(struct batch_request *);
+extern void  req_sched_cycle_end(struct batch_request *preq);
 extern void  req_rerunjob(struct batch_request *req);
 extern void  arrayfree(char **array);
 
@@ -450,6 +459,7 @@ extern int decode_DIS_Status(int socket, struct batch_request *);
 extern int decode_DIS_TrackJob(int socket, struct batch_request *);
 extern int decode_DIS_replySvr(int socket, struct batch_reply *);
 extern int decode_DIS_svrattrl(int socket, pbs_list_head *);
+extern int decode_DIS_SchedCycleEnd(int sock, struct batch_request *preq);
 
 extern int encode_DIS_failover(int socket, struct batch_request *);
 extern int encode_DIS_CopyFiles(int socket, struct batch_request *);
@@ -460,6 +470,7 @@ extern int encode_DIS_TrackJob(int socket, struct batch_request *);
 extern int encode_DIS_reply(int socket, struct batch_reply *);
 extern int encode_DIS_replyRPP(int socket, char *, struct batch_reply *);
 extern int encode_DIS_svrattrl(int socket, svrattrl *);
+extern int encode_DIS_SchedCycleEnd(int sock, char *scname, int start_or_end);
 
 extern int dis_request_read(int socket, struct batch_request *);
 extern int dis_reply_read(int socket, struct batch_reply *, int rpp);

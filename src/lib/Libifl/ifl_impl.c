@@ -717,3 +717,21 @@ int
 pbs_terminate(int c, int manner, char *extend) {
 	return __pbs_terminate(c, manner, extend);
 }
+
+/**
+ * @brief
+ *	Pass-through call to sends and reads signal job batch request.
+ *
+ * @param[in] c - communication handle
+ * @param[in] scname -scheduler name
+ * @param[in] extend - extend string for request
+ *
+ * @return	int
+ * @retval	0	success
+ * @retval	!0	error
+ *
+ */
+int
+pbs_sched_cycle_end(int c, char *scname, int start_or_end, char *extend) {
+	return __pbs_sched_cycle_end(c, scname, start_or_end, extend);
+}

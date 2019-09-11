@@ -143,7 +143,8 @@ extern char pbs_current_group[];
 
 struct shard_conn {
 	int 	sd;
-	int		state;
+	int	secondary_sd;
+	int	state;
 	time_t	state_change_time;
 	time_t 	last_used;
 };
@@ -157,6 +158,8 @@ struct connect_handle {
 	pthread_mutex_t ch_mutex;  /* serialize connection between threads */
 	struct shard_conn **ch_shards; /* handles to multiple sharded servers */
 	int 	shard_context; /* last server to which dialogue was going on */
+	int	ch_secondary_socket;
+	int	conn_exists;
 };
 extern struct connect_handle connection[];
 #define PBS_MAX_CONNECTIONS        5000  /* Max connections in the connections array */
@@ -296,6 +299,7 @@ struct batch_reply {
 #define PBS_BATCH_RelnodesJob	90
 #define PBS_BATCH_ModifyResv	91
 #define PBS_BATCH_ResvOccurEnd	92
+#define PBS_BATCH_SchedCycleEnd 93
 
 #define PBS_BATCH_FileOpt_Default	0
 #define PBS_BATCH_FileOpt_OFlg		1
@@ -342,6 +346,7 @@ extern int PBSD_relnodes_put(int connect, char *jobid,
 extern int PBSD_py_spawn_put(int connect, char *jobid,
 	char **argv, char **envp, int rpp, char **msgid);
 extern int PBSD_sig_put(int connect, char *jobid, char *signal, char *extend, int rpp, char **msgid);
+extern int PBSD_sched_cycle_end_put(int c, char *scname, int start_or_end, char *extend, int rpp, char **msgid);
 extern int PBSD_term_put(int connect, int manner, char *extend);
 extern int PBSD_jobfile(int connect, int req_type, char *path,
 	char *jobid, enum job_file which, int rpp, char **msgid);
@@ -386,6 +391,7 @@ extern int encode_DIS_Run(int socket, char *jid, char *where,
 	unsigned long resch);
 extern int encode_DIS_ShutDown(int socket, int manner);
 extern int encode_DIS_SignalJob(int socket, char *jid, char *sig);
+extern int encode_DIS_SchedCycleEnd(int sock, char *scname, int start_or_end);
 extern int encode_DIS_Status(int socket, char *objid, struct attrl *);
 extern int encode_DIS_attrl(int socket, struct attrl *);
 extern int encode_DIS_attropl(int socket, struct attropl *);
@@ -403,6 +409,7 @@ extern char *PBSD_modify_resv(int connect, char *resv_id,
 	struct attropl *attrib, char *extend);
 
 int initialise_connection_table(int table_size);
+int initialise_connection_slot(int table_size);
 #ifdef	__cplusplus
 }
 #endif
