@@ -118,6 +118,10 @@ pg_db_prepare_que_sqls(pbs_db_conn_t *conn)
 	if (pg_prepare_stmt(conn, STMT_SELECT_QUE, conn->conn_sql, 1) != 0)
 		return -1;
 
+	strcat(conn->conn_sql, " FOR UPDATE");
+	if (pg_prepare_stmt(conn, STMT_SELECT_QUE_LOCKED, conn->conn_sql, 1) != 0)
+		return -1;
+
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select qu_name, "
 			"qu_type, "
 			"qu_deleted, "
@@ -128,10 +132,6 @@ pg_db_prepare_que_sqls(pbs_db_conn_t *conn)
 			"where qu_savetm > to_timestamp($1, 'YYYY-MM-DD HH24:MI:SS:US') "
 			"order by qu_savetm ");
 	if (pg_prepare_stmt(conn, STMT_FIND_QUES_FROM_TIME_ORDBY_SAVETM, conn->conn_sql, 1) != 0)
-		return -1;
-
-	strcat(conn->conn_sql, " FOR UPDATE");
-	if (pg_prepare_stmt(conn, STMT_SELECT_QUE_LOCKED, conn->conn_sql, 1) != 0)
 		return -1;
 
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select "

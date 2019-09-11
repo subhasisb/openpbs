@@ -133,7 +133,7 @@ static int status_resv(resc_resv *, struct batch_request *, pbs_list_head *);
 extern pbs_sched *find_scheduler(char *sched_name);
 static int get_all_db_jobs();
 static int get_all_db_resvs();
-static int get_all_db_queues();
+int 	    get_all_db_queues();
 
 /**
  * @brief
@@ -494,7 +494,7 @@ get_all_db_jobs()
  * @return	0 - success
  * 			1 - fail/error
  */
-static int
+int
 get_all_db_queues() {
 	pbs_db_que_info_t	dbque;
 	pbs_db_obj_info_t	dbobj;

@@ -1906,6 +1906,11 @@ action_entlim_chk(attribute *pattr, void *pobject, int actmode)
 		log_mixed_limit_controls(NULL, i, "old");
 		return PBSE_MIXENTLIMS;
 	}
+	/* refresh the queue list from db */
+	if (get_all_db_queues()) {
+		log_err(-1, __func__, "Failed to refresh queues from db");
+		return 1;
+	}
 	pq = (pbs_queue *)GET_NEXT(svr_queues);
 	while (pq) {
 		if ((i=is_attrs_in_list_set(que_oldstyle, pq->qu_attr)) != -1) {
@@ -2134,6 +2139,13 @@ int actmode;
 		log_mixed_limit_controls(NULL, i, "new");
 		return PBSE_MIXENTLIMS;
 	}
+
+	/* refresh the queue list from db */
+	if (get_all_db_queues()) {
+		log_err(-1, __func__, "Failed to refresh queues from db");
+		return 1;
+	}
+
 	pq = (pbs_queue *)GET_NEXT(svr_queues);
 	while (pq) {
 		if ((i=is_attrs_in_list_set(que_newstyle, pq->qu_attr)) != -1) {

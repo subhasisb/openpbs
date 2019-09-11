@@ -142,6 +142,10 @@ pg_db_prepare_resv_sqls(pbs_db_conn_t *conn)
 	if (pg_prepare_stmt(conn, STMT_SELECT_RESV, conn->conn_sql, 1) != 0)
 		return -1;
 
+	strcat(conn->conn_sql, " FOR UPDATE");
+	if (pg_prepare_stmt(conn, STMT_SELECT_RESV_LOCKED, conn->conn_sql, 1) != 0)
+		return -1;
+
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select "
 		"ri_resvID, "
 		"ri_queue, "
@@ -164,10 +168,6 @@ pg_db_prepare_resv_sqls(pbs_db_conn_t *conn)
 		"from pbs.resv where ri_savetm > to_timestamp($1, 'YYYY-MM-DD HH24:MI:SS:US') "
 		"order by ri_savetm ");
 	if (pg_prepare_stmt(conn, STMT_FINDRESVS_FROM_TIME_ORDBY_SAVETM, conn->conn_sql, 1) != 0)
-		return -1;
-
-	strcat(conn->conn_sql, " FOR UPDATE");
-	if (pg_prepare_stmt(conn, STMT_SELECT_RESV_LOCKED, conn->conn_sql, 1) != 0)
 		return -1;
 
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select "

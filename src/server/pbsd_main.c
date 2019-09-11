@@ -2099,8 +2099,12 @@ try_db_again:
 			}
 		}
 
+		/* refresh the queue list from db */
+		if (get_all_db_queues()) {
+			log_err(-1, __func__, "Failed to refresh queues from db");
+			/* TODO: Need to handle error here */
+		}
 		/* any jobs to route today */
-
 		pque = (pbs_queue *)GET_NEXT(svr_queues);
 		while (pque) {
 			if (pque->qu_qs.qu_type == QTYPE_RoutePush)

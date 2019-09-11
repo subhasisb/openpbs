@@ -1415,6 +1415,11 @@ mgr_queue_delete(struct batch_request *preq)
 			return;
 		}
 		problem_cnt = 0;
+		if (get_all_db_queues()) {
+			log_err(-1, __func__, "Failed to refresh queues from db");
+			req_reject(PBSE_SYSTEM, 0, preq);
+			return;
+		}
 		pque = (pbs_queue *)GET_NEXT(svr_queues);
 	}
 
@@ -1899,17 +1904,24 @@ mgr_queue_set(struct batch_request *preq)
 	pbs_queue *pque;
 	char      *qname;
 	int	   rc;
-
+	pbs_db_conn_t	*conn = (pbs_db_conn_t *) svr_db_conn;
+	char 		bak_qu_name[PBS_MAXQUEUENAME + 1] = {0}; /* back up the qname for logging error */
+	pbs_queue 	*bak_nxt_q_link; 			 /* back up the next queue addr */
 
 	if ((*preq->rq_ind.rq_manager.rq_objname == '\0') ||
 		(*preq->rq_ind.rq_manager.rq_objname == '@')) {
 		qname   = all_quename;
 		allques = 1;
+		if (get_all_db_queues()) {
+			log_err(-1, __func__, "Failed to refresh queues from db");
+			req_reject(PBSE_SYSTEM, 0, preq);
+			return;
+		}
 		pque = (pbs_queue *)GET_NEXT(svr_queues);
 	} else {
 		qname   = preq->rq_ind.rq_manager.rq_objname;
 		allques = 0;
-		pque = find_queuebyname(qname, 0);
+		pque = find_queuebyname(qname, 1);
 	}
 	if (pque == NULL) {
 		req_reject(PBSE_UNKQUE, 0, preq);
@@ -1922,22 +1934,53 @@ mgr_queue_set(struct batch_request *preq)
 		preq->rq_user, preq->rq_host);
 	log_event(PBSEVENT_ADMIN, PBS_EVENTCLASS_QUEUE, LOG_INFO,
 		qname, log_buffer);
-	if (allques)
-		pque = (pbs_queue *)GET_NEXT(svr_queues);
+	/* already got the pointer, see at line 1916*/
+	/*if (allques)
+		pque = (pbs_queue *)GET_NEXT(svr_queues);*/
 
 	plist = (svrattrl *)GET_NEXT(preq->rq_ind.rq_manager.rq_attr);
 
 	while (pque) {
+		if (pbs_db_begin_trx(conn, 0, 0) != 0) {
+			req_reject(PBSE_SYSTEM, 0, preq);
+			return;
+		}
+		bak_nxt_q_link = (pbs_queue *)GET_NEXT(pque->qu_link);
+		strcpy(bak_qu_name, pque->qu_qs.qu_name);
+		pque = que_recov_db(pque->qu_qs.qu_name, pque, 1);
+		if(pque == NULL) {
+			(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
+			sprintf(log_buffer, "Failed to fetch Queue %s or doesn't exist in db", bak_qu_name);
+			log_err(-1, __func__, log_buffer);
+			if (allques) {
+				/* for all queues */
+				pque = bak_nxt_q_link;
+				continue;
+			} else {
+				/* for a single queue */
+				req_reject(PBSE_UNKQUE, 0, preq);
+				return;
+			}
+		}
+
 		rc = mgr_set_attr(pque->qu_attr, que_attr_def, QA_ATR_LAST,
 			plist, preq->rq_perm, &bad, (void *)pque,
 			ATR_ACTION_ALTER);
 		if (rc != 0) {
+			(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
 			reply_badattr(rc, bad, plist, preq);
 			return;
 		} else {
 			que_save_db(pque, QUE_SAVE_FULL);
+			if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0) {
+				sprintf(log_buffer, "Failed to commit queue %s updated attributes in db", pque->qu_qs.qu_name);
+				log_err(-1, __func__, log_buffer);
+				req_reject(PBSE_SYSTEM, 0, preq);
+				return;
+			}
 			mgr_log_attr(msg_man_set, plist, PBS_EVENTCLASS_QUEUE, pque->qu_qs.qu_name, NULL);
 		}
+
 		if (allques)
 			pque = (pbs_queue *)GET_NEXT(pque->qu_link);
 		else
@@ -1981,16 +2024,21 @@ mgr_queue_unset(struct batch_request *preq)
 	svrattrl  *plist;
 	pbs_queue *pque;
 	char      *qname;
-	int	   rc;
-	pbs_db_conn_t		*conn = (pbs_db_conn_t *) svr_db_conn;
-
-	if (pbs_db_begin_trx(conn, 0, 0) != 0)
-		goto err;
+	int		rc;
+	pbs_db_conn_t	*conn = (pbs_db_conn_t *) svr_db_conn;
+	char 		bak_qu_name[PBS_MAXQUEUENAME + 1] = {0}; /* back up the qname for logging error */
+	pbs_queue 	*bak_nxt_q_link;                         /* back up the next queue addr */
 
 	if ((*preq->rq_ind.rq_manager.rq_objname == '\0') ||
 		(*preq->rq_ind.rq_manager.rq_objname == '@')) {
 		qname   = all_quename;
 		allques = 1;
+		/* refresh all the queues with latest data */
+		if (get_all_db_queues()) {
+			log_err(-1, __func__, "Failed to refresh queues from db");
+			req_reject(PBSE_SYSTEM, 0, preq);
+			return;
+		}
 		pque = (pbs_queue *)GET_NEXT(svr_queues);
 	} else {
 		allques = 0;
@@ -2018,10 +2066,32 @@ mgr_queue_unset(struct batch_request *preq)
 	plist = (svrattrl *)GET_NEXT(preq->rq_ind.rq_manager.rq_attr);
 
 	while (pque) {
+		if (pbs_db_begin_trx(conn, 0, 0) != 0) {
+			req_reject(PBSE_SYSTEM, 0, preq);
+			return;
+		}
+		bak_nxt_q_link = (pbs_queue *)GET_NEXT(pque->qu_link);
+		strcpy(bak_qu_name, pque->qu_qs.qu_name);
+		pque = que_recov_db(pque->qu_qs.qu_name, pque, 1);
+		if(pque == NULL) {
+			(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
+			sprintf(log_buffer, "Failed to fetch Queue %s or doesn't exist in db", bak_qu_name);
+			log_err(-1, __func__, log_buffer);
+			if (allques) {
+				/* for all queues */
+				pque = bak_nxt_q_link;
+				continue;
+			} else {
+				/* for a single queue */
+				req_reject(PBSE_UNKQUE, 0, preq);
+				return;
+			}
+		}
 		rc = mgr_unset_attr(pque->qu_attr, que_attr_def, QA_ATR_LAST,
 			plist, preq->rq_perm, &bad_attr,
 			(void *)pque, PARENT_TYPE_QUE_ALL, INDIRECT_RES_CHECK);
 		if (rc != 0) {
+			(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
 			reply_badattr(rc, bad_attr, plist, preq);
 			return;
 		} else {
@@ -2029,6 +2099,12 @@ mgr_queue_unset(struct batch_request *preq)
 				(void)deflt_chunk_action(&pque->qu_attr[QE_ATR_DefaultChunk], (void *)pque, ATR_ACTION_ALTER);
 			}
 			que_save_db(pque, QUE_SAVE_FULL);
+			if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0) {
+				sprintf(log_buffer, "Failed to commit queue %s updated attributes in db", pque->qu_qs.qu_name);
+				log_err(-1, __func__, log_buffer);
+				req_reject(PBSE_SYSTEM, 0, preq);
+				return;
+			}
 			mgr_log_attr(msg_man_uns, plist, PBS_EVENTCLASS_QUEUE, pque->qu_qs.qu_name, NULL);
 			if ((pque->qu_attr[(int)QA_ATR_QType].at_flags &
 				ATR_VFLAG_SET) == 0)
@@ -2039,10 +2115,6 @@ mgr_queue_unset(struct batch_request *preq)
 		else
 			break;
 	}
-	if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0)
-		goto err;
-	err:
-		(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
 	reply_ack(preq);
 }
 
@@ -4164,6 +4236,9 @@ mgr_resource_delete(struct batch_request *preq)
 	svrattrl *plist;
 	int bad;
 	int updatedb;	/* set to 1 if a db update is needed */
+	pbs_db_conn_t	*conn = (pbs_db_conn_t *) svr_db_conn;
+	char 		bak_qu_name[PBS_MAXQUEUENAME + 1] = {0}; /* back up the qname for logging error */
+	pbs_queue 	*bak_nxt_q_link; 			 /* back up the next queue addr */
 
 	if ((resc = preq->rq_ind.rq_manager.rq_objname) == NULL) {
 		req_reject(PBSE_BADATVAL, 0 , preq);
@@ -4202,9 +4277,29 @@ mgr_resource_delete(struct batch_request *preq)
 		return;
 	}
 
+    /* refresh all the queues with latest data or if not present then load it from db */
+	if (get_all_db_queues()) {
+		log_err(-1, __func__, "Failed to refresh queues from db");
+		req_reject(PBSE_SYSTEM, 0, preq);
+		return;
+	}
 	/* Is the resource set on queues? If so unset */
 	pq = (pbs_queue *)GET_NEXT(svr_queues);
 	while (pq != NULL) {
+		if (pbs_db_begin_trx(conn, 0, 0) != 0) {
+			req_reject(PBSE_SYSTEM, 0, preq);
+			return;
+		}
+		bak_nxt_q_link = (pbs_queue *)GET_NEXT(pq->qu_link);
+		strcpy(bak_qu_name, pq->qu_qs.qu_name);
+		pq = que_recov_db(pq->qu_qs.qu_name, pq, 1);
+		if(pq == NULL) {
+			(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
+			sprintf(log_buffer, "Failed to fetch Queue %s or doesn't exist in db", bak_qu_name);
+			log_err(-1, __func__, log_buffer);
+			pq = bak_nxt_q_link;
+			continue;
+		}
 		updatedb = 0;
 		for (i=0; i < QA_ATR_LAST; i++) {
 			pattr = &pq->qu_attr[i];
@@ -4213,6 +4308,7 @@ mgr_resource_delete(struct batch_request *preq)
 				plist->al_link.ll_next->ll_struct = NULL;
 				rc = mgr_unset_attr(pq->qu_attr, que_attr_def, QA_ATR_LAST, plist, -1, &bad, (void *)pq, PARENT_TYPE_QUE_ALL, INDIRECT_RES_CHECK);
 				if (rc != 0) {
+					(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
 					snprintf(log_buffer, sizeof(log_buffer), "error unsetting resource %s.%s", que_attr_def[i].at_name, prdef->rs_name);
 					log_event(PBSEVENT_DEBUG, PBS_EVENTCLASS_RESC, LOG_DEBUG, resc, log_buffer);
 					reply_badattr(rc, bad, plist, preq);
@@ -4234,6 +4330,12 @@ mgr_resource_delete(struct batch_request *preq)
 		}
 		if (updatedb) {
 			que_save_db(pq, QUE_SAVE_FULL);
+		}
+		if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0) {
+			sprintf(log_buffer, "Failed to commit queue %s during resource deletetion in db", pq->qu_qs.qu_name);
+			log_err(-1, __func__, log_buffer);
+			req_reject(PBSE_SYSTEM, 0, preq);
+			return;
 		}
 		pq = (pbs_queue *) GET_NEXT(pq->qu_link);
 	}
@@ -4444,6 +4546,14 @@ mgr_resource_set(struct batch_request *preq)
 		/* check function replies to client's preq */
 		return;
 	}
+
+	/* refresh the queue list from db */
+	if (get_all_db_queues()) {
+		log_err(-1, __func__, "Failed to refresh queues from db");
+		req_reject(PBSE_SYSTEM, 0, preq);
+		return;
+	}
+
 	/* Reject if resource is on a queue and the type is being modified */
 	pq = (pbs_queue *)GET_NEXT(svr_queues);
 	while (pq != NULL) {
@@ -4652,6 +4762,13 @@ mgr_resource_unset(struct batch_request *preq)
 	rc = check_resource_set_on_jobs_or_resvs(preq, prdef, 1);
 	if (rc == 1)
 		return;
+
+	/* refresh the queue list from db */
+	if (get_all_db_queues()) {
+		log_err(-1, __func__, "Failed to refresh queues from db");
+		req_reject(PBSE_SYSTEM, 0, preq);
+		return;
+	}
 
 	/* Reject if resource is on a queue */
 	pq = (pbs_queue *)GET_NEXT(svr_queues);

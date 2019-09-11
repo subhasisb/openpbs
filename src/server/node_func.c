@@ -2201,11 +2201,13 @@ mark_which_queues_have_nodes()
 {
 	int		 i;
 	pbs_queue       *pque;
-
 	/* clear "has node" flag in all queues */
-
 	svr_quehasnodes = 0;
 
+	if (get_all_db_queues()) {
+		log_err(-1, __func__, "Failed to refresh queues from db");
+		/* TODO: Need to handle error here */
+	}
 	pque = (pbs_queue *)GET_NEXT(svr_queues);
 	while (pque != NULL) {
 		pque->qu_attr[(int)QE_ATR_HasNodes].at_val.at_long = 0;
