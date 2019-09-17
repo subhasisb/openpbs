@@ -7473,10 +7473,12 @@ adj_resc_on_node(void *obj, int is_resv, char *noden, enum batch_op op, resource
 	attribute	 rs_value;
 	pbs_db_nodejob_info_t	*db_obj;
 	int i;
-	pbs_db_attr_info_t *old_attr = NULL;
+	job *pjob = NULL;
+	pbs_db_attr_info_t *cur_attr = NULL;
 	pbs_db_attr_info_t *new_attr = NULL;
+	char *cur_val = NULL;
 
-	DBPRT(("----------------Inside adj_resc_on_node()------------"))
+	DBPRT(("----------------Entering adj_resc_on_node()------------"))
 	/* make sure there isn't multiple levels of indirectness */
 	/* resource->resource->resource */
 
@@ -7489,11 +7491,14 @@ adj_resc_on_node(void *obj, int is_resv, char *noden, enum batch_op op, resource
 		return (PBSE_INDIRECTHOP);
 	}
 
-	DBPRT(("Job ID: %s, prdef->rs_name: %s, val: %s", ((job*)obj)->ji_qs.ji_jobid, prdef->rs_name, val))
 	if (is_resv)
 		db_obj = initialize_nodejob_db_obj(noden, ((resc_resv*)obj)->ri_qs.ri_resvID, is_resv);
-	else
-		db_obj = initialize_nodejob_db_obj(noden, ((job*)obj)->ji_qs.ji_jobid, is_resv);
+	else {
+		pjob = (job*)obj;
+		db_obj = initialize_nodejob_db_obj(noden, pjob->ji_qs.ji_jobid, is_resv);
+	}
+
+	DBPRT(("ji_state: %d, ji_substate: %d", ((job*)obj)->ji_qs.ji_state, ((job*)obj)->ji_qs.ji_substate))
 
 	if (nodejob_recov_db(db_obj) != 0)
 		return PBSE_INTERNAL;
@@ -7502,17 +7507,16 @@ adj_resc_on_node(void *obj, int is_resv, char *noden, enum batch_op op, resource
 	for (i = 0; i < db_obj->attr_list.attr_count; i++) {
 		pbs_db_attr_info_t *pattr_info = &db_obj->attr_list.attributes[i];
 		if (!strncmp(pattr_info->attr_resc, prdef->rs_name, PBS_MAXATTRRESC)) {
-			old_attr = pattr_info;
-			DBPRT(("old_val: %s", old_attr->attr_value))
+			cur_attr = pattr_info;
 		}
 	}
 
-	if (old_attr && (old_attr->attr_flags & ATR_VFLAG_INDIRECT) &&
-		(old_attr->attr_value[0] == '@')) {
+	if (cur_attr && (cur_attr->attr_flags & ATR_VFLAG_INDIRECT) &&
+		(cur_attr->attr_value[0] == '@')) {
 
 		/* indirect reference to another vnode, recurse w/ that node */
 
-		noden = old_attr->attr_value + 1;
+		noden = cur_attr->attr_value + 1;
 		clear_nodejob_dbobj(db_obj);
 		return (adj_resc_on_node(obj, is_resv, noden, op, prdef, val, hop + 1));
 	}
@@ -7522,10 +7526,18 @@ adj_resc_on_node(void *obj, int is_resv, char *noden, enum batch_op op, resource
 	rc = 0;
 	if ((rc = prdef->rs_decode(&tmpattr, ATTR_rescassn, prdef->rs_name, val)) != 0)
 		return rc;
+
+	/* if the request is from sched_spec, job might have requed and database may not have cleaned up.
+	   so, start afresh! */
+	if (pjob && (pjob->ji_qs.ji_state & JOB_STATE_RUNNING) && (pjob->ji_qs.ji_substate && JOB_SUBSTATE_PRERUN))
+		cur_val = NULL;
+	else
+		cur_val = cur_attr ? cur_attr->attr_value : NULL;
+
 	if ((rc = prdef->rs_decode(&rs_value, ATTR_rescassn, prdef->rs_name,
-					old_attr ? old_attr->attr_value : NULL)) != 0)
+					cur_val)) != 0)
 		return rc;
-	DBPRT(("Operation: %d", op))
+
 	rc = prdef->rs_set(&rs_value, &tmpattr, op);
 
 	new_attr = (pbs_db_attr_info_t *) malloc(sizeof(pbs_db_attr_info_t));

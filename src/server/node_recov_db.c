@@ -363,7 +363,10 @@ initialize_nodejob_db_obj(char *nd_name, char *job_id, int is_resv) {
 
 	db_obj = (pbs_db_nodejob_info_t *) malloc(sizeof(pbs_db_nodejob_info_t));
 
-	strncpy(db_obj->job_id, job_id, PBS_MAXSVRJOBID);
+	if (job_id)
+		strncpy(db_obj->job_id, job_id, PBS_MAXSVRJOBID);
+	else
+		db_obj->job_id[0] = '\0';
 	strncpy(db_obj->nd_name, nd_name, PBS_MAXSERVERNAME);
 	db_obj->is_resv = is_resv;
 	db_obj->subnode_ct = -1;
@@ -372,6 +375,39 @@ initialize_nodejob_db_obj(char *nd_name, char *job_id, int is_resv) {
 	db_obj->attr_list.attributes = NULL;
 
 	return db_obj;
+}
+
+int
+nodejob_db_to_attrlist(struct pbsnode *pnode, pbs_db_nodejob_info_t *db_obj)
+{
+	int i;
+	resource   *prsc;
+	attribute    *pattr = &pnode->nd_attr[(int)ND_ATR_ResourceAssn];
+
+	DBPRT(("----------------Entering nodejob_db_to_attrlist()------------"))
+
+	for (i = 0; i < db_obj->attr_list.attr_count; i++) {
+		attribute tmpattr;
+		pbs_db_attr_info_t *attrs = &db_obj->attr_list.attributes[i];
+
+		if (strcmp(attrs->attr_name, ATTR_rescassn))
+			continue;
+		memset(&tmpattr, 0, sizeof(attribute));
+		if ((node_attr_def + ND_ATR_ResourceAssn)->at_decode) {
+			(void)(node_attr_def + ND_ATR_ResourceAssn)->at_decode(
+							&tmpattr, attrs->attr_name,
+							attrs->attr_resc,
+							attrs->attr_value);
+		}
+		prsc = find_resc_entry(pattr,  find_resc_def(svr_resc_def,
+					attrs->attr_resc, svr_resc_size));
+		if (prsc->rs_value.at_flags & ATR_VFLAG_SET)
+			(void)(node_attr_def + ND_ATR_ResourceAssn)->at_set(pattr, &tmpattr, INCR);
+		else
+			(void)(node_attr_def + ND_ATR_ResourceAssn)->at_set(pattr, &tmpattr, SET);
+	}
+
+	return 0;
 }
 
 void

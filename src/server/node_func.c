@@ -330,7 +330,67 @@ chk_characteristic(struct pbsnode *pnode, int *pneed_todo)
 	return  0;
 }
 
+int
+encode_resc_assn(struct pbsnode *pnode)
+{
+	pbs_db_nodejob_info_t	*db_obj;
+	pbs_db_obj_info_t	obj;
+	resource   *prsc;
+	attribute    *pattr = &pnode->nd_attr[(int)ND_ATR_ResourceAssn];
+	void		*state = NULL;
+	pbs_db_conn_t *conn = (pbs_db_conn_t *) svr_db_conn;
 
+	DBPRT(("----------------Entering encode_resc_assn()------------"))
+
+	/* start a transaction */
+	if (pbs_db_begin_trx(conn, 0, 0) != 0)
+		return (-1);
+
+	db_obj = initialize_nodejob_db_obj(pnode->nd_name, NULL, 0);
+
+	/* get jobs from DB for this instance of server, by port and address */
+	obj.pbs_db_obj_type = PBS_DB_NODEJOB;
+	obj.pbs_db_un.pbs_db_nodejob = db_obj;
+
+	state = pbs_db_cursor_init(conn, &obj, NULL);
+	if (state == NULL) {
+		sprintf(log_buffer, "%s", (char *) conn->conn_db_err);
+		log_err(-1, __func__, log_buffer);
+		pbs_db_cursor_close(conn, state);
+		(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
+		return (-1);
+	}
+
+	for (prsc = (resource *)GET_NEXT(pattr->at_val.at_list);
+			prsc != NULL;
+			prsc = (resource *)GET_NEXT(prsc->rs_link)) {
+		prsc->rs_value.at_flags &= ~ATR_VFLAG_SET;
+	}
+
+	while (pbs_db_cursor_next(conn, state, &obj) == 0) {
+		if (nodejob_db_to_attrlist(pnode, db_obj) != 0) {
+			sprintf(log_buffer, "nodejob_db_to_attrlist failed for node: %s",
+				pnode->nd_name);
+			log_event(PBSEVENT_SYSTEM | PBSEVENT_ADMIN |
+				PBSEVENT_DEBUG, PBS_EVENTCLASS_SERVER,
+				LOG_INFO, msg_daemonname, log_buffer);
+		}
+		pbs_db_reset_obj(&obj);
+	}
+
+	for (prsc = (resource *)GET_NEXT(pattr->at_val.at_list);
+			prsc != NULL;
+			prsc = (resource *)GET_NEXT(prsc->rs_link)) {
+		prsc->rs_value.at_flags |= ATR_VFLAG_SET;
+	}
+
+	pbs_db_cursor_close(conn, state);
+
+	/* end the transaction */
+	if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0)
+		return (-1);
+	return 0;
+}
 
 /**
  * @brief

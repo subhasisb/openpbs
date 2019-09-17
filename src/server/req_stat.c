@@ -113,6 +113,7 @@ extern int status_nodeattrib(svrattrl *, attribute_def *, struct pbsnode *,
 	int, int, pbs_list_head *, int *);
 
 extern int svr_chk_histjob(job *);
+extern int encode_resc_assn(struct pbsnode *pnode);
 
 
 
@@ -827,6 +828,9 @@ status_node(struct pbsnode *pnode, struct batch_request *preq, pbs_list_head *ps
 
 	if ((preq->rq_perm & ATR_DFLAG_RDACC) == 0)
 		return (PBSE_PERM);
+
+	/* Read node job table and encode Resc_assigned */
+	encode_resc_assn(pnode);
 
 	/* sync state attribute with nd_state */
 

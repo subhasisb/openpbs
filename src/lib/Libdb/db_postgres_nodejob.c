@@ -84,6 +84,19 @@ pg_db_prepare_nodejob_sqls(pbs_db_conn_t *conn)
 	if (pg_prepare_stmt(conn, STMT_SELECT_NODEJOB, conn->conn_sql, 2) != 0)
 		return -1;
 
+	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select "
+		"job_id, "
+		"nd_name, "
+		"is_resv, "
+		"subnode_ct, "
+		"admn_suspend, "
+		"hstore_to_array(attributes) as attributes "
+		"from pbs.node_job "
+		"where nd_name = $1 "
+		"order by nj_creattm");
+	if (pg_prepare_stmt(conn, STMT_FIND_NODEJOB_USING_NODEID, conn->conn_sql, 1) != 0)
+		return -1;
+
 		snprintf(conn->conn_sql, MAX_SQL_LENGTH, "insert into pbs.node_job("
 		"job_id, "
 		"nd_name, "
@@ -284,7 +297,6 @@ pg_db_load_nodejob(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int lock)
 
 	SET_PARAM_STR(conn, pnj->job_id, 0);
 	SET_PARAM_STR(conn, pnj->nd_name, 1);
-
 	if ((rc = pg_db_query(conn, STMT_SELECT_NODEJOB, 2, lock, &res)) != 0)
 		return rc;
 
@@ -292,6 +304,66 @@ pg_db_load_nodejob(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int lock)
 
 	PQclear(res);
 	return rc;
+}
+
+/**
+ * @brief
+ *	Find nodejob
+ *
+ * @param[in]	conn - Connection handle
+ * @param[in]	st   - The cursor state variable updated by this query
+ * @param[in]	obj  - Information of nodejob to be found
+ * @param[in]	opts - Any other options (like flags, timestamp)
+ *
+ * @return      Error code
+ * @retval	-1 - Failure
+ * @retval	 0 - Success
+ * @retval	 1 - Success, but no rows found
+ *
+ */
+int
+pg_db_find_nodejob(pbs_db_conn_t *conn, void *st, pbs_db_obj_info_t *obj,
+	pbs_db_query_options_t *opts)
+{
+	PGresult *res;
+	int rc;
+	pg_query_state_t *state = (pg_query_state_t *) st;
+	pbs_db_nodejob_info_t *pnj = obj->pbs_db_un.pbs_db_nodejob;
+
+	if (!state)
+		return -1;
+
+	SET_PARAM_STR(conn, pnj->nd_name, 0);
+	if ((rc = pg_db_query(conn, STMT_FIND_NODEJOB_USING_NODEID, 1, 0, &res)) != 0)
+		return rc;
+
+	state->row = 0;
+	state->res = res;
+	state->count = PQntuples(res);
+	return 0;
+}
+
+/**
+ * @brief
+ *	Get the next nodejob from the cursor
+ *
+ * @param[in]	conn - Connection handle
+ * @param[in]	st   - The cursor state
+ * @param[in]	obj  - Node information is loaded into this object
+ *
+ * @return      Error code
+ *		(Even though this returns only 0 now, keeping it as int
+ *			to support future change to return a failure)
+ * @retval	 0 - Success
+ *
+ */
+int
+pg_db_next_nodejob(pbs_db_conn_t *conn, void *st, pbs_db_obj_info_t *obj)
+{
+	PGresult *res = ((pg_query_state_t *) st)->res;
+	pg_query_state_t *state = (pg_query_state_t *) st;
+
+	return (load_nodejob(res, obj->pbs_db_un.pbs_db_nodejob, state->row));
 }
 
 /**
