@@ -7393,15 +7393,18 @@ free_resvNodes(resc_resv *presv)
  * @param[in]	presc	- resource in question
  * @param[in]	noden	- non-NULL if resources coming from a vnode
  *
- * @return void
+ * @return int
+ * @retval 0 : success
+ * @retval -1 : negative
+ * @retval 1 : other error
  */
-static void
+static int
 check_for_negative_resource(resource_def *prdef, attribute *rs_value, char *noden)
 {
 	int nerr = 0;
 
 	if ((prdef == NULL) || (rs_value == NULL)) {
-		return;
+		return 1;
 	}
 	/* make sure nothing in resources_assigned goes negative */
 	switch (prdef->rs_type) {
@@ -7443,6 +7446,7 @@ check_for_negative_resource(resource_def *prdef, attribute *rs_value, char *node
 					LOG_ALERT, msg_daemonname, log_buffer);
 		}
 	}
+	return nerr;
 }
 
 /**
@@ -7529,7 +7533,7 @@ adj_resc_on_node(void *obj, int is_resv, char *noden, enum batch_op op, resource
 
 	/* if the request is from sched_spec, job might have requed and database may not have cleaned up.
 	   so, start afresh! */
-	if (pjob && (pjob->ji_qs.ji_state & JOB_STATE_RUNNING) && (pjob->ji_qs.ji_substate && JOB_SUBSTATE_PRERUN))
+	if (pjob && (pjob->ji_qs.ji_state & JOB_STATE_RUNNING) && (pjob->ji_qs.ji_substate & JOB_SUBSTATE_PRERUN))
 		cur_val = NULL;
 	else
 		cur_val = cur_attr ? cur_attr->attr_value : NULL;
@@ -7549,11 +7553,14 @@ adj_resc_on_node(void *obj, int is_resv, char *noden, enum batch_op op, resource
 	db_obj->attr_list.attr_count = 1;
 	db_obj->attr_list.attributes = new_attr;
 
-	nodejob_update_attr_db(db_obj);
-
-	if (op == DECR) {
-		check_for_negative_resource(prdef, &rs_value, noden);
+	if (op == DECR && check_for_negative_resource(prdef, &rs_value, noden) != 0) {
+		if ((rc = prdef->rs_decode(&rs_value, ATTR_rescassn, prdef->rs_name,
+					NULL)) != 0)
+			return rc;
+		new_attr->attr_value = get_resc_value(prdef, &rs_value);
 	}
+
+	nodejob_update_attr_db(db_obj);
 
 	return rc;
 }

@@ -88,6 +88,7 @@ pbs_server_bin_SOURCES = \
 	node_func.c \
 	node_manager.c \
 	node_recov_db.c \
+	nodejob_recov_db.c \
 	pbsd_init.c \
 	pbsd_main.c \
 	process_request.c \

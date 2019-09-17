@@ -141,7 +141,7 @@ pg_db_fn_t db_fn_arr[PBS_DB_NUM_TYPES] =
 	},
 	{ /* PBS_DB_NODEJOB */
 		pg_db_save_nodejob,
-		NULL,
+		pg_db_delete_nodejob,
 		pg_db_load_nodejob,
 		pg_db_find_nodejob,
 		pg_db_next_nodejob,

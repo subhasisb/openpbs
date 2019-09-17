@@ -772,7 +772,7 @@ get_resc_value(resource_def *prdef, attribute *attr)
 		return NULL;
 	}
 
-	cvnbuf = (char *) malloc(sizeof(CVNBUFSZ));
+	cvnbuf = (char *) malloc(CVNBUFSZ);
 	if (!cvnbuf)
 		return NULL;
 
@@ -784,7 +784,7 @@ get_resc_value(resource_def *prdef, attribute *attr)
 			(void)snprintf(cvnbuf, CVNBUFSZ, "%lld", attr->at_val.at_ll);
 			break;
 		case ATR_TYPE_SHORT:
-			(void)snprintf(cvnbuf, CVNBUFSZ, "%d", attr->at_val.at_short);
+			(void)snprintf(cvnbuf, CVNBUFSZ, "%hd", attr->at_val.at_short);
 			break;
 		case ATR_TYPE_FLOAT:
 			(void)snprintf(cvnbuf, CVNBUFSZ, "%-.*f",

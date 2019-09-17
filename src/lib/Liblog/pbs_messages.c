@@ -64,6 +64,7 @@ char *msg_err_noqueue	= "Unable to requeue job,";
 char *msg_err_noqueue1	= "queue is not defined";
 char *msg_err_purgejob	= "Unlink of job file failed";
 char *msg_err_purgejob_db	= "Removal of job from datastore failed";
+char *msg_err_purgenodejob_db	= "Removal of job from node-job table failed";
 char *msg_err_unlink	= "Unlink of %s file %s failed";
 char *msg_illregister	= "Illegal op in register request received for job %s";
 char *msg_init_abt	= "Job aborted on PBS Server initialization";

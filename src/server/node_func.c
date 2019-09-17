@@ -364,7 +364,12 @@ encode_resc_assn(struct pbsnode *pnode)
 	for (prsc = (resource *)GET_NEXT(pattr->at_val.at_list);
 			prsc != NULL;
 			prsc = (resource *)GET_NEXT(prsc->rs_link)) {
-		prsc->rs_value.at_flags &= ~ATR_VFLAG_SET;
+		int rc;
+		//prsc->rs_value.at_flags &= ~ATR_VFLAG_SET;
+		if ((rc = prsc->rs_defin->rs_decode(&prsc->rs_value,
+				ATTR_rescassn, prsc->rs_defin->rs_name,
+							NULL)) != 0)
+			return rc;
 	}
 
 	while (pbs_db_cursor_next(conn, state, &obj) == 0) {

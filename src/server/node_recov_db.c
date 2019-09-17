@@ -114,7 +114,52 @@ extern int recov_attr_db_raw(pbs_db_conn_t *conn,
 
 
 extern int make_pbs_list_attr_db(void *parent, pbs_db_attr_list_t *attr_list, struct attribute_def *padef, pbs_list_head *phead, int limit, int unknown);
+/**
+ * @brief
+ *		Load a server node object from a database node object
+ *
+ * @param[out]	pnode - Address of the node in the server
+ * @param[in]	pdbnd - Address of the database node object
+ *
+ * @return	Error code
+ * @retval   0 - Success
+ * @retval  -1 - Failure
+ *
+ */
+/*
+static int
+db_to_svr_node(struct pbsnode *pnode, pbs_db_node_info_t *pdbnd)
+{
+	if (pdbnd->nd_name && pdbnd->nd_name[0]!=0) {
+		pnode->nd_name = strdup(pdbnd->nd_name);
+		if (pnode->nd_name == NULL)
+			return -1;
+	}
+	else
+		pnode->nd_name = NULL;
 
+
+	if (pdbnd->nd_hostname && pdbnd->nd_hostname[0]!=0) {
+		pnode->nd_hostname = strdup(pdbnd->nd_hostname);
+		if (pnode->nd_hostname == NULL)
+			return -1;
+	}
+	else
+		pnode->nd_hostname = NULL;
+
+	pnode->nd_ntype = pdbnd->nd_ntype;
+	pnode->nd_state = pdbnd->nd_state;
+	if (pnode->nd_pque)
+		strcpy(pnode->nd_pque->qu_qs.qu_name, pdbnd->nd_pque);
+
+
+	if ((decode_attr_db(pnode, &pdbnd->attr_list, node_attr_def,
+		pnode->nd_attr, (int) ND_ATR_LAST, 0)) != 0)
+		return -1;
+
+	return 0;
+}
+*/
 
 /**
  * @brief
@@ -288,62 +333,7 @@ svr_to_db_node(struct pbsnode *pnode, pbs_db_node_info_t *pdbnd)
 	return 0;
 }
 
-/**
- * @brief
- *		Recover a nodejob from the database
- *
- * @param[in]	nj	- Information about the nodejob to recover
- *
- * @return	return code
- * @retval	!0 - Failure
- * @retval	0 - Success
- */
-int
-nodejob_recov_db(void *nj)
-{
-	pbs_db_obj_info_t obj;
-	int rc = 0;
-	pbs_db_conn_t *conn = (pbs_db_conn_t *) svr_db_conn;
 
-	obj.pbs_db_obj_type = PBS_DB_NODEJOB;
-	obj.pbs_db_un.pbs_db_nodejob = (pbs_db_nodejob_info_t *) nj;
-
-	if ((rc = pbs_db_begin_trx(conn, 0, 0)) != 0)
-		goto db_err;
-
-	if ((rc = pbs_db_load_obj(conn, &obj, 0)) < 0)
-		goto db_err;
-
-	if ((rc = pbs_db_end_trx(conn, PBS_DB_COMMIT)) != 0)
-		goto db_err;
-
-	return 0;
-
-db_err:
-	log_err(-1, "nodejob_recov_db", "error on recovering nodejob table");
-	(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
-	pbs_db_reset_obj(&obj);
-	return rc;
-}
-
-
-/**
- * @brief
- *	Recover a node from the database without calling the action routines
- *	for the node attributes. This is because, the node attribute action
- *	routines access other resources in the node attributes which may
- *	not have been loaded yet. create_pbs_node (the top level caller)
- *	eventually calls mgr_set_attr to atomically set all the attributes
- *	and in that process triggers all the action routines.
- *
- * @param[in]	nd - Information about the node to recover
- * @param[in]	phead - list head to which to append loaded node attributes
- *
- * @return      Error code
- * @retval	-1 - Failure
- * @retval	 0 - Success
- *
- */
 int
 node_recov_db_raw(void *nd, pbs_list_head *phead)
 {
@@ -355,110 +345,6 @@ node_recov_db_raw(void *nd, pbs_list_head *phead)
 		return -1;
 
 	return 0;
-}
-
-pbs_db_nodejob_info_t *
-initialize_nodejob_db_obj(char *nd_name, char *job_id, int is_resv) {
-	pbs_db_nodejob_info_t	*db_obj;
-
-	db_obj = (pbs_db_nodejob_info_t *) malloc(sizeof(pbs_db_nodejob_info_t));
-
-	if (job_id)
-		strncpy(db_obj->job_id, job_id, PBS_MAXSVRJOBID);
-	else
-		db_obj->job_id[0] = '\0';
-	strncpy(db_obj->nd_name, nd_name, PBS_MAXSERVERNAME);
-	db_obj->is_resv = is_resv;
-	db_obj->subnode_ct = -1;
-	db_obj->admn_suspend = 0;
-	db_obj->attr_list.attr_count = 0;
-	db_obj->attr_list.attributes = NULL;
-
-	return db_obj;
-}
-
-int
-nodejob_db_to_attrlist(struct pbsnode *pnode, pbs_db_nodejob_info_t *db_obj)
-{
-	int i;
-	resource   *prsc;
-	attribute    *pattr = &pnode->nd_attr[(int)ND_ATR_ResourceAssn];
-
-	DBPRT(("----------------Entering nodejob_db_to_attrlist()------------"))
-
-	for (i = 0; i < db_obj->attr_list.attr_count; i++) {
-		attribute tmpattr;
-		pbs_db_attr_info_t *attrs = &db_obj->attr_list.attributes[i];
-
-		if (strcmp(attrs->attr_name, ATTR_rescassn))
-			continue;
-		memset(&tmpattr, 0, sizeof(attribute));
-		if ((node_attr_def + ND_ATR_ResourceAssn)->at_decode) {
-			(void)(node_attr_def + ND_ATR_ResourceAssn)->at_decode(
-							&tmpattr, attrs->attr_name,
-							attrs->attr_resc,
-							attrs->attr_value);
-		}
-		prsc = find_resc_entry(pattr,  find_resc_def(svr_resc_def,
-					attrs->attr_resc, svr_resc_size));
-		if (prsc->rs_value.at_flags & ATR_VFLAG_SET)
-			(void)(node_attr_def + ND_ATR_ResourceAssn)->at_set(pattr, &tmpattr, INCR);
-		else
-			(void)(node_attr_def + ND_ATR_ResourceAssn)->at_set(pattr, &tmpattr, SET);
-	}
-
-	return 0;
-}
-
-void
-clear_nodejob_dbobj(pbs_db_nodejob_info_t *db_obj)
-{
-	pbs_db_obj_info_t obj;
-
-	obj.pbs_db_obj_type = PBS_DB_NODEJOB;
-	obj.pbs_db_un.pbs_db_nodejob = db_obj;
-	pbs_db_reset_obj(&obj);
-	free(db_obj);
-}
-
-/**
- * @brief
- *	Save a nodejob attributes to the database.
- *
- * @param[in]	pnodejob- Pointer to the nodejob to save
- *
- * @return      Error code
- * @retval	0 - Success
- * @retval	-1 - Failure
- *
- */
-int
-nodejob_update_attr_db(pbs_db_nodejob_info_t *dbnode)
-{
-	pbs_db_obj_info_t obj;
-	pbs_db_conn_t *conn = (pbs_db_conn_t *) svr_db_conn;
-
-	obj.pbs_db_obj_type = PBS_DB_NODEJOB;
-	obj.pbs_db_un.pbs_db_nodejob = dbnode;
-
-	DBPRT(("dbnode->nd_name: %s, dbnode->job_id: %s", dbnode->nd_name, dbnode->job_id))
-
-	if (pbs_db_add_update_attr_obj(conn, &obj, dbnode->nd_name, &dbnode->attr_list) != 0) {
-		if (pbs_db_save_obj(conn, &obj, PBS_INSERT_DB) != 0) {
-			goto db_err;
-		}
-	}
-
-	clear_nodejob_dbobj(dbnode);
-
-	return (0);
-db_err:
-	strcpy(log_buffer, "nodejob_save failed ");
-	if (conn->conn_db_err != NULL)
-		strncat(log_buffer, conn->conn_db_err, LOG_BUF_SIZE - strlen(log_buffer) - 1);
-	log_err(-1, "node_save_db", log_buffer);
-	panic_stop_db(log_buffer);
-	return (-1);
 }
 
 

@@ -97,7 +97,7 @@ pg_db_prepare_nodejob_sqls(pbs_db_conn_t *conn)
 	if (pg_prepare_stmt(conn, STMT_FIND_NODEJOB_USING_NODEID, conn->conn_sql, 1) != 0)
 		return -1;
 
-		snprintf(conn->conn_sql, MAX_SQL_LENGTH, "insert into pbs.node_job("
+	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "insert into pbs.node_job("
 		"job_id, "
 		"nd_name, "
 		"is_resv, "
@@ -122,6 +122,10 @@ pg_db_prepare_nodejob_sqls(pbs_db_conn_t *conn)
 		"attributes = hstore($6::text[]) "
 		" where job_id = $1 and nd_name = $2");
 	if (pg_prepare_stmt(conn, STMT_UPDATE_NODEJOB, conn->conn_sql, 6) != 0)
+		return -1;
+
+	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "delete from pbs.node_job where job_id = $1");
+	if (pg_prepare_stmt(conn, STMT_DELETE_NODEJOB, conn->conn_sql, 1) != 0)
 		return -1;
 
 	return 0;
@@ -379,4 +383,25 @@ void
 pg_db_reset_nodejob(pbs_db_obj_info_t *obj)
 {
 	free_db_attr_list(&(obj->pbs_db_un.pbs_db_nodejob->attr_list));
+}
+
+/**
+ * @brief
+ *	Delete the nodejob from the database
+ *
+ * @param[in]	conn - Connection handle
+ * @param[in]	obj  - Node information
+ *
+ * @return      Error code
+ * @retval	-1 - Failure
+ * @retval	 0 - Success
+ * @retval	 1 - Success but no rows deleted
+ *
+ */
+int
+pg_db_delete_nodejob(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj)
+{
+	pbs_db_nodejob_info_t *pnd = obj->pbs_db_un.pbs_db_nodejob;
+	SET_PARAM_STR(conn, pnd->job_id, 0);
+	return (pg_db_cmd(conn, STMT_DELETE_NODEJOB, 1));
 }

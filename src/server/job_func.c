@@ -696,8 +696,10 @@ job_purge(job *pjob)
 
 #else
 	extern	char	*msg_err_purgejob_db;
+	extern	char	*msg_err_purgenodejob_db;
 	pbs_db_obj_info_t obj;
 	pbs_db_job_info_t dbjob;
+	pbs_db_nodejob_info_t db_nj;
 	pbs_db_conn_t *conn = (pbs_db_conn_t *) svr_db_conn;
 #endif	/* PBS_MOM */
 
@@ -922,6 +924,15 @@ job_purge(job *pjob)
 	strcpy(dbjob.ji_jobid, pjob->ji_qs.ji_jobid);
 	if (pbs_db_delete_obj(conn, &obj) == -1) {
 		log_joberr(-1, __func__, msg_err_purgejob_db,
+			pjob->ji_qs.ji_jobid);
+	}
+
+	/* delete entries from node job table */
+	obj.pbs_db_obj_type = PBS_DB_NODEJOB;
+	obj.pbs_db_un.pbs_db_nodejob = &db_nj;
+	strcpy(db_nj.job_id, pjob->ji_qs.ji_jobid);
+	if (pbs_db_delete_obj(conn, &obj) == -1) {
+		log_joberr(-1, __func__, msg_err_purgenodejob_db,
 			pjob->ji_qs.ji_jobid);
 	}
 
