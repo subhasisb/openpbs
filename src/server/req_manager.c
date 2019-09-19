@@ -1921,7 +1921,7 @@ mgr_queue_set(struct batch_request *preq)
 	} else {
 		qname   = preq->rq_ind.rq_manager.rq_objname;
 		allques = 0;
-		pque = find_queuebyname(qname, 1);
+		pque = find_queuebyname(qname, 0);
 	}
 	if (pque == NULL) {
 		req_reject(PBSE_UNKQUE, 0, preq);
@@ -2043,7 +2043,7 @@ mgr_queue_unset(struct batch_request *preq)
 	} else {
 		allques = 0;
 		qname   = preq->rq_ind.rq_manager.rq_objname;
-		pque = find_queuebyname(qname, 1);
+		pque = find_queuebyname(qname, 0);
 	}
 	if (pque == NULL) {
 		req_reject(PBSE_UNKQUE, 0, preq);

@@ -438,13 +438,15 @@ job_save_db(job *pjob, int updatetype)
 
 		rc = pbs_db_save_obj(conn, &obj, savetype);
 		if (rc != 0) {
-			if (updatetype == SAVEJOB_NEW && strstr(conn->conn_db_err, "duplicate key value")) {
-				/* new job has a jobid clash, allow retry with a new jobid */
-				pbs_db_reset_obj(&obj);
-				if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0)
-					goto db_err;
+			if(conn->conn_db_err) {
+				if (updatetype == SAVEJOB_NEW && strstr(conn->conn_db_err, "duplicate key value")) {
+					/* new job has a jobid clash, allow retry with a new jobid */
+					pbs_db_reset_obj(&obj);
+					if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0)
+						goto db_err;
 
-				return (1);
+					return (1);
+				}
 			}
 			goto db_err;
 		}
