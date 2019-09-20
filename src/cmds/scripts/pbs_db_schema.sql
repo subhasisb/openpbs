@@ -43,7 +43,6 @@
 
 drop schema pbs cascade; -- Drop any existing schema called pbs
 create schema pbs;	 -- Create a new schema called pbs
-create extension hstore; -- Create the hstore extension if it does not exit
 ---------------------- VERSION -----------------------------
 
 /*
@@ -64,7 +63,7 @@ INSERT INTO pbs.info values('2.0.0'); /* schema version */
 CREATE TABLE pbs.server (
     sv_savetm		TIMESTAMP	NOT NULL,
     sv_creattm		TIMESTAMP	NOT NULL,
-    attributes		hstore		NOT NULL DEFAULT ''	
+    attributes		jsonb 	    NOT NULL DEFAULT '{}'	
 );
 ---------------------- SCHED -------------------------------
 
@@ -75,7 +74,7 @@ CREATE TABLE pbs.scheduler (
     sched_name		TEXT		NOT NULL,
     sched_savetm	TIMESTAMP	NOT NULL,
     sched_creattm	TIMESTAMP	NOT NULL,
-    attributes		hstore		NOT NULL default '',	
+    attributes		jsonb 	    NOT NULL DEFAULT '{}',	
     CONSTRAINT scheduler_pk PRIMARY KEY (sched_name)
 );
 
@@ -103,7 +102,7 @@ CREATE TABLE pbs.node (
     nd_index		INTEGER		NOT NULL,
     nd_savetm		TIMESTAMP	NOT NULL,
     nd_creattm		TIMESTAMP	NOT NULL,
-    attributes		hstore		NOT NULL default '',
+    attributes		jsonb   	NOT NULL DEFAULT '{}',
     CONSTRAINT pbsnode_pk PRIMARY KEY (nd_name)
 );
 CREATE INDEX nd_creattm_idx ON pbs.node(nd_creattm);
@@ -119,10 +118,10 @@ CREATE TABLE pbs.queue (
     qu_type		    INTEGER		NOT NULL,
     qu_creattm		TIMESTAMP	NOT NULL,
     qu_savetm		TIMESTAMP	NOT NULL,
-    attributes		hstore		NOT NULL default '',
+    attributes		jsonb   	NOT NULL DEFAULT '{}',
     CONSTRAINT queue_pk PRIMARY KEY (qu_name)
 );
-CREATE INDEX que_creattm_idx ON pbs.queue(qu_creatm);
+CREATE INDEX que_creattm_idx ON pbs.queue(qu_creattm);
 CREATE INDEX qu_savetm_idx ON pbs.queue(qu_savetm);
 
 
@@ -149,7 +148,7 @@ CREATE TABLE pbs.resv (
     ri_fromaddr		BIGINT		NOT NULL,
     ri_savetm		TIMESTAMP	NOT NULL,
     ri_creattm		TIMESTAMP	NOT NULL,
-    attributes		hstore		NOT NULL default '',
+    attributes		jsonb   	NOT NULL DEFAULT '{}',
     CONSTRAINT resv_pk PRIMARY KEY (ri_resvID)
 );
 CREATE INDEX ri_savetm_idx ON pbs.resv(ri_savetm);
@@ -186,7 +185,7 @@ CREATE TABLE pbs.job (
     ji_qrank		INTEGER		NOT NULL,
     ji_savetm		TIMESTAMP	NOT NULL,
     ji_creattm		TIMESTAMP	NOT NULL,
-    attributes		hstore		NOT NULL default '',
+    attributes		jsonb   	NOT NULL DEFAULT '{}',
     CONSTRAINT jobid_pk PRIMARY KEY (ji_jobid)
 );
 CREATE INDEX job_rank_idx ON pbs.job(ji_qrank);

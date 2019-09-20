@@ -70,7 +70,7 @@ pg_db_prepare_svr_sqls(pbs_db_conn_t *conn)
 		"attributes "
 		") "
 		"values "
-		"(localtimestamp, localtimestamp, hstore($1::text[])) "
+		"(localtimestamp, localtimestamp, $1) "
 		"returning to_char(sv_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as sv_savetm");
 	if (pg_prepare_stmt(conn, STMT_INSERT_SVR, conn->conn_sql, 1) != 0)
 		return -1;
@@ -78,14 +78,14 @@ pg_db_prepare_svr_sqls(pbs_db_conn_t *conn)
 	/* replace all attributes for a FULL update */
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "update pbs.server set "
 		"sv_savetm = localtimestamp, "
-		"attributes = hstore($1::text[]) "
+		"attributes = $1 "
 		"returning to_char(sv_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as sv_savetm");
 	if (pg_prepare_stmt(conn, STMT_UPDATE_SVR_FULL, conn->conn_sql, 1) != 0)
 		return -1;
 
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "update pbs.server set "
 		"sv_savetm = localtimestamp,"
-		"attributes = attributes - hstore($1::text[]) "
+		"attributes = attributes - $1 "
 		"returning to_char(sv_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as sv_savetm");
 	if (pg_prepare_stmt(conn, STMT_REMOVE_SVRATTRS, conn->conn_sql, 1) != 0)
 		return -1;
@@ -93,7 +93,7 @@ pg_db_prepare_svr_sqls(pbs_db_conn_t *conn)
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select "
 		"to_char(sv_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as sv_savetm, "
 		"to_char(sv_creattm, 'YYYY-MM-DD HH24:MI:SS.US') as sv_creattm, "
-		"hstore_to_array(attributes) as attributes "
+		"attributes::text "
 		"from "
 		"pbs.server ");
 	if (pg_prepare_stmt(conn, STMT_SELECT_SVR, conn->conn_sql, 0) != 0)
@@ -160,16 +160,15 @@ pg_db_save_svr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
 	pbs_db_svr_info_t *ps = obj->pbs_db_un.pbs_db_svr;
 	char *stmt;
 	int params;
-	char *raw_array = NULL;
+	char *json = NULL;
 	static int sv_savetm_fnum;
 	static int fnums_inited = 0;
-	int len = 0;
 
 	/* convert attributes to postgres raw array format */
-	if ((len = convert_db_attr_list_to_array(&raw_array, &ps->attr_list)) <= 0)
+	if (convert_db_attr_list_to_json(&json, &ps->attr_list) < 0)
 		return -1;
 
-	SET_PARAM_BIN(conn, raw_array, len, 0);
+	SET_PARAM_STR(conn, json, 0);
 	params = 1;
 
 	if (savetype == PBS_UPDATE_DB_FULL)
@@ -178,7 +177,7 @@ pg_db_save_svr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
 		stmt = STMT_INSERT_SVR;
 
 	if (pg_db_cmd_ret(conn, stmt, params) != 0) {
-		free(raw_array);
+		free(json);
 		return -1;
 	}
 
@@ -189,7 +188,7 @@ pg_db_save_svr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
 	GET_PARAM_STR(conn->conn_resultset, 0, ps->sv_savetm, sv_savetm_fnum);
 	PQclear(conn->conn_resultset);
 
-	free(raw_array);
+	free(json);
 
 	return 0;
 }
@@ -215,7 +214,7 @@ pg_db_load_svr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int lock)
 {
 	PGresult *res;
 	int rc;
-	char *raw_array;
+	char *json;
 	pbs_db_svr_info_t *ps = obj->pbs_db_un.pbs_db_svr;
 	static int sv_savetm_fnum, sv_creattm_fnum, attributes_fnum;
 	static int fnums_inited = 0;
@@ -240,10 +239,10 @@ pg_db_load_svr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int lock)
 	}
 	strcpy(ps->sv_savetm, db_savetm); /* update the save timestamp */
 	GET_PARAM_STR(res, 0, ps->sv_creattm, sv_creattm_fnum);
-	GET_PARAM_BIN(res, 0, raw_array, attributes_fnum);
+	GET_PARAM_BIN(res, 0, json, attributes_fnum);
 
 	/* convert attributes from postgres raw array format */
-	rc = convert_array_to_db_attr_list(raw_array, &ps->attr_list);
+	rc = convert_json_to_db_attr_list(json, &ps->attr_list);
 
 	PQclear(res);
 	return rc;
@@ -310,20 +309,19 @@ pbs_db_get_schema_version(pbs_db_conn_t *conn, int *db_maj_ver, int *db_min_ver)
 int
 pg_db_del_attr_svr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, void *obj_id, pbs_db_attr_list_t *attr_list)
 {
-	char *raw_array = NULL;
-	int len = 0;
+	char *json = NULL;
 	static int sv_savetm_fnum;
 	static int fnums_inited = 0;
 	pbs_db_svr_info_t *ps = obj->pbs_db_un.pbs_db_svr;
 
 
-	if ((len = convert_db_attr_list_to_array(&raw_array, attr_list)) <= 0)
+	if (convert_db_attr_list_to_json(&json, attr_list) < 0)
 		return -1;
 
-	SET_PARAM_BIN(conn, raw_array, len, 0);
+	SET_PARAM_STR(conn, json, 0);
 
 	if (pg_db_cmd_ret(conn, STMT_REMOVE_SVRATTRS, 1) != 0) {
-		free(raw_array);
+		free(json);
 		return -1;
 	}
 
@@ -334,7 +332,7 @@ pg_db_del_attr_svr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, void *obj_id, pb
 	GET_PARAM_STR(conn->conn_resultset, 0, ps->sv_savetm, sv_savetm_fnum);
 	PQclear(conn->conn_resultset);
 
-	free(raw_array);
+	free(json);
 
 	return 0;
 }

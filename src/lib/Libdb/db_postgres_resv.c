@@ -84,7 +84,7 @@ pg_db_prepare_resv_sqls(pbs_db_conn_t *conn)
 		") "
 		"values "
 		"($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, "
-		"$14, $15, localtimestamp, localtimestamp, hstore($16::text[])) "
+		"$14, $15, localtimestamp, localtimestamp, $16) "
 		"returning to_char(ri_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as ri_savetm");
 	if (pg_prepare_stmt(conn, STMT_INSERT_RESV, conn->conn_sql, 16) != 0)
 		return -1;
@@ -105,7 +105,7 @@ pg_db_prepare_resv_sqls(pbs_db_conn_t *conn)
 		"ri_fromsock = $14, "
 		"ri_fromaddr = $15, "
 		"ri_savetm = localtimestamp, "
-		"attributes = attributes || hstore($16::text[]) "
+		"attributes = attributes || $16 "
 		"where ri_resvID = $1 "
 		"returning to_char(ri_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as ri_savetm");
 	if (pg_prepare_stmt(conn, STMT_UPDATE_RESV, conn->conn_sql, 16) != 0)
@@ -113,7 +113,7 @@ pg_db_prepare_resv_sqls(pbs_db_conn_t *conn)
 
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "update pbs.resv set "
 		"ri_savetm = localtimestamp,"
-		"attributes = attributes - hstore($2::text[]) "
+		"attributes = attributes - $2 "
 		"where ri_resvID = $1 "
 		"returning to_char(ri_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as ri_savetm");
 	if (pg_prepare_stmt(conn, STMT_REMOVE_RESVATTRS, conn->conn_sql, 2) != 0)
@@ -137,7 +137,7 @@ pg_db_prepare_resv_sqls(pbs_db_conn_t *conn)
 		"ri_fromaddr, "
 		"to_char(ri_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as ri_savetm, "
 		"to_char(ri_creattm, 'YYYY-MM-DD HH24:MI:SS.US') as ri_creattm, "
-		"hstore_to_array(attributes) as attributes "
+		"attributes::text "
 		"from pbs.resv where ri_resvid = $1");
 	if (pg_prepare_stmt(conn, STMT_SELECT_RESV, conn->conn_sql, 1) != 0)
 		return -1;
@@ -164,7 +164,7 @@ pg_db_prepare_resv_sqls(pbs_db_conn_t *conn)
 		"ri_fromaddr, "
 		"to_char(ri_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as ri_savetm, "
 		"to_char(ri_creattm, 'YYYY-MM-DD HH24:MI:SS.US') as ri_creattm, "
-		"hstore_to_array(attributes) as attributes "
+		"attributes::text "
 		"from pbs.resv "
 		"order by ri_creattm");
 	if (pg_prepare_stmt(conn, STMT_FINDRESVS_ORDBY_CREATTM,
@@ -195,7 +195,7 @@ pg_db_prepare_resv_sqls(pbs_db_conn_t *conn)
 static int
 load_resv(PGresult *res, pbs_db_resv_info_t *presv, int row)
 {
-	char *raw_array;
+	char *json;
 	char db_savetm[DB_TIMESTAMP_LEN + 1];
 	static int ri_resvid_fnum, ri_queue_fnum, ri_state_fnum, ri_substate_fnum, ri_type_fnum, ri_stime_fnum,
 	ri_etime_fnum, ri_duration_fnum, ri_tactive_fnum, ri_svrflags_fnum, ri_numattr_fnum, ri_resvTag_fnum,
@@ -250,10 +250,10 @@ load_resv(PGresult *res, pbs_db_resv_info_t *presv, int row)
 	GET_PARAM_INTEGER(res, row, presv->ri_fromsock, ri_fromsock_fnum);
 	GET_PARAM_BIGINT(res, row, presv->ri_fromaddr, ri_fromaddr_fnum);
 	GET_PARAM_STR(res, row, presv->ri_creattm, ri_creattm_fnum);
-	GET_PARAM_BIN(res, row, raw_array, attributes_fnum);
+	GET_PARAM_BIN(res, row, json, attributes_fnum);
 
 	/* convert attributes from postgres raw array format */
-	return (convert_array_to_db_attr_list(raw_array, &presv->attr_list));
+	return (convert_json_to_db_attr_list(json, &presv->attr_list));
 }
 
 /**
@@ -274,7 +274,7 @@ pg_db_save_resv(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
 	pbs_db_resv_info_t *presv = obj->pbs_db_un.pbs_db_resv;
 	char *stmt;
 	int params;
-	char *raw_array = NULL;
+	char *json = NULL;
 	static int ri_savetm_fnum;
 	static int fnums_inited = 0;
 	int rc = 0;
@@ -298,12 +298,11 @@ pg_db_save_resv(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
 	if (savetype == PBS_UPDATE_DB_QUICK) {
 		params = 15;
 	} else {
-		int len = 0;
 		/* convert attributes to postgres raw array format */
-		if ((len = convert_db_attr_list_to_array(&raw_array, &presv->attr_list)) <= 0)
+		if (convert_db_attr_list_to_json(&json, &presv->attr_list) < 0)
 			return -1;
 
-		SET_PARAM_BIN(conn, raw_array, len, 15);
+		SET_PARAM_STR(conn, json, 15);
 		params = 16;
 	}
 
@@ -322,7 +321,7 @@ pg_db_save_resv(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
 		PQclear(conn->conn_resultset);
 	}
 
-	free(raw_array);
+	free(json);
 
 	return 0;
 }
@@ -460,17 +459,16 @@ pg_db_delete_resv(pbs_db_conn_t *conn, pbs_db_obj_info_t* obj)
 int
 pg_db_del_attr_resv(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, void *obj_id, pbs_db_attr_list_t *attr_list)
 {
-	char *raw_array = NULL;
-	int len = 0;
+	char *json = NULL;
 	static int nd_savetm_fnum;
 	static int fnums_inited = 0;
 	pbs_db_node_info_t *pnd = obj->pbs_db_un.pbs_db_node;
 
-	if ((len = convert_db_attr_list_to_array(&raw_array, attr_list)) <= 0)
+	if (convert_db_attr_list_to_json(&json, attr_list) < 0)
 		return -1;
 
 	SET_PARAM_STR(conn, obj_id, 0);
-	SET_PARAM_BIN(conn, raw_array, len, 1);
+	SET_PARAM_STR(conn, json, 1);
 
 	if (pg_db_cmd_ret(conn, STMT_REMOVE_RESVATTRS, 2) != 0)
 		return -1;
@@ -482,7 +480,7 @@ pg_db_del_attr_resv(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, void *obj_id, p
 	GET_PARAM_STR(conn->conn_resultset, 0, pnd->nd_savetm, nd_savetm_fnum);
 	PQclear(conn->conn_resultset);
 
-	free(raw_array);
+	free(json);
 
 	return 0;
 }

@@ -329,8 +329,8 @@ int pg_db_cmd(pbs_db_conn_t *conn, char *stmt, int num_vars);
 int pg_db_cmd_ret(pbs_db_conn_t *conn, char *stmt, int num_vars);
 int pg_db_query(pbs_db_conn_t *conn, char *stmt, int num_vars, int lock, PGresult **res);
 unsigned long long pbs_ntohll(unsigned long long);
-int convert_array_to_db_attr_list(char *raw_array, pbs_db_attr_list_t *attr_list);
-int convert_db_attr_list_to_array(char **raw_array, pbs_db_attr_list_t *attr_list);
+int convert_json_to_db_attr_list(char *json, pbs_db_attr_list_t *attr_list);
+int convert_db_attr_list_to_json(char **json, pbs_db_attr_list_t *attr_list);
 void free_db_attr_list(pbs_db_attr_list_t *attr_list);
 
 #ifdef NAS /* localmod 005 */

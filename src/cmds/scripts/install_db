@@ -280,6 +280,7 @@ sed "{
 	s/#log_truncate_on_rotation = off/log_truncate_on_rotation = on/g
 	s/#log_rotation_age = 1d/log_rotation_age = 1440/g
 	s/#log_line_prefix = ''/log_line_prefix = '%t'/g
+	s/##log_statement = 'none'/log_statement = 'all'/g
     }" ${data_dir}/postgresql.conf > ${tmp_file}
 if [ $? -ne 0 ]; then
 	echo "Error creating PBS datastore"
