@@ -166,6 +166,7 @@ que_save_db(pbs_queue *pque, int mode)
 {
 	pbs_db_que_info_t	dbque;
 	pbs_db_obj_info_t	obj;
+	pbs_db_query_options_t opts;
 	pbs_db_conn_t		*conn = (pbs_db_conn_t *) svr_db_conn;
 	int savetype = PBS_UPDATE_DB_FULL;
 	int rc;
@@ -187,7 +188,7 @@ que_save_db(pbs_queue *pque, int mode)
 		if (rc == UNIQUE_KEY_VIOLATION) {
 			/* delete the existing queue with same name */
 			strcpy(dbque.qu_name, pque->qu_qs.qu_name);
-			if (pbs_db_delete_obj(conn, &obj) != 0) {
+			if (pbs_db_delete_obj(conn, &obj, &opts) != 0) {
 				(void)sprintf(log_buffer,
 					"deletetion of que %s from datastore failed after unique key violation",
 					pque->qu_qs.qu_name);

@@ -88,6 +88,7 @@
 #include "resource.h"
 #include "pbs_sched.h"
 #include "pbs_share.h"
+#include <libpq-fe.h>
 
 #define REFRESH_TIME_PERIOD 86400
 
@@ -507,6 +508,7 @@ get_all_db_queues() {
 	int rc_cur = 0;
 	int refreshed = 0;
 	int count = 0;
+	int total_rows = 0;
 
 	if (pbs_db_begin_trx(conn, 0, 0) !=0) {
 		(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
@@ -529,7 +531,17 @@ get_all_db_queues() {
 		return (1);
 	}
 
+	/* to get the number of rows returned by query */
+	if ((total_rows = pbs_db_get_rowcount(cur_state)) == -2) {
+		log_err(-1, __func__, "Failed to get count in resultset");
+	}
+
 	while ((rc_cur = pbs_db_cursor_next(conn, cur_state, &dbobj)) == 0) {
+		/* to save the last queue row save_tm */
+		if((total_rows - 1) == 0)
+			if(dbque.qu_savetm)
+				strcpy(ques_from_time, dbque.qu_savetm);
+
 		if ((pque = refresh_queue(&dbque, &refreshed)) == NULL) {
 			sprintf(log_buffer, "Failed to refresh queue %s", dbque.qu_name);
 			log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_NOTICE, msg_daemonname, log_buffer);
@@ -539,6 +551,7 @@ get_all_db_queues() {
 			count++;
 		}
 
+		total_rows --;
 		pbs_db_reset_obj(&dbobj);
 	}
 
@@ -546,8 +559,9 @@ get_all_db_queues() {
 	if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0)
 		return (1);
 
-	if (pque)
-		strcpy(ques_from_time, pque->qu_savetm);
+	sprintf(log_buffer, "Refreshed %d queues", count);
+	log_event(PBSEVENT_DEBUG3, PBS_EVENTCLASS_SERVER, LOG_DEBUG, msg_daemonname, log_buffer);
+
 
 	return 0;
 }
@@ -676,8 +690,8 @@ req_stat_que(struct batch_request *preq)
 
 		pque = (pbs_queue *)GET_NEXT(svr_queues);
 		while (pque) {
-			if((time(0) - pque->qu_last_refresh_time) >= REFRESH_TIME_PERIOD) {
-				/* this que hasn't refreshed since from long time. Hence need to check it's existence.
+			if((time(0) - pque->qu_last_refresh_time) >= OBJ_REFRESH_TIME_PERIOD) {
+				/* this que hasn't refreshed since from long time(24 hrs.) hence need to check it's existence.
 				 * If it's been deleted by other server instance then remove from this server as well
 				 * and remove all the related jobs as well.
 				 */

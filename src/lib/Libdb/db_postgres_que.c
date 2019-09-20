@@ -149,6 +149,11 @@ pg_db_prepare_que_sqls(pbs_db_conn_t *conn)
 	if (pg_prepare_stmt(conn, STMT_DELETE_QUE, conn->conn_sql, 1) != 0)
 		return -1;
 
+	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "delete from pbs.queue "
+			"where qu_deleted = 1 and 'localtimestamp - qu_savetm' > $1");
+	if (pg_prepare_stmt(conn, STMT_DELETE_ALL_QUE_AS_DELETED, conn->conn_sql, 1) != 0)
+		return -1;
+
 	return 0;
 }
 
@@ -380,6 +385,7 @@ pg_db_next_que(pbs_db_conn_t* conn, void *st, pbs_db_obj_info_t* obj)
  *
  * @param[in]	conn - Connection handle
  * @param[in]	obj  - queue information
+ * @param[in]	opts - Optional arguments (i.e. timestamp or flags)
  *
  * @return      Error code
  * @retval	-1 - Failure
@@ -388,11 +394,20 @@ pg_db_next_que(pbs_db_conn_t* conn, void *st, pbs_db_obj_info_t* obj)
  *
  */
 int
-pg_db_delete_que(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj)
+pg_db_delete_que(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, pbs_db_query_options_t *opts)
 {
 	pbs_db_que_info_t *pq = obj->pbs_db_un.pbs_db_que;
-	SET_PARAM_STR(conn, pq->qu_name, 0);
-	return (pg_db_cmd(conn, STMT_DELETE_QUE, 1));
+
+	if((opts->timestamp != NULL) && !(strcmp(pq->qu_name, "DEL_ALL_QUES"))) {
+		/* delete all queues whichever is marked as deleted(qu_deleted=1) in db */
+		SET_PARAM_STR(conn, opts->timestamp, 0);
+		return (pg_db_cmd(conn, STMT_DELETE_ALL_QUE_AS_DELETED, 1));
+	} else {
+		/* delete a single queue by name(qu_name) */
+		SET_PARAM_STR(conn, pq->qu_name, 0);
+		return (pg_db_cmd(conn, STMT_DELETE_QUE, 1));
+	}
+
 }
 
 

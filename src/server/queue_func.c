@@ -250,19 +250,19 @@ que_purge(pbs_queue *pque)
 		}
 	}
 
-	/* for multi-server, update queue and mark it as deleted */
+	/* for multi-server, update queue and mark it as deleted to intimate other servers */
 	strcpy(dbque.qu_name, pque->qu_qs.qu_name);
 	dbque.qu_deleted = Obj_Deleted;
 	obj.pbs_db_obj_type = PBS_DB_QUEUE;
 	obj.pbs_db_un.pbs_db_que = &dbque;
+	/* it's a normal queue, mark it as deleted */
 	if (pbs_db_save_obj(conn, &obj, PBS_UPDATE_DB_AS_DELETED) != 0) {
 		(void)sprintf(log_buffer,
-			"Marking queue as deleted %s from datastore failed",
+			"Marking queue as deleted %s in datastore failed",
 			pque->qu_qs.qu_name);
-		log_err(errno, "queue_purge", log_buffer);
+		log_err(-1, __func__, log_buffer);
 	}
 	que_free(pque);
-
 	return (0);
 }
 

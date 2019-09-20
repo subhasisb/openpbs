@@ -183,6 +183,11 @@ extern int       get_all_db_queues();
 #define QUE_SAVE_FULL 0
 #define QUE_SAVE_NEW  1
 
+/* after every 30 seconds, global list of server queues "svr_queues" updates from db see pbsd_main.c*/
+#define QUE_LOAD_INTERVAL 30
+/* 86400 secs = 1 day, objects has to refresh oneself atleast once in a day see: req_stat.c */
+#define OBJ_REFRESH_TIME_PERIOD 86400
+
 #ifdef	__cplusplus
 }
 #endif

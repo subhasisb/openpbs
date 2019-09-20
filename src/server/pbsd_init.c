@@ -233,6 +233,7 @@ static int   attach_queue_to_reservation(resc_resv *);
 static void  call_log_license(struct work_task *);
 extern int create_resreleased(job *pjob);
 int am_i_resv_owner(char *);
+static void del_objects_from_db(struct work_task *);
 
 extern pbs_sched *sched_alloc(char *sched_name, int append);
 
@@ -1404,7 +1405,8 @@ pbsd_init(int type)
 #ifndef WIN32
 	(void)set_task(WORK_Immed, time_now, memory_debug_log, NULL);
 #endif /* !WIN32 */
-
+/* for multi-server project: create a  work task to delete the objects(job,queue,resv,node etc.) from the database */
+	(void)set_task(WORK_Timed, time_now + 1800, del_objects_from_db, NULL);
 	return (0);
 }
 
@@ -2174,4 +2176,53 @@ call_log_license(struct work_task *ptask)
 /* check the ownership of the reservtaion (i.e. servername)*/
 int am_i_resv_owner(char *resvid) {
 	return 1;
+}
+
+/**
+ * @brief
+ * 		del_que_from_db() - delete objects(job,que,resv etc.)from the database permanently
+ *
+ * @param[in]	ptask	- work task pointer
+ *
+ * @return	void
+ */
+void
+del_objects_from_db(struct work_task *ptask)
+{
+	/* delete all the objects (job,queue,resv,node etc) permanently from the db (only those objects which were marked
+	 * as deleted earlier)
+	 */
+	pbs_db_conn_t *conn = (pbs_db_conn_t *) svr_db_conn;
+	pbs_db_obj_info_t   obj;
+	pbs_db_query_options_t opts;
+	char time_buffer [6];
+	pbs_db_que_info_t   dbque;
+	pbs_db_node_info_t	dbnode;
+
+	/* delete all the queues(reservation and normal) */
+	sprintf(time_buffer, "%d", OBJ_REFRESH_TIME_PERIOD);
+	opts.timestamp = time_buffer;
+	strcpy(dbque.qu_name, "DEL_ALL_QUES");
+	obj.pbs_db_obj_type = PBS_DB_QUEUE;
+	obj.pbs_db_un.pbs_db_que = &dbque;
+	if (pbs_db_delete_obj(conn, &obj, &opts) != 0) {
+		log_err(-1, __func__, "deletion of queues from datastore failed");
+	}
+	pbs_db_reset_obj(&obj);
+
+	/* delete all the nodes */
+	strcpy(dbnode.nd_name, "DEL_ALL_NODES");
+	obj.pbs_db_obj_type = PBS_DB_NODE;
+	obj.pbs_db_un.pbs_db_node = &dbnode;
+	if (pbs_db_delete_obj(conn, &obj, &opts) != 0) {
+		log_err(-1, __func__, "deletion of nodes from datastore failed");
+	}
+
+	/*
+	 * TODO: write code to delete jobs from db permanently
+	 */
+
+	/* create a next occurence of the event after 30 minutes(1800 secs) */
+	if (ptask)
+		(void)set_task(WORK_Timed, time_now + 1800, del_objects_from_db, NULL);
 }

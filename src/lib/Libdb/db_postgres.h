@@ -142,6 +142,7 @@ typedef unsigned __int64 uint64_t;
 #define STMT_REMOVE_QUEATTRS "remove_queattrs"
 #define STMT_FIND_QUES_FROM_TIME_ORDBY_SAVETM "find_ques_from_time_ordby_savetm"
 #define STMT_UPDATE_QUE_AS_DELETED "update_que_status_as_deleted"
+#define STMT_DELETE_ALL_QUE_AS_DELETED "delete_all_que_as_deleted"
 
 /* node statement names */
 #define STMT_INSERT_NODE "insert_node"
@@ -159,6 +160,7 @@ typedef unsigned __int64 uint64_t;
 #define STMT_UPDATE_NODEJOBATTRS "update_nodejob_attrs"
 #define STMT_FIND_NODES_ORDBY_INDEX_FILTERBY_SAVETM "find_nodes_ordby_index_filterby_savetm"
 #define STMT_UPDATE_NODE_AS_DELETED "update_nd_as_deleted"
+#define STMT_DELETE_ALL_NODE_AS_DELETED "delete_all_node_as_deleted"
 
 /* node job statements */
 #define STMT_SELECT_NODEJOB "select_nodejob"
@@ -229,7 +231,7 @@ typedef struct postgres_query_state pg_query_state_t;
  */
 struct postgres_db_fn {
 	int (*pg_db_save_obj)	(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype);
-	int (*pg_db_delete_obj)	(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj);
+	int (*pg_db_delete_obj)	(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, pbs_db_query_options_t *opts);
 	int (*pg_db_load_obj)	(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int lock);
 	int (*pg_db_find_obj)	(pbs_db_conn_t *conn, void *state, pbs_db_obj_info_t *obj, pbs_db_query_options_t *opts);
 	int (*pg_db_next_obj)	(pbs_db_conn_t *conn, void *state, pbs_db_obj_info_t *obj);
@@ -354,7 +356,7 @@ int pg_db_save_job(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype);
 int pg_db_load_job(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int lock);
 int pg_db_find_job(pbs_db_conn_t *conn, void *st, pbs_db_obj_info_t *obj, pbs_db_query_options_t *opts);
 int pg_db_next_job(pbs_db_conn_t *conn, void *st, pbs_db_obj_info_t *obj);
-int pg_db_delete_job(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj);
+int pg_db_delete_job(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, pbs_db_query_options_t *opts);
 
 int pg_db_save_jobscr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype);
 int pg_db_load_jobscr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int lock);
@@ -365,7 +367,7 @@ int pg_db_save_resv(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype);
 int pg_db_load_resv(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int lock);
 int pg_db_find_resv(pbs_db_conn_t *conn, void *st, pbs_db_obj_info_t *obj, pbs_db_query_options_t *opts);
 int pg_db_next_resv(pbs_db_conn_t *conn, void *st, pbs_db_obj_info_t *obj);
-int pg_db_delete_resv(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj);
+int pg_db_delete_resv(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, pbs_db_query_options_t *opts);
 
 /* svr functions */
 int pg_db_save_svr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype);
@@ -376,7 +378,7 @@ int pg_db_save_node(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype);
 int pg_db_load_node(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int lock);
 int pg_db_find_node(pbs_db_conn_t *conn, void *st, pbs_db_obj_info_t *obj, pbs_db_query_options_t *opts);
 int pg_db_next_node(pbs_db_conn_t *conn, void *st, pbs_db_obj_info_t *obj);
-int pg_db_delete_node(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj);
+int pg_db_delete_node(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, pbs_db_query_options_t *opts);
 
 /* mominfo_time functions */
 int pg_db_save_mominfo_tm(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype);
@@ -387,7 +389,7 @@ int pg_db_save_que(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype);
 int pg_db_load_que(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int lock);
 int pg_db_find_que(pbs_db_conn_t *conn, void *st, pbs_db_obj_info_t *obj, pbs_db_query_options_t *opts);
 int pg_db_next_que(pbs_db_conn_t *conn, void *st, pbs_db_obj_info_t *obj);
-int pg_db_delete_que(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj);
+int pg_db_delete_que(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, pbs_db_query_options_t *opts);
 
 /* scheduler functions */
 int pg_db_save_sched(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype);
@@ -395,7 +397,7 @@ int pg_db_load_sched(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int lock);
 
 int pg_db_find_sched(pbs_db_conn_t *conn, void *st, pbs_db_obj_info_t *obj, pbs_db_query_options_t *opts);
 int pg_db_next_sched(pbs_db_conn_t *conn, void *st, pbs_db_obj_info_t *obj);
-int pg_db_delete_sched(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj);
+int pg_db_delete_sched(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, pbs_db_query_options_t *opts);
 
 int pg_db_del_attr_job(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, void *obj_id, pbs_db_attr_list_t *attr_list);
 int pg_db_del_attr_sched(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, void *obj_id, pbs_db_attr_list_t *attr_list);
@@ -412,7 +414,7 @@ int pg_db_load_nodejob(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int lock);
 int pg_db_save_nodejob(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype);
 int pg_db_find_nodejob(pbs_db_conn_t *conn, void *st, pbs_db_obj_info_t *obj, pbs_db_query_options_t *opts);
 int pg_db_next_nodejob(pbs_db_conn_t *conn, void *st, pbs_db_obj_info_t *obj);
-int pg_db_delete_nodejob(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj);
+int pg_db_delete_nodejob(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, pbs_db_query_options_t *opts);
 
 /* reset functions */
 void pg_db_reset_job(pbs_db_obj_info_t *obj);

@@ -1344,6 +1344,7 @@ struct batch_request *preq;
 		pque = NULL;
 	} else {
 		(void)que_save_db(pque, QUE_SAVE_NEW);
+		// here we are saving server just to update queue count only, for more info check que_alloc() above */
 		(void)svr_save_db(&server, SVR_SAVE_FULL);
 		(void)sprintf(log_buffer, msg_manager, msg_man_cre,
 			preq->rq_user, preq->rq_host);

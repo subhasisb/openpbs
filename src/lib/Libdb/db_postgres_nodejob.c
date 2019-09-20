@@ -385,6 +385,7 @@ pg_db_reset_nodejob(pbs_db_obj_info_t *obj)
  *
  * @param[in]	conn - Connection handle
  * @param[in]	obj  - Node information
+ * @param[in]	opts - Optional arguments (i.e. timestamp or flags)
  *
  * @return      Error code
  * @retval	-1 - Failure
@@ -393,7 +394,7 @@ pg_db_reset_nodejob(pbs_db_obj_info_t *obj)
  *
  */
 int
-pg_db_delete_nodejob(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj)
+pg_db_delete_nodejob(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, pbs_db_query_options_t *opts)
 {
 	pbs_db_nodejob_info_t *pnd = obj->pbs_db_un.pbs_db_nodejob;
 	SET_PARAM_STR(conn, pnd->job_id, 0);

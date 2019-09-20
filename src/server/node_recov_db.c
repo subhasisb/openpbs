@@ -510,6 +510,7 @@ node_delete_db(struct pbsnode *pnode)
 	dbnode.nd_deleted = Obj_Deleted;
 	obj.pbs_db_obj_type = PBS_DB_NODE;
 	obj.pbs_db_un.pbs_db_node = &dbnode;
+
 	if (pbs_db_save_obj(conn, &obj, PBS_UPDATE_DB_AS_DELETED) != 0) {
 		(void)sprintf(log_buffer,
 			"Marking node as deleted %s from datastore failed",

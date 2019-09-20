@@ -423,6 +423,7 @@ pg_db_next_sched(pbs_db_conn_t *conn, void *st, pbs_db_obj_info_t *obj)
  *
  * @param[in]	conn - Connection handle
  * @param[in]	obj  - scheduler information
+ * @param[in]	opts - Optional arguments (i.e. timestamp or flags)
  *
  * @return      Error code
  * @retval	-1 - Failure
@@ -431,7 +432,7 @@ pg_db_next_sched(pbs_db_conn_t *conn, void *st, pbs_db_obj_info_t *obj)
  *
  */
 int
-pg_db_delete_sched(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj)
+pg_db_delete_sched(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, pbs_db_query_options_t *opts)
 {
 	pbs_db_sched_info_t *sc = obj->pbs_db_un.pbs_db_sched;
 	SET_PARAM_STR(conn, sc->sched_name, 0);

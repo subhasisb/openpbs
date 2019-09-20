@@ -169,6 +169,7 @@ sched_delete(pbs_sched *psched)
 {
 	pbs_db_obj_info_t obj;
 	pbs_db_sched_info_t dbsched;
+	pbs_db_query_options_t opts;
 	pbs_db_conn_t *conn = (pbs_db_conn_t *) svr_db_conn;
 
 	if (psched == NULL)
@@ -179,7 +180,7 @@ sched_delete(pbs_sched *psched)
 	strcpy(dbsched.sched_name, psched->sc_name);
 	obj.pbs_db_obj_type = PBS_DB_SCHED;
 	obj.pbs_db_un.pbs_db_sched = &dbsched;
-	if (pbs_db_delete_obj(conn, &obj) != 0) {
+	if (pbs_db_delete_obj(conn, &obj, &opts) != 0) {
 		snprintf(log_buffer, LOG_BUF_SIZE,
 				"delete of scheduler %s from datastore failed",
 				psched->sc_name);

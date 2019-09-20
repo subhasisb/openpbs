@@ -626,11 +626,11 @@ void pbs_db_cursor_close(pbs_db_conn_t *conn, void *state);
  * @brief
  *	Get the number of rows from a cursor
  *
- * @param[in]	state - The opaque cusor state handle
+ * @param[in]	state - The opaque cursor state handle
  *
  * @return      int
  * @retval       0  - success
- * @retval      -1  - Failure
+ * @retval      -2  - Failure
  *
  */
 int pbs_db_get_rowcount(void *state);
@@ -673,6 +673,8 @@ int pbs_db_save_obj(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype);
  * @param[in]	conn - Connected database handle
  * @param[in]	pbs_db_obj_info_t - Wrapper object that describes the object
  *              (and data) to delete
+ * @param[in]   pbs_db_query_options_t - Pointer to the options object that can
+ *		 contain the flags or timestamp which will effect the query.
  *
  * @return      int
  * @retval      -1  - Failure
@@ -680,7 +682,7 @@ int pbs_db_save_obj(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype);
  * @retval       1 -  Success but no rows deleted
  *
  */
-int pbs_db_delete_obj(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj);
+int pbs_db_delete_obj(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, pbs_db_query_options_t *opts);
 
 /**
  * @brief

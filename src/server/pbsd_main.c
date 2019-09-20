@@ -178,6 +178,7 @@ static void log_tppmsg(int level, const char *objname, char *mess);
 #define MAX_DB_RETRIES			20
 #define MAX_DB_LOOP_DELAY		1000000
 #define HOT_START_PING_RATE		15
+static time_t last_que_load_tm;
 
 /* Global Data Items */
 
@@ -2101,10 +2102,13 @@ try_db_again:
 			}
 		}
 
-		/* refresh the queue list from db */
-		if (get_all_db_queues()) {
-			log_err(-1, __func__, "Failed to refresh queues from db");
-			/* TODO: Need to handle error here */
+		if((time(0) - last_que_load_tm) > QUE_LOAD_INTERVAL) {
+			/* refresh the queue list from db */
+			if (get_all_db_queues()) {
+				log_err(-1, __func__, "Failed to refresh queues from db");
+				/* TODO: Need to handle error here */
+			}
+			last_que_load_tm = time(0);
 		}
 		/* any jobs to route today */
 		pque = (pbs_queue *)GET_NEXT(svr_queues);

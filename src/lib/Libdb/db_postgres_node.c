@@ -230,6 +230,11 @@ pg_db_prepare_node_sqls(pbs_db_conn_t *conn)
 	if (pg_prepare_stmt(conn, STMT_UPDATE_MOMINFO_TIME, conn->conn_sql, 2) != 0)
 		return -1;
 
+	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "delete from pbs.node "
+			"where nd_deleted = 1 and 'localtimestamp - nd_savetm' > $1");
+	if (pg_prepare_stmt(conn, STMT_DELETE_ALL_NODE_AS_DELETED, conn->conn_sql, 1) != 0)
+		return -1;
+
 	return 0;
 }
 
@@ -473,6 +478,7 @@ pg_db_next_node(pbs_db_conn_t *conn, void *st, pbs_db_obj_info_t *obj)
  *
  * @param[in]	conn - Connection handle
  * @param[in]	obj  - Node information
+ * @param[in]	opts - Optional arguments (i.e. timestamp or flags)
  *
  * @return      Error code
  * @retval	-1 - Failure
@@ -481,11 +487,19 @@ pg_db_next_node(pbs_db_conn_t *conn, void *st, pbs_db_obj_info_t *obj)
  *
  */
 int
-pg_db_delete_node(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj)
+pg_db_delete_node(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, pbs_db_query_options_t *opts)
 {
 	pbs_db_node_info_t *pnd = obj->pbs_db_un.pbs_db_node;
-	SET_PARAM_STR(conn, pnd->nd_name, 0);
-	return (pg_db_cmd(conn, STMT_DELETE_NODE, 1));
+
+	if((opts->timestamp != NULL) && !(strcmp(pnd->nd_name, "DEL_ALL_NODES"))) {
+		/* delete all nodes whichever is marked as deleted(nd_deleted=1) */
+		SET_PARAM_STR(conn, opts->timestamp, 0);
+		return (pg_db_cmd(conn, STMT_DELETE_ALL_NODE_AS_DELETED, 1));
+	} else {
+		/* delete a single node by name(nd_name) */
+		SET_PARAM_STR(conn, pnd->nd_name, 0);
+		return (pg_db_cmd(conn, STMT_DELETE_NODE, 1));
+	}
 }
 
 

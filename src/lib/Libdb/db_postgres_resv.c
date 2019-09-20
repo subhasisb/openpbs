@@ -456,6 +456,7 @@ pg_db_next_resv(pbs_db_conn_t* conn, void* st, pbs_db_obj_info_t* obj)
  *
  * @param[in]	conn - Connection handle
  * @param[in]	obj  - Resv information
+ * @param[in]	opts - Optional arguments (i.e. timestamp or flags)
  *
  * @return      Error code
  * @retval	-1 - Failure
@@ -464,7 +465,7 @@ pg_db_next_resv(pbs_db_conn_t* conn, void* st, pbs_db_obj_info_t* obj)
  *
  */
 int
-pg_db_delete_resv(pbs_db_conn_t *conn, pbs_db_obj_info_t* obj)
+pg_db_delete_resv(pbs_db_conn_t *conn, pbs_db_obj_info_t* obj, pbs_db_query_options_t *opts)
 {
 	pbs_db_resv_info_t *presv = obj->pbs_db_un.pbs_db_resv;
 	SET_PARAM_STR(conn, presv->ri_resvid, 0);

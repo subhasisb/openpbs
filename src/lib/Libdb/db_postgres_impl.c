@@ -286,7 +286,9 @@ pbs_db_cursor_close(pbs_db_conn_t *conn, void *state)
  *
  * @param[in]	conn - Connected database handle
  * @param[in]	pbs_db_obj_info_t - Wrapper object that describes the object
- *		(and data) to delete
+ *		        (and data) to delete
+ * @param[in]	pbs_db_query_options_t - Pointer to the options object that can
+ *		contain the flags or timestamp which will effect the query.
  *
  * @return      int
  * @retval	-1  - Failure
@@ -295,9 +297,9 @@ pbs_db_cursor_close(pbs_db_conn_t *conn, void *state)
  *
  */
 int
-pbs_db_delete_obj(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj)
+pbs_db_delete_obj(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, pbs_db_query_options_t *opts)
 {
-	return (db_fn_arr[obj->pbs_db_obj_type].pg_db_delete_obj(conn, obj));
+	return (db_fn_arr[obj->pbs_db_obj_type].pg_db_delete_obj(conn, obj, opts));
 }
 
 /**
@@ -344,7 +346,7 @@ pbs_db_cleanup_resultset(pbs_db_conn_t *conn)
  *
  * @return      Numer of rows in the cursor
  * @retval       0 or positive - Number of rows in cursor
- * @retval	-1  - Failure
+ * @retval	-2  - Failure
  *
  *
  */
@@ -354,7 +356,7 @@ pbs_db_get_rowcount(void *st)
 	pg_query_state_t *state = (pg_query_state_t *) st;
 	if (state)
 		return state->count;
-	return -1;
+	return -2;
 }
 
 /**
