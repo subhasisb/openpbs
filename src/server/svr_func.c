@@ -6931,9 +6931,9 @@ svr_load_jobscript(job *pj)
 	}
 
 	if (pj->ji_qs.ji_svrflags & JOB_SVFLG_SubJob) {
-		strcpy(jobscr.ji_jobid, pj->ji_parentaj->ji_qs.ji_jobid);
+		jobscr.ji_jobid = strtoll(pj->ji_parentaj->ji_qs.ji_jobid, NULL, 10);
 	} else {
-		strcpy(jobscr.ji_jobid, pj->ji_qs.ji_jobid);
+		jobscr.ji_jobid = strtoll(pj->ji_qs.ji_jobid, NULL, 10);
 	}
 	obj.pbs_db_obj_type = PBS_DB_JOBSCR;
 	obj.pbs_db_un.pbs_db_jobscr = &jobscr;

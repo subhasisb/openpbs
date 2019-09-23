@@ -163,7 +163,7 @@ typedef struct pbs_db_attr_list pbs_db_attr_list_t;
  *
  */
 struct pbs_db_job_info {
-	char     ji_jobid[PBS_MAXSVRJOBID + 1]; /* job identifier */
+	BIGINT  ji_jobid; /* job identifier */
 	INTEGER  ji_state; /* INTEGERernal copy of state */
 	INTEGER  ji_substate; /* job sub-state */
 	INTEGER  ji_svrflags; /* server flags */
@@ -295,7 +295,7 @@ typedef struct pbs_db_mominfo_time pbs_db_mominfo_time_t;
  *
  */
 struct pbs_db_jobscr_info {
-	char     ji_jobid[PBS_MAXSVRJOBID + 1]; /* job identifier */
+	BIGINT	 ji_jobid; /* job identifier */
 	TEXT     script;
 };
 typedef struct pbs_db_jobscr_info pbs_db_jobscr_info_t;

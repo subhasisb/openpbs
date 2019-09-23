@@ -609,7 +609,7 @@ svr_migrate_data_from_fs(void)
 
 			if (pjob->ji_qs.ji_svrflags & JOB_SVFLG_SCRIPT) {
 				/* save job script */
-				strcpy(jobscr.ji_jobid, pjob->ji_qs.ji_jobid);
+				jobscr.ji_jobid = strtoll(pjob->ji_qs.ji_jobid, NULL, 10);
 				jobscr.script = scrbuf;
 				obj.pbs_db_obj_type = PBS_DB_JOBSCR;
 				obj.pbs_db_un.pbs_db_jobscr = &jobscr;

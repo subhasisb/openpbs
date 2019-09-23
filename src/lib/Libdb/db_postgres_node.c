@@ -76,8 +76,8 @@ pg_db_prepare_node_sqls(pbs_db_conn_t *conn)
 		"attributes "
 		") "
 		"values "
-		"($1, $2, $3, $4, $5, $6, $7, localtimestamp, localtimestamp, $8) "
-		"returning to_char(nd_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as nd_savetm");
+		"($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, $8) "
+		"returning nd_savetm");
 
 	if (pg_prepare_stmt(conn, STMT_INSERT_NODE, conn->conn_sql, 8) != 0)
 		return -1;
@@ -90,26 +90,26 @@ pg_db_prepare_node_sqls(pbs_db_conn_t *conn)
 		"nd_state = $5, "
 		"nd_ntype = $6, "
 		"nd_pque = $7, "
-		"nd_savetm = localtimestamp, "
+		"nd_savetm = CURRENT_TIMESTAMP, "
 		"attributes = $8 "
 		" where nd_name = $1 "
-		"returning to_char(nd_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as nd_savetm");
+		"returning nd_savetm");
 	if (pg_prepare_stmt(conn, STMT_UPDATE_NODE, conn->conn_sql, 8) != 0)
 		return -1;
 
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "update pbs.node set "
-		"nd_savetm = localtimestamp,"
-		"attributes = attributes - $2 "
+		"nd_savetm = CURRENT_TIMESTAMP,"
+		"attributes = attributes #- $2::text[] "
 		"where nd_name = $1 "
-		"returning to_char(nd_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as nd_savetm");
+		"returning nd_savetm");
 	if (pg_prepare_stmt(conn, STMT_REMOVE_NODEATTRS, conn->conn_sql, 2) != 0)
 		return -1;
 
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "update pbs.node set "
-			"nd_savetm = localtimestamp,"
+			"nd_savetm = CURRENT_TIMESTAMP,"
 			"attributes = attributes || $2 "
 			"where nd_name = $1 "
-			"returning to_char(nd_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as nd_savetm");
+			"returning nd_savetm");
 	if (pg_prepare_stmt(conn, STMT_UPDATE_NODEATTRS, conn->conn_sql, 2) != 0)
 		return -1;
 
@@ -121,16 +121,12 @@ pg_db_prepare_node_sqls(pbs_db_conn_t *conn)
 		"nd_state, "
 		"nd_ntype, "
 		"nd_pque, "
-		"to_char(nd_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as nd_savetm, "
-		"to_char(nd_creattm, 'YYYY-MM-DD HH24:MI:SS.US') as nd_creattm, "
+		"nd_savetm::text, "
+		"nd_creattm::text, "
 		"attributes::text "
 		"from pbs.node "
 		"where nd_name = $1 ");
 	if (pg_prepare_stmt(conn, STMT_SELECT_NODE, conn->conn_sql, 1) != 0)
-		return -1;
-
-	strcat(conn->conn_sql, " FOR UPDATE");
-	if (pg_prepare_stmt(conn, STMT_SELECT_NODE_LOCKED, conn->conn_sql, 1) != 0)
 		return -1;
 
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select "
@@ -141,8 +137,8 @@ pg_db_prepare_node_sqls(pbs_db_conn_t *conn)
 		"nd_state, "
 		"nd_ntype, "
 		"nd_pque, "
-		"to_char(nd_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as nd_savetm, "
-		"to_char(nd_creattm, 'YYYY-MM-DD HH24:MI:SS.US') as nd_creattm, "
+		"nd_savetm::text, "
+		"nd_creattm::text, "
 		"attributes::text "
 		"from pbs.node order by nd_creattm");
 	if (pg_prepare_stmt(conn, STMT_FIND_NODES_ORDBY_CREATTM, conn->conn_sql, 0) != 0)
@@ -165,8 +161,8 @@ pg_db_prepare_node_sqls(pbs_db_conn_t *conn)
 		"nd_state, "
 		"nd_ntype, "
 		"nd_pque, "
-		"to_char(nd_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as nd_savetm, "
-		"to_char(nd_creattm, 'YYYY-MM-DD HH24:MI:SS.US') as nd_creattm, "
+		"nd_savetm::text, "
+		"nd_creattm::text, "
 		"attributes::text "
 		"from pbs.node order by nd_index, nd_creattm");
 #endif /* localmod 079 */
@@ -249,8 +245,8 @@ load_node(PGresult *res, pbs_db_node_info_t *pnd, int row)
 	GET_PARAM_STR(res, row, pnd->nd_name, nd_name_fnum);
 	GET_PARAM_BIGINT(res, row, pnd->mom_modtime, mom_modtime_fnum);
 	GET_PARAM_STR(res, row, pnd->nd_hostname, nd_hostname_fnum);
-	GET_PARAM_INTEGER(res, row, pnd->nd_state, nd_state_fnum);
-	GET_PARAM_INTEGER(res, row, pnd->nd_ntype, nd_ntype_fnum);
+	GET_PARAM_BIGINT(res, row, pnd->nd_state, nd_state_fnum);
+	GET_PARAM_BIGINT(res, row, pnd->nd_ntype, nd_ntype_fnum);
 	GET_PARAM_STR(res, row, pnd->nd_pque, nd_pque_fnum);
 	GET_PARAM_STR(res, row, pnd->nd_creattm, nd_creattm_fnum);
 	GET_PARAM_BIN(res, row, json, attributes_fnum);
@@ -282,11 +278,11 @@ pg_db_save_node(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
 	static int fnums_inited = 0;
 
 	SET_PARAM_STR(conn, pnd->nd_name, 0);
-	SET_PARAM_INTEGER(conn, pnd->nd_index, 1);
+	SET_PARAM_BIGINT(conn, pnd->nd_index, 1);
 	SET_PARAM_BIGINT(conn, pnd->mom_modtime, 2);
 	SET_PARAM_STR(conn, pnd->nd_hostname, 3);
-	SET_PARAM_INTEGER(conn, pnd->nd_state, 4);
-	SET_PARAM_INTEGER(conn, pnd->nd_ntype, 5);
+	SET_PARAM_BIGINT(conn, pnd->nd_state, 4);
+	SET_PARAM_BIGINT(conn, pnd->nd_ntype, 5);
 	SET_PARAM_STR(conn, pnd->nd_pque, 6);
 
 	if (savetype == PBS_UPDATE_DB_QUICK) {
@@ -499,7 +495,7 @@ pg_db_save_mominfo_tm(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
 	pbs_db_mominfo_time_t *pmi = obj->pbs_db_un.pbs_db_mominfo_tm;
 
 	SET_PARAM_BIGINT(conn, pmi->mit_time, 0);
-	SET_PARAM_INTEGER(conn, pmi->mit_gen, 1);
+	SET_PARAM_BIGINT(conn, pmi->mit_gen, 1);
 
 	if (savetype == PBS_INSERT_DB)
 		stmt = STMT_INSERT_MOMINFO_TIME;
@@ -543,7 +539,7 @@ pg_db_load_mominfo_tm(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int lock)
 	}
 
 	GET_PARAM_BIGINT(res, 0, pmi->mit_time, mit_time_fnum);
-	GET_PARAM_INTEGER(res, 0, pmi->mit_gen, mit_gen_fnum);
+	GET_PARAM_BIGINT(res, 0, pmi->mit_gen, mit_gen_fnum);
 
 	PQclear(res);
 	return 0;

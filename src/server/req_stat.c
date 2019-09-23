@@ -463,7 +463,7 @@ get_all_db_jobs()
 	
 	while ((rc_cur = pbs_db_cursor_next(conn, state, &obj)) == 0) {
 		if ((pj = refresh_job(&dbjob, &refreshed)) == NULL) {
-			sprintf(log_buffer, "Failed to refresh job %s", dbjob.ji_jobid);
+			sprintf(log_buffer, "Failed to refresh job %llu", dbjob.ji_jobid);
 			log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_NOTICE, msg_daemonname, log_buffer);
 		}
 		if (refreshed)

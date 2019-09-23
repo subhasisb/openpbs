@@ -176,6 +176,7 @@ fi
 #
 
 check_status() {
+	return 0 # COCKROACHDB: always return success for now, starting DB manually
   cd ${PBS_HOME}/datastore
   if [ $? -ne 0 ]; then
 	echo "Could not change directory to ${PBS_HOME}/datastore"
@@ -313,6 +314,8 @@ start_dataservice() {
 
 
 data_srv_mon="${PBS_EXEC}/sbin/pbs_ds_monitor"
+
+exit 0
 
 # 
 # If second parameter is specified as "PBS" it means this was called from the PBS daemons

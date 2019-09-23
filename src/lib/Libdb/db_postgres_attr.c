@@ -208,7 +208,7 @@ err:
  *
  */
 int
-convert_db_attr_list_to_json(char **outbuf, pbs_db_attr_list_t *attr_list)
+convert_db_attr_list_to_json_inner(char **outbuf, pbs_db_attr_list_t *attr_list, int type)
 {
 	#define DEFAULT_LEN 1000
 
@@ -237,7 +237,7 @@ convert_db_attr_list_to_json(char **outbuf, pbs_db_attr_list_t *attr_list)
 	p++;
 
 	for (i = 0; i < attr_list->attr_count; ++i) {
-		space_needed = PBS_MAXATTRNAME + PBS_MAXATTRRESC + (attrs[i].attr_value?strlen(attrs[i].attr_value):0) + sizeof(int) + 25;
+		space_needed = PBS_MAXATTRNAME + PBS_MAXATTRRESC + (type && attrs[i].attr_value?strlen(attrs[i].attr_value):0) + sizeof(int) + 25;
 		if (space_needed > space_left) {
 			if (space_needed > DEFAULT_LEN)
 				tot_space += space_needed * 2;
@@ -263,7 +263,12 @@ convert_db_attr_list_to_json(char **outbuf, pbs_db_attr_list_t *attr_list)
 			dot = "";
 			resc = "";
 		}
-		used = sprintf(p, "%s\"%s%s%s\": {\"attr_value\": \"%s\", \"attr_flags\": %d}", (i != 0)? ", ":"", attrs[i].attr_name, dot, resc, attrs[i].attr_value, attrs[i].attr_flags);
+
+		if (type) {
+			used = sprintf(p, "%s\"%s%s%s\": {\"attr_value\": \"%s\", \"attr_flags\": %d}", (i != 0)? ", ":"", attrs[i].attr_name, dot, resc, attrs[i].attr_value, attrs[i].attr_flags);
+		} else {
+			used = sprintf(p, "%s\"%s\"", (i != 0)? ", ":"", attrs[i].attr_name);
+		}
 		space_left -= used;
 		p += used;
 	}
@@ -271,6 +276,18 @@ convert_db_attr_list_to_json(char **outbuf, pbs_db_attr_list_t *attr_list)
 
 	*outbuf = buf; 
 	return 0;
+}
+
+int
+convert_db_attr_list_to_json(char **outbuf, pbs_db_attr_list_t *attr_list)
+{
+	return convert_db_attr_list_to_json_inner(outbuf, attr_list, 1);
+}
+
+int
+convert_db_attr_list_to_keys_array(char **outbuf, pbs_db_attr_list_t *attr_list)
+{
+	return convert_db_attr_list_to_json_inner(outbuf, attr_list, 0);
 }
 
 /**

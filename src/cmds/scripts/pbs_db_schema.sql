@@ -42,7 +42,7 @@
  */
 
 drop schema pbs cascade; -- Drop any existing schema called pbs
-create schema pbs;	 -- Create a new schema called pbs
+create database pbs;	 -- Create a new schema called pbs (COCKROACHDB: need to create database, not schema: default schema public)
 ---------------------- VERSION -----------------------------
 
 /*
@@ -160,7 +160,7 @@ CREATE INDEX ri_savetm_idx ON pbs.resv(ri_savetm);
  * Table pbs.job holds job information
  */
 CREATE TABLE pbs.job (
-    ji_jobid		TEXT		NOT NULL,
+    ji_jobid		BIGINT		NOT NULL,
     ji_state		INTEGER		NOT NULL,
     ji_substate		INTEGER		NOT NULL,
     ji_svrflags		INTEGER		NOT NULL,
@@ -195,7 +195,7 @@ CREATE INDEX job_savetm_idx ON pbs.job(ji_savetm);
  * Table pbs.job_scr holds the job script 
  */
 CREATE TABLE pbs.job_scr (
-    ji_jobid	    TEXT		NOT NULL,
+    ji_jobid	    BIGINT		NOT NULL,
     script		    TEXT
 );
 CREATE INDEX job_scr_idx ON pbs.job_scr (ji_jobid);

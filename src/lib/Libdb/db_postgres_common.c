@@ -213,7 +213,7 @@ pg_db_query(pbs_db_conn_t *conn, char *stmt, int num_vars, int lock, PGresult **
 
 	if (lock) {
 		strcpy(stmt_tmp, stmt);
-		strcat(stmt_tmp, "_locked");
+		//strcat(stmt_tmp, "_locked");
 	}
 	
 	*res = PQexecPrepared((PGconn*) conn->conn_db_handle,
@@ -401,10 +401,9 @@ pbs_get_connect_string(char *host, int timeout, int *err_code, char *errmsg, int
 	struct 		in_addr in;
 	char		hostaddr_str[IPV4_STR_LEN + 1];
 	char		*q;
-	char		template1[]="hostaddr = '%s' port = %d dbname = '%s' user = '%s' password = '%s' "
-		"connect_timeout = %d";
-	char		template2[]="port = %d dbname = '%s' user = '%s' password = '%s' "
-		"connect_timeout = %d";
+	//postgres://<username>:<password>@<host>:<port>/<database>?<parameters>
+	char		template1[]="postgres://@%s:%d?sslmode=disable";
+	char		template2[]="postgres://@%s:%d?sslmode=disable";
 
 	usr = pbs_get_dataservice_usr(errmsg, len);
 	if (usr == NULL) {
@@ -448,11 +447,11 @@ pbs_get_connect_string(char *host, int timeout, int *err_code, char *errmsg, int
 	if (host == NULL) {
 		sprintf(svr_conn_info,
 			template2,
-			pbs_conf.pbs_data_service_port,
-			PBS_DATA_SERVICE_STORE_NAME,
-			usr,
-			pquoted,
-			timeout);
+			pbs_conf.pbs_data_service_port);
+			//PBS_DATA_SERVICE_STORE_NAME,
+			//usr,
+			//pquoted,
+			//timeout);
 	} else {
 		if ((hostaddr = get_hostaddr(host)) == (pbs_net_t)0) {
 			free(pquoted);
@@ -478,11 +477,11 @@ pbs_get_connect_string(char *host, int timeout, int *err_code, char *errmsg, int
 		sprintf(svr_conn_info,
 			template1,
 			hostaddr_str,
-			pbs_conf.pbs_data_service_port,
-			PBS_DATA_SERVICE_STORE_NAME,
-			usr,
-			pquoted,
-			timeout);
+			pbs_conf.pbs_data_service_port);
+			//PBS_DATA_SERVICE_STORE_NAME,
+			//usr,
+			//pquoted,
+			//timeout);
 	}
 	memset(p, 0, strlen(p)); 			 /* clear password from memory */
 	memset(pquoted, 0, strlen(pquoted)); /* clear password from memory */

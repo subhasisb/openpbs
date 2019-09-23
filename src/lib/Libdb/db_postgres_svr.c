@@ -70,37 +70,33 @@ pg_db_prepare_svr_sqls(pbs_db_conn_t *conn)
 		"attributes "
 		") "
 		"values "
-		"(localtimestamp, localtimestamp, $1) "
-		"returning to_char(sv_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as sv_savetm");
+		"(CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, $1) "
+		"returning sv_savetm");
 	if (pg_prepare_stmt(conn, STMT_INSERT_SVR, conn->conn_sql, 1) != 0)
 		return -1;
 
 	/* replace all attributes for a FULL update */
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "update pbs.server set "
-		"sv_savetm = localtimestamp, "
+		"sv_savetm = CURRENT_TIMESTAMP, "
 		"attributes = $1 "
-		"returning to_char(sv_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as sv_savetm");
+		"returning sv_savetm");
 	if (pg_prepare_stmt(conn, STMT_UPDATE_SVR_FULL, conn->conn_sql, 1) != 0)
 		return -1;
 
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "update pbs.server set "
-		"sv_savetm = localtimestamp,"
-		"attributes = attributes - $1 "
-		"returning to_char(sv_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as sv_savetm");
+		"sv_savetm = CURRENT_TIMESTAMP,"
+		"attributes = attributes #- $1::text[] "
+		"returning sv_savetm");
 	if (pg_prepare_stmt(conn, STMT_REMOVE_SVRATTRS, conn->conn_sql, 1) != 0)
 		return -1;
 
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select "
-		"to_char(sv_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as sv_savetm, "
-		"to_char(sv_creattm, 'YYYY-MM-DD HH24:MI:SS.US') as sv_creattm, "
+		"sv_savetm::text, "
+		"sv_creattm::text, "
 		"attributes::text "
 		"from "
 		"pbs.server ");
 	if (pg_prepare_stmt(conn, STMT_SELECT_SVR, conn->conn_sql, 0) != 0)
-		return -1;
-
-	strcat(conn->conn_sql, " FOR UPDATE");
-	if (pg_prepare_stmt(conn, STMT_SELECT_SVR_LOCKED, conn->conn_sql, 0) != 0)
 		return -1;
 
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select "

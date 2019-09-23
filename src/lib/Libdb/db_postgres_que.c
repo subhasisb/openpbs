@@ -71,8 +71,8 @@ pg_db_prepare_que_sqls(pbs_db_conn_t *conn)
 		"attributes "
 		") "
 		"values "
-		"($1, $2,  localtimestamp, localtimestamp, $3) "
-		"returning to_char(qu_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as qu_savetm");
+		"($1, $2,  CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, $3) "
+		"returning qu_savetm");
 
 	if (pg_prepare_stmt(conn, STMT_INSERT_QUE, conn->conn_sql, 3) != 0)
 		return -1;
@@ -80,26 +80,26 @@ pg_db_prepare_que_sqls(pbs_db_conn_t *conn)
 	/* rewrite all attributes for FULL update */
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "update pbs.queue set "
 			"qu_type = $2, "
-			"qu_savetm = localtimestamp, "
+			"qu_savetm = CURRENT_TIMESTAMP, "
 			"attributes = $3 "
 			"where qu_name = $1 "
-			"returning to_char(qu_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as qu_savetm");
+			"returning qu_savetm");
 	if (pg_prepare_stmt(conn, STMT_UPDATE_QUE_FULL, conn->conn_sql, 3) != 0)
 		return -1;
 
 
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "update pbs.queue set "
-		"qu_savetm = localtimestamp,"
-		"attributes = attributes - $2 "
+		"qu_savetm = CURRENT_TIMESTAMP,"
+		"attributes = attributes #- $2::text[] "
 		"where qu_name = $1 "
-		"returning to_char(qu_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as qu_savetm");
+		"returning qu_savetm");
 	if (pg_prepare_stmt(conn, STMT_REMOVE_QUEATTRS, conn->conn_sql, 2) != 0)
 		return -1;
 
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select qu_name, "
 			"qu_type, "
-			"to_char(qu_creattm, 'YYYY-MM-DD HH24:MI:SS.US') as qu_creattm, "
-			"to_char(qu_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as qu_savetm, "
+			"qu_creattm::text, "
+			"qu_savetm::text, "
 			"attributes::text "
 			"from pbs.queue "
 			"where qu_name = $1");
@@ -108,24 +108,20 @@ pg_db_prepare_que_sqls(pbs_db_conn_t *conn)
 
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select qu_name, "
 			"qu_type, "
-			"to_char(qu_creattm, 'YYYY-MM-DD HH24:MI:SS.US') as qu_creattm, "
-			"to_char(qu_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as qu_savetm, "
+			"qu_creattm::text, "
+			"qu_savetm::text, "
 			"attributes::text "
 			"from pbs.queue "
-			"where qu_savetm > to_timestamp($1, 'YYYY-MM-DD HH24:MI:SS:US') "
+			"where qu_savetm > $1 "
 			"order by qu_savetm ");
 	if (pg_prepare_stmt(conn, STMT_SELECT_QUE_FROM_TIME, conn->conn_sql, 1) != 0)
-		return -1;
-
-	strcat(conn->conn_sql, " FOR UPDATE");
-	if (pg_prepare_stmt(conn, STMT_SELECT_QUE_LOCKED, conn->conn_sql, 1) != 0)
 		return -1;
 
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select "
 			"qu_name, "
 			"qu_type, "
-			"to_char(qu_creattm, 'YYYY-MM-DD HH24:MI:SS.US') as qu_creattm, "
-			"to_char(qu_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as qu_savetm, "
+			"qu_creattm::text, "
+			"qu_savetm::text, "
 			"attributes::text "
 			"from pbs.queue order by qu_savetm");
 	if (pg_prepare_stmt(conn, STMT_FIND_QUES_ORDBY_CREATTM, conn->conn_sql, 0) != 0)
@@ -178,7 +174,7 @@ load_que(PGresult *res, pbs_db_que_info_t *pq, int row)
 	strcpy(pq->qu_savetm, db_savetm); /* update the save timestamp */
 
 	GET_PARAM_STR(res, row, pq->qu_name, qu_name_fnum);
-	GET_PARAM_INTEGER(res, row, pq->qu_type, qu_type_fnum);
+	GET_PARAM_BIGINT(res, row, pq->qu_type, qu_type_fnum);
 	GET_PARAM_STR(res, row, pq->qu_creattm, qu_creattm_fnum);
 	GET_PARAM_BIN(res, row, json, attributes_fnum);
 
@@ -209,7 +205,7 @@ pg_db_save_que(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
 	static int fnums_inited = 0;
 
 	SET_PARAM_STR(conn, pq->qu_name, 0);
-	SET_PARAM_INTEGER(conn, pq->qu_type, 1);
+	SET_PARAM_BIGINT(conn, pq->qu_type, 1);
 
 	if (savetype == PBS_UPDATE_DB_QUICK) {
 		params = 2;
@@ -302,7 +298,7 @@ pg_db_find_que(pbs_db_conn_t *conn, void *st, pbs_db_obj_info_t *obj, pbs_db_que
 	if (!state)
 		return -1;
 
-	if (opts != NULL && opts->timestamp) {
+	if (opts != NULL && opts->timestamp && opts->timestamp[0]!='\0') {
 		SET_PARAM_STR(conn, opts->timestamp, 0);
 		params = 1;
 		strcpy(conn->conn_sql, STMT_SELECT_QUE_FROM_TIME);

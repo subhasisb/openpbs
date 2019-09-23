@@ -268,7 +268,7 @@ read_attr(int fd)
 static void
 db_to_svr_job(job *pjob,  pbs_db_job_info_t *pdjob)
 {
-	strcpy(pjob->ji_qs.ji_jobid, pdjob->ji_jobid);
+	snprintf(pjob->ji_qs.ji_jobid, sizeof(pjob->ji_qs.ji_jobid), "%llu.%s", pdjob->ji_jobid, "server");
 	pjob->ji_qs.ji_state = pdjob->ji_state;
 	pjob->ji_qs.ji_substate = pdjob->ji_substate;
 	pjob->ji_qs.ji_svrflags = pdjob->ji_svrflags;
@@ -373,19 +373,14 @@ print_db_job(char *id, int no_attributes)
 	if (display_script) {
 		obj.pbs_db_obj_type = PBS_DB_JOBSCR;
 		obj.pbs_db_un.pbs_db_jobscr = &jobscr;
-		strcpy(jobscr.ji_jobid, id);
-		if (strchr(id, '.') == 0) {
-			strcat(jobscr.ji_jobid, ".");
-			strcat(jobscr.ji_jobid, pbs_conf.pbs_server_name);
-		}
-
+		jobscr.ji_jobid = strtoll(id, NULL, 10);
 		if (pbs_db_load_obj(conn, &obj, 0) != 0) {
-			fprintf(stderr, "Job %s not found\n", jobscr.ji_jobid);
+			fprintf(stderr, "Job %llu not found\n", jobscr.ji_jobid);
 			return (1);
 		}
 		else {
 			printf("---------------------------------------------------\n");
-			printf("Jobscript for jobid:%s\n", jobscr.ji_jobid);
+			printf("Jobscript for jobid:%llu\n", jobscr.ji_jobid);
 			printf("---------------------------------------------------\n");
 
 			printf("%s \n", jobscr.script);
@@ -399,14 +394,9 @@ print_db_job(char *id, int no_attributes)
 	else {
 		obj.pbs_db_obj_type = PBS_DB_JOB;
 		obj.pbs_db_un.pbs_db_job = &dbjob;
-		strcpy(dbjob.ji_jobid, id);
-		if (strchr(id, '.') == 0) {
-			strcat(dbjob.ji_jobid, ".");
-			strcat(dbjob.ji_jobid, pbs_conf.pbs_server_name);
-		}
-
+		dbjob.ji_jobid = strtoll(id, NULL, 10);
 		if (pbs_db_load_obj(conn, &obj, 0) !=0) {
-			fprintf(stderr, "Job %s not found\n", dbjob.ji_jobid);
+			fprintf(stderr, "Job %llu not found\n", dbjob.ji_jobid);
 			return (1);
 		}
 		db_to_svr_job(&xjob, &dbjob);

@@ -148,7 +148,7 @@ static int
 svr_to_db_job(job *pjob, pbs_db_job_info_t *dbjob, int updatetype)
 {
 	memset(dbjob, 0, sizeof(pbs_db_job_info_t));
-	strcpy(dbjob->ji_jobid, pjob->ji_qs.ji_jobid);
+	dbjob->ji_jobid     = strtoll(pjob->ji_qs.ji_jobid, NULL, 10);
 	dbjob->ji_state     = pjob->ji_qs.ji_state;
 	dbjob->ji_substate  = pjob->ji_qs.ji_substate;
 	dbjob->ji_svrflags  = pjob->ji_qs.ji_svrflags;
@@ -206,10 +206,11 @@ svr_to_db_job(job *pjob, pbs_db_job_info_t *dbjob, int updatetype)
 static int
 db_to_svr_job(job *pjob,  pbs_db_job_info_t *dbjob)
 {
+	extern char		server_name[];
 	/* Variables assigned constant values are not stored in the DB */
 	pjob->ji_qs.ji_jsversion = JSVERSION;
 	strcpy(pjob->ji_savetm, dbjob->ji_savetm);
-	strcpy(pjob->ji_qs.ji_jobid, dbjob->ji_jobid);
+	snprintf(pjob->ji_qs.ji_jobid, sizeof(pjob->ji_qs.ji_jobid), "%llu.%s", dbjob->ji_jobid, server_name);
 	pjob->ji_qs.ji_state = dbjob->ji_state;
 	pjob->ji_qs.ji_substate = dbjob->ji_substate;
 	/* dbjob->ji_svrflags fetching wrong value from database, thus commented out.
@@ -504,7 +505,7 @@ db_err:
 	if (pj)
 		job_free(pj);
 
-	snprintf(log_buffer, LOG_BUF_SIZE, "Failed to recover job %s", dbjob->ji_jobid);
+	snprintf(log_buffer, LOG_BUF_SIZE, "Failed to recover job %llu", dbjob->ji_jobid);
 	log_err(-1, "job_recov", log_buffer);
 
 	return (NULL);
@@ -526,10 +527,14 @@ job *
 refresh_job(pbs_db_job_info_t *dbjob, int *refreshed) 
 {
 	job *pj = NULL;
+	char jidbuf[PBS_MAXSVRJOBID + 1];
+	extern char server_name[];
 	
 	*refreshed = 0;
 
-	if (!(pj = find_job_avl(dbjob->ji_jobid))) {
+	sprintf(jidbuf, "%llu.%s", dbjob->ji_jobid, server_name);
+
+	if (!(pj = find_job_avl(jidbuf))) {
 		if (!(pj = job_recov_db_spl(dbjob))) /* if job is not in AVL tree, load the job from database */
 			goto err;
 		
@@ -547,7 +552,7 @@ refresh_job(pbs_db_job_info_t *dbjob, int *refreshed)
 	return pj;
 
 err:
-	snprintf(log_buffer, LOG_BUF_SIZE, "Failed to refresh job attribute %s", dbjob->ji_jobid);
+	snprintf(log_buffer, LOG_BUF_SIZE, "Failed to refresh job attribute %llu", dbjob->ji_jobid);
 	log_err(-1, __func__, log_buffer);
 	return NULL;
 }
@@ -679,7 +684,7 @@ job_recov_db(char *jid, job *pjob, int lock)
 	int rc = 0;
 	pbs_db_conn_t *conn = svr_db_conn;
 
-	strcpy(dbjob.ji_jobid, jid);
+	dbjob.ji_jobid = strtoll(jid, NULL, 10);
 	if (pjob)
 		strcpy(dbjob.ji_savetm, pjob->ji_savetm);
 	else

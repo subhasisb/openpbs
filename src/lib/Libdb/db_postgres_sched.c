@@ -69,32 +69,32 @@ pg_db_prepare_sched_sqls(pbs_db_conn_t *conn)
 		"sched_creattm, "
 		"attributes "
 		") "
-		"values ($1, localtimestamp, localtimestamp, $2) "
-		"returning to_char(sched_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as sched_savetm");
+		"values ($1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, $2) "
+		"returning sched_savetm");
 	if (pg_prepare_stmt(conn, STMT_INSERT_SCHED, conn->conn_sql, 2) != 0)
 		return -1;
 
 	/* rewrite all attributes for a FULL update */
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "update pbs.scheduler set "
-		"sched_savetm = localtimestamp, "
+		"sched_savetm = CURRENT_TIMESTAMP, "
 		"attributes = $2 "
 		"where sched_name = $1 "
-		"returning to_char(sched_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as sched_savetm");
+		"returning sched_savetm");
 	if (pg_prepare_stmt(conn, STMT_UPDATE_SCHED_FULL, conn->conn_sql, 2) != 0)
 		return -1;
 
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "update pbs.scheduler set "
-		"sched_savetm = localtimestamp,"
-		"attributes = attributes - $2 "
+		"sched_savetm = CURRENT_TIMESTAMP,"
+		"attributes = attributes #- $2::text[] "
 		"where sched_name = $1 "
-		"returning to_char(sched_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as sched_savetm");
+		"returning sched_savetm");
 	if (pg_prepare_stmt(conn, STMT_REMOVE_SCHEDATTRS, conn->conn_sql, 2) != 0)
 		return -1;
 
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select "
 		"sched_name, "
-		"to_char(sched_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as sched_savetm, "
-		"to_char(sched_creattm, 'YYYY-MM-DD HH24:MI:SS.US') as sched_creattm, "
+		"sched_savetm::text, "
+		"sched_creattm::text, "
 		"attributes::text "
 		"from "
 		"pbs.scheduler "
@@ -102,14 +102,10 @@ pg_db_prepare_sched_sqls(pbs_db_conn_t *conn)
 	if (pg_prepare_stmt(conn, STMT_SELECT_SCHED, conn->conn_sql, 1) != 0)
 		return -1;
 
-	strcat(conn->conn_sql, " FOR UPDATE");
-	if (pg_prepare_stmt(conn, STMT_SELECT_SCHED_LOCKED, conn->conn_sql, 1) != 0)
-		return -1;
-
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select "
 		"sched_name, "
-		"to_char(sched_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as sched_savetm, "
-		"to_char(sched_creattm, 'YYYY-MM-DD HH24:MI:SS.US') as sched_creattm, "
+		"sched_savetm::text, "
+		"sched_creattm::text, "
 		"attributes::text "
 		"from "
 		"pbs.scheduler "
@@ -120,8 +116,8 @@ pg_db_prepare_sched_sqls(pbs_db_conn_t *conn)
 
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select "
 		"sched_name, "
-		"to_char(sched_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as sched_savetm, "
-		"to_char(sched_creattm, 'YYYY-MM-DD HH24:MI:SS.US') as sched_creattm, "
+		"sched_savetm::text, "
+		"sched_creattm::text, "
 		"attributes::text "
 		"from "
 		"pbs.scheduler "
@@ -131,8 +127,8 @@ pg_db_prepare_sched_sqls(pbs_db_conn_t *conn)
 
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select "
 		"sched_name, "
-		"to_char(sched_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as sched_savetm, "
-		"to_char(sched_creattm, 'YYYY-MM-DD HH24:MI:SS.US') as sched_creattm, "
+		"sched_savetm::text, "
+		"sched_creattm::text, "
 		"attributes::text "
 		"from "
 		"pbs.scheduler ");

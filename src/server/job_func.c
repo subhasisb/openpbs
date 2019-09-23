@@ -919,7 +919,7 @@ job_purge(job *pjob)
 	/* delete job and dependants from database */
 	obj.pbs_db_obj_type = PBS_DB_JOB;
 	obj.pbs_db_un.pbs_db_job = &dbjob;
-	strcpy(dbjob.ji_jobid, pjob->ji_qs.ji_jobid);
+	dbjob.ji_jobid = strtoll(pjob->ji_qs.ji_jobid, NULL, 10);
 	if (pbs_db_delete_obj(conn, &obj) == -1) {
 		log_joberr(-1, __func__, msg_err_purgejob_db,
 			pjob->ji_qs.ji_jobid);

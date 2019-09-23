@@ -1944,7 +1944,7 @@ req_commit_now(struct batch_request *preq, job *pj)
 	}
 
 	if (pj->ji_script) {
-		strcpy(jobscr.ji_jobid, pj->ji_qs.ji_jobid);
+		jobscr.ji_jobid = strtol(pj->ji_qs.ji_jobid, NULL, 10);
 		jobscr.script = pj->ji_script;
 		obj.pbs_db_obj_type = PBS_DB_JOBSCR;
 		obj.pbs_db_un.pbs_db_jobscr = &jobscr;
