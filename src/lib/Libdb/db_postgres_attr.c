@@ -145,6 +145,8 @@ again:
 			*p = '\0';
 			p++;
 			strncpy(attrs[tot_attrs].attr_resc, p, sizeof(attrs[tot_attrs].attr_resc));
+		} else {
+			attrs[tot_attrs].attr_resc[0] = '\0';
 		}
 		i++;
 

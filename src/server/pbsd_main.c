@@ -2993,6 +2993,8 @@ stop_db()
 {
 	char *db_err = NULL;
 
+	return;
+
 	pbs_db_disconnect(svr_db_conn);
 	pbs_db_destroy_connection(svr_db_conn);
 	svr_db_conn = NULL;

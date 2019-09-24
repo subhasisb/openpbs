@@ -1,16 +1,22 @@
 #!/bin/bash
 
-if [ $# -lt 3 ]; then
-	echo "syntax: $0 <num-threads> <jobs-per-thread> <server-port-range>"
+if [ $# -lt 2 ]; then
+	echo "syntax: $0 <num-threads> <jobs-per-thread>"
 	exit 1
 fi
 
+. /etc/pbs.conf
+
 function submit_jobs {
-	port=$1
+	svr=$1
 	njobs=$2
 
-	export PBS_SERVER_INSTANCES=:$port
-	echo "New thread submitting to Port = $port, jobs=$njobs"
+	if [ "${svr}" = "${PBS_SERVER}" ]; then
+		echo "New thread submitting to default Server, jobs=$njobs"
+	else
+		echo "New thread submitting to Server = $svr, jobs=$njobs"
+		export PBS_SERVER_INSTANCES=$svr
+	fi
 
 	for i in $(seq 1 $njobs)
 	do
@@ -27,23 +33,42 @@ fi
 
 nthreads=$1
 njobs=$2
-port_start=`echo $3 | cut -f1 -d"-"`
-port_end=`echo $3 | cut -f2 -d"-"`
 
-echo "parameters supplied: nthreads=$nthreads, njobs=$njobs, port_start=$port_start, port_end=$port_end"
+if [ "x${PBS_SERVER_INSTANCES}" = "x" ]; then
+	echo "Multiserver not configured. Submitting to single server"
+	servers=($PBS_SERVER)
+else
+	IFS=', ' read -r -a servers <<< "$PBS_SERVER_INSTANCES"
+fi
+
+num_svrs=${#servers[@]}
+
+echo "parameters supplied: nthreads=$nthreads, njobs=$njobs, num_servers=$num_svrs"
 
 #assign each new thread a new port in a round robin fashion to distribute almost evenly
 #qsub background daemons will be created for each different server port, so connections would be persistent
 
-start_time=`date +%s%3N`
+script_path=$0
+if [ "${script_path::1}" != "/" ]; then
+	script_path=`pwd`/$script_path
+fi
 
-port=$port_start
+echo "Script path=$script_path"
+
+start_time=`date +%s%3N`
+j=0
 for i in $(seq 1 $nthreads)
-do
-	setsid $0 submit $port $njobs &
-	port=$((port + 1))
-	if [ $port -gt $port_end ]; then
-		port=$port_start
+do 
+    port=`echo ${servers[j]} | awk -F":" '{print $2}'`
+	if [ -z "$port" ]; then
+		port=15001
+	fi
+	
+	setsid $script_path submit ${servers[j]} $njobs &
+
+	j=$((j + 1))
+	if [ $j -ge $num_svrs ]; then
+		j=0
 	fi
 done
 

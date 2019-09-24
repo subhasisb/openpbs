@@ -1,30 +1,49 @@
 #!/usr/bin/sh
 
-if [ $# -lt 2 ]
-then
-	echo "Usage is: $0 <numsvrs> <start port no.>"
-	exit 
+sep_db=0
+if [ $# -gt 0 ]; then
+	sep_db=1
 fi
-
-n=$1
-port=$2
-
-echo "Starting $n Servers with port starting from $port"
 
 . /etc/pbs.conf
 
-ulimit -n 10000
-ulimit -c unlimited
-
-i=1
-while [ $i -le $n ]
-do
-	export PBS_BATCH_SERVICE_PORT=$port
-	echo starting Server $i
+if [ "x${PBS_SERVER_INSTANCES}" = "x" ]; then
+	echo "Multiserver not configured correctly. Starting single server"
 	$PBS_EXEC/sbin/pbs_server
-	
-	i=`expr $i + 1`
-	port=`expr $port + 1`
+	return 0
+fi
+
+dbport=15007
+i=0
+errs=0
+
+IFS=', ' read -r -a servers <<< "$PBS_SERVER_INSTANCES"
+
+for svr in "${servers[@]}"
+do
+	server=`echo $svr | awk -F":" '{print $1}'`
+	if [ "${server}" = "${PBS_SERVER}" -o -z "${server}" ]; then
+		port=`echo $svr | awk -F":" '{print $2}'`
+		export PBS_BATCH_SERVICE_PORT=$port
+		export PBS_DATA_SERVICE_PORT=$dbport
+
+		echo "Starting Server $svr with port=$port, dbport=$dbport"
+
+		$PBS_EXEC/sbin/pbs_server
+		if [ $? -eq 0 ]; then
+			i=`expr $i + 1`
+		else
+			errs=`expr $errs + 1`
+		fi
+
+		if [ $sep_db -eq 1 ]; then
+			dbport=`expr $dbport + 1` # increment dbport by 1 for cockroachdb
+		fi
+	fi
 done
 
+echo "Succesfully started $i server instances" 
+if [ $errs -gt 0 ]; then
+	echo "Failed to start $errs instances"
+fi
 echo "Done"
