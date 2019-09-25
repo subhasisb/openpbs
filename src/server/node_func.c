@@ -181,10 +181,12 @@ static void	remove_node_topology(char *);
  * @retval	NULL	- failure
  */
 
-struct pbsnode	  *find_nodebyname(nodename)
-char *nodename;
+struct pbsnode *
+find_nodebyname(char *nodename)
 {
 	char		*pslash;
+	struct pbsnode *pnode;
+	struct pbsnode **tmpndlist;
 
 	if (nodename == NULL)
 		return NULL;
@@ -195,7 +197,30 @@ char *nodename;
 	if (node_tree == NULL)
 		return NULL;
 
-	return ((struct pbsnode *) find_tree(node_tree, nodename));
+	pnode = find_tree(node_tree, nodename);
+	if (pnode == NULL) {
+		if ((pnode = node_recov_db(nodename, pnode)) != NULL) {
+			DBPRT(("add to node tree"))
+			if (tree_add_del(node_tree, nodename, pnode, TREE_OP_ADD) != 0) {
+				DBPRT(("Addition to node tree has failed"))
+				free_pnode(pnode);
+				return NULL;
+			}
+			/* expand pbsndlist array exactly svr_totnodes long*/
+			tmpndlist = (struct pbsnode **)realloc(pbsndlist,
+				sizeof(struct pbsnode*) * (svr_totnodes + 1));
+
+			if (tmpndlist != NULL) {
+				/*add in the new entry etc*/
+				pbsndlist = tmpndlist;
+				pnode->nd_index = svr_totnodes;
+				pnode->nd_arr_index = svr_totnodes; /* this is only in mem, not from db */
+				pbsndlist[svr_totnodes++] = pnode;
+			}
+		}
+	} else
+		pnode = node_recov_db(nodename, pnode);
+	return pnode;
 }
 
 
@@ -746,6 +771,7 @@ free_pnode(struct pbsnode *pnode)
 		(void)free(pnode->nd_hostname);
 		(void)free(pnode->nd_moms);
 		(void)free(pnode); /* delete the pnode from memory */
+		pnode = NULL;
 	}
 }
 
@@ -937,8 +963,6 @@ process_host_name_part(char *objname, svrattrl *plist, char **pname, int *ntype)
 	return  (0);				/* function successful    */
 }
 
-static char *nodeerrtxt = "Node description file update failed";
-
 /**
  * @brief
  *		Static function to update the specified mom in the db. If the
@@ -968,8 +992,6 @@ save_nodes_db_mom(mominfo_t *pmom)
 	struct pbsnode *np;
 	pbs_list_head wrtattr;
 	mom_svrinfo_t *psvrm;
-	int	isoff;
-	int	hascomment;
 	int	nchild;
 
 	CLEAR_HEAD(wrtattr);
@@ -988,33 +1010,8 @@ save_nodes_db_mom(mominfo_t *pmom)
 			continue;
 		}
 
-		if (np->nd_modified & NODE_UPDATE_OTHERS) {
-			DBPRT(("Saving node %s into the database\n", np->nd_name))
-			if (node_save_db(np) != 0) {
-				log_event(PBSEVENT_ADMIN, PBS_EVENTCLASS_SERVER,
-					LOG_WARNING, "nodes", nodeerrtxt);
-				return (-1);
-			}
-			/*
-			 * node record were deleted
-			 * so add state and comments only if set
-			 */
-			isoff = np->nd_state &
-				(INUSE_OFFLINE | INUSE_OFFLINE_BY_MOM | INUSE_SLEEP);
+		node_save_db(np);
 
-			hascomment = (np->nd_attr[(int) ND_ATR_Comment].at_flags &
-				(ATR_VFLAG_SET | ATR_VFLAG_DEFLT)) == ATR_VFLAG_SET;
-
-			if (isoff)
-				np->nd_modified |= NODE_UPDATE_STATE;
-
-			if (hascomment)
-				np->nd_modified |= NODE_UPDATE_COMMENT;
-
-			write_single_node_state(np);
-		} else if (np->nd_modified & NODE_UPDATE_MOM) {
-			write_single_node_mom_attr(np);
-		}
 	}
 
 	return 0;

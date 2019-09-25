@@ -3153,7 +3153,7 @@ create_pbs_node2(char *objname, svrattrl *plist, int perms, int *bad, struct pbs
 		return (rc);
 
 
-	if ((pnode=find_nodebyname(pname)) == NULL) {
+	if ((pnode = find_nodebyname(pname)) == NULL) {
 
 		/* need to create the pbs_node entry */
 

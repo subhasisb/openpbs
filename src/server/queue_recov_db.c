@@ -243,7 +243,6 @@ que_recov_db(char *qname, pbs_queue *pq, int lock)
 
 	obj.pbs_db_obj_type = PBS_DB_QUEUE;
 	obj.pbs_db_un.pbs_db_que = &dbque;
-		
 	strcpy(dbque.qu_name, qname);
 
 	if (pq) {

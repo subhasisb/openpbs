@@ -59,6 +59,7 @@
 #include <errno.h>
 #include <arpa/inet.h>
 #include "ticket.h"
+#include "log.h"
 
 #define IPV4_STR_LEN	15
 
@@ -226,6 +227,7 @@ pg_db_query(pbs_db_conn_t *conn, char *stmt, int num_vars, int lock, PGresult **
 
 	res_rc = PQresultStatus(*res);
 	if (res_rc != PGRES_TUPLES_OK) {
+		DBPRT(("Execution of Prepared statement Failed"))
 		pg_set_error(conn, "Execution of Prepared statement", stmt);
 		PQclear(*res);
 		return -1;

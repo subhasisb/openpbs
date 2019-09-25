@@ -204,7 +204,7 @@ decode_resc(struct attribute *patr, char *name, char *rescn, char *val)
 int
 encode_resc(attribute *attr, pbs_list_head *phead, char *atname, char *rsname, int mode, svrattrl **rtnl)
 {
-	int	    dflt;
+	//int	    dflt;
 	resource   *prsc;
 	int	    rc;
 	int	    grandtotal = 0;
@@ -227,17 +227,17 @@ encode_resc(attribute *attr, pbs_list_head *phead, char *atname, char *rsname, i
 		/*
 		 * encode if sending to client or MOM with permission
 		 * encode if saving and ( not default value or save on deflt set)
-		 * encode if sending to server and not default and have permission
+		 * encode if sending to server and have permission
 		 */
 
 		perm = prsc->rs_defin->rs_flags & resc_access_perm ;
-		dflt = prsc->rs_value.at_flags & ATR_VFLAG_DEFLT;
+		//dflt = prsc->rs_value.at_flags & ATR_VFLAG_DEFLT;
 		if (((mode == ATR_ENCODE_CLIENT) && perm) ||
 			(mode == ATR_ENCODE_HOOK) ||
 			(mode == ATR_ENCODE_DB) ||
 			((mode == ATR_ENCODE_MOM) && perm) ||
 			(mode == ATR_ENCODE_SAVE) ||
-			((mode == ATR_ENCODE_SVR) && (dflt == 0) && perm)) {
+			((mode == ATR_ENCODE_SVR) && perm)) {
 
 			rsname = prsc->rs_defin->rs_name;
 			xrtnl = NULL;

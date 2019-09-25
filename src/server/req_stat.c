@@ -547,7 +547,7 @@ get_all_db_queues() {
 		return (1);
 
 	sprintf(log_buffer, "Refreshed %d queues", count);
-	log_err(-1, __func__, log_buffer);
+	log_event(PBSEVENT_DEBUG3, PBS_EVENTCLASS_SERVER, LOG_DEBUG, msg_daemonname, log_buffer);
 
 	if (pque)
 		strcpy(ques_from_time, pque->qu_savetm);

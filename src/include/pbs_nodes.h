@@ -500,6 +500,7 @@ extern int nodejob_update_attr_db(pbs_db_nodejob_info_t *dbnode);
 extern pbs_db_nodejob_info_t * initialize_nodejob_db_obj(char *nd_name, char *job_id, int is_resv);
 int nodejob_db_to_attrlist(struct pbsnode *pnode, pbs_db_nodejob_info_t *db_obj);
 extern void clear_nodejob_dbobj(pbs_db_nodejob_info_t *db_obj);
+extern struct pbsnode *node_recov_db(char *nd_name, struct pbsnode *pnode);
 extern int add_mom_to_pool(mominfo_t *);
 extern void remove_mom_from_pool(mominfo_t *);
 extern void reset_pool_inventory_mom(mominfo_t *);

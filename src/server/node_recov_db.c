@@ -50,6 +50,7 @@
  *	svr_to_db_node()
  *	node_recov_db_raw()
  *	node_delete_db()
+ *	node_recov_db()
  */
 
 
@@ -126,11 +127,11 @@ extern int make_pbs_list_attr_db(void *parent, pbs_db_attr_list_t *attr_list, st
  * @retval  -1 - Failure
  *
  */
-/*
+
 static int
 db_to_svr_node(struct pbsnode *pnode, pbs_db_node_info_t *pdbnd)
 {
-	if (pdbnd->nd_name && pdbnd->nd_name[0]!=0) {
+	if (pdbnd->nd_name && pdbnd->nd_name[0] != 0) {
 		pnode->nd_name = strdup(pdbnd->nd_name);
 		if (pnode->nd_name == NULL)
 			return -1;
@@ -152,6 +153,7 @@ db_to_svr_node(struct pbsnode *pnode, pbs_db_node_info_t *pdbnd)
 	if (pnode->nd_pque)
 		strcpy(pnode->nd_pque->qu_qs.qu_name, pdbnd->nd_pque);
 
+	strcpy(pnode->nd_savetm, pdbnd->nd_savetm);
 
 	if ((decode_attr_db(pnode, &pdbnd->attr_list, node_attr_def,
 		pnode->nd_attr, (int) ND_ATR_LAST, 0)) != 0)
@@ -159,7 +161,74 @@ db_to_svr_node(struct pbsnode *pnode, pbs_db_node_info_t *pdbnd)
 
 	return 0;
 }
-*/
+
+
+/**
+ * @brief
+ *		Recover a node from the database
+ *
+ * @param[in]	nd	- Information about the node to recover
+ *
+ * @return	The recovered node structure
+ * @retval	NULL - Failure
+ * @retval	!NULL - Success - address of recovered node returned
+ */
+struct pbsnode *
+node_recov_db(char *nd_name, struct pbsnode *pnode)
+{
+	pbs_db_obj_info_t obj;
+	pbs_db_conn_t *conn = (pbs_db_conn_t *) svr_db_conn;
+	pbs_db_node_info_t dbnode;
+	int rc = 0;
+
+	DBPRT(("Inside node_recov_db"))
+
+	strcpy(dbnode.nd_name, nd_name);
+	dbnode.nd_savetm[0] = '\0';
+	dbnode.attr_list.attributes = NULL;
+
+	if (!pnode) {
+		pnode = malloc(sizeof(struct pbsnode));
+		initialize_pbsnode(pnode, nd_name, NTYPE_PBS);
+	} else {
+		strcpy(dbnode.nd_savetm, pnode->nd_savetm);
+	}
+	
+	if (pnode == NULL) {
+		log_err(errno, "node_recov", "error on recovering node table");
+		return NULL;
+	}
+	obj.pbs_db_obj_type = PBS_DB_NODE;
+	obj.pbs_db_un.pbs_db_node = &dbnode;
+
+	if (pbs_db_begin_trx(conn, 0, 0) != 0)
+		goto db_err;
+
+	if ((rc = pbs_db_load_obj(conn, &obj, 0)) == -1)
+		goto db_err;
+
+	if (rc == -2) {
+		if (pbs_db_end_trx(conn, PBS_DB_ROLLBACK) != 0)
+			goto db_err;
+		return pnode;
+	}
+
+	if (db_to_svr_node(pnode, &dbnode) != 0)
+		goto db_err;
+
+	if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0)
+		goto db_err;
+
+	pbs_db_reset_obj(&obj);
+
+	return pnode;
+
+db_err:
+	free(pnode);
+	log_err(-1, __func__, "error on recovering node");
+	(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
+	return NULL;
+}
 
 /**
  * @brief
@@ -220,9 +289,8 @@ svr_to_db_node(struct pbsnode *pnode, pbs_db_node_info_t *pdbnd)
 	CLEAR_HEAD(wrtattr);
 
 	for (j = 0; j < ND_ATR_LAST; ++j) {
-		/* skip certain ones: no-save and default values */
-		if ((node_attr_def[j].at_flags & ATR_DFLAG_NOSAVM) ||
-				(pnode->nd_attr[j].at_flags & ATR_VFLAG_DEFLT))
+		/* skip certain ones: no-save values */
+		if (node_attr_def[j].at_flags & ATR_DFLAG_NOSAVM)
 			continue;
 
 		(void) node_attr_def[j].at_encode(&pnode->nd_attr[j],
@@ -235,10 +303,8 @@ svr_to_db_node(struct pbsnode *pnode, pbs_db_node_info_t *pdbnd)
 		node_attr_def[j].at_flags &= ~ATR_VFLAG_MODIFY;
 	}
 
-	vnode_sharing = (((pnode->nd_attr[ND_ATR_Sharing].at_flags & (ATR_VFLAG_SET | ATR_VFLAG_DEFLT))
-				== (ATR_VFLAG_SET | ATR_VFLAG_DEFLT))
-				&& ((pnode->nd_attr[ND_ATR_Sharing].at_val.at_long != VNS_UNSET)
-						&& (pnode->nd_attr[ND_ATR_Sharing].at_val.at_long != VNS_DFLT_SHARED)));
+	vnode_sharing = ((pnode->nd_attr[ND_ATR_Sharing].at_flags & ATR_VFLAG_SET)
+				&& (pnode->nd_attr[ND_ATR_Sharing].at_val.at_long != VNS_UNSET));
 	numattr = vnode_sharing;
 	psvrl = (svrattrl *)GET_NEXT(wrtattr);
 	while (psvrl) {
@@ -260,21 +326,13 @@ svr_to_db_node(struct pbsnode *pnode, pbs_db_node_info_t *pdbnd)
 
 	while ((psvrl = (svrattrl *) GET_NEXT(wrtattr)) != NULL) {
 
-		if (strcmp(psvrl->al_name, ATTR_NODE_pcpus) == 0) {
+		if (wrote_np == 0 && strcmp(psvrl->al_name, ATTR_NODE_pcpus) == 0) {
 			/* don't write out pcpus at this point, see */
 			/* check for pcpus if needed after loop end */
 			delete_link(&psvrl->al_link);
 			(void) free(psvrl);
 
 			continue;
-		} else if (strcmp(psvrl->al_name, ATTR_NODE_resv_enable) == 0) {
-			/*  write resv_enable only if not default value */
-			if ((psvrl->al_flags & ATR_VFLAG_DEFLT) != 0) {
-				delete_link(&psvrl->al_link);
-				(void) free(psvrl);
-
-				continue;
-			}
 		}
 
 		/* every attribute to this point we write to database */
@@ -313,6 +371,7 @@ svr_to_db_node(struct pbsnode *pnode, pbs_db_node_info_t *pdbnd)
 		strcpy(attrs[count].attr_resc, "");
 		sprintf(pcpu_str, "%ld", pnode->nd_nsn);
 		attrs[count].attr_value = strdup(pcpu_str);
+		attrs[count].attr_flags = ATR_VFLAG_SET;
 		count++;
 	}
 
@@ -324,6 +383,7 @@ svr_to_db_node(struct pbsnode *pnode, pbs_db_node_info_t *pdbnd)
 		strncpy(attrs[count].attr_name, ATTR_NODE_Sharing, sizeof(attrs[count].attr_name));
 		strcpy(attrs[count].attr_resc, "");
 		attrs[count].attr_value = strdup(vn_str);
+		attrs[count].attr_flags = pnode->nd_attr[ND_ATR_Sharing].at_flags;
 		count++;
 	}
 	pdbnd->attr_list.attr_count = count;
@@ -378,6 +438,8 @@ node_save_db(struct pbsnode *pnode)
 			goto db_err;
 		}
 	}
+
+	strcpy(pnode->nd_savetm, dbnode.nd_savetm);
 
 	pbs_db_reset_obj(&obj);
 

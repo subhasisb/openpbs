@@ -3266,6 +3266,8 @@ update2_to_vnode(vnal_t *pvnal, int new, mominfo_t *pmom, int *madenew, int from
 
 	CLEAR_HEAD(atrlist);
 
+	DBPRT(("Entering update2_to_vnode"))
+
 	/*
 	 * Can't do static initialization of these because svr_resc_def
 	 * may change as new resources are added dynamically.
@@ -4513,7 +4515,6 @@ found:
 			}
 
 
-
 			/* UPDATE2 message - multiple vnoded system */
 
 			if (command == IS_UPDATE2) {
@@ -4752,6 +4753,7 @@ found:
 			}
 
 			if (made_new_vnodes || cr_node) {
+				DBPRT(("Saving nodes to database"))
 				save_nodes_db(1, pmom); /* update the node database */
 			}
 			break;
