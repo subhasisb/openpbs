@@ -157,6 +157,7 @@ typedef unsigned __int64 uint64_t;
 #define STMT_INSERT_MOMINFO_TIME "insert_mominfo_time"
 #define STMT_UPDATE_MOMINFO_TIME "update_mominfo_time"
 #define STMT_UPDATE_NODEJOBATTRS "update_nodejob_attrs"
+#define STMT_FIND_NODES_ORDBY_INDEX_FILTERBY_SAVETM "find_nodes_ordby_index_filterby_savetm"
 
 /* node job statements */
 #define STMT_SELECT_NODEJOB "select_nodejob"

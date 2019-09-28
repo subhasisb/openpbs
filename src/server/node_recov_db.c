@@ -127,10 +127,10 @@ extern int make_pbs_list_attr_db(void *parent, pbs_db_attr_list_t *attr_list, st
  * @retval  -1 - Failure
  *
  */
-
 static int
 db_to_svr_node(struct pbsnode *pnode, pbs_db_node_info_t *pdbnd)
 {
+	DBPRT(("Entering %s", __func__))
 	if (pdbnd->nd_name && pdbnd->nd_name[0] != 0) {
 		pnode->nd_name = strdup(pdbnd->nd_name);
 		if (pnode->nd_name == NULL)
@@ -167,7 +167,8 @@ db_to_svr_node(struct pbsnode *pnode, pbs_db_node_info_t *pdbnd)
  * @brief
  *		Recover a node from the database
  *
- * @param[in]	nd	- Information about the node to recover
+ * @param[in]	nd_name	- node name
+ * @param[in]	pnode	- node object pointer
  *
  * @return	The recovered node structure
  * @retval	NULL - Failure

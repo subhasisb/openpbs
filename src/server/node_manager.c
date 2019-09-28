@@ -188,6 +188,7 @@ int		 svr_chngNodesfile = 0;	/* 1 signals want nodes file update */
 int		 is_called_by_job_purge = 0;
 
 struct pbsnode **pbsndlist = NULL;
+int pbsndlist_sz = 0;
 
 static int	 cvt_overflow(size_t, size_t);
 static int	 cvt_realloc(char **, size_t *, char **, size_t *);

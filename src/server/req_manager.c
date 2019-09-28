@@ -3113,7 +3113,6 @@ int
 create_pbs_node2(char *objname, svrattrl *plist, int perms, int *bad, struct pbsnode **rtnpnode, int nodup, int allow_unkresc)
 {
 	struct pbsnode	*pnode;
-	struct pbsnode **tmpndlist;
 	int		ntype;		/* node type, always PBS */
 	char		*pc;
 	char		*phost;		/* trial host name */
@@ -3163,21 +3162,6 @@ create_pbs_node2(char *objname, svrattrl *plist, int perms, int *bad, struct pbs
 			return (PBSE_SYSTEM);
 		}
 
-		/* expand pbsndlist array exactly svr_totnodes long*/
-		tmpndlist = (struct pbsnode **)realloc(pbsndlist,
-			sizeof(struct pbsnode*) * (svr_totnodes + 1));
-
-		if (tmpndlist != NULL) {
-			/*add in the new entry etc*/
-			pbsndlist = tmpndlist;
-			pnode->nd_index = svr_totnodes;
-			pnode->nd_arr_index = svr_totnodes; /* this is only in mem, not from db */
-			pbsndlist[svr_totnodes++] = pnode;
-		} else {
-			free_pnode(pnode);
-			free(pname);
-			return (PBSE_SYSTEM);
-		}
 		if (initialize_pbsnode(pnode, pname, ntype) != PBSE_NONE) {
 			svr_totnodes--;
 			free_pnode(pnode);
@@ -3194,21 +3178,7 @@ create_pbs_node2(char *objname, svrattrl *plist, int perms, int *bad, struct pbs
 			return (PBSE_SYSTEM);
 		}
 
-		/* create node tree if not already done */
-		if (node_tree == NULL ) {
-			node_tree = create_tree(AVL_NO_DUP_KEYS, 0);
-			if (node_tree == NULL ) {
-				svr_totnodes--;
-				free_pnode(pnode);
-				free(pname);
-				return (PBSE_SYSTEM);
-			}
-		}
-
-		/* add to node tree */
-		if (tree_add_del(node_tree, pname, pnode, TREE_OP_ADD) != 0) {
-			svr_totnodes--;
-			free_pnode(pnode);
+		if (update_node_cache(pnode) != 0) {
 			free(pname);
 			return (PBSE_SYSTEM);
 		}

@@ -204,7 +204,6 @@ decode_resc(struct attribute *patr, char *name, char *rescn, char *val)
 int
 encode_resc(attribute *attr, pbs_list_head *phead, char *atname, char *rsname, int mode, svrattrl **rtnl)
 {
-	//int	    dflt;
 	resource   *prsc;
 	int	    rc;
 	int	    grandtotal = 0;
@@ -231,7 +230,6 @@ encode_resc(attribute *attr, pbs_list_head *phead, char *atname, char *rsname, i
 		 */
 
 		perm = prsc->rs_defin->rs_flags & resc_access_perm ;
-		//dflt = prsc->rs_value.at_flags & ATR_VFLAG_DEFLT;
 		if (((mode == ATR_ENCODE_CLIENT) && perm) ||
 			(mode == ATR_ENCODE_HOOK) ||
 			(mode == ATR_ENCODE_DB) ||

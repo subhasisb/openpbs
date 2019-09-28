@@ -172,6 +172,89 @@ extern int write_single_node_state(struct pbsnode *np);
 
 static void	remove_node_topology(char *);
 
+int
+update_node_cache(pbs_node *pnode)
+{
+	struct pbsnode **tmpndlist;
+
+	DBPRT(("Entering %s", __func__))
+
+	/* create node tree if not already done */
+	if (node_tree == NULL ) {
+		node_tree = create_tree(AVL_NO_DUP_KEYS, 0);
+		if (node_tree == NULL ) {
+			free_pnode(pnode);
+			return (PBSE_SYSTEM);
+		}
+	}
+
+	if (tree_add_del(node_tree, pnode->nd_name, pnode, TREE_OP_ADD) != 0) {
+		DBPRT(("Addition to node tree has failed"))
+		free_pnode(pnode);
+		return (PBSE_SYSTEM);
+	}
+
+	/* expand pbsndlist array if not sufficient*/
+	if (pbsndlist_sz <= svr_totnodes) {
+		tmpndlist = (struct pbsnode **)realloc(pbsndlist,
+			sizeof(struct pbsnode*) * (svr_totnodes * 2 + 1));
+
+		if (tmpndlist != NULL) {
+			pbsndlist = tmpndlist;
+		} else {
+			free_pnode(pnode);
+			return (PBSE_SYSTEM);
+		}
+		pbsndlist_sz = svr_totnodes * 2 + 1;
+	}
+	/*add in the new entry etc*/
+	pnode->nd_index = svr_totnodes;
+	pnode->nd_arr_index = svr_totnodes; /* this is only in mem, not from db */
+	pbsndlist[svr_totnodes++] = pnode;
+
+	return 0;
+}
+
+/**
+ * @brief
+ * 		find_nodebyname() - find a node host by its name
+ * @param[in]	nodename	- node being searched
+ * @param[in]	nd_savetm	- timestamp of node save time
+ * @return	pbsnode
+ * @retval	NULL	- failure
+ */
+
+struct pbsnode *
+refresh_node(char *nodename, char * nd_savetm)
+{
+	char		*pslash;
+	struct pbsnode *pnode = NULL;
+
+	DBPRT(("Entering %s", __func__))
+
+	if (nodename == NULL)
+		return NULL;
+	if (*nodename == '(')
+		nodename++;	/* skip over leading paren */
+	if ((pslash = strchr(nodename, (int)'/')) != NULL)
+		*pslash = '\0';
+
+	if (node_tree)
+		pnode = find_tree(node_tree, nodename);
+
+	if (pnode == NULL) {
+		if ((pnode = node_recov_db(nodename, pnode)) != NULL) {
+			if (update_node_cache(pnode) != 0)
+				return NULL;
+		}
+	} else if (!nd_savetm || strcmp(nd_savetm, pnode->nd_savetm) != 0) {
+		/* if node had changed in db */
+		pnode = node_recov_db(nodename, pnode);
+	}
+
+	return pnode;
+}
+
 /**
  * @brief
  * 		find_nodebyname() - find a node host by its name
@@ -184,43 +267,8 @@ static void	remove_node_topology(char *);
 struct pbsnode *
 find_nodebyname(char *nodename)
 {
-	char		*pslash;
-	struct pbsnode *pnode;
-	struct pbsnode **tmpndlist;
-
-	if (nodename == NULL)
-		return NULL;
-	if (*nodename == '(')
-		nodename++;	/* skip over leading paren */
-	if ((pslash = strchr(nodename, (int)'/')) != NULL)
-		*pslash = '\0';
-	if (node_tree == NULL)
-		return NULL;
-
-	pnode = find_tree(node_tree, nodename);
-	if (pnode == NULL) {
-		if ((pnode = node_recov_db(nodename, pnode)) != NULL) {
-			DBPRT(("add to node tree"))
-			if (tree_add_del(node_tree, nodename, pnode, TREE_OP_ADD) != 0) {
-				DBPRT(("Addition to node tree has failed"))
-				free_pnode(pnode);
-				return NULL;
-			}
-			/* expand pbsndlist array exactly svr_totnodes long*/
-			tmpndlist = (struct pbsnode **)realloc(pbsndlist,
-				sizeof(struct pbsnode*) * (svr_totnodes + 1));
-
-			if (tmpndlist != NULL) {
-				/*add in the new entry etc*/
-				pbsndlist = tmpndlist;
-				pnode->nd_index = svr_totnodes;
-				pnode->nd_arr_index = svr_totnodes; /* this is only in mem, not from db */
-				pbsndlist[svr_totnodes++] = pnode;
-			}
-		}
-	} else
-		pnode = node_recov_db(nodename, pnode);
-	return pnode;
+	DBPRT(("Entering %s", __func__))
+	return refresh_node(nodename, NULL);
 }
 
 
