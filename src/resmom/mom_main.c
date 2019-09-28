@@ -8108,6 +8108,46 @@ net_down_handler(void *data)
 	mom_net_up_time = 0;
 }
 
+
+/**
+ * @brief
+ *      This function returns the time delta
+ * 	after which mom should send the next hello.
+ * 	Tries for short bursts followed by longer intervals.
+ * @param[in] mode -	reset mode is to bring it back to bursting mode
+ * 
+ * @return int
+ * @retval >0 : time mom should wait before sending the next hello
+ * @retval 0 : only in case of reset mode.
+ */
+int
+time_delta(int mode)
+{
+	static int delta = 1;
+	static int cnt = 1;
+	int max_delta_mask = 0x3F;
+
+	DBPRT(("time_delta: mode: %d, delta: %d, cnt: %d", mode, delta, cnt))
+
+	if (mode == MOM_DELTA_RESET) {
+		delta = 1;
+		cnt = 1;
+		return 0;
+	}
+
+	if (cnt == 0) {
+		if (delta & ~max_delta_mask) {
+			return delta;
+		}
+		delta <<= 1;
+		cnt = delta;
+	} else {
+		cnt--;
+	}
+
+	return delta;
+}
+
 #ifdef	WIN32
 /**
  * @brief
@@ -9687,7 +9727,7 @@ main(int argc, char *argv[])
 
 		if (server_stream == -1) {
 			if (time_now > time_last_hello) {
-				time_last_hello = time_now + MIN_CHECK_POLL_TIME;
+				time_last_hello = time_now + time_delta(MOM_DELTA_NORMAL);
 				send_restart();
 			}
 		}

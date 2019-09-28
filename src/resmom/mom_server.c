@@ -762,6 +762,8 @@ is_request(int stream, int version)
 		case IS_NULL:		/* a reply from the server */
 			DBPRT(("%s: IS_NULL\n", __func__))
 
+			(void) time_delta(MOM_DELTA_RESET);
+
 			/*
 			 ** If the server supports it, values for
 			 ** rpp_retry and rpp_highwater will be sent
