@@ -116,7 +116,6 @@ CREATE INDEX nd_savetm_idx ON pbs.node(nd_savetm);
     job_id		    TEXT	NOT NULL,
     nd_name		    TEXT	NOT NULL,
     is_resv		    INTEGER,
-    subnode_ct		    INTEGER,
     admn_suspend		INTEGER,
     nj_creattm      TIMESTAMP	NOT NULL,
     nj_savetm		TIMESTAMP	NOT NULL,

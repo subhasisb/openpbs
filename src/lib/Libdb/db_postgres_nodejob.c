@@ -75,7 +75,6 @@ pg_db_prepare_nodejob_sqls(pbs_db_conn_t *conn)
 		"job_id, "
 		"nd_name, "
 		"is_resv, "
-		"subnode_ct, "
 		"admn_suspend, "
 		"hstore_to_array(attributes) as attributes "
 		"from pbs.node_job "
@@ -88,7 +87,6 @@ pg_db_prepare_nodejob_sqls(pbs_db_conn_t *conn)
 		"job_id, "
 		"nd_name, "
 		"is_resv, "
-		"subnode_ct, "
 		"admn_suspend, "
 		"hstore_to_array(attributes) as attributes "
 		"from pbs.node_job "
@@ -101,27 +99,25 @@ pg_db_prepare_nodejob_sqls(pbs_db_conn_t *conn)
 		"job_id, "
 		"nd_name, "
 		"is_resv, "
-		"subnode_ct, "
 		"admn_suspend, "
 		"nj_creattm, "
 		"nj_savetm, "
 		"attributes "
 		") "
 		"values "
-		"($1, $2, $3, $4, $5, localtimestamp, localtimestamp, hstore($6::text[]))");
+		"($1, $2, $3, $4, localtimestamp, localtimestamp, hstore($5::text[]))");
 
-	if (pg_prepare_stmt(conn, STMT_INSERT_NODEJOB, conn->conn_sql, 6) != 0)
+	if (pg_prepare_stmt(conn, STMT_INSERT_NODEJOB, conn->conn_sql, 5) != 0)
 		return -1;
 
 	/* in case of nodes do not use || with existing attributes, since we re-write all attributes */
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "update pbs.node_job set "
 		"is_resv = $3, "
-		"subnode_ct = $4, "
-		"admn_suspend = $5, "
+		"admn_suspend = $4, "
 		"nj_savetm = localtimestamp, "
-		"attributes = hstore($6::text[]) "
+		"attributes = hstore($5::text[]) "
 		" where job_id = $1 and nd_name = $2");
-	if (pg_prepare_stmt(conn, STMT_UPDATE_NODEJOB, conn->conn_sql, 6) != 0)
+	if (pg_prepare_stmt(conn, STMT_UPDATE_NODEJOB, conn->conn_sql, 5) != 0)
 		return -1;
 
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "delete from pbs.node_job where job_id = $1");
@@ -152,14 +148,13 @@ load_nodejob(PGresult *res, pbs_db_nodejob_info_t *pnd, int row)
 {
 	char *raw_array;
 	//BIGINT db_savetm;
-	static int job_id_fnum, nd_name_fnum, is_resv_fnum, subnode_ct_fnum, admn_suspend_fnum, attributes_fnum;
+	static int job_id_fnum, nd_name_fnum, is_resv_fnum, admn_suspend_fnum, attributes_fnum;
 	static int fnums_inited = 0;
 
 	if (fnums_inited == 0) {
 		job_id_fnum = PQfnumber(res, "job_id");
 		nd_name_fnum = PQfnumber(res, "nd_name");
 		is_resv_fnum = PQfnumber(res, "is_resv");
-		subnode_ct_fnum = PQfnumber(res, "subnode_ct");
 		admn_suspend_fnum = PQfnumber(res, "admn_suspend");
 		attributes_fnum = PQfnumber(res, "attributes");
 		fnums_inited = 1;
@@ -178,7 +173,6 @@ load_nodejob(PGresult *res, pbs_db_nodejob_info_t *pnd, int row)
 	GET_PARAM_STR(res, row, pnd->job_id, job_id_fnum);
 	GET_PARAM_STR(res, row, pnd->nd_name, nd_name_fnum);
 	GET_PARAM_INTEGER(res, row, pnd->is_resv, is_resv_fnum);
-	GET_PARAM_INTEGER(res, row, pnd->subnode_ct, subnode_ct_fnum);
 	GET_PARAM_INTEGER(res, row, pnd->admn_suspend, admn_suspend_fnum);
 	GET_PARAM_BIN(res, row, raw_array, attributes_fnum);
 
@@ -209,19 +203,18 @@ pg_db_save_nodejob(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
 	SET_PARAM_STR(conn, pndjob->job_id, 0);
 	SET_PARAM_STR(conn, pndjob->nd_name, 1);
 	SET_PARAM_INTEGER(conn, pndjob->is_resv, 2);
-	SET_PARAM_INTEGER(conn, pndjob->subnode_ct, 3);
-	SET_PARAM_INTEGER(conn, pndjob->admn_suspend, 4);
+	SET_PARAM_INTEGER(conn, pndjob->admn_suspend, 3);
 
 	if (savetype == PBS_UPDATE_DB_QUICK) {
-		params = 5;
+		params = 4;
 	} else {
 		int len = 0;
 		/* convert attributes to postgres raw array format */
 		if ((len = convert_db_attr_list_to_array(&raw_array, &pndjob->attr_list)) <= 0)
 			return -1;
 
-		SET_PARAM_BIN(conn, raw_array, len, 5);
-		params = 6;
+		SET_PARAM_BIN(conn, raw_array, len, 4);
+		params = 5;
 	}
 
 	if (savetype == PBS_UPDATE_DB_FULL)

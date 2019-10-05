@@ -111,7 +111,6 @@ initialize_nodejob_db_obj(char *nd_name, char *job_id, int is_resv) {
 		db_obj->job_id[0] = '\0';
 	strncpy(db_obj->nd_name, nd_name, PBS_MAXSERVERNAME);
 	db_obj->is_resv = is_resv;
-	db_obj->subnode_ct = -1;
 	db_obj->admn_suspend = 0;
 	db_obj->attr_list.attr_count = 0;
 	db_obj->attr_list.attributes = NULL;
@@ -157,6 +156,40 @@ db_err:
 	return rc;
 }
 
+void
+append_to_joblist(pbs_node *pnode, char *jobid, int ncpus)
+{	
+	struct pbs_job_list *jlist;
+
+	DBPRT(("Entering: %s", __func__))
+
+	if (pnode->job_list == NULL) {
+		pnode->job_list = malloc(sizeof(struct pbs_job_list));
+		pnode->job_list->job_str = malloc(1024);
+		pnode->job_list->buf_sz = 1024;
+		pnode->job_list->offset = 0;
+		pnode->job_list->last_cpu_indx = 0;
+	}
+	
+	jlist = pnode->job_list;
+	if (jlist->offset + (strlen(jobid) + 15) * ncpus > jlist->buf_sz) {
+		char *tmp_str = realloc(jlist->job_str, jlist->buf_sz * 2);
+		if (tmp_str != NULL) {
+			jlist->job_str = tmp_str;
+			jlist->buf_sz *= 2;
+		}
+	}
+
+	do {
+		if (jlist->offset != 0) {
+			jlist->offset +=sprintf(jlist->job_str + jlist->offset, ", ");
+		}
+		jlist->offset += sprintf(jlist->job_str + jlist->offset,
+					 "%s/%ld", jobid, jlist->last_cpu_indx);
+		if (ncpus)
+			jlist->last_cpu_indx += 1;
+	} while(--ncpus > 0);
+}
 
 int
 nodejob_db_to_attrlist(struct pbsnode *pnode, pbs_db_nodejob_info_t *db_obj)
@@ -178,6 +211,9 @@ nodejob_db_to_attrlist(struct pbsnode *pnode, pbs_db_nodejob_info_t *db_obj)
 							&tmpattr, attrs->attr_name,
 							attrs->attr_resc,
 							attrs->attr_value);
+		}
+		if (strcmp(attrs->attr_resc, "ncpus") == 0 && !db_obj->is_resv) {
+			append_to_joblist(pnode, db_obj->job_id, atol(attrs->attr_value));
 		}
 		(void)(node_attr_def + ND_ATR_ResourceAssn)->at_set(pattr, &tmpattr, INCR);
 	}

@@ -293,7 +293,6 @@ struct pbs_db_nodejob_info {
 	char	job_id[PBS_MAXSVRJOBID+1];
 	char	nd_name[PBS_MAXSERVERNAME+1];
 	INTEGER is_resv;
-	INTEGER	subnode_ct;
 	INTEGER	admn_suspend;
 	BIGINT nj_creattm;
 	BIGINT nj_savetm;

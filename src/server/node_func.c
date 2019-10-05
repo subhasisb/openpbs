@@ -406,16 +406,53 @@ chk_characteristic(struct pbsnode *pnode, int *pneed_todo)
 }
 
 int
-encode_resc_assn(struct pbsnode *pnode)
+pre_nodejob_query(struct pbsnode *pnode)
+{
+	resource   *prsc;
+	attribute    *pattr = &pnode->nd_attr[(int)ND_ATR_ResourceAssn];
+
+	/* clear all resc_assn values before reading afresh */
+	for (prsc = (resource *)GET_NEXT(pattr->at_val.at_list);
+			prsc != NULL;
+			prsc = (resource *)GET_NEXT(prsc->rs_link)) {
+		int rc;
+		if ((rc = prsc->rs_defin->rs_decode(&prsc->rs_value,
+				ATTR_rescassn, prsc->rs_defin->rs_name,
+							NULL)) != 0)
+			return rc;
+	}
+	/* clear the joblist */
+	if (pnode->job_list) {
+		free(pnode->job_list->job_str);
+		free(pnode->job_list);
+	}
+	pnode->job_list = NULL;
+	return 0;
+}
+
+void
+post_nodejob_query(struct pbsnode *pnode)
+{
+	resource   *prsc;
+	attribute    *pattr = &pnode->nd_attr[(int)ND_ATR_ResourceAssn];
+
+	/* set the flags on another pass */
+	for (prsc = (resource *)GET_NEXT(pattr->at_val.at_list);
+			prsc != NULL;
+			prsc = (resource *)GET_NEXT(prsc->rs_link)) {
+		prsc->rs_value.at_flags |= ATR_VFLAG_SET;
+	}
+}
+
+int
+encode_nodejob(struct pbsnode *pnode)
 {
 	pbs_db_nodejob_info_t	*db_obj;
 	pbs_db_obj_info_t	obj;
-	resource   *prsc;
-	attribute    *pattr = &pnode->nd_attr[(int)ND_ATR_ResourceAssn];
 	void		*state = NULL;
 	pbs_db_conn_t *conn = (pbs_db_conn_t *) svr_db_conn;
 
-	DBPRT(("----------------Entering encode_resc_assn()------------"))
+	DBPRT(("----------------Entering encode_nodejob()------------"))
 
 	/* start a transaction */
 	if (pbs_db_begin_trx(conn, 0, 0) != 0)
@@ -423,7 +460,7 @@ encode_resc_assn(struct pbsnode *pnode)
 
 	db_obj = initialize_nodejob_db_obj(pnode->nd_name, NULL, 0);
 
-	/* get jobs from DB for this instance of server, by port and address */
+	/* get jobs from DB for this node */
 	obj.pbs_db_obj_type = PBS_DB_NODEJOB;
 	obj.pbs_db_un.pbs_db_nodejob = db_obj;
 
@@ -436,17 +473,9 @@ encode_resc_assn(struct pbsnode *pnode)
 		return (-1);
 	}
 
-	for (prsc = (resource *)GET_NEXT(pattr->at_val.at_list);
-			prsc != NULL;
-			prsc = (resource *)GET_NEXT(prsc->rs_link)) {
-		int rc;
-		//prsc->rs_value.at_flags &= ~ATR_VFLAG_SET;
-		if ((rc = prsc->rs_defin->rs_decode(&prsc->rs_value,
-				ATTR_rescassn, prsc->rs_defin->rs_name,
-							NULL)) != 0)
-			return rc;
-	}
+	pre_nodejob_query(pnode);
 
+	/* Read attributes from database */
 	while (pbs_db_cursor_next(conn, state, &obj) == 0) {
 		if (nodejob_db_to_attrlist(pnode, db_obj) != 0) {
 			sprintf(log_buffer, "nodejob_db_to_attrlist failed for node: %s",
@@ -458,11 +487,7 @@ encode_resc_assn(struct pbsnode *pnode)
 		pbs_db_reset_obj(&obj);
 	}
 
-	for (prsc = (resource *)GET_NEXT(pattr->at_val.at_list);
-			prsc != NULL;
-			prsc = (resource *)GET_NEXT(prsc->rs_link)) {
-		prsc->rs_value.at_flags |= ATR_VFLAG_SET;
-	}
+	post_nodejob_query(pnode);
 
 	pbs_db_cursor_close(conn, state);
 
@@ -620,6 +645,7 @@ initialize_pbsnode(struct pbsnode *pnode, char *pname, int ntype)
 	if (pnode->nd_moms == NULL)
 		return (PBSE_SYSTEM);
 	pnode->nd_nummslots = 1;
+	pnode->job_list = NULL;
 
 	/* first, clear the attributes */
 
