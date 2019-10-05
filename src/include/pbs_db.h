@@ -87,6 +87,9 @@ extern "C" {
 #define DB_TIMESTAMP_LEN 50
 #define UNIQUE_KEY_VIOLATION 23505 /* postgres throws this error code in case of primary key violation */
 
+#define LOCK 1
+#define NO_LOCK 0
+
 /**
  * @brief
  *  Structure used to maintain the database connection information

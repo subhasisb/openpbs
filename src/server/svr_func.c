@@ -4916,7 +4916,7 @@ find_prov_vnode_list(job *pjob, exec_vnode_listtype *prov_vnodes, char **aoe_nam
 						break;
 
 					DBPRT(("%s: Look up node %s\n", __func__, vname))
-					pnode = find_nodebyname(vname);
+					pnode = find_nodebyname(vname, NO_LOCK);
 					/* check if node really needs provisioning, if not, continue.
 					 * This is to stop qrun -H from provisioning a node (including
 					 * head node) that does not have aoe_req in its available list.
@@ -5133,7 +5133,7 @@ is_runnable(job *ptr, struct prov_vnode_info *pvnfo)
 
 	for (i = 0; i < num_of_prov_vnodes; i++) {
 
-		np = find_nodebyname(prov_vnode_list[i]);
+		np = find_nodebyname(prov_vnode_list[i], NO_LOCK);
 		if (np == NULL) {
 			DBPRT(("%s: node %s is null\n",
 				__func__, prov_vnode_list[i]))
@@ -5298,7 +5298,7 @@ fail_vnode_job(struct prov_vnode_info * prov_vnode_info, int hold_or_que)
 		pjob->ji_wattr[(int)JOB_ATR_prov_vnode].at_val.at_str,
 		&prov_vnode_list);
 	for (i = 0; i < cnt; i++) {
-		if ((np = find_nodebyname(prov_vnode_list[i]))) {
+		if ((np = find_nodebyname(prov_vnode_list[i], NO_LOCK))) {
 			if ((ptracking = get_prov_record_by_vnode(np->nd_name))) {
 				prov_vnode_info = ptracking->prov_vnode_info;
 				if (prov_vnode_info)
@@ -5363,7 +5363,6 @@ mark_prov_vnode_offline(pbsnode *pnode, char * comment)
 
 	/* write the node state and current_aoe */
 	pnode->nd_modified |= (NODE_UPDATE_CURRENT_AOE | NODE_UPDATE_STATE);
-	write_single_node_state(pnode);
 	pnode->nd_modified &= ~(NODE_UPDATE_CURRENT_AOE | NODE_UPDATE_STATE);
 
 	if (comment != NULL) {
@@ -5416,7 +5415,7 @@ fail_vnode(struct prov_vnode_info *prov_vnode_info, int hold_or_que)
 		return;
 	}
 
-	pnode = find_nodebyname(prov_vnode_info->pvnfo_vnode);
+	pnode = find_nodebyname(prov_vnode_info->pvnfo_vnode, LOCK);
 
 	DBPRT(("%s: node=%s entered\n", __func__, prov_vnode_info->pvnfo_vnode))
 
@@ -5425,6 +5424,7 @@ fail_vnode(struct prov_vnode_info *prov_vnode_info, int hold_or_que)
 
 	strcpy(comment, "Vnode offlined since it failed provisioning");
 	mark_prov_vnode_offline(pnode, comment);
+	node_save_db(pnode);
 
 	fail_vnode_job(prov_vnode_info, hold_or_que);
 }
@@ -5467,10 +5467,11 @@ offline_all_provisioning_vnodes()
 		if (server.sv_prov_track[i].pvtk_mtime != 0) {
 			/* found an empty record */
 			vnode = server.sv_prov_track[i].pvtk_vnode;
-			pnode = find_nodebyname(vnode);
+			pnode = find_nodebyname(vnode, LOCK);
 
 			if (pnode) {
 				mark_prov_vnode_offline(pnode, comment);
+				node_save_db(pnode);
 				/*
 				 * reservations will take care of
 				 * themselves in pbsd_init
@@ -5634,7 +5635,7 @@ is_vnode_prov_done(char * vnode)
 
 	prov_vnode_info = ptracking->prov_vnode_info;
 
-	pnode = (struct pbsnode *) find_nodebyname(prov_vnode_info->pvnfo_vnode);
+	pnode = (struct pbsnode *) find_nodebyname(prov_vnode_info->pvnfo_vnode, LOCK);
 	assert(pnode!=NULL);
 
 	ptask_timeout = prov_vnode_info->ptask_timed;
@@ -5665,10 +5666,8 @@ is_vnode_prov_done(char * vnode)
 		set_vnode_state(pnode, ~INUSE_PROV, Nd_State_And);
 	}
 
-	/* save the state of this node to the nodes file */
-	pnode->nd_modified |= NODE_UPDATE_STATE;
-	write_single_node_state(pnode);
-	pnode->nd_modified &= ~NODE_UPDATE_STATE;
+	/* save the state of this node to the database */
+	node_save_db(pnode);
 
 	/* log msg about prov of node success */
 	sprintf(log_buffer, "Provisioning of Vnode %s successful",
@@ -5828,7 +5827,6 @@ prov_request_deferred(struct work_task *wtask)
 	assert(wtask->wt_parm1 != NULL);
 
 	prov_vnode_info = (struct prov_vnode_info *) wtask->wt_parm1;
-	pnode = (struct pbsnode *) find_nodebyname(prov_vnode_info->pvnfo_vnode);
 #ifdef	WIN32
 	this_pid = (HANDLE) wtask->wt_event;
 #else
@@ -5856,6 +5854,7 @@ prov_request_deferred(struct work_task *wtask)
 
 	/* success or application prov over */
 	if (exit_status == 0 || exit_status == APP_PROV_SUCCESS) {
+		pnode = (struct pbsnode *) find_nodebyname(prov_vnode_info->pvnfo_vnode, LOCK);
 
 		if (pnode == NULL) {
 			delete_task(timeout_task);
@@ -5873,12 +5872,6 @@ prov_request_deferred(struct work_task *wtask)
 		DBPRT(("%s: node:%s current_aoe set: %s\n",
 			__func__, pnode->nd_name, prov_vnode_info->pvnfo_aoe_req))
 
-
-		/* write the node current_aoe */
-		pnode->nd_modified |= NODE_UPDATE_CURRENT_AOE;
-		write_single_node_state(pnode);
-		pnode->nd_modified &= ~NODE_UPDATE_CURRENT_AOE;
-
 		/* if exit_status says app_prov returned success, reset down
 		 * that we set. after setting the state, is_vnode_prov_done()
 		 * is called which would delete the timed work task.
@@ -5888,6 +5881,7 @@ prov_request_deferred(struct work_task *wtask)
 			set_vnode_state(pnode, ~INUSE_DOWN, Nd_State_And);
 
 		is_vnode_prov_done(pnode->nd_name);
+		node_save_db(pnode);
 
 		return;
 	}
@@ -5903,6 +5897,7 @@ prov_request_deferred(struct work_task *wtask)
 	/* kill the timed task since we dont need it any more */
 	delete_task(timeout_task);
 
+	pnode = (struct pbsnode *) find_nodebyname(prov_vnode_info->pvnfo_vnode, NO_LOCK);
 	/* Remove record from prov tracking table */
 	remove_prov_record(pnode->nd_name);
 	prov_track_save(); /* save tracking table since its modified now */
@@ -6291,7 +6286,7 @@ start_vnode_provisioning(struct prov_vnode_info * prov_vnode_info)
 	DBPRT(("%s: Provisioning vnode: %s with aoe: %s\n", __func__,
 		prov_vnode_info->pvnfo_vnode, prov_vnode_info->pvnfo_aoe_req))
 
-	pnode = find_nodebyname(prov_vnode_info->pvnfo_vnode);
+	pnode = find_nodebyname(prov_vnode_info->pvnfo_vnode, LOCK);
 	if (!pnode) {
 		DBPRT(("%s: Could not find vnode %s\n", __func__,
 			prov_vnode_info->pvnfo_vnode))
@@ -6387,12 +6382,6 @@ start_vnode_provisioning(struct prov_vnode_info * prov_vnode_info)
 	(void)node_attr_def[(int)ND_ATR_current_aoe].at_free(
 		&(pnode->nd_attr[(int)ND_ATR_current_aoe]));
 
-
-	/* write the node current_aoe */
-	pnode->nd_modified |= NODE_UPDATE_CURRENT_AOE;
-	write_single_node_state(pnode);
-	pnode->nd_modified &= ~NODE_UPDATE_CURRENT_AOE;
-
 	/*
 	 * Parent process creates two work tasks
 	 * i.e deferred child work task and timed work task.Deferred child
@@ -6454,6 +6443,8 @@ start_vnode_provisioning(struct prov_vnode_info * prov_vnode_info)
 
 	/* set prov and down states */
 	set_vnode_state(pnode, INUSE_PROV | INUSE_DOWN, Nd_State_Or);
+
+	node_save_db(pnode);
 
 	return (PBSE_NONE);
 }
@@ -6573,9 +6564,10 @@ check_and_enqueue_provisioning(job *pjob, int *need_prov)
 		append_link(&prov_allvnodes, &prov_vnode_info->al_link,
 			prov_vnode_info);
 
-		pnode = find_nodebyname(prov_vnode_list[i]);
+		pnode = find_nodebyname(prov_vnode_list[i], LOCK);
 
 		set_vnode_state(pnode, INUSE_WAIT_PROV, Nd_State_Or);
+		node_save_db(pnode);
 	}
 
 	/*
@@ -6660,7 +6652,7 @@ do_provisioning(struct work_task * wtask)
 		/* remove this node from the linked list */
 		delete_link(&prov_vnode_info->al_link);
 
-		pnode = find_nodebyname(prov_vnode_info->pvnfo_vnode);
+		pnode = find_nodebyname(prov_vnode_info->pvnfo_vnode, NO_LOCK);
 		if (pnode == NULL) {
 			DBPRT(("%s: node %s was deleted\n", __func__,
 				prov_vnode_info->pvnfo_vnode))
@@ -6678,11 +6670,12 @@ do_provisioning(struct work_task * wtask)
 			fail_vnode_job(prov_vnode_info, 0);
 
 			/* this node will not provision, remove flag */
-			pnode = find_nodebyname(prov_vnode_info->pvnfo_vnode);
+			pnode = find_nodebyname(prov_vnode_info->pvnfo_vnode, LOCK);
 			if (pnode) {
 				DBPRT(("%s: \n", __func__))
 				set_vnode_state(pnode, ~(INUSE_PROV|INUSE_WAIT_PROV),
 					Nd_State_And);
+				node_save_db(pnode);
 			}
 			free_pvnfo(prov_vnode_info);
 		}
@@ -6728,11 +6721,12 @@ del_prov_vnode_entry(job *pjob)
 			delete_link(&tmp_record->al_link);
 			DBPRT(("%s: vnode %s\n", __func__, tmp_record->pvnfo_vnode))
 			/* node is no longer going to provision */
-			pnode = find_nodebyname(tmp_record->pvnfo_vnode);
+			pnode = find_nodebyname(tmp_record->pvnfo_vnode, LOCK);
 			if (pnode)
 				set_vnode_state(pnode,
 					~(INUSE_PROV|INUSE_WAIT_PROV),
 					Nd_State_And);
+			node_save_db(pnode);
 			free_pvnfo(tmp_record);
 		}
 		tmp_record = nxt_record;

@@ -3806,7 +3806,7 @@ _pps_helper_get_vnode(struct pbsnode *pvnode_o, const char *vname)
 			return NULL;
 		}
 
-		pvnode = find_nodebyname((char *)vname);
+		pvnode = find_nodebyname((char *)vname, NO_LOCK);
 	}
 
 	if (pvnode == NULL) {
@@ -9250,7 +9250,7 @@ _pbs_python_do_vnode_set(void)
 	vn_set_req = (vnode_set_req *)GET_NEXT(pbs_vnode_set_list);
 	while (vn_set_req != NULL) {
 
-		pnode = find_nodebyname(vn_set_req->vnode_name);
+		pnode = find_nodebyname(vn_set_req->vnode_name, LOCK);
 
 		if ((pnode == NULL) ||
 			(pnode->nd_state & INUSE_DELETED)) {
@@ -9320,6 +9320,7 @@ _pbs_python_do_vnode_set(void)
 			}
 		}
 
+		node_save_db(pnode);
 		vn_set_req = (vnode_set_req *) GET_NEXT(vn_set_req->all_reqs);
 	}
 

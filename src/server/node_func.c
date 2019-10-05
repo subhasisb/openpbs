@@ -220,12 +220,13 @@ update_node_cache(pbs_node *pnode)
  * 		find_nodebyname() - find a node host by its name
  * @param[in]	nodename	- node being searched
  * @param[in]	nd_savetm	- timestamp of node save time
+ * @param[in]	lock		- whether db row has to be locked
  * @return	pbsnode
  * @retval	NULL	- failure
  */
 
 struct pbsnode *
-refresh_node(char *nodename, char * nd_savetm)
+refresh_node(char *nodename, char * nd_savetm, int lock)
 {
 	char		*pslash;
 	struct pbsnode *pnode = NULL;
@@ -243,13 +244,13 @@ refresh_node(char *nodename, char * nd_savetm)
 		pnode = find_tree(node_tree, nodename);
 
 	if (pnode == NULL) {
-		if ((pnode = node_recov_db(nodename, pnode)) != NULL) {
+		if ((pnode = node_recov_db(nodename, pnode, lock)) != NULL) {
 			if (update_node_cache(pnode) != 0)
 				return NULL;
 		}
 	} else if (!nd_savetm || strcmp(nd_savetm, pnode->nd_savetm) != 0) {
 		/* if node had changed in db */
-		pnode = node_recov_db(nodename, pnode);
+		pnode = node_recov_db(nodename, pnode, lock);
 	}
 
 	return pnode;
@@ -259,16 +260,17 @@ refresh_node(char *nodename, char * nd_savetm)
  * @brief
  * 		find_nodebyname() - find a node host by its name
  * @param[in]	nodename	- node being searched
+ * @param[in]	lock		- whether db row has to be locked
  *
  * @return	pbsnode
  * @retval	NULL	- failure
  */
 
 struct pbsnode *
-find_nodebyname(char *nodename)
+find_nodebyname(char *nodename, int lock)
 {
 	DBPRT(("Entering %s", __func__))
-	return refresh_node(nodename, NULL);
+	return refresh_node(nodename, NULL, lock);
 }
 
 
@@ -1058,8 +1060,13 @@ save_nodes_db_mom(mominfo_t *pmom)
 			continue;
 		}
 
-		node_save_db(np);
-
+		if (np->nd_modified & NODE_UPDATE_OTHERS) {
+			if (node_save_db(np) != 0) {
+				log_event(PBSEVENT_ADMIN, PBS_EVENTCLASS_SERVER,
+					LOG_WARNING, __func__, "node_save_db() failed");
+				return (-1);
+			}
+		}
 	}
 
 	return 0;
@@ -1892,7 +1899,7 @@ fix_indirect_resc_targets(struct pbsnode *psourcend, resource *psourcerc, int in
 	pn = psourcerc->rs_value.at_val.at_str;
 	if ((pn == NULL) ||
 		(*pn != '@') ||
-		((pnode = find_nodebyname(pn+1)) == NULL)) {
+		((pnode = find_nodebyname(pn+1, LOCK)) == NULL)) {
 		sprintf(log_buffer,
 			"resource %s on vnode points to invalid vnode %s",
 			psourcerc->rs_defin->rs_name, pn);
@@ -1935,6 +1942,7 @@ fix_indirect_resc_targets(struct pbsnode *psourcend, resource *psourcerc, int in
 			ptargetrc->rs_value.at_flags &= ~ATR_VFLAG_TARGET;
 	}
 
+	node_save_db(pnode);
 	return 0;
 }
 
@@ -2047,7 +2055,7 @@ fix_indirectness(resource *presc, struct pbsnode *pnode, int doit)
 
 			/* target vnode must be known unless the Server is recovering */
 			/* the value (at_str) is "@vnodename", so skip over the '@'   */
-			ptargetnd = find_nodebyname(presc->rs_value.at_val.at_str+1);
+			ptargetnd = find_nodebyname(presc->rs_value.at_val.at_str+1, LOCK);
 			if (ptargetnd == NULL) {
 				if (! recover_ok)
 					return (PBSE_UNKNODE);
@@ -2081,6 +2089,7 @@ fix_indirectness(resource *presc, struct pbsnode *pnode, int doit)
 						return PBSE_SYSTEM;
 				}
 			}
+			node_save_db(pnode);
 
 		} else {
 
@@ -2423,7 +2432,7 @@ is_vnode_up(char *nodename)
 {
 	struct pbsnode	*np;
 
-	np = find_nodebyname(nodename);
+	np = find_nodebyname(nodename, NO_LOCK);
 	if ((np == NULL) ||
 		((np->nd_state & (INUSE_OFFLINE | INUSE_OFFLINE_BY_MOM | INUSE_DOWN | INUSE_DELETED | INUSE_STALE)) != 0))
 		return 0;	/* vnode is not up */

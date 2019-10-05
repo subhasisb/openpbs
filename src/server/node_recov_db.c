@@ -169,13 +169,14 @@ db_to_svr_node(struct pbsnode *pnode, pbs_db_node_info_t *pdbnd)
  *
  * @param[in]	nd_name	- node name
  * @param[in]	pnode	- node object pointer
+ * @param[in]	lock	- whether db row has to be locked
  *
  * @return	The recovered node structure
  * @retval	NULL - Failure
  * @retval	!NULL - Success - address of recovered node returned
  */
 struct pbsnode *
-node_recov_db(char *nd_name, struct pbsnode *pnode)
+node_recov_db(char *nd_name, struct pbsnode *pnode, int lock)
 {
 	pbs_db_obj_info_t obj;
 	pbs_db_conn_t *conn = (pbs_db_conn_t *) svr_db_conn;
@@ -199,13 +200,14 @@ node_recov_db(char *nd_name, struct pbsnode *pnode)
 		log_err(errno, "node_recov", "error on recovering node table");
 		return NULL;
 	}
+
 	obj.pbs_db_obj_type = PBS_DB_NODE;
 	obj.pbs_db_un.pbs_db_node = &dbnode;
 
 	if (pbs_db_begin_trx(conn, 0, 0) != 0)
 		goto db_err;
 
-	if ((rc = pbs_db_load_obj(conn, &obj, 0)) == -1)
+	if ((rc = pbs_db_load_obj(conn, &obj, lock)) == -1)
 		goto db_err;
 
 	if (rc == -2) {
@@ -217,7 +219,9 @@ node_recov_db(char *nd_name, struct pbsnode *pnode)
 	if (db_to_svr_node(pnode, &dbnode) != 0)
 		goto db_err;
 
-	if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0)
+	if (lock && pnode) {
+		pnode->nd_modified |= NODE_LOCKED;
+	} else if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0)
 		goto db_err;
 
 	pbs_db_reset_obj(&obj);
@@ -443,6 +447,12 @@ node_save_db(struct pbsnode *pnode)
 	strcpy(pnode->nd_savetm, dbnode.nd_savetm);
 
 	pbs_db_reset_obj(&obj);
+	pnode->nd_modified &= ~NODE_UPDATE_OTHERS;
+	if (pnode->nd_modified & NODE_LOCKED) {
+		if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0)
+			goto db_err;
+		pnode->nd_modified &= ~NODE_LOCKED;
+	}
 
 	return (0);
 db_err:

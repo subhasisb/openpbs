@@ -1837,7 +1837,7 @@ pbs_release_nodes_given_nodelist(relnodes_input_t *r_input, relnodes_input_vnode
 
 				if ((pnode == NULL) || 
 					(strcmp(pnode->nd_name, noden) != 0)) {
-					pnode = find_nodebyname(noden);
+					pnode = find_nodebyname(noden, NO_LOCK);
 				}
 
 				if (pnode == NULL) { /* should not happen */
@@ -3438,7 +3438,7 @@ pbs_release_nodes_given_select(relnodes_input_t *r_input, relnodes_input_select_
 				/* see if previous entry already matches this */
 				if ((pnode == NULL) || 
 					(strcmp(pnode->nd_name, noden) != 0)) {
-					pnode = find_nodebyname(noden);
+					pnode = find_nodebyname(noden, NO_LOCK);
 				}
 
 				if (pnode == NULL) { /* should not happen */

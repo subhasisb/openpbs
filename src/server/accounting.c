@@ -202,7 +202,7 @@ sum_resc_alloc(job *pjob, pbs_list_head *list)
 
 			/* find if node is shared or excl */
 
-			pnode = find_nodebyname(noden);
+			pnode = find_nodebyname(noden, NO_LOCK);
 			if (pnode) {
 				if ((pnode->nd_state & INUSE_JOBEXCL) == 0) {
 

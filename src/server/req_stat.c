@@ -598,7 +598,7 @@ get_all_db_nodes() {
 	}
 
 	while ((rc_cur = pbs_db_cursor_next(conn, cur_state, &dbobj)) == 0) {
-		if ((pnode = refresh_node(dbnode.nd_name, dbnode.nd_savetm)) == NULL) {
+		if ((pnode = refresh_node(dbnode.nd_name, dbnode.nd_savetm, NO_LOCK)) == NULL) {
 			sprintf(log_buffer, "Failed to refresh node %s", dbnode.nd_name);
 			log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_NOTICE, msg_daemonname, log_buffer);
 		}
@@ -821,7 +821,7 @@ req_stat_node(struct batch_request *preq)
 	if ((*name == '\0') || (*name =='@'))
 		type = 1;
 	else {
-		pnode = find_nodebyname(name);
+		pnode = find_nodebyname(name, NO_LOCK);
 		if (pnode == NULL) {
 			req_reject(PBSE_UNKNODE, 0, preq);
 			return;

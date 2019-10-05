@@ -499,7 +499,7 @@ get_addr_of_nodebyname(char *name, unsigned int *port)
 
 	nodename = parse_servername(name, NULL);
 	/* ignore the port which might have been found in the string */
-	np = find_nodebyname(nodename);
+	np = find_nodebyname(nodename, NO_LOCK);
 	if ((np == 0) ||
 		((np->nd_attr[(int)ND_ATR_Mom].at_flags & ATR_VFLAG_SET) == 0))
 		return (0);
@@ -743,7 +743,7 @@ node_down_requeue(struct work_task *pwt)
 
 							/* Check if any node associated to the provisioned job is still in provisioning state. */
 							for (i = 0; i < cnt; i++) {
-								if ((vnode = find_nodebyname(prov_vnode_list[i]))) {
+								if ((vnode = find_nodebyname(prov_vnode_list[i], NO_LOCK))) {
 									if ((ptracking = get_prov_record_by_vnode(vnode->nd_name))) {
 										prov_vnode_info = ptracking->prov_vnode_info;
 										if (prov_vnode_info){
@@ -2468,7 +2468,7 @@ discard_job(job *pjob, char *txt, int noack)
 			++pc;
 		*pc = '\0';
 
-		pnode = find_nodebyname(pn);
+		pnode = find_nodebyname(pn, NO_LOCK);
 		/* had better be the "natural" vnode with only the one parent */
 		if (pnode != NULL) {
 
@@ -3276,7 +3276,7 @@ update2_to_vnode(vnal_t *pvnal, int new, mominfo_t *pmom, int *madenew, int from
 	prdefhost = find_resc_def(svr_resc_def, "host", svr_resc_size);
 	prdefvnode = find_resc_def(svr_resc_def, "vnode", svr_resc_size);
 
-	pnode = find_nodebyname(pvnal->vnal_id);
+	pnode = find_nodebyname(pvnal->vnal_id, LOCK);
 
 	if (pnode == NULL) {
 		/*
@@ -3810,6 +3810,7 @@ update2_to_vnode(vnal_t *pvnal, int new, mominfo_t *pmom, int *madenew, int from
 		set_vnode_state(pnode,
 			~states_to_clear,
 			Nd_State_And);
+		node_save_db(pnode);
 		return 0;
 	} else {
 		snprintf(log_buffer, sizeof(log_buffer),
@@ -4445,7 +4446,7 @@ found:
 				/* for multiple vnodes, the info is in UPDATE2 */
 
 				if (psvrmom->msr_numvnds != 0) {
-					np = psvrmom->msr_children[0];
+					np = GET_NODEBYINDX_LOCKED(psvrmom->msr_children, 0);
 
 					/*
 					 * Sharing attribute - three cases for at_flags:
@@ -4510,7 +4511,7 @@ found:
 							ATR_VFLAG_MODCACHE |
 							ATR_VFLAG_DEFLT);
 					}
-
+				node_save_db(np);
 				}
 
 			}
@@ -4623,7 +4624,7 @@ found:
 			/* natural vnode if they are not already set.       */
 
 			for (ivnd = 0; ivnd < psvrmom->msr_numvnds; ++ivnd) {
-				np = psvrmom->msr_children[ivnd];
+				np = GET_NODEBYINDX_LOCKED(psvrmom->msr_children, ivnd);
 
 				if (np->nd_state & INUSE_STALE) {
 					/* vnode is stale */
@@ -4751,6 +4752,7 @@ found:
 						ap->at_flags |= ATR_VFLAG_SET;
 					}
 				}
+				node_save_db(np);
 			}
 
 			if (made_new_vnodes || cr_node) {
@@ -6721,7 +6723,7 @@ set_nodes(void *pobj, int objtype, char *execvnod_in, char **execvnod_out, char 
 	while (chunk) {
 
 		if (parse_node_resc(chunk, &vname, &nelem, &pkvp) == 0) {
-			pnode = find_nodebyname(vname);
+			pnode = find_nodebyname(vname, NO_LOCK);
 			if (pnode == NULL) {
 				free(phowl);
 				free(execvncopy);
@@ -6802,7 +6804,7 @@ set_nodes(void *pobj, int objtype, char *execvnod_in, char **execvnod_out, char 
 					while (*pehnxt && (*pehnxt != '/'))
 						pehnxt++;
 					*pehnxt = '\0';
-					(phowl+ndindex)->hw_natvn = find_nodebyname(peh);
+					(phowl+ndindex)->hw_natvn = find_nodebyname(peh, NO_LOCK);
 					if ((phowl+ndindex)->hw_natvn == NULL) {
 						free(phowl);
 						free(execvncopy);
@@ -7213,7 +7215,7 @@ free_nodes(job *pjob)
 	/* and saved in ji_destin in assign_hosts()		    */
 	if (((pjob->ji_qs.ji_svrflags & JOB_SVFLG_HasNodes) != 0) &&
 		(pjob->ji_qs.ji_destin[0] != '\0')) {
-		pnode = find_nodebyname(pjob->ji_qs.ji_destin);
+		pnode = find_nodebyname(pjob->ji_qs.ji_destin, NO_LOCK);
 		if (pnode) {
 			psvrmom = pnode->nd_moms[0]->mi_data;
 			if (--psvrmom->msr_numjobs < 0)
@@ -7254,7 +7256,7 @@ free_nodes(job *pjob)
 		}
 
 		for (ivnd = 0; ivnd < psvrmom->msr_numvnds; ++ivnd) {
-			pnode = psvrmom->msr_children[ivnd];
+			pnode = GET_NODEBYINDX_LOCKED(psvrmom->msr_children, ivnd);
 			still_has_jobs = 0;
 			for (np = pnode->nd_psn; np; np = np->next) {
 
@@ -7308,7 +7310,7 @@ free_nodes(job *pjob)
 				if (pjob->ji_qs.ji_substate == JOB_SUBSTATE_PROVISION)
 					free_prov_vnode(pnode);
 			}
-
+			node_save_db(pnode);
 		}
 		special_case = 0;
 	}
@@ -7757,7 +7759,7 @@ mark_node_down(char *nodename, char *why)
 
 	/* note - find_nodebyname strips off /VP */
 
-	if ((pnode = find_nodebyname(nodename)) != NULL) {
+	if ((pnode = find_nodebyname(nodename, NO_LOCK)) != NULL) {
 		/* XXXX fix see momptr_down() XXXX */
 		momptr_down(pnode->nd_moms[0], why);
 	}
@@ -7807,11 +7809,11 @@ mark_node_offline_by_mom(char *nodename, char *why)
 
 	/* note - find_nodebyname strips off /VP */
 
-	if ((pnode = find_nodebyname(nodename)) != NULL) {
+	if ((pnode = find_nodebyname(nodename, LOCK)) != NULL) {
 		/* XXXX fix see momptr_down() XXXX */
 		momptr_offline_by_mom(pnode->nd_moms[0], why);
 		pnode->nd_modified |= (NODE_UPDATE_STATE|NODE_UPDATE_COMMENT);
-		write_node_state();
+		node_save_db(pnode);
 	}
 }
 
@@ -7855,11 +7857,11 @@ clear_node_offline_by_mom(char *nodename, char *why)
 
 	/* note - find_nodebyname strips off /VP */
 
-	if ((pnode = find_nodebyname(nodename)) != NULL) {
+	if ((pnode = find_nodebyname(nodename, LOCK)) != NULL) {
 		/* XXXX fix see momptr_down() XXXX */
 		momptr_clear_offline_by_mom(pnode->nd_moms[0], why);
 		pnode->nd_modified |= (NODE_UPDATE_STATE|NODE_UPDATE_COMMENT);
-		write_node_state();
+		node_save_db(pnode);
 	}
 }
 
@@ -8214,16 +8216,15 @@ set_last_used_time_node(void *pobj, int type)
 		*pc = '\0';
 
 		if (last_pn == NULL || (cmp_ret = strcmp(pn, last_pn)) != 0 ) {
-			pnode = find_nodebyname(pn);
+			pnode = find_nodebyname(pn, LOCK);
 			/* had better be the "natural" vnode with only the one parent */
 			if (pnode != NULL) {
 				snprintf(str_val, sizeof(str_val), "%d", time_int_val);
 				set_attr_svr(&(pnode->nd_attr[(int)ND_ATR_last_used_time]),
 						&node_attr_def[(int) ND_ATR_last_used_time], str_val);
 				pnode->nd_modified = NODE_UPDATE_OTHERS;
-				if(svr_chngNodesfile == 0)
-					svr_chngNodesfile = 1; /*make sure nodes are saved to the database during shutdown*/
 			}
+			node_save_db(pnode);
 		}
 		last_pn = pn;
 		pn = parse_plus_spec(NULL, &rc);

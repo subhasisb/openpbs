@@ -198,7 +198,7 @@ find_queuebyname(char *qname, int lock)
 	return NULL;
 }
 
-struct pbsnode *find_nodebyname(char *nname)
+struct pbsnode *find_nodebyname(char *nname, int lock)
 {
 	return NULL;
 }
@@ -239,6 +239,12 @@ mgr_set_attr(attribute *pattr, attribute_def *pdef, int limit,
 
 int
 svr_chk_history_conf(void)
+{
+	return (0);
+}
+
+int
+node_save_db(struct pbsnode *pnode)
 {
 	return (0);
 }

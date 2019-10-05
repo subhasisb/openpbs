@@ -652,7 +652,7 @@ void set_admin_suspend(job *pjob, int set_remove_nstate) {
 	while (chunk) {
 
 		if (parse_node_resc(chunk, &vname, &nelem, &pkvp) == 0) {
-			pnode = find_nodebyname(vname);
+			pnode = find_nodebyname(vname, LOCK);
 			if(pnode) {
 				if(set_remove_nstate) {
 					set_arst(&pnode->nd_attr[(int)ND_ATR_MaintJobs], &new, INCR);
@@ -662,7 +662,7 @@ void set_admin_suspend(job *pjob, int set_remove_nstate) {
 					if (pnode->nd_attr[(int)ND_ATR_MaintJobs].at_val.at_arst->as_usedptr == 0)
 						set_vnode_state(pnode, ~INUSE_MAINTENANCE, Nd_State_And);
 				}
-				pnode->nd_modified |= NODE_UPDATE_OTHERS; /* force save of attributes */
+				node_save_db(pnode); /* force save of attributes */
 			}
 		}
 		chunk = parse_plus_spec_r(last, &last, &hasprn);

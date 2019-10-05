@@ -7375,7 +7375,7 @@ get_server_hook_results(char *input_file, int *accept_flag, int *reject_flag, ch
 				(plist->al_link).ll_next->ll_struct = NULL;
 				/* there are vnode hook updates */
 				/* Push hook changes to server */
-				pnode = find_nodebyname(vname_str);
+				pnode = find_nodebyname(vname_str, LOCK);
 				if (pnode == NULL) {
 					log_event(PBSEVENT_DEBUG3, PBS_EVENTCLASS_HOOK,
 						LOG_INFO, phook->hook_name, "node_name not found");
@@ -7400,6 +7400,7 @@ get_server_hook_results(char *input_file, int *accept_flag, int *reject_flag, ch
 					}
 				}
 				free_svrattrl(plist);
+				node_save_db(pnode);
 			}
 		}
 		/* TODO: for job objects */

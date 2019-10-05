@@ -398,6 +398,7 @@ typedef enum node_topology_type ntt_t;
 #define NODE_UPDATE_VNL             0x8  /* this vnode updated in vnl by Mom  */
 #define NODE_UPDATE_CURRENT_AOE     0x10  /* current_aoe attribute to be updated */
 #define NODE_UPDATE_MOM             0x20 /* update only the mom attribute */
+#define NODE_LOCKED                 0x40 /* indicate whether node is already locked in db for update*/
 
 
 #define NODE_SAVE_FULL  0
@@ -445,10 +446,10 @@ extern  struct pbssubn *create_subnode(struct pbsnode *, struct pbssubn *lstsn);
 extern	void	effective_node_delete(struct pbsnode*);
 extern	void	setup_notification(void);
 extern  struct	pbssubn  *find_subnodebyname(char *);
-extern	struct	pbsnode  *find_nodebyname(char *);
-extern	struct	pbsnode  *refresh_node(char *, char *);
-extern int update_node_cache(pbs_node *);
-extern int       get_all_db_nodes();
+extern	struct	pbsnode  *find_nodebyname(char *, int);
+extern	struct	pbsnode  *refresh_node(char *, char *, int);
+extern	int update_node_cache(pbs_node *);
+extern	int get_all_db_nodes();
 extern	struct	pbsnode  *find_nodebyaddr(pbs_net_t);
 extern	void	free_prop_list(struct prop*);
 extern	void	recompute_ntype_cnts(void);
@@ -499,13 +500,14 @@ extern char *msg_daemonname;
 
 
 #ifndef PBS_MOM
+#define GET_NODEBYINDX_LOCKED(obj, idx)	find_nodebyname(obj[idx] ? obj[idx]->nd_name : NULL, LOCK)
 extern int node_save_db(struct pbsnode *pnode);
 extern int nodejob_recov_db(void *nj);
 extern int nodejob_update_attr_db(pbs_db_nodejob_info_t *dbnode);
 extern pbs_db_nodejob_info_t * initialize_nodejob_db_obj(char *nd_name, char *job_id, int is_resv);
 int nodejob_db_to_attrlist(struct pbsnode *pnode, pbs_db_nodejob_info_t *db_obj);
 extern void clear_nodejob_dbobj(pbs_db_nodejob_info_t *db_obj);
-extern struct pbsnode *node_recov_db(char *nd_name, struct pbsnode *pnode);
+extern struct pbsnode *node_recov_db(char *nd_name, struct pbsnode *pnode, int lock);
 extern int add_mom_to_pool(mominfo_t *);
 extern void remove_mom_from_pool(mominfo_t *);
 extern void reset_pool_inventory_mom(mominfo_t *);
