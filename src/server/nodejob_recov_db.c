@@ -191,6 +191,36 @@ append_to_joblist(pbs_node *pnode, char *jobid, int ncpus)
 	} while(--ncpus > 0);
 }
 
+void
+append_to_resvlist(pbs_node *pnode, char *resvid)
+{	
+	struct pbs_job_list *rlist;
+
+	DBPRT(("Entering: %s", __func__))
+
+	if (pnode->resv_list == NULL) {
+		pnode->resv_list = malloc(sizeof(struct pbs_job_list));
+		pnode->resv_list->job_str = malloc(1024);
+		pnode->resv_list->buf_sz = 1024;
+		pnode->resv_list->offset = 0;
+		pnode->resv_list->last_cpu_indx = 0;
+	}
+	
+	rlist = pnode->resv_list;
+	if (rlist->offset + strlen(resvid) >= rlist->buf_sz) {
+		char *tmp_str = realloc(rlist->job_str, rlist->buf_sz * 2);
+		if (tmp_str != NULL) {
+			rlist->job_str = tmp_str;
+			rlist->buf_sz *= 2;
+		}
+	}
+
+	if (rlist->offset != 0) {
+		rlist->offset +=sprintf(rlist->job_str + rlist->offset, ", ");
+	}
+	rlist->offset += sprintf(rlist->job_str + rlist->offset, "%s", resvid);
+}
+
 int
 nodejob_db_to_attrlist(struct pbsnode *pnode, pbs_db_nodejob_info_t *db_obj)
 {
@@ -212,11 +242,13 @@ nodejob_db_to_attrlist(struct pbsnode *pnode, pbs_db_nodejob_info_t *db_obj)
 							attrs->attr_resc,
 							attrs->attr_value);
 		}
-		if (strcmp(attrs->attr_resc, "ncpus") == 0 && !db_obj->is_resv) {
+		if (strcmp(attrs->attr_resc, "ncpus") == 0 && db_obj->is_resv == PBS_NODEJOB_JOB) {
 			append_to_joblist(pnode, db_obj->job_id, atol(attrs->attr_value));
 		}
 		(void)(node_attr_def + ND_ATR_ResourceAssn)->at_set(pattr, &tmpattr, INCR);
 	}
+	if (db_obj->is_resv == PBS_NODEJOB_RESV)
+		append_to_resvlist(pnode, db_obj->job_id);
 
 	return 0;
 }

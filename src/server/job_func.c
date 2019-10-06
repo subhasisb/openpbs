@@ -169,6 +169,8 @@ extern pbs_list_head svr_alljobs;
 extern int is_called_by_job_purge;
 extern int am_i_resv_owner(char *);
 
+extern	char	*msg_err_purgenodejob_db;
+
 #ifdef PBS_MOM
 #include "mom_func.h"
 
@@ -696,7 +698,6 @@ job_purge(job *pjob)
 
 #else
 	extern	char	*msg_err_purgejob_db;
-	extern	char	*msg_err_purgenodejob_db;
 	pbs_db_obj_info_t obj;
 	pbs_db_job_info_t dbjob;
 	pbs_db_nodejob_info_t db_nj;
@@ -1715,6 +1716,7 @@ resv_purge(resc_resv *presv)
 	extern char *msg_purgeResvDb;
 	pbs_db_obj_info_t	obj;
 	pbs_db_resv_info_t	dbresv;
+	pbs_db_nodejob_info_t db_nj;
 
 	if (presv == NULL)
 		return;
@@ -1790,6 +1792,15 @@ resv_purge(resc_resv *presv)
 	obj.pbs_db_un.pbs_db_resv = &dbresv;
 	if (pbs_db_delete_obj(svr_db_conn, &obj) == -1)
 		log_err(errno, __func__, msg_purgeResvDb);
+
+	/* delete entries from node job table */
+	obj.pbs_db_obj_type = PBS_DB_NODEJOB;
+	obj.pbs_db_un.pbs_db_nodejob = &db_nj;
+	strcpy(db_nj.job_id, presv->ri_qs.ri_resvID);
+	if (pbs_db_delete_obj(svr_db_conn, &obj) == -1) {
+		log_joberr(-1, __func__, msg_err_purgenodejob_db,
+			presv->ri_qs.ri_resvID);
+	}
 
 	/*Free resc_resv struct, any hanging substructs, any attached
 	 *work_task structs

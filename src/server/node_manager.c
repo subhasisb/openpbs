@@ -3176,8 +3176,8 @@ cross_link_mom_vnode(struct pbsnode *pnode, mominfo_t *pmom)
 		node_attr_def[(int) ND_ATR_Mom].at_set(
 			&pnode->nd_attr[(int) ND_ATR_Mom],
 			&tmpmom, INCR);
-		if (pnode->nd_modified != NODE_UPDATE_OTHERS)
-			pnode->nd_modified = NODE_UPDATE_MOM; /* since we modified nd_nummoms, save it */
+		if (!(pnode->nd_modified & NODE_UPDATE_OTHERS))
+			pnode->nd_modified |= NODE_UPDATE_MOM; /* since we modified nd_nummoms, save it */
 		node_attr_def[(int) ND_ATR_Mom].at_free(&tmpmom);
 	}
 
@@ -7507,8 +7507,6 @@ adj_resc_on_node(void *obj, int is_resv, char *noden, enum batch_op op, resource
 		db_obj = initialize_nodejob_db_obj(noden, pjob->ji_qs.ji_jobid, is_resv);
 	}
 
-	DBPRT(("ji_state: %d, ji_substate: %d", ((job*)obj)->ji_qs.ji_state, ((job*)obj)->ji_qs.ji_substate))
-
 	if (nodejob_recov_db(db_obj) != 0)
 		return PBSE_INTERNAL;
 
@@ -8222,7 +8220,7 @@ set_last_used_time_node(void *pobj, int type)
 				snprintf(str_val, sizeof(str_val), "%d", time_int_val);
 				set_attr_svr(&(pnode->nd_attr[(int)ND_ATR_last_used_time]),
 						&node_attr_def[(int) ND_ATR_last_used_time], str_val);
-				pnode->nd_modified = NODE_UPDATE_OTHERS;
+				pnode->nd_modified |= NODE_UPDATE_OTHERS;
 			}
 			node_save_db(pnode);
 		}

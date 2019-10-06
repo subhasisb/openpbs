@@ -290,6 +290,7 @@ struct	pbsnode {
 	struct pbs_queue	*nd_pque;	/* queue to which it belongs */
 	int			 nd_modified;	/* flag indicating whether state update is required */
 	struct	pbs_job_list	*job_list;	/* list of jobs in this node */
+	struct	pbs_job_list	*resv_list;	/* list of resv in this node comma separated */
 	char		nd_creatm[DB_TIMESTAMP_LEN + 1];		/* time queue created */
 	char		nd_savetm[DB_TIMESTAMP_LEN + 1];		/* time queue last modified */
 	attribute		 nd_attr[ND_ATR_LAST];

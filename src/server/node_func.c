@@ -355,7 +355,7 @@ chk_characteristic(struct pbsnode *pnode, int *pneed_todo)
 		old_address = NULL;
 		return (-1);
 	}
-	pnode->nd_modified = 0; /* reset */
+	pnode->nd_modified &= NODE_LOCKED; /* reset */
 
 	tmp = pnode->nd_state;
 	if (tmp != old_state) {
@@ -421,12 +421,18 @@ pre_nodejob_query(struct pbsnode *pnode)
 							NULL)) != 0)
 			return rc;
 	}
-	/* clear the joblist */
+	/* clear the job_list */
 	if (pnode->job_list) {
 		free(pnode->job_list->job_str);
 		free(pnode->job_list);
 	}
 	pnode->job_list = NULL;
+	/* clear the resv_list */
+	if (pnode->resv_list) {
+		free(pnode->resv_list->job_str);
+		free(pnode->resv_list);
+	}
+	pnode->resv_list = NULL;
 	return 0;
 }
 
@@ -646,6 +652,7 @@ initialize_pbsnode(struct pbsnode *pnode, char *pname, int ntype)
 		return (PBSE_SYSTEM);
 	pnode->nd_nummslots = 1;
 	pnode->job_list = NULL;
+	pnode->resv_list = NULL;
 
 	/* first, clear the attributes */
 
@@ -818,7 +825,7 @@ remove_mom_from_vnodes(mominfo_t *pmom)
 				}
 				pnode->nd_moms[imom] = NULL;
 				--pnode->nd_nummoms;
-				pnode->nd_modified = NODE_UPDATE_OTHERS; /* since we modified nd_nummoms, flag for save */
+				pnode->nd_modified |= NODE_UPDATE_OTHERS; /* since we modified nd_nummoms, flag for save */
 				/* remove (decr) Mom host from Mom attrbute */
 				(void)node_attr_def[(int)ND_ATR_Mom].at_set(
 					&pnode->nd_attr[(int)ND_ATR_Mom],
@@ -1793,7 +1800,8 @@ setup_nodes()
 		for (num=0; num<ND_ATR_LAST; num++) {
 			np->nd_attr[num].at_flags &= ~ATR_VFLAG_MODIFY;
 		}
-		np->nd_modified = 0; /* clear nd_modified on node since create_pbsnode set it*/
+		np->nd_modified &= NODE_LOCKED;
+		/* clear nd_modified on node since create_pbsnode set it*/
 	}
 	svr_chngNodesfile = 0;	/* clear in case set while creating node */
 

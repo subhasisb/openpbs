@@ -554,55 +554,30 @@ int
 encode_resvs(attribute *pattr, pbs_list_head *ph, char *aname, char *rname, int mode, svrattrl **rtnl)
 {
 	svrattrl	*pal;
-	struct resvinfo *rip;
-	struct pbsnode	*pnode;
-	int		i;
-	int		resvcnt;	/*number of reservations on the node*/
-	int		strsize;	/*computed string size		    */
-	char		*resv_str;	/*comma separated reservations list */
+	struct pbs_job_list 	*rlist;
+
+	DBPRT(("Entering %s", __func__))
 
 	if (!pattr)
 		return (-1);
+
 	if (!(pattr->at_flags & ATR_VFLAG_SET) || !pattr->at_val.at_jinfo)
 		return (0);                  /*nothing to report back   */
 
-	/*cnt number of reservations and estimate size of string buffer required*/
-	resvcnt = 0;
-	strsize = 1;			     /*allow for terminating null char*/
-	pnode = pattr->at_val.at_jinfo;
-	for (rip = pnode->nd_resvp; rip; rip = rip->next) {
-		resvcnt++;
-		strsize += strlen(rip->resvp->ri_qs.ri_resvID) + 9; /*4digit*/
-	}
+	rlist = pattr->at_val.at_jinfo->resv_list;
+	if (!rlist)
+		return 0;
 
-	if (resvcnt == 0)
+	if (*rlist->job_str == 0)
 		return (0);	      /*no reservations currently on this node*/
 
-	else if (!(resv_str = (char *)malloc(strsize)))
-		return -(PBSE_SYSTEM);
-
-	resv_str[0] = '\0';
-	i = 0;
-	for (rip = pnode->nd_resvp; rip; rip = rip->next) {
-		if (i != 0)
-			strcat(resv_str, ", ");
-		else
-			i++;
-
-		sprintf(resv_str + strlen(resv_str), "%s",
-			rip->resvp->ri_qs.ri_resvID);
-	}
-
-
-	pal = attrlist_create(aname, rname, (int)strlen(resv_str) + 1  );
+	pal = attrlist_create(aname, rname, rlist->offset + 1);
 	if (pal == NULL) {
-		free(resv_str);
 		return -(PBSE_SYSTEM);
 	}
 
-	(void)strcpy(pal->al_value, resv_str);
+	(void)strcpy(pal->al_value, rlist->job_str);
 	pal->al_flags = ATR_VFLAG_SET;
-	free(resv_str);
 
 	if (ph)
 		append_link(ph, &pal->al_link, pal);

@@ -210,19 +210,17 @@ node_recov_db(char *nd_name, struct pbsnode *pnode, int lock)
 	if ((rc = pbs_db_load_obj(conn, &obj, lock)) == -1)
 		goto db_err;
 
-	if (rc == -2) {
-		if (pbs_db_end_trx(conn, PBS_DB_ROLLBACK) != 0)
-			goto db_err;
-		return pnode;
-	}
+	if (rc == -2)
+		goto db_commit;
 
 	if (db_to_svr_node(pnode, &dbnode) != 0)
 		goto db_err;
 
+db_commit:
 	if (lock && pnode) {
 		pnode->nd_modified |= NODE_LOCKED;
-	} else if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0)
-		goto db_err;
+	} else
+		pbs_db_end_trx(conn, PBS_DB_COMMIT);
 
 	pbs_db_reset_obj(&obj);
 
@@ -433,6 +431,8 @@ node_save_db(struct pbsnode *pnode)
 	pbs_db_node_info_t dbnode;
 	pbs_db_obj_info_t obj;
 	pbs_db_conn_t *conn = (pbs_db_conn_t *) svr_db_conn;
+
+	DBPRT(("Entering %s", __func__))
 
 	svr_to_db_node(pnode, &dbnode);
 	obj.pbs_db_obj_type = PBS_DB_NODE;

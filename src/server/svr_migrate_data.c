@@ -247,7 +247,7 @@ svr_migrate_data()
 
 		/* loop through all the nodes and mark for update */
 		for (i = 0; i < svr_totnodes; i++) {
-			pbsndlist[i]->nd_modified = NODE_UPDATE_OTHERS;
+			pbsndlist[i]->nd_modified |= NODE_UPDATE_OTHERS;
 		}
 
 		if (save_nodes_db(0, NULL) != 0) {
