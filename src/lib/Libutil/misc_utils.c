@@ -91,7 +91,7 @@
 #include <netinet/tcp.h>
 #endif
 #include "pbs_error.h"
-
+#include "libpbs.h"
 #ifdef HAVE_MALLOC_INFO
 #include <malloc.h>
 #endif
@@ -1535,6 +1535,54 @@ set_nodelay(int fd)
 
 	opt = 1;
 	return setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &opt, sizeof(opt));
+}
+
+
+int
+initialise_connection_table(int table_size)
+{
+	int i;
+	int j;
+
+	for (i=0; i < table_size; i++) {
+			if (connection[i].ch_inuse == 0) {
+				if (pbs_client_thread_lock_conntable() != 0)
+					return -1;
+
+				connection[i].ch_inuse = 1;
+				connection[i].ch_errno = 0;
+				connection[i].ch_socket= -1;
+				connection[i].ch_errtxt = NULL;
+				connection[i].shard_context = -1;
+
+				if (get_max_servers() > 1) {
+					if (connection[i].ch_shards == NULL) {
+						if (!(connection[i].ch_shards = calloc(get_current_servers(), sizeof(struct shard_conn *)))) {
+							pbs_errno = PBSE_SYSTEM;
+							connection[i].ch_inuse = 0;
+							return -1;
+						}
+						for (j = 0; j < get_current_servers(); j++) {
+							connection[i].ch_shards[j] = malloc(sizeof(struct shard_conn));
+							connection[i].ch_shards[j]->sd = -1;
+							connection[i].ch_shards[j]->state = SHARD_CONN_STATE_DOWN;
+							connection[i].ch_shards[j]->state_change_time = 0;
+							connection[i].ch_shards[j]->last_used = 0;
+						}
+
+					}
+
+				}
+
+				if (pbs_client_thread_unlock_conntable() != 0)
+					return -1;
+
+				return (i);
+			}
+		}
+
+		pbs_errno = PBSE_NOCONNECTS;
+		return (-1);
 }
 
 #endif /* malloc_info */

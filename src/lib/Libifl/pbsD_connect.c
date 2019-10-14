@@ -70,6 +70,7 @@
 #include "libsec.h"
 #include "pbs_ecl.h"
 #include "pbs_internal.h"
+#include "rpp.h"
 
 
 extern struct connect_handle connection[NCONNECTS];
@@ -686,7 +687,14 @@ tryagain:
 		} else if (connection[channel].ch_shards[srv_index]->state == SHARD_CONN_STATE_DOWN) {
 			/* connect and authenticate */
 			
-			sd = internal_tcp_connect(channel, pbs_conf.psi[srv_index]->name, pbs_conf.psi[srv_index]->port, NULL);
+			if (req_type != PBS_BATCH_MomRestart)
+				sd = internal_tcp_connect(channel, pbs_conf.psi[srv_index]->name, pbs_conf.psi[srv_index]->port, NULL);
+			else
+			{
+				sd = rpp_open(pbs_conf.psi[srv_index]->name, pbs_conf.psi[srv_index]->port);
+				connection[channel].ch_socket = sd; /* use the same socket for replies etc. */
+			}
+			
 			if (sd == -1) {
 				DBG_TRACE_SHARD((stderr, "Connect returned -1\n"))
 			   /* connection failed, check the error return 

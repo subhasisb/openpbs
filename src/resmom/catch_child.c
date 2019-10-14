@@ -1907,6 +1907,38 @@ end_loop:
 
 /**
  * @brief
+ * 	Build and utilize the connection array to get the connect handle and 
+ *  utilize get_svr_shard_connection() to choose the shard server.
+ *
+ * @par
+ *	Open an RPP stream server/port, 
+ *
+ * @param[in]	svr  - name of Server to which to send the restart
+ * @param[in]	port - port Server would be expecting to receive IM messages
+ *
+ * @return	int
+ *
+ */
+
+int
+get_server_stream(char *svr, unsigned int port)
+{
+	int		stream;
+	int conn_slot;
+	int *jobid = NULL;
+	if ((conn_slot = initialise_connection_table(NCONNECTS)) == -1) {
+		log_err(-1, __func__, "connection table initialization failed");
+		return -1;
+	}
+	set_new_shard_context(conn_slot);
+	stream = get_svr_shard_connection(conn_slot, PBS_BATCH_MomRestart, jobid);
+	return stream;
+}
+
+
+
+/**
+ * @brief
  * 	send IS_HELLOSVR message to Server.
  *	Used when Server is older & does not recognize the TCP Restart message.
  *
@@ -1926,7 +1958,10 @@ send_hellosvr_rpp(char *svr, unsigned int port)
 {
 	int		stream;
 
-	stream = rpp_open(svr, port);
+	if (pbs_conf.pbs_max_servers > 1) 
+		stream = get_server_stream(svr, port);
+	else 
+		stream = rpp_open(svr, port);	
 
 	if (stream < 0) {
 		(void)sprintf(log_buffer, "rpp_open(%s, %d) failed", svr, port);
@@ -1944,7 +1979,7 @@ send_hellosvr_rpp(char *svr, unsigned int port)
 	(void)diswui(stream, pbs_mom_port);
 	rpp_flush(stream);
 
-	(void)sprintf(log_buffer, "HELLOSVR sent to server at %s:%d", svr, port);
+	(void)sprintf(log_buffer, "HELLOSVR sent to server at %s", svr);
 	log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_NOTICE,
 		msg_daemonname, log_buffer);
 	server_stream = stream;
