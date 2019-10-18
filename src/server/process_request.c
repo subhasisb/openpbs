@@ -566,19 +566,19 @@ clear_non_blocking(conn_t *conn)
 int 
 memcache_good(struct memcache_state *ts, int lock)
 {
+	long last_loaded_trx;
+	long curr_trx_id;
+
 	if (sched_trx_chk) {
-		if (ts->last_loaded_sched_trx == curr_sched_trx_id) {
-			if (lock == 0)
-				return 1;
-			else if (ts->locked == 1)
-				return 1;
-		}
-		return 0;
+		last_loaded_trx = ts->last_loaded_sched_trx;
+		curr_trx_id = curr_sched_trx_id;
+	} else {
+		last_loaded_trx = ts->last_loaded_srv_trx;
+		curr_trx_id = curr_svr_trx_id;
 	}
-	if (ts->last_loaded_srv_trx == curr_svr_trx_id) {
-		if (lock == 0)
-			return 1;
-		else if (ts->locked == 1)
+	
+	if (last_loaded_trx == curr_trx_id) {
+		if (lock == 0 || ts->locked == 1)
 			return 1;
 	}
 	return 0;
@@ -589,15 +589,12 @@ memcache_update_state(struct memcache_state *ts, int lock)
 {
 	if (ts) {
 		ts->last_loaded_srv_trx = curr_svr_trx_id; /* note down transaction id in the object to optimize loading */
-		if (lock)
-			ts->locked = 1;
+		ts->locked = lock;
+		if (sched_trx_chk)
+			ts->last_loaded_sched_trx = curr_sched_trx_id; /* note down transaction id in the object to optimize loading */
 		else
-			ts->locked = 0;
+			ts->last_loaded_sched_trx = 0;
 	}
-	if (sched_trx_chk) {
-		ts->last_loaded_sched_trx = curr_sched_trx_id; /* note down transaction id in the object to optimize loading */
-	} else
-		ts->last_loaded_sched_trx = 0;
 }
 
 void

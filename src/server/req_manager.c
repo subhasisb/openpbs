@@ -1442,7 +1442,7 @@ mgr_queue_delete(struct batch_request *preq)
 		}
 
 		/* are there nodes associated with the queue */
-
+		get_all_db_nodes();
 		for (i=0; i<svr_totnodes; i++) {
 			if (pbsndlist[i]->nd_pque == pque) {
 				rc = PBSE_OBJBUSY;
@@ -2369,7 +2369,7 @@ mgr_node_set(struct batch_request *preq)
 		 * In this instance the set node req is to apply to all
 		 * nodes at the local ('\0')  or specified ('@') server
 		 */
-
+		get_all_db_nodes();
 		if ((pbsndlist != NULL) && svr_totnodes) {
 			nodename = all_nodes;
 			pnode = GET_NODEBYINDX_LOCKED(pbsndlist, 0);
@@ -2694,7 +2694,7 @@ mgr_node_unset(struct batch_request *preq)
 
 		/*In this instance the set node req is to apply to all */
 		/*nodes at the local ('\0')  or specified ('@') server */
-
+		get_all_db_nodes();
 		if ((pbsndlist != NULL) && svr_totnodes) {
 			nodename = all_nodes;
 			pnode = GET_NODEBYINDX_LOCKED(pbsndlist, 0);
@@ -3554,7 +3554,7 @@ struct batch_request *preq;
 
 		/*In this instance the delete node req is to apply to all */
 		/*nodes at the local ('\0')  or specified ('@') server */
-
+		get_all_db_nodes();
 		if ((pbsndlist != NULL) && svr_totnodes) {
 			nodename = all_nodes;
 			pnode = *pbsndlist;
@@ -4345,11 +4345,13 @@ mgr_resource_delete(struct batch_request *preq)
 	}
 
 	/* Is the resource set on nodes? If so unset */
+	get_all_db_nodes();
 	for (i=0; i < svr_totnodes; i++) {
 		updatedb = 0;
 		for (j=0; j < ND_ATR_LAST; j++) {
 			pattr = &pbsndlist[i]->nd_attr[j];
 			if ((pattr->at_flags & ATR_VFLAG_SET) && (pattr->at_type == ATR_TYPE_RESC || pattr->at_type == ATR_TYPE_ENTITY)) {
+				pattr = &GET_NODEBYINDX_LOCKED(pbsndlist, i)->nd_attr[j];
 				plist = attrlist_create(node_attr_def[j].at_name, prdef->rs_name, 0);
 				plist->al_link.ll_next->ll_struct = NULL;
 				rc = mgr_unset_attr(pbsndlist[i]->nd_attr, node_attr_def, ND_ATR_LAST, plist, -1, &bad, (void *)pbsndlist[i], PARENT_TYPE_NODE, INDIRECT_RES_UNLINK);
@@ -4572,6 +4574,7 @@ mgr_resource_set(struct batch_request *preq)
 	}
 
 	/* Reject if resource is on a node and the type is being modified */
+	get_all_db_nodes();
 	for (i=0; i < svr_totnodes; i++) {
 		if (pbsndlist[i]->nd_state & INUSE_DELETED)
 			continue;
@@ -4782,6 +4785,7 @@ mgr_resource_unset(struct batch_request *preq)
 	}
 
 	/* Reject if resource is on a node */
+	get_all_db_nodes();
 	for (i=0; i < svr_totnodes; i++) {
 		if (pbsndlist[i]->nd_state & INUSE_DELETED)
 			continue;

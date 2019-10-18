@@ -810,8 +810,11 @@ req_stat_node(struct batch_request *preq)
 	 */
 
 	if (pbsndlist == 0  ||  svr_totnodes <= 0) {
-		req_reject(PBSE_NONODES, 0, preq);
-		return;
+		get_all_db_nodes();
+		if (pbsndlist == 0  ||  svr_totnodes <= 0) {
+			req_reject(PBSE_NONODES, 0, preq);
+			return;
+		}
 	}
 
 	resc_access_perm = preq->rq_perm;

@@ -2845,6 +2845,7 @@ deallocate_job(mominfo_t *pmom, job *pjob)
 	if ((jobid == NULL) || (*jobid == '\0'))
 		return;
 
+	get_all_db_nodes();
 	for (i = 0; i < svr_totnodes; i++) {
 		pbsnode *pnode;
 
@@ -6030,13 +6031,10 @@ cvt_nodespec_to_select(char *str, char **cvt_bp, size_t *cvt_lenp, attribute *pa
 		/* 4. now need to see if any property matches a node name */
 
 		for (walkprop = prop; walkprop; walkprop = walkprop->next) {
-			for (i=0; i<svr_totnodes; i++) {
-				if (pbsndlist[i]->nd_state & INUSE_DELETED)
-					continue;
-				if (strcasecmp(pbsndlist[i]->nd_name, walkprop->name) == 0) {
+			pbs_node *pnode;
+			if ((pnode = find_nodebyname(walkprop->name, NO_LOCK)) != NULL) {
+				if (!(pnode->nd_state & INUSE_DELETED))
 					walkprop->mark = 0;
-					break;
-				}
 			}
 		}
 		/* 5. now turn each property into "property=True" unless */
@@ -7346,6 +7344,7 @@ free_resvNodes(resc_resv *presv)
 	pbsnode_list_t *pnl_next;
 
 	DBPRT(("%s: entered\n", __func__))
+	get_all_db_nodes();
 	for (i=0; i<svr_totnodes; i++) {
 		pnode = pbsndlist[i];
 

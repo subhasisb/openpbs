@@ -370,9 +370,9 @@ typedef struct pbs_db_query_options pbs_db_query_options_t;
 #define PBS_DB_STARTED				3
 
 /* Node-Job object types */
-#define PBS_NODEJOB_JOB			0
-#define PBS_NODEJOB_RESV		1
-#define PBS_NODEJOB_MAINTJOB		2
+#define PBS_NODEJOB_JOB		0
+#define PBS_NODEJOB_RESV	1
+#define PBS_NODEJOB_MAINTJOB	2
 
 /**
  * @brief

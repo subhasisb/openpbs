@@ -972,6 +972,7 @@ setup_notification()
 	int	i;
 	int	nmom;
 
+	get_all_db_nodes();
 	for (i=0; i<svr_totnodes; i++) {
 		if (pbsndlist[i]->nd_state & INUSE_DELETED)
 			continue;
@@ -2003,6 +2004,7 @@ indirect_target_check(struct work_task *ptask)
 	struct pbsnode	*pnode;
 	resource	*presc;
 
+	get_all_db_nodes();
 	for (i=0; i<svr_totnodes; i++) {
 		pnode = pbsndlist[i];
 		if (pnode->nd_state & INUSE_DELETED ||
@@ -2370,7 +2372,7 @@ mark_which_queues_have_nodes()
 	}
 
 	/* now (re)set flag for those queues that do have nodes */
-
+	get_all_db_nodes();
 	for (i=0; i<svr_totnodes; i++) {
 		if (pbsndlist[i]->nd_pque) {
 			pbsndlist[i]->nd_pque->qu_attr[(int)QE_ATR_HasNodes].at_val.at_long = 1;

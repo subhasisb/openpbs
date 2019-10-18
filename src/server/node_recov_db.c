@@ -193,6 +193,8 @@ node_recov_db(char *nd_name, struct pbsnode *pnode, int lock)
 		pnode = malloc(sizeof(struct pbsnode));
 		initialize_pbsnode(pnode, nd_name, NTYPE_PBS);
 	} else {
+		if (memcache_good(&pnode->trx_status, lock))
+			return pnode;
 		strcpy(dbnode.nd_savetm, pnode->nd_savetm);
 	}
 	
@@ -219,6 +221,7 @@ node_recov_db(char *nd_name, struct pbsnode *pnode, int lock)
 db_commit:
 	if (lock && pnode) {
 		pnode->nd_modified |= NODE_LOCKED;
+		memcache_update_state(&pnode->trx_status, lock);
 	} else
 		pbs_db_end_trx(conn, PBS_DB_COMMIT);
 

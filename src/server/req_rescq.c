@@ -89,7 +89,6 @@ struct name_and_val {
 int  gen_task_Time4resv(resc_resv*);
 void resv_revert_alter_times(resc_resv *presv);
 
-extern int     svr_totnodes;
 extern time_t  time_now;
 
 extern int cnvrt_local_move(job *, struct batch_request *);
