@@ -94,13 +94,14 @@ CREATE TABLE pbs.mominfo_time (
  * Table pbs.node holds information about PBS nodes
  */
 CREATE TABLE pbs.node (
-    nd_name		    TEXT		NOT NULL,
+    nd_name		TEXT		NOT NULL,
     mom_modtime		BIGINT,
     nd_hostname		TEXT		NOT NULL,
     nd_state		INTEGER		NOT NULL,
     nd_ntype		INTEGER		NOT NULL,
-    nd_pque		    TEXT,
+    nd_pque		TEXT,
     nd_index		INTEGER		NOT NULL,
+    nd_deleted		INTEGER		NOT NULL default 0,
     nd_savetm		TIMESTAMP	NOT NULL,
     nd_creattm		TIMESTAMP	NOT NULL,
     attributes		hstore		NOT NULL default '',

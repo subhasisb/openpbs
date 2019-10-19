@@ -266,8 +266,8 @@ que_recov_db(char *qname, pbs_queue *pq, int lock)
 	/* if queue is marked as deleted in db then remove it from cache also */
 	if(dbque.qu_deleted == 1) {
 		if(pq) {
-			sprintf(log_buffer, "Queue %s marked as deleted", qname);
-			log_err(-1, __func__, log_buffer);
+			sprintf(log_buffer, "Queue marked as deleted");
+			log_event(PBSEVENT_DEBUG3, PBS_EVENTCLASS_QUEUE, LOG_DEBUG, qname, log_buffer);
 			/* TODO: Remove all the jobs, related to this queue in the system */
 			que_free(pq);
 			pbs_db_reset_obj(&obj);

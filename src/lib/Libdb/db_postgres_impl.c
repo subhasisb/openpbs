@@ -409,6 +409,8 @@ pbs_db_begin_trx(pbs_db_conn_t *conn, int isolation_level, int async)
 {
 	PGresult *res;
 
+	DBPRT(("Entering: %s, conn->conn_trx_nest: %d", __func__, conn->conn_trx_nest))
+
 	if (conn->conn_trx_nest == 0) {
 		res = PQexec((PGconn *) conn->conn_db_handle, "BEGIN");
 		if (PQresultStatus(res) != PGRES_COMMAND_OK) {
@@ -462,6 +464,8 @@ pbs_db_end_trx(pbs_db_conn_t *conn, int commit)
 	char str[10] = "END";
 	PGresult *res;
 	int	rc = 0;
+
+	DBPRT(("Entering: %s, commit: %d, conn->conn_trx_nest: %d", __func__, commit, conn->conn_trx_nest))
 
 	if (conn->conn_trx_nest == 0)
 		return 0;

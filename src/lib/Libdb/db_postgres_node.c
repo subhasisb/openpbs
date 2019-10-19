@@ -72,15 +72,16 @@ pg_db_prepare_node_sqls(pbs_db_conn_t *conn)
 		"nd_state, "
 		"nd_ntype, "
 		"nd_pque, "
+		"nd_deleted, "
 		"nd_savetm, "
 		"nd_creattm, "
 		"attributes "
 		") "
 		"values "
-		"($1, $2, $3, $4, $5, $6, $7, localtimestamp, localtimestamp, hstore($8::text[])) "
+		"($1, $2, $3, $4, $5, $6, $7, $8, localtimestamp, localtimestamp, hstore($9::text[])) "
 		"returning to_char(nd_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as nd_savetm");
 
-	if (pg_prepare_stmt(conn, STMT_INSERT_NODE, conn->conn_sql, 8) != 0)
+	if (pg_prepare_stmt(conn, STMT_INSERT_NODE, conn->conn_sql, 9) != 0)
 		return -1;
 
 	/* in case of nodes do not use || with existing attributes, since we re-write all attributes */
@@ -91,11 +92,21 @@ pg_db_prepare_node_sqls(pbs_db_conn_t *conn)
 		"nd_state = $5, "
 		"nd_ntype = $6, "
 		"nd_pque = $7, "
+		"nd_deleted = $8, "
 		"nd_savetm = localtimestamp, "
-		"attributes = hstore($8::text[]) "
+		"attributes = hstore($9::text[]) "
 		" where nd_name = $1 "
 		"returning to_char(nd_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as nd_savetm");
 	if (pg_prepare_stmt(conn, STMT_UPDATE_NODE, conn->conn_sql, 8) != 0)
+		return -1;
+
+	/* update a nd_deleted attribute only */
+	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "update pbs.node set "
+			"nd_deleted = $2, "
+			"nd_savetm = localtimestamp "
+			"where nd_name = $1 "
+			"returning to_char(nd_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as nd_savetm");
+	if (pg_prepare_stmt(conn, STMT_UPDATE_NODE_AS_DELETED, conn->conn_sql, 2) != 0)
 		return -1;
 
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "update pbs.node set "
@@ -121,6 +132,7 @@ pg_db_prepare_node_sqls(pbs_db_conn_t *conn)
 		"nd_state, "
 		"nd_ntype, "
 		"nd_pque, "
+		"nd_deleted, "
 		"to_char(nd_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as nd_savetm, "
 		"to_char(nd_creattm, 'YYYY-MM-DD HH24:MI:SS.US') as nd_creattm, "
 		"hstore_to_array(attributes) as attributes "
@@ -141,6 +153,7 @@ pg_db_prepare_node_sqls(pbs_db_conn_t *conn)
 		"nd_state, "
 		"nd_ntype, "
 		"nd_pque, "
+		"nd_deleted, "
 		"to_char(nd_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as nd_savetm, "
 		"to_char(nd_creattm, 'YYYY-MM-DD HH24:MI:SS.US') as nd_creattm, "
 		"hstore_to_array(attributes) as attributes "
@@ -165,6 +178,7 @@ pg_db_prepare_node_sqls(pbs_db_conn_t *conn)
 		"nd_state, "
 		"nd_ntype, "
 		"nd_pque, "
+		"nd_deleted, "
 		"to_char(nd_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as nd_savetm, "
 		"to_char(nd_creattm, 'YYYY-MM-DD HH24:MI:SS.US') as nd_creattm, "
 		"hstore_to_array(attributes) as attributes "
@@ -181,6 +195,7 @@ pg_db_prepare_node_sqls(pbs_db_conn_t *conn)
 		"nd_state, "
 		"nd_ntype, "
 		"nd_pque, "
+		"nd_deleted, "
 		"to_char(nd_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as nd_savetm, "
 		"to_char(nd_creattm, 'YYYY-MM-DD HH24:MI:SS.US') as nd_creattm, "
 		"hstore_to_array(attributes) as attributes "
@@ -239,7 +254,7 @@ load_node(PGresult *res, pbs_db_node_info_t *pnd, int row)
 	char *raw_array;
 	char db_savetm[DB_TIMESTAMP_LEN + 1];
 	static int nd_name_fnum, mom_modtime_fnum, nd_hostname_fnum, nd_state_fnum, nd_ntype_fnum,
-	nd_pque_fnum, nd_svtime_fnum, nd_creattm_fnum, attributes_fnum;
+	nd_pque_fnum, nd_deleted_fnum, nd_svtime_fnum, nd_creattm_fnum, attributes_fnum;
 	static int fnums_inited = 0;
 
 	DBPRT(("Loading node from database"))
@@ -251,6 +266,7 @@ load_node(PGresult *res, pbs_db_node_info_t *pnd, int row)
 		nd_state_fnum = PQfnumber(res, "nd_state");
 		nd_ntype_fnum = PQfnumber(res, "nd_ntype");
 		nd_pque_fnum = PQfnumber(res, "nd_pque");
+		nd_deleted_fnum = PQfnumber(res,  "nd_deleted");
 		nd_svtime_fnum = PQfnumber(res, "nd_savetm");
 		nd_creattm_fnum = PQfnumber(res, "nd_creattm");
 		attributes_fnum = PQfnumber(res, "attributes");
@@ -272,6 +288,7 @@ load_node(PGresult *res, pbs_db_node_info_t *pnd, int row)
 	GET_PARAM_INTEGER(res, row, pnd->nd_state, nd_state_fnum);
 	GET_PARAM_INTEGER(res, row, pnd->nd_ntype, nd_ntype_fnum);
 	GET_PARAM_STR(res, row, pnd->nd_pque, nd_pque_fnum);
+	GET_PARAM_INTEGER(res, row, pnd->nd_deleted, nd_deleted_fnum);
 	GET_PARAM_STR(res, row, pnd->nd_creattm, nd_creattm_fnum);
 	GET_PARAM_BIN(res, row, raw_array, attributes_fnum);
 
@@ -302,26 +319,33 @@ pg_db_save_node(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
 	static int fnums_inited = 0;
 
 	SET_PARAM_STR(conn, pnd->nd_name, 0);
-	SET_PARAM_INTEGER(conn, pnd->nd_index, 1);
-	SET_PARAM_BIGINT(conn, pnd->mom_modtime, 2);
-	SET_PARAM_STR(conn, pnd->nd_hostname, 3);
-	SET_PARAM_INTEGER(conn, pnd->nd_state, 4);
-	SET_PARAM_INTEGER(conn, pnd->nd_ntype, 5);
-	SET_PARAM_STR(conn, pnd->nd_pque, 6);
-
-	if (savetype == PBS_UPDATE_DB_QUICK) {
-		params = 7;
+	if (savetype == PBS_UPDATE_DB_AS_DELETED) {
+		SET_PARAM_INTEGER(conn, pnd->nd_deleted, 1);
+		params = 2;
 	} else {
+		SET_PARAM_INTEGER(conn, pnd->nd_index, 1);
+		SET_PARAM_BIGINT(conn, pnd->mom_modtime, 2);
+		SET_PARAM_STR(conn, pnd->nd_hostname, 3);
+		SET_PARAM_INTEGER(conn, pnd->nd_state, 4);
+		SET_PARAM_INTEGER(conn, pnd->nd_ntype, 5);
+		SET_PARAM_STR(conn, pnd->nd_pque, 6);
+		SET_PARAM_INTEGER(conn, pnd->nd_deleted, 7);
+		params = 8;
+	}
+
+	if (savetype == PBS_UPDATE_DB_FULL || savetype == PBS_INSERT_DB) {
 		int len = 0;
 		/* convert attributes to postgres raw array format */
 		if ((len = convert_db_attr_list_to_array(&raw_array, &pnd->attr_list)) <= 0)
 			return -1;
 
-		SET_PARAM_BIN(conn, raw_array, len, 7);
-		params = 8;
+		SET_PARAM_BIN(conn, raw_array, len, 8);
+		params = 9;
 	}
 
-	if (savetype == PBS_UPDATE_DB_FULL)
+	if (savetype == PBS_UPDATE_DB_AS_DELETED)
+		stmt = STMT_UPDATE_NODE_AS_DELETED;
+	else if (savetype == PBS_UPDATE_DB_FULL)
 		stmt = STMT_UPDATE_NODE;
 	else
 		stmt = STMT_INSERT_NODE;

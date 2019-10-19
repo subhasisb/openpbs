@@ -90,6 +90,10 @@ extern "C" {
 #define LOCK 1
 #define NO_LOCK 0
 
+/* for multi-server, given macros defines availability of Object */
+#define Obj_Exist 0
+#define Obj_Deleted 1
+
 /**
  * @brief
  *  Structure used to maintain the database connection information
@@ -278,6 +282,7 @@ struct pbs_db_node_info {
 	INTEGER nd_state;
 	INTEGER nd_ntype;
 	char	nd_pque[PBS_MAXSERVERNAME+1];
+	INTEGER nd_deleted;
 	char    nd_creattm[DB_TIMESTAMP_LEN + 1];
 	char    nd_savetm[DB_TIMESTAMP_LEN + 1];
 	pbs_db_attr_list_t attr_list; /* list of attributes */

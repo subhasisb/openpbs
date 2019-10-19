@@ -191,7 +191,8 @@ node_recov_db(char *nd_name, struct pbsnode *pnode, int lock)
 
 	if (!pnode) {
 		pnode = malloc(sizeof(struct pbsnode));
-		initialize_pbsnode(pnode, nd_name, NTYPE_PBS);
+		initialize_pbsnode(pnode, strdup(nd_name), NTYPE_PBS);
+		DBPRT(("Initializing pbsnode..."))
 	} else {
 		if (memcache_good(&pnode->trx_status, lock))
 			return pnode;
@@ -206,11 +207,26 @@ node_recov_db(char *nd_name, struct pbsnode *pnode, int lock)
 	obj.pbs_db_obj_type = PBS_DB_NODE;
 	obj.pbs_db_un.pbs_db_node = &dbnode;
 
-	if (pbs_db_begin_trx(conn, 0, 0) != 0)
-		goto db_err;
+	if (lock)
+		if (pbs_db_begin_trx(conn, 0, 0) != 0)
+			goto db_err;
 
 	if ((rc = pbs_db_load_obj(conn, &obj, lock)) == -1)
 		goto db_err;
+
+	/* if queue is marked as deleted in db then remove it from cache also */
+	if (dbnode.nd_deleted == 1) {
+		if(pnode) {
+			sprintf(log_buffer, "Node marked as deleted");
+			log_event(PBSEVENT_DEBUG3, PBS_EVENTCLASS_NODE, LOG_DEBUG, nd_name, log_buffer);
+			/* TODO: Remove all the jobs, related to this queue in the system */
+			effective_node_delete(pnode);
+			if (lock)
+				(void)pbs_db_end_trx(conn,PBS_DB_COMMIT);
+			pbs_db_reset_obj(&obj);
+		}
+		return NULL;
+	}
 
 	if (rc == -2)
 		goto db_commit;
@@ -222,8 +238,7 @@ db_commit:
 	if (lock && pnode) {
 		pnode->nd_modified |= NODE_LOCKED;
 		memcache_update_state(&pnode->trx_status, lock);
-	} else
-		pbs_db_end_trx(conn, PBS_DB_COMMIT);
+	}
 
 	pbs_db_reset_obj(&obj);
 
@@ -285,6 +300,8 @@ svr_to_db_node(struct pbsnode *pnode, pbs_db_node_info_t *pdbnd)
 		strcpy(pdbnd->nd_pque, pnode->nd_pque->qu_qs.qu_name);
 	else
 		pdbnd->nd_pque[0]=0;
+
+	pdbnd->nd_deleted = 0;
 
 	/*
 	 * node attributes are saved in a different way than attributes of other objects
@@ -413,7 +430,6 @@ node_recov_db_raw(void *nd, pbs_list_head *phead)
 	return 0;
 }
 
-
 /**
  * @brief
  *	Save a node to the database. When we save a node to the database, delete
@@ -487,13 +503,18 @@ node_delete_db(struct pbsnode *pnode)
 	pbs_db_obj_info_t obj;
 	pbs_db_conn_t *conn = (pbs_db_conn_t *) svr_db_conn;
 
-	dbnode.nd_name[sizeof(dbnode.nd_name) - 1] = '\0';
-	strncpy(dbnode.nd_name, pnode->nd_name, sizeof(dbnode.nd_name));
+	/* for multi-server, update node and mark it as deleted */
+	strcpy(dbnode.nd_name, pnode->nd_name);
+	dbnode.nd_deleted = Obj_Deleted;
 	obj.pbs_db_obj_type = PBS_DB_NODE;
 	obj.pbs_db_un.pbs_db_node = &dbnode;
-
-	if (pbs_db_delete_obj(conn, &obj) == -1)
+	if (pbs_db_save_obj(conn, &obj, PBS_UPDATE_DB_AS_DELETED) != 0) {
+		(void)sprintf(log_buffer,
+			"Marking node as deleted %s from datastore failed",
+			pnode->nd_name);
+		log_err(errno, __func__, log_buffer);
 		return (-1);
-	else
-		return (0);	/* "success" or "success but rows deleted" */
+	}
+
+	return (0);
 }

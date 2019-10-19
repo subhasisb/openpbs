@@ -152,8 +152,6 @@ load_nodejob(PGresult *res, pbs_db_nodejob_info_t *pnd, int row)
 	static int job_id_fnum, nd_name_fnum, is_resv_fnum, admn_suspend_fnum, attributes_fnum;
 	static int fnums_inited = 0;
 
-	DBPRT(("Entering %s", __func__))
-
 	if (fnums_inited == 0) {
 		job_id_fnum = PQfnumber(res, "job_id");
 		nd_name_fnum = PQfnumber(res, "nd_name");
@@ -202,8 +200,6 @@ pg_db_save_nodejob(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
 	char *stmt;
 	int params;
 	char *raw_array = NULL;
-
-	DBPRT(("Entering %s", __func__))
 
 	SET_PARAM_STR(conn, pndjob->job_id, 0);
 	SET_PARAM_STR(conn, pndjob->nd_name, 1);
@@ -259,8 +255,6 @@ pg_db_add_update_attr_nodejob(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, void 
 	int len = 0;
 	pbs_db_nodejob_info_t *pnj = obj->pbs_db_un.pbs_db_nodejob;
 
-	DBPRT(("Entering %s", __func__))
-
 	if ((len = convert_db_attr_list_to_array(&raw_array, attr_list)) <= 0)
 		return -1;
 	SET_PARAM_STR(conn, pnj->job_id, 0);
@@ -299,8 +293,6 @@ pg_db_load_nodejob(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int lock)
 	int rc;
 	pbs_db_nodejob_info_t *pnj = obj->pbs_db_un.pbs_db_nodejob;
 
-	DBPRT(("Entering %s", __func__))
-
 	SET_PARAM_STR(conn, pnj->job_id, 0);
 	SET_PARAM_STR(conn, pnj->nd_name, 1);
 	if ((rc = pg_db_query(conn, STMT_SELECT_NODEJOB, 2, lock, &res)) != 0)
@@ -336,8 +328,6 @@ pg_db_find_nodejob(pbs_db_conn_t *conn, void *st, pbs_db_obj_info_t *obj,
 	pg_query_state_t *state = (pg_query_state_t *) st;
 	pbs_db_nodejob_info_t *pnj = obj->pbs_db_un.pbs_db_nodejob;
 
-	DBPRT(("Entering %s", __func__))
-
 	if (!state)
 		return -1;
 
@@ -371,8 +361,6 @@ pg_db_next_nodejob(pbs_db_conn_t *conn, void *st, pbs_db_obj_info_t *obj)
 	PGresult *res = ((pg_query_state_t *) st)->res;
 	pg_query_state_t *state = (pg_query_state_t *) st;
 
-	DBPRT(("Entering %s", __func__))
-
 	return (load_nodejob(res, obj->pbs_db_un.pbs_db_nodejob, state->row));
 }
 
@@ -388,7 +376,6 @@ pg_db_next_nodejob(pbs_db_conn_t *conn, void *st, pbs_db_obj_info_t *obj)
 void
 pg_db_reset_nodejob(pbs_db_obj_info_t *obj)
 {
-	DBPRT(("Entering %s", __func__))
 	free_db_attr_list(&(obj->pbs_db_un.pbs_db_nodejob->attr_list));
 }
 
@@ -408,7 +395,6 @@ pg_db_reset_nodejob(pbs_db_obj_info_t *obj)
 int
 pg_db_delete_nodejob(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj)
 {
-	DBPRT(("Entering %s", __func__))
 	pbs_db_nodejob_info_t *pnd = obj->pbs_db_un.pbs_db_nodejob;
 	SET_PARAM_STR(conn, pnd->job_id, 0);
 	return (pg_db_cmd(conn, STMT_DELETE_NODEJOB, 1));

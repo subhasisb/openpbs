@@ -118,7 +118,7 @@ que_alloc(char *name)
 	}
 	(void)memset((char *)pq, (int)0, (size_t)sizeof(pbs_queue));
 	pq->qu_qs.qu_type = QTYPE_Unset;
-	pq->qu_qs.qu_deleted = Q_Exist;
+	pq->qu_qs.qu_deleted = Obj_Exist;
 	pq->qu_last_refresh_time = 0;
 	CLEAR_HEAD(pq->qu_jobs);
 	CLEAR_LINK(pq->qu_link);
@@ -252,7 +252,7 @@ que_purge(pbs_queue *pque)
 
 	/* for multi-server, update queue and mark it as deleted */
 	strcpy(dbque.qu_name, pque->qu_qs.qu_name);
-	dbque.qu_deleted = Q_Deleted;
+	dbque.qu_deleted = Obj_Deleted;
 	obj.pbs_db_obj_type = PBS_DB_QUEUE;
 	obj.pbs_db_un.pbs_db_que = &dbque;
 	if (pbs_db_save_obj(conn, &obj, PBS_UPDATE_DB_AS_DELETED) != 0) {

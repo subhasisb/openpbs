@@ -61,10 +61,6 @@ extern "C" {
 #define QTYPE_RoutePush 2
 #define QTYPE_RoutePull 3
 
-/* for multi-server, given macros defines availability of queue */
-#define Q_Exist 0
-#define Q_Deleted 1
-
 /*
  * Attributes, including the various resource-lists are maintained in an
  * array in a "decoded or parsed" form for quick access to the value.

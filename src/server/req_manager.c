@@ -3182,7 +3182,7 @@ create_pbs_node2(char *objname, svrattrl *plist, int perms, int *bad, struct pbs
 			return (PBSE_SYSTEM);
 		}
 
-		if (update_node_cache(pnode) != 0) {
+		if (update_node_cache(pnode, TREE_OP_ADD) != 0) {
 			free(pname);
 			return (PBSE_SYSTEM);
 		}

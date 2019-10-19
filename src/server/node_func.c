@@ -173,44 +173,62 @@ extern int write_single_node_state(struct pbsnode *np);
 static void	remove_node_topology(char *);
 
 int
-update_node_cache(pbs_node *pnode)
+update_node_cache(pbs_node *pnode, int op)
 {
 	struct pbsnode **tmpndlist;
 
 	DBPRT(("Entering %s", __func__))
 
-	/* create node tree if not already done */
-	if (node_tree == NULL ) {
-		node_tree = create_tree(AVL_NO_DUP_KEYS, 0);
-		if (node_tree == NULL ) {
-			free_pnode(pnode);
-			return (PBSE_SYSTEM);
-		}
-	}
+	switch(op) {
+		case TREE_OP_ADD:
+			/* create node tree if not already done */
+			if (node_tree == NULL ) {
+				node_tree = create_tree(AVL_NO_DUP_KEYS, 0);
+				if (node_tree == NULL ) {
+					free_pnode(pnode);
+					return (PBSE_SYSTEM);
+				}
+			}
 
-	if (tree_add_del(node_tree, pnode->nd_name, pnode, TREE_OP_ADD) != 0) {
-		DBPRT(("Addition to node tree has failed"))
-		free_pnode(pnode);
-		return (PBSE_SYSTEM);
-	}
+			if (tree_add_del(node_tree, pnode->nd_name, pnode, op) != 0) {
+				DBPRT(("Addition to node tree has failed"))
+				free_pnode(pnode);
+				return (PBSE_SYSTEM);
+			}
 
-	/* expand pbsndlist array if not sufficient*/
-	if (pbsndlist_sz <= svr_totnodes) {
-		tmpndlist = (struct pbsnode **)realloc(pbsndlist,
-			sizeof(struct pbsnode*) * (svr_totnodes * 2 + 1));
+			/* expand pbsndlist array if not sufficient*/
+			if (pbsndlist_sz <= svr_totnodes) {
+				tmpndlist = (struct pbsnode **)realloc(pbsndlist,
+					sizeof(struct pbsnode*) * (svr_totnodes * 2 + 1));
 
-		if (tmpndlist != NULL) {
-			pbsndlist = tmpndlist;
-		} else {
-			free_pnode(pnode);
-			return (PBSE_SYSTEM);
-		}
-		pbsndlist_sz = svr_totnodes * 2 + 1;
+				if (tmpndlist != NULL) {
+					pbsndlist = tmpndlist;
+				} else {
+					free_pnode(pnode);
+					return (PBSE_SYSTEM);
+				}
+				pbsndlist_sz = svr_totnodes * 2 + 1;
+			}
+			/*add in the new entry etc*/
+			pnode->nd_index = svr_totnodes;
+			pnode->nd_arr_index = svr_totnodes; /* this is only in mem, not from db */
+			DBPRT(("pbsndlist_sz: %d, svr_totnodes: %d", pbsndlist_sz, svr_totnodes))
+			pbsndlist[svr_totnodes++] = pnode;
+			break;
+
+		case TREE_OP_DEL:
+			/* delete the node from the node tree as well as the node array */
+			if (node_tree != NULL && find_tree(node_tree, pnode->nd_name)) {
+				int	iht;
+				tree_add_del(node_tree, pnode->nd_name, NULL, TREE_OP_DEL);
+				for (iht=pnode->nd_arr_index + 1; iht < svr_totnodes; iht++) {
+					pbsndlist[iht - 1] = pbsndlist[iht];
+					/* adjust the arr_index since we are coalescing elements */
+					pbsndlist[iht - 1]->nd_arr_index--;
+				}
+				svr_totnodes--;
+			}
 	}
-	/*add in the new entry etc*/
-	pnode->nd_index = svr_totnodes;
-	pnode->nd_arr_index = svr_totnodes; /* this is only in mem, not from db */
-	pbsndlist[svr_totnodes++] = pnode;
 
 	return 0;
 }
@@ -245,7 +263,7 @@ refresh_node(char *nodename, char * nd_savetm, int lock)
 
 	if (pnode == NULL) {
 		if ((pnode = node_recov_db(nodename, pnode, lock)) != NULL) {
-			if (update_node_cache(pnode) != 0)
+			if (update_node_cache(pnode, TREE_OP_ADD) != 0)
 				return NULL;
 		}
 	} else if (!nd_savetm || strcmp(nd_savetm, pnode->nd_savetm) != 0) {
@@ -875,7 +893,6 @@ effective_node_delete(struct pbsnode *pnode)
 	struct pbssubn  *psubn;
 	struct pbssubn  *pnxt;
 	mom_svrinfo_t	*psvrmom;
-	int		 iht;
 	int		 socket_released = 0;
 
 	psubn = pnode->nd_psn;
@@ -938,18 +955,7 @@ effective_node_delete(struct pbsnode *pnode)
 	node_delete_db(pnode);
 
 	remove_node_topology(pnode->nd_name);
-
-	/* delete the node from the node tree as well as the node array */
-	if (node_tree != NULL) {
-		tree_add_del(node_tree, pnode->nd_name, NULL, TREE_OP_DEL);
-	}
-
-	for (iht=pnode->nd_arr_index + 1; iht < svr_totnodes; iht++) {
-		pbsndlist[iht - 1] = pbsndlist[iht];
-		/* adjust the arr_index since we are coalescing elements */
-		pbsndlist[iht - 1]->nd_arr_index--;
-	}
-	svr_totnodes--;
+	update_node_cache(pnode, TREE_OP_DEL);
 	free_pnode(pnode);
 	if (socket_released)
 		license_more_nodes();
@@ -1413,6 +1419,11 @@ setup_nodes()
 			goto db_err;
 		}
 		mom_modtime = dbnode.mom_modtime;
+
+		if (dbnode.nd_deleted) {
+			pbs_db_reset_obj(&obj);
+			continue;
+		}
 
 		/* now create node and subnodes */
 		pal = GET_NEXT(atrlist);
