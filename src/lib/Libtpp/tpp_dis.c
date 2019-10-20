@@ -1028,6 +1028,7 @@ set_tpp_config(struct pbs_config *pbs_conf,
 void
 set_tpp_funcs(void (*log_fn)(int, const char *, char *))
 {
+	DBPRT(("Entering %s", __func__))
 	pfn_rpp_open = tpp_open;
 	pfn_rpp_bind = tpp_bind;
 	pfn_rpp_poll = tpp_poll;

@@ -230,6 +230,8 @@ update_node_cache(pbs_node *pnode, int op)
 			}
 	}
 
+	create_svrmom_struct(pnode);
+
 	return 0;
 }
 
@@ -258,15 +260,12 @@ refresh_node(char *nodename, char * nd_savetm, int lock)
 	if ((pslash = strchr(nodename, (int)'/')) != NULL)
 		*pslash = '\0';
 
-	if (node_tree)
-		pnode = find_tree(node_tree, nodename);
-
-	if (pnode == NULL) {
+	if (!node_tree || (pnode = find_tree(node_tree, nodename)) == NULL) {
 		if ((pnode = node_recov_db(nodename, pnode, lock)) != NULL) {
 			if (update_node_cache(pnode, TREE_OP_ADD) != 0)
 				return NULL;
 		}
-	} else if (!nd_savetm || strcmp(nd_savetm, pnode->nd_savetm) != 0) {
+	} else if (!nd_savetm || strcmp(nd_savetm, pnode->nd_savetm)) {
 		/* if node had changed in db */
 		pnode = node_recov_db(nodename, pnode, lock);
 	}

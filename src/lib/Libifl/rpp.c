@@ -2837,7 +2837,7 @@ __rpp_close(int index)
 {
 	struct	stream		*sp;
 
-	DBPRT((DBTO, "%s: entered index %d\n", __func__, index))
+	DBPRT(("%s: entered index %d\n", __func__, index))
 	errno = 0;
 	if (index < 0 || index >= stream_num) {
 		errno = EINVAL;
@@ -3577,6 +3577,7 @@ __DIS_rpp_reset()
 void
 set_rpp_funcs(void (*log_fn)(char *))
 {
+	DBPRT(("Entering %s", __func__))
 	pfn_rpp_open = __rpp_open;
 	pfn_rpp_bind = __rpp_bind;
 	pfn_rpp_poll = __rpp_poll;
