@@ -1773,12 +1773,6 @@ assign_hosts(job  *pjob, char *given, int set_exec_vnode)
 	unsigned int	 port;
 	int		 rc = 0;
 
-	if (svr_totnodes == 0) {
-		get_all_db_nodes();
-		if (svr_totnodes == 0)
-			return (PBSE_NONODES);
-	}
-
 	if (given == NULL)
 		return (PBSE_IVALREQ);
 

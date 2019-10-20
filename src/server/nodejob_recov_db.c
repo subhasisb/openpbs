@@ -242,6 +242,7 @@ nodejob_db_to_attrlist(struct pbsnode *pnode, pbs_db_nodejob_info_t *db_obj)
 							attrs->attr_resc,
 							attrs->attr_value);
 		}
+		/* Add to job list whenever we encounter "ncpus" resource. */
 		if (strcmp(attrs->attr_resc, "ncpus") == 0 && db_obj->is_resv == PBS_NODEJOB_JOB) {
 			append_to_joblist(pnode, db_obj->job_id, atol(attrs->attr_value));
 		}

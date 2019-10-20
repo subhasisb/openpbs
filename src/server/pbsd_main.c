@@ -148,7 +148,6 @@ extern void shutdown_ack();
 extern int takeover_from_secondary(void);
 extern int  be_secondary(time_t sec);
 extern void set_srv_prov_attributes();
-extern int svr_migrate_data();
 extern void log_set_dberr(char *err_msg, char *db_err);
 extern int chk_save_file(char *filename);
 #ifdef NAS /* localmod 005 */
@@ -1669,12 +1668,6 @@ try_db_again:
 	pbs_python_ext_quick_start_interpreter();
 
 	if (server_init_type == RECOV_UPDATEDB) {
-		if (svr_migrate_data() != 0) {
-			stop_db();
-			log_err(-1, msg_daemonname, "Failed to update PBS datastore");
-			fprintf(stderr, "Failed to update PBS datastore\n");
-			return (3);
-		}
 		stop_db();
 		exit(0);
 	}

@@ -71,7 +71,6 @@ pbs_server_bin_LDADD = \
 pbs_server_bin_SOURCES = \
 	accounting.c \
 	array_func.c \
-	attr_recov.c \
 	attr_recov_db.c \
 	checkkey.c \
 	dis_read.c \
@@ -80,7 +79,6 @@ pbs_server_bin_SOURCES = \
 	hook_func.c \
 	issue_request.c \
 	job_func.c \
-	job_recov.c \
 	job_recov_db.c \
 	job_route.c \
 	license_client.c \
@@ -93,7 +91,6 @@ pbs_server_bin_SOURCES = \
 	pbsd_main.c \
 	process_request.c \
 	queue_func.c \
-	queue_recov.c \
 	queue_recov_db.c \
 	reply_send.c \
 	req_delete.c \
@@ -127,9 +124,7 @@ pbs_server_bin_SOURCES = \
 	svr_func.c \
 	svr_jobfunc.c \
 	svr_mail.c \
-	svr_migrate_data.c \
 	svr_movejob.c \
-	svr_recov.c \
 	svr_recov_db.c \
 	svr_resccost.c \
 	user_func.c \

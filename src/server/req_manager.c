@@ -3908,7 +3908,7 @@ struct batch_request *preq;
 	mgr_log_attr(msg_man_set, plist,
 		PBS_EVENTCLASS_NODE, preq->rq_ind.rq_manager.rq_objname, NULL);
 
-	setup_notification();	    /*set mechanism for notifying */
+	/*setup_notification();	    set mechanism for notifying */
 	/*other nodes of new member   */
 
 	if (save_nodes_db(1, NULL)) { /*if update fails now (odd)   */

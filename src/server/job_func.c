@@ -1787,11 +1787,15 @@ resv_purge(resc_resv *presv)
 	free_resvNodes(presv);
 	set_scheduler_flag(SCH_SCHEDULE_TERM, dflt_scheduler);
 
+	if (pbs_db_begin_trx(svr_db_conn, 0, 0) != 0)
+		return;
 	strcpy(dbresv.ri_resvid, presv->ri_qs.ri_resvID);
 	obj.pbs_db_obj_type = PBS_DB_RESV;
 	obj.pbs_db_un.pbs_db_resv = &dbresv;
-	if (pbs_db_delete_obj(svr_db_conn, &obj) == -1)
+	if (pbs_db_delete_obj(svr_db_conn, &obj) == -1) {
 		log_err(errno, __func__, msg_purgeResvDb);
+		(void) pbs_db_end_trx(svr_db_conn, PBS_DB_ROLLBACK);
+	}
 
 	/* delete entries from node job table */
 	obj.pbs_db_obj_type = PBS_DB_NODEJOB;
@@ -1800,7 +1804,9 @@ resv_purge(resc_resv *presv)
 	if (pbs_db_delete_obj(svr_db_conn, &obj) == -1) {
 		log_joberr(-1, __func__, msg_err_purgenodejob_db,
 			presv->ri_qs.ri_resvID);
+		(void) pbs_db_end_trx(svr_db_conn, PBS_DB_ROLLBACK);
 	}
+	(void) pbs_db_end_trx(svr_db_conn, PBS_DB_COMMIT);
 
 	/*Free resc_resv struct, any hanging substructs, any attached
 	 *work_task structs

@@ -36,10 +36,10 @@
  *
  */
 /**
- * @file	svr_migrate_data.c
+ * @file	svr_movejob.c
  *
  * @brief
- * 		svr_migrate_data.c - functions to move a job to another queue
+ * 		svr_movejob.c - functions to move a job to another queue
  *
  * Included functions are:
  * 	svr_movejob()
