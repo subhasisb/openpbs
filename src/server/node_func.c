@@ -188,6 +188,9 @@ update_node_cache(pbs_node *pnode)
 		}
 	}
 
+	if (find_tree(node_tree, pnode->nd_name))
+		return 0;
+
 	if (tree_add_del(node_tree, pnode->nd_name, pnode, TREE_OP_ADD) != 0) {
 		DBPRT(("Addition to node tree has failed"))
 		free_pnode(pnode);
@@ -211,6 +214,8 @@ update_node_cache(pbs_node *pnode)
 	pnode->nd_index = svr_totnodes;
 	pnode->nd_arr_index = svr_totnodes; /* this is only in mem, not from db */
 	pbsndlist[svr_totnodes++] = pnode;
+
+	create_svrmom_struct(pnode);
 
 	return 0;
 }
@@ -240,15 +245,12 @@ refresh_node(char *nodename, char * nd_savetm, int lock)
 	if ((pslash = strchr(nodename, (int)'/')) != NULL)
 		*pslash = '\0';
 
-	if (node_tree)
-		pnode = find_tree(node_tree, nodename);
-
-	if (pnode == NULL) {
+	if (!node_tree || (pnode = find_tree(node_tree, nodename)) == NULL) {
 		if ((pnode = node_recov_db(nodename, pnode, lock)) != NULL) {
 			if (update_node_cache(pnode) != 0)
 				return NULL;
 		}
-	} else if (!nd_savetm || strcmp(nd_savetm, pnode->nd_savetm) != 0) {
+	} else if (!nd_savetm || strcmp(nd_savetm, pnode->nd_savetm)) {
 		/* if node had changed in db */
 		pnode = node_recov_db(nodename, pnode, lock);
 	}

@@ -601,6 +601,8 @@ get_all_db_nodes() {
 		if ((pnode = refresh_node(dbnode.nd_name, dbnode.nd_savetm, NO_LOCK)) == NULL) {
 			sprintf(log_buffer, "Failed to refresh node %s", dbnode.nd_name);
 			log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_NOTICE, msg_daemonname, log_buffer);
+		} else if (strncmp(pnode->nd_savetm, nodes_from_time, DB_TIMESTAMP_LEN) > 0) {
+			strcpy(nodes_from_time, pnode->nd_savetm);
 		}
 		pbs_db_reset_obj(&dbobj);
 	}
@@ -608,11 +610,6 @@ get_all_db_nodes() {
 	pbs_db_cursor_close(conn, cur_state);
 	if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0)
 		return (1);
-
-	if (pnode)
-		if (strncmp(pnode->nd_savetm, nodes_from_time, DB_TIMESTAMP_LEN) > 0)
-			strcpy(nodes_from_time, pnode->nd_savetm);
-		
 
 	return 0;
 }
