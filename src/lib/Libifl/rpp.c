@@ -1546,12 +1546,11 @@ hostbyaddr(const char *addr, int len, int type)
  * @retval      NULL                    error
  *
  */
-static
-struct	hostent		*
+struct	hostent*
 __rpp_get_cname(struct sockaddr_in *addr)
 {
 	struct	hostent		*hp;
-	char			*hname;
+	char			*hname = NULL;
 
 	if ((hp = hostbyaddr((void *)&addr->sin_addr,
 		sizeof(struct in_addr),
@@ -1564,8 +1563,7 @@ __rpp_get_cname(struct sockaddr_in *addr)
 		return NULL;
 
 	if ((hp = hostbyname(hname)) == NULL) {
-		DBPRT((DBTO,
-			"%s: canonical name %s not found, h_errno=%d errno=%d\n",
+		DBPRT((DBTO, "%s: canonical name %s not found, h_errno=%d errno=%d\n",
 			__func__, hname, h_errno, errno))
 	}
 	free(hname);
@@ -2837,7 +2835,7 @@ __rpp_close(int index)
 {
 	struct	stream		*sp;
 
-	DBPRT(("%s: entered index %d\n", __func__, index))
+	DBPRT((DBTO, "%s: entered index %d\n", __func__, index))
 	errno = 0;
 	if (index < 0 || index >= stream_num) {
 		errno = EINVAL;
@@ -3577,7 +3575,6 @@ __DIS_rpp_reset()
 void
 set_rpp_funcs(void (*log_fn)(char *))
 {
-	DBPRT(("Entering %s", __func__))
 	pfn_rpp_open = __rpp_open;
 	pfn_rpp_bind = __rpp_bind;
 	pfn_rpp_poll = __rpp_poll;

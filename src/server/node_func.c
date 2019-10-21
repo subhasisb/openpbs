@@ -72,7 +72,6 @@
  *	init_prop()				-	allocate and initialize a prop struct
  *	create_subnode()		-	create a subnode entry and link to parent node
  *	setup_nodes_fs()		-	Read the file, "nodes", containing the list of properties for each node.
- *	setup_nodes()			-	Read the, "nodes" information from database
  *								containing the list of properties for each node.
  *	delete_a_subnode()		-	mark a (last) single subnode entry as deleted
  *	mod_node_ncpus()		-	when resources_available.ncpus changes, need to update the number of subnodes,
@@ -1345,144 +1344,6 @@ struct pbssubn *create_subnode(struct pbsnode *pnode, struct pbssubn *lstsn)
 	return (psubn);
 }
 
-/**
- * @brief
- *		Read the, "nodes" information from database
- *		containing the list of properties for each node.
- *		The list of nodes is formed with pbsndlist as the head.
- * @see
- * 		pbsd_init
- *
- * @return	error code
- * @retval	-1	- Failure
- * @retval	0	- Success
- *
- */
-int
-setup_nodes()
-{
-	int	  err;
-	int       perm = ATR_DFLAG_ACCESS | ATR_PERM_ALLOW_INDIRECT;
-	pbs_db_obj_info_t   obj;
-	pbs_db_node_info_t dbnode;
-	pbs_db_mominfo_time_t mom_tm;
-	void *state;
-	int rc;
-	time_t	  mom_modtime = 0;
-	struct pbsnode *np;
-	pbs_list_head atrlist;
-	pbs_db_conn_t *conn = (pbs_db_conn_t *) svr_db_conn;
-	svrattrl *pal;
-	int bad;
-	int i, num;
-
-	DBPRT(("%s: entered\n", __func__))
-	CLEAR_HEAD(atrlist);
-
-	tfree2(&streams);
-	tfree2(&ipaddrs);
-
-	svr_totnodes = 0;
-
-	/* start a transaction */
-	if (pbs_db_begin_trx(conn, 0, 0) != 0)
-		return (-1);
-
-	/* Load  the mominfo_time from the db */
-	obj.pbs_db_obj_type = PBS_DB_MOMINFO_TIME;
-	obj.pbs_db_un.pbs_db_mominfo_tm = &mom_tm;
-	if (pbs_db_load_obj(svr_db_conn, &obj, 0) == -1) {
-		sprintf(log_buffer, "Could not load momtime info");
-		goto db_err;
-	}
-	mominfo_time.mit_time = mom_tm.mit_time;
-	mominfo_time.mit_gen = mom_tm.mit_gen;
-
-	obj.pbs_db_obj_type = PBS_DB_NODE;
-	obj.pbs_db_un.pbs_db_node = &dbnode;
-	dbnode.nd_savetm[0] = '\0';
-	dbnode.attr_list.attributes = NULL;
-	
-	state = pbs_db_cursor_init(conn, &obj, NULL);
-	if (state == NULL) {
-		sprintf(log_buffer, "%s", (char *) conn->conn_db_err);
-		goto db_err;
-	}
-
-	while ((rc = pbs_db_cursor_next(conn, state, &obj)) == 0) {
-		/* recover node without triggering action routines */
-		if (node_recov_db_raw(&dbnode, &atrlist) != 0) {
-			sprintf(log_buffer,
-				"Could not load node info for %s",
-				dbnode.nd_name);
-			pbs_db_cursor_close(conn, state);
-			goto db_err;
-		}
-		mom_modtime = dbnode.mom_modtime;
-
-		if (dbnode.nd_deleted) {
-			pbs_db_reset_obj(&obj);
-			continue;
-		}
-
-		/* now create node and subnodes */
-		pal = GET_NEXT(atrlist);
-		err = create_pbs_node2(dbnode.nd_name, pal, perm, &bad, &np, FALSE, TRUE);	/* allow unknown resources */
-		free_attrlist(&atrlist);
-		if (err) {
-			if (err == PBSE_NODEEXIST) {
-				sprintf(log_buffer, "duplicate node \"%s\"",
-					dbnode.nd_name);
-			} else {
-				sprintf(log_buffer,
-					"could not create node \"%s\", "
-					"error = %d",
-					dbnode.nd_name, err);
-			}
-			log_err(-1, "setup_nodes", log_buffer);
-			continue; /* continue recovering other nodes */
-		}
-		if (mom_modtime) {
-			/* a vnode pointer will be returned */
-			if (np)
-				np->nd_moms[0]->mi_modtime = mom_modtime;
-		}
-		if (np) {
-			if ((np->nd_attr[(int)ND_ATR_vnode_pool].at_flags & ATR_VFLAG_SET) &&
-			    (np->nd_attr[(int)ND_ATR_vnode_pool].at_val.at_long > 0)) {
-				mominfo_t *pmom = np->nd_moms[0];
-				if (pmom &&
-				    (np == ((mom_svrinfo_t *)(pmom->mi_data))->msr_children[0])) {
-					/* natural vnode being recovered, add to pool */
-					(void)add_mom_to_pool(np->nd_moms[0]);
-				}
-			}
-		}
-		pbs_db_reset_obj(&obj);
-	}
-
-	pbs_db_cursor_close(conn, state);
-	if (pbs_db_end_trx(conn, PBS_DB_COMMIT) !=0)
-		goto db_err;
-
-	/* clear MODIFY bit on attributes */
-	for (i=0; i<svr_totnodes; i++) {
-		np = pbsndlist[i];
-		for (num=0; num<ND_ATR_LAST; num++) {
-			np->nd_attr[num].at_flags &= ~ATR_VFLAG_MODIFY;
-		}
-		np->nd_modified = 0;
-		/* clear nd_modified on node since create_pbsnode set it*/
-	}
-	svr_chngNodesfile = 0;	/* clear in case set while creating node */
-
-	return (0);
-db_err:
-	log_err(-1, "setup_nodes", log_buffer);
-	(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
-	return (-1);
-}
-
 
 /**
  * @brief
@@ -1674,7 +1535,7 @@ indirect_target_check(struct work_task *ptask)
 	struct pbsnode	*pnode;
 	resource	*presc;
 
-	get_all_db_nodes();
+	get_all_db_nodes(NULL);
 	for (i=0; i<svr_totnodes; i++) {
 		pnode = pbsndlist[i];
 		if (pnode->nd_state & INUSE_DELETED ||
@@ -2042,7 +1903,7 @@ mark_which_queues_have_nodes()
 	}
 
 	/* now (re)set flag for those queues that do have nodes */
-	get_all_db_nodes();
+	get_all_db_nodes(NULL);
 	for (i=0; i<svr_totnodes; i++) {
 		if (pbsndlist[i]->nd_pque) {
 			pbsndlist[i]->nd_pque->qu_attr[(int)QE_ATR_HasNodes].at_val.at_long = 1;

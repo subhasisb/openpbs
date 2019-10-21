@@ -2845,7 +2845,7 @@ deallocate_job(mominfo_t *pmom, job *pjob)
 	if ((jobid == NULL) || (*jobid == '\0'))
 		return;
 
-	get_all_db_nodes();
+	get_all_db_nodes(NULL);
 	for (i = 0; i < svr_totnodes; i++) {
 		pbsnode *pnode;
 
@@ -4202,7 +4202,8 @@ is_request(int stream, int version)
 		DBPRT(("%s: IS_HELLOSVR port %lu\n", __func__, port))
 
 		if ((pmom = tfind2(ipaddr, port, &ipaddrs)) == NULL)
-			goto badcon;
+			if ((pmom = recover_mom(ipaddr, port)) == NULL)
+				goto badcon;
 
 		log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_NODE,
 			LOG_NOTICE, pmom->mi_host, hellosvrmsg);
@@ -7344,7 +7345,7 @@ free_resvNodes(resc_resv *presv)
 	pbsnode_list_t *pnl_next;
 
 	DBPRT(("%s: entered\n", __func__))
-	get_all_db_nodes();
+	get_all_db_nodes(NULL);
 	for (i=0; i<svr_totnodes; i++) {
 		pnode = pbsndlist[i];
 

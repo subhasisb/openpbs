@@ -159,6 +159,7 @@ typedef unsigned __int64 uint64_t;
 #define STMT_UPDATE_NODEJOBATTRS "update_nodejob_attrs"
 #define STMT_FIND_NODES_ORDBY_INDEX_FILTERBY_SAVETM "find_nodes_ordby_index_filterby_savetm"
 #define STMT_UPDATE_NODE_AS_DELETED "update_nd_as_deleted"
+#define STMT_FIND_NODES_ORDBY_INDEX_FILTERBY_HOSTNAME "find_nodes_ordby_index_filterby_hostname"
 
 /* node job statements */
 #define STMT_SELECT_NODEJOB "select_nodejob"

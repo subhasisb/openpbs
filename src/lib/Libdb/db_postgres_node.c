@@ -205,6 +205,22 @@ pg_db_prepare_node_sqls(pbs_db_conn_t *conn)
 	if (pg_prepare_stmt(conn, STMT_FIND_NODES_ORDBY_INDEX_FILTERBY_SAVETM, conn->conn_sql, 1) != 0)
 		return -1;
 
+	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select "
+		"nd_name, "
+		"mom_modtime, "
+		"nd_hostname, "
+		"nd_state, "
+		"nd_ntype, "
+		"nd_pque, "
+		"to_char(nd_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as nd_savetm, "
+		"to_char(nd_creattm, 'YYYY-MM-DD HH24:MI:SS.US') as nd_creattm, "
+		"hstore_to_array(attributes) as attributes "
+		"from pbs.node "
+		"where nd_hostname = $1 "
+		"order by nd_index, nd_creattm");
+	if (pg_prepare_stmt(conn, STMT_FIND_NODES_ORDBY_INDEX_FILTERBY_HOSTNAME, conn->conn_sql, 1) != 0)
+		return -1;
+
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "delete from pbs.node where nd_name = $1");
 	if (pg_prepare_stmt(conn, STMT_DELETE_NODE, conn->conn_sql, 1) != 0)
 		return -1;
@@ -426,14 +442,14 @@ pg_db_find_node(pbs_db_conn_t *conn, void *st, pbs_db_obj_info_t *obj,
 	if (!state)
 		return -1;
 
-	if (opts != NULL && opts->timestamp) {
-		SET_PARAM_STR(conn, opts->timestamp, 0);
-		params = 1;
-		strcpy(conn->conn_sql, STMT_FIND_NODES_ORDBY_INDEX_FILTERBY_SAVETM);
+	if (opts != NULL && opts->flags == 1 && opts->hostname) {
+		SET_PARAM_STR(conn, opts->hostname, 0);
+		strcpy(conn->conn_sql, STMT_FIND_NODES_ORDBY_INDEX_FILTERBY_HOSTNAME);
 	} else {
-		strcpy(conn->conn_sql, STMT_FIND_NODES_ORDBY_INDEX);
-		params = 0;
+		SET_PARAM_STR(conn, opts->timestamp, 0);
+		strcpy(conn->conn_sql, STMT_FIND_NODES_ORDBY_INDEX_FILTERBY_SAVETM);
 	}
+	params = 1;
 
 	if ((rc = pg_db_query(conn, conn->conn_sql, params, 0, &res)) != 0)
 		return rc;

@@ -1431,7 +1431,7 @@ mgr_queue_delete(struct batch_request *preq)
 		}
 
 		/* are there nodes associated with the queue */
-		get_all_db_nodes();
+		get_all_db_nodes(NULL);
 		for (i=0; i<svr_totnodes; i++) {
 			if (pbsndlist[i]->nd_pque == pque) {
 				rc = PBSE_OBJBUSY;
@@ -2358,7 +2358,7 @@ mgr_node_set(struct batch_request *preq)
 		 * In this instance the set node req is to apply to all
 		 * nodes at the local ('\0')  or specified ('@') server
 		 */
-		get_all_db_nodes();
+		get_all_db_nodes(NULL);
 		if ((pbsndlist != NULL) && svr_totnodes) {
 			nodename = all_nodes;
 			pnode = GET_NODEBYINDX_LOCKED(pbsndlist, 0);
@@ -2683,7 +2683,7 @@ mgr_node_unset(struct batch_request *preq)
 
 		/*In this instance the set node req is to apply to all */
 		/*nodes at the local ('\0')  or specified ('@') server */
-		get_all_db_nodes();
+		get_all_db_nodes(NULL);
 		if ((pbsndlist != NULL) && svr_totnodes) {
 			nodename = all_nodes;
 			pnode = GET_NODEBYINDX_LOCKED(pbsndlist, 0);
@@ -2926,6 +2926,25 @@ mgr_node_unset(struct batch_request *preq)
 	free(warn_nodes);
 }
 
+void
+get_firstname(char *hostname, char *realfirsthost)
+{
+	struct sockaddr_in sa4;
+	struct sockaddr_in6 sa6;
+	char		*pc;
+
+	strncpy(realfirsthost, hostname, sizeof(realfirsthost) - 1);
+	realfirsthost[sizeof(realfirsthost) - 1] = '\0';
+	if ((inet_pton(AF_INET, realfirsthost, &(sa4.sin_addr)) != 1) &&
+			(inet_pton(AF_INET6, realfirsthost, &(sa6.sin6_addr)) != 1))
+	{
+		/* Not an IPv4 or IPv6 address, truncate it. */
+		pc = strchr(realfirsthost, '.');
+		if (pc)
+			*pc = '\0';
+	}
+}
+
 /**
  * @brief
  *		create pbs node structure, i.e. add a node
@@ -2950,7 +2969,6 @@ create_pbs_node2(char *objname, svrattrl *plist, int perms, int *bad, struct pbs
 {
 	struct pbsnode	*pnode;
 	int		ntype;		/* node type, always PBS */
-	char		*pc;
 	char		*pname;		/* node name w/o any :ts       */
 	int		 rc;
 	attribute	*pattr;
@@ -3090,24 +3108,7 @@ create_pbs_node2(char *objname, svrattrl *plist, int perms, int *bad, struct pbs
 		/* add the entry */
 		presc = add_resource_entry(pattr, prdef);
 		if (presc) {
-			struct sockaddr_in sa4;
-			struct sockaddr_in6 sa6;
-
-			strncpy(realfirsthost, pnode->nd_attr[(int)ND_ATR_Mom].at_val.at_arst->as_string[0], (sizeof(realfirsthost) - 1));
-			realfirsthost[PBS_MAXHOSTNAME] = '\0';
-#ifdef WIN32
-			if ((InetPton(AF_INET, realfirsthost, &(sa4.sin_addr)) != 1) &&
-					(InetPton(AF_INET6, realfirsthost, &(sa6.sin6_addr)) != 1))
-#else
-			if ((inet_pton(AF_INET, realfirsthost, &(sa4.sin_addr)) != 1) &&
-					(inet_pton(AF_INET6, realfirsthost, &(sa6.sin6_addr)) != 1))
-#endif
-			{
-				/* Not an IPv4 or IPv6 address, truncate it. */
-				pc = strchr(realfirsthost, '.');
-				if (pc)
-					*pc = '\0';
-			}
+			get_firstname(pnode->nd_attr[(int)ND_ATR_Mom].at_val.at_arst->as_string[0], realfirsthost);
 			rc = prdef->rs_decode(&presc->rs_value, "", "host", realfirsthost);
 			presc->rs_value.at_flags |= ATR_VFLAG_DEFLT; /* so not written to nodes file */
 		} else {
@@ -3296,7 +3297,7 @@ struct batch_request *preq;
 
 		/*In this instance the delete node req is to apply to all */
 		/*nodes at the local ('\0')  or specified ('@') server */
-		get_all_db_nodes();
+		get_all_db_nodes(NULL);
 		if ((pbsndlist != NULL) && svr_totnodes) {
 			nodename = all_nodes;
 			pnode = *pbsndlist;
@@ -4087,7 +4088,7 @@ mgr_resource_delete(struct batch_request *preq)
 	}
 
 	/* Is the resource set on nodes? If so unset */
-	get_all_db_nodes();
+	get_all_db_nodes(NULL);
 	for (i=0; i < svr_totnodes; i++) {
 		updatedb = 0;
 		for (j=0; j < ND_ATR_LAST; j++) {
@@ -4316,7 +4317,7 @@ mgr_resource_set(struct batch_request *preq)
 	}
 
 	/* Reject if resource is on a node and the type is being modified */
-	get_all_db_nodes();
+	get_all_db_nodes(NULL);
 	for (i=0; i < svr_totnodes; i++) {
 		if (pbsndlist[i]->nd_state & INUSE_DELETED)
 			continue;
@@ -4527,7 +4528,7 @@ mgr_resource_unset(struct batch_request *preq)
 	}
 
 	/* Reject if resource is on a node */
-	get_all_db_nodes();
+	get_all_db_nodes(NULL);
 	for (i=0; i < svr_totnodes; i++) {
 		if (pbsndlist[i]->nd_state & INUSE_DELETED)
 			continue;

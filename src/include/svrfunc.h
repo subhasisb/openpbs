@@ -92,7 +92,6 @@ extern void  svr_shutdown(int);
 extern int   svr_get_privilege(char *, char *);
 extern void  write_node_state(void);
 extern int   write_single_node_state(struct pbsnode *);
-extern int   setup_nodes(void);
 extern int   setup_resc(int);
 extern void  mark_node_down(char *, char *);
 extern void  mark_node_offline_by_mom(char *, char *);

@@ -410,6 +410,25 @@ create_svrmom_entry(char *hostname, unsigned int port, unsigned long *pul)
 	return pmom;
 }
 
+mominfo_t *
+recover_mom(pbs_net_t hostaddr, unsigned int port)
+{
+	struct sockaddr_in	addr;
+	struct	hostent		*hp;
+	char 		 realfirsthost[PBS_MAXHOSTNAME+1];
+
+	DBPRT(("Entering %s", __func__))
+
+	addr.sin_addr.s_addr = htonl(hostaddr);
+	addr.sin_family = PF_UNSPEC;
+	if ((hp = rpp_get_cname(&addr)) == NULL || !hp->h_name)
+		return NULL;
+	get_firstname(hp->h_name, realfirsthost);
+	get_all_db_nodes(realfirsthost);
+
+	return tfind2((unsigned long)hostaddr, port, &ipaddrs);
+}
+
 /**
  * @brief
  * 		make_host_addresses_list - return a null terminated list of all of the

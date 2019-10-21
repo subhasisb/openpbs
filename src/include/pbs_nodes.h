@@ -47,6 +47,7 @@ extern "C" {
  *	Header file used for the node tracking routines.
  */
 
+#include <netinet/in.h>
 #include "resv_node.h"
 #include "resource.h"
 #include "job.h"
@@ -460,13 +461,15 @@ extern  struct	pbssubn  *find_subnodebyname(char *);
 extern	struct	pbsnode  *find_nodebyname(char *, int);
 extern	struct	pbsnode  *refresh_node(char *, char *, int);
 extern	int update_node_cache(pbs_node *, int);
-extern	int get_all_db_nodes();
+extern	int update_node_cache(pbs_node *);
+extern	int get_all_db_nodes(char *);
 extern	struct	pbsnode  *find_nodebyaddr(pbs_net_t);
 extern	void	free_prop_list(struct prop*);
 extern	void	recompute_ntype_cnts(void);
 extern	int	process_host_name_part(char*, svrattrl*, char**, int*);
 extern  int     create_pbs_node(char *, svrattrl *, int, int *, struct pbsnode **, int);
 extern  int     create_pbs_node2(char *, svrattrl *, int, int *, struct pbsnode **, int, int);
+extern void get_firstname(char *, char *);
 extern  int     mgr_set_node_attr(struct pbsnode *, attribute_def *, int, svrattrl *, int, int *, void *, int);
 extern	int	node_queue_action(attribute *, void *, int);
 extern	int	node_pcpu_action(attribute *, void *, int);
@@ -487,6 +490,7 @@ extern  void	   delete_mom_entry(mominfo_t *);
 extern  mominfo_t *create_svrmom_entry(char *, unsigned int, unsigned long *);
 extern  void	delete_svrmom_entry(mominfo_t *);
 extern  int	create_svrmom_struct(pbs_node *pnode);
+extern	mominfo_t *	recover_mom(pbs_net_t hostaddr, unsigned int port);
 extern  int	legal_vnode_char(char, int);
 extern 	char	*parse_node_token(char *, int, int *, char *);
 extern  int	cross_link_mom_vnode(struct pbsnode *, mominfo_t *);

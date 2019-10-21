@@ -877,12 +877,9 @@ pbsd_init(int type)
 	if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0)
 		return (-1);
 
-	/* Open and read in node list if one exists */
-	if ((rc = setup_nodes()) == -1) {
-		/* log_buffer set in setup_nodes */
-		log_err(-1, __func__, log_buffer);
-		return (-1);
-	}
+	tfree2(&streams);
+	tfree2(&ipaddrs);
+
 	mark_which_queues_have_nodes();
 	(void) license_sanity_check();
 
