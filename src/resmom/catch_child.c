@@ -1905,6 +1905,10 @@ end_loop:
 		exiting_tasks = 0;	/* went through all jobs */
 }
 
+int internal_connect_mom(int channel, char *server, int port, char *extend_data)
+{
+	return rpp_open(server, port);
+}
 /**
  * @brief
  * 	Build and utilize the connection array to get the connect handle and 
@@ -1923,15 +1927,20 @@ end_loop:
 int
 get_server_stream(char *svr, unsigned int port)
 {
-	int		stream;
-	int conn_slot;
-	int *jobid = NULL;
-	if ((conn_slot = initialise_connection_table(NCONNECTS)) == -1) {
-		log_err(-1, __func__, "connection table initialization failed");
-		return -1;
+	int	stream = -1;
+	if (pbs_conf.pbs_max_servers > 1) {		
+		int conn_slot;
+		int *jobid = NULL;
+		if ((conn_slot = initialise_connection_table(NCONNECTS)) == -1) {
+			log_err(-1, __func__, "connection table initialization failed");
+			return -1;
+		}
+		set_new_shard_context(conn_slot);
+		internal_connect = internal_connect_mom;
+		stream = get_svr_shard_connection(conn_slot, -1 , jobid);	
 	}
-	set_new_shard_context(conn_slot);
-	stream = get_svr_shard_connection(conn_slot, PBS_BATCH_MomRestart, jobid);
+	else 
+		stream = rpp_open(svr, port);	
 	return stream;
 }
 
@@ -1956,12 +1965,8 @@ get_server_stream(char *svr, unsigned int port)
 static void
 send_hellosvr_rpp(char *svr, unsigned int port)
 {
-	int		stream;
-
-	if (pbs_conf.pbs_max_servers > 1) 
-		stream = get_server_stream(svr, port);
-	else 
-		stream = rpp_open(svr, port);	
+	int	stream;
+	stream = get_server_stream(svr, port);
 
 	if (stream < 0) {
 		(void)sprintf(log_buffer, "rpp_open(%s, %d) failed", svr, port);

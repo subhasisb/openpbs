@@ -730,6 +730,9 @@ extern int pbs_delresv(int, char *, char *);
 extern int pbs_terminate(int, int, char *);
 
 extern char *pbs_modify_resv(int, char*, struct attropl *, char *);
+
+extern int (*internal_connect)(int, char *, int , char *);
+
 #endif /* _USRDLL */
 #ifdef	__cplusplus
 }
