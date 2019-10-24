@@ -70,7 +70,6 @@
 #include "libsec.h"
 #include "pbs_ecl.h"
 #include "pbs_internal.h"
-#include "rpp.h"
 
 
 extern struct connect_handle connection[NCONNECTS];
@@ -78,6 +77,8 @@ extern struct connect_handle connection[NCONNECTS];
 #define ERR_BUF_SIZE 4096
 
 #define DBG_TRACE_SHARD(x) { if (getenv("DBG_TRACE_SHARD")) { fprintf x;}}
+
+int (*internal_connect)(int, char *, int , char *) = NULL;
 
 /**
  * @brief
@@ -638,12 +639,22 @@ set_new_shard_context(int channel)
 	DBG_TRACE_SHARD((stderr, "*** Set new shard ***\n"))
 }
 
+int internal_connect_cli(int channel, char *server, int port, char *extend_data)
+{
+	return internal_tcp_connect(channel, server, port, NULL);
+}
+
+
+
+
 int 
 get_svr_shard_connection(int channel, int req_type, void *shard_hint)
 {
 	int srv_index;
 	int sd;
 	int first_index = -1;
+	if (internal_connect == NULL)
+		internal_connect = internal_connect_cli;
 
 	if (pbs_conf.pbs_max_servers > 1) {
 		if (connection[channel].shard_context == -1) {
@@ -686,14 +697,9 @@ tryagain:
 
 		} else if (connection[channel].ch_shards[srv_index]->state == SHARD_CONN_STATE_DOWN) {
 			/* connect and authenticate */
-			
-			if (req_type != PBS_BATCH_MomRestart)
-				sd = internal_tcp_connect(channel, pbs_conf.psi[srv_index]->name, pbs_conf.psi[srv_index]->port, NULL);
-			else
-			{
-				sd = rpp_open(pbs_conf.psi[srv_index]->name, pbs_conf.psi[srv_index]->port);
-				connection[channel].ch_socket = sd; /* use the same socket for replies etc. */
-			}
+						
+			sd = internal_connect(channel, pbs_conf.psi[srv_index]->name, pbs_conf.psi[srv_index]->port, NULL);
+			connection[channel].ch_socket = sd; /* use the same socket for replies etc. */
 			
 			if (sd == -1) {
 				DBG_TRACE_SHARD((stderr, "Connect returned -1\n"))
