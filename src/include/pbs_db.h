@@ -312,17 +312,18 @@ typedef struct pbs_db_jobscr_info pbs_db_jobscr_info_t;
  */
 struct pbs_db_query_options {
 	int	flags;
+	char *queue;
 	char *timestamp;
 };
 typedef struct pbs_db_query_options pbs_db_query_options_t;
 
-#define PBS_DB_JOB 			0
-#define PBS_DB_RESV			1
-#define PBS_DB_SVR			2
-#define PBS_DB_NODE			3
-#define PBS_DB_QUEUE			4
-#define PBS_DB_JOBSCR			5
-#define PBS_DB_SCHED			6
+#define PBS_DB_SVR			0
+#define PBS_DB_SCHED		1
+#define PBS_DB_QUEUE		2
+#define PBS_DB_JOB 			3
+#define PBS_DB_JOBSCR		4
+#define PBS_DB_NODE			5
+#define PBS_DB_RESV			6
 #define PBS_DB_MOMINFO_TIME		7
 #define PBS_DB_NUM_TYPES		8
 
@@ -371,6 +372,7 @@ struct pbs_db_obj_info {
 	} pbs_db_un;
 };
 typedef struct pbs_db_obj_info pbs_db_obj_info_t;
+typedef int (*query_cb_t) (pbs_db_obj_info_t *, int *);
 
 #define PBS_DB_CNT_TIMEOUT_NORMAL		30
 #define PBS_DB_CNT_TIMEOUT_INFINITE		0
@@ -531,6 +533,9 @@ int pbs_db_begin_trx(pbs_db_conn_t *conn, int isolation_level, int async);
 int pbs_db_end_trx(pbs_db_conn_t *conn, int commit);
 
 
+void*
+pbs_db_search(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, pbs_db_query_options_t *opts, query_cb_t query_cb);
+
 /**
  * @brief
  *	Initialize a multirow database cursor
@@ -548,8 +553,7 @@ int pbs_db_end_trx(pbs_db_conn_t *conn, int commit);
  *
  */
 void *
-pbs_db_cursor_init(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj,
-	pbs_db_query_options_t *opts);
+pbs_db_cursor_init(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, pbs_db_query_options_t *opts, query_cb_t query_cb);
 
 /**
  * @brief
@@ -586,7 +590,7 @@ pbs_db_cursor_next(pbs_db_conn_t *conn, void *state,
  * @retval      -1  - Failure
  *
  */
-void pbs_db_cursor_close(pbs_db_conn_t *conn, void *state);
+int pbs_db_cursor_close(pbs_db_conn_t *conn, void *state);
 
 /**
  * @brief
@@ -990,7 +994,7 @@ char* pbs_db_get_svr_id(pbs_db_conn_t *conn, char *hostname);
  * @retval	 1 - Success but no rows deleted
  *
  */
-int pg_db_delete_svrattr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj);
+int pbs_db_delete_svrattr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj);
 
 /**
  * @brief

@@ -1518,6 +1518,30 @@ main(int argc, char **argv)
 	prctl(PR_SET_FPEMU, PR_FPEMU_NOPRINT, 0, 0, 0);
 #endif
 
+	/* go into the background and become own sess/process group */
+/* need to fork before we do database connect due to pthreads */
+#ifndef DEBUG
+
+#ifndef WIN32
+	if (stalone == 0 && already_forked == 0) {
+		if ((sid = go_to_background()) == -1) {
+			stop_db();
+			return (2);
+		}
+	}
+#endif	/* end the ifndef WIN32 */
+	pbs_close_stdfiles();
+#else	/* DEBUG is defined */
+#ifndef WIN32
+	sid = getpid();
+	(void)setvbuf(stdout, NULL, _IOLBF, 0);
+	(void)setvbuf(stderr, NULL, _IOLBF, 0);
+#else	/* WIN32 */
+	(void)setvbuf(stdout, NULL, _IONBF, 0);
+	(void)setvbuf(stderr, NULL, _IONBF, 0);
+#endif
+#endif	/* end the ifndef DEBUG */
+
 try_db_again:
 	/* database connection code start */
 	/* continue forever till a successful database connection is made */
@@ -1651,13 +1675,6 @@ try_db_again:
 	svr_db_conn = conn; /* use this connection */
 	conn = NULL; /* ensure conn does not point to svr_db_conn any more */
 
-	if (pbs_db_prepare_sqls(svr_db_conn) != 0) {
-		/* this means there is programmatic/unrecoverable error, so we quit */
-		log_set_dberr("Failed to initialize PBS dataservice", svr_db_conn->conn_db_err);
-		log_err(-1, msg_daemonname, log_buffer);
-		stop_db();
-		return -1;
-	}
 	/* database connection code end */
 
 	/* Curses! pbsd_init() calls validate_job_formula() (in svr_recov()) */
@@ -1714,30 +1731,6 @@ try_db_again:
 		stop_db();
 		return (4);
 	}
-
-	/* go into the background and become own sess/process group */
-
-#ifndef DEBUG
-
-#ifndef WIN32
-	if (stalone == 0 && already_forked == 0) {
-		if ((sid = go_to_background()) == -1) {
-			stop_db();
-			return (2);
-		}
-	}
-#endif	/* end the ifndef WIN32 */
-	pbs_close_stdfiles();
-#else	/* DEBUG is defined */
-#ifndef WIN32
-	sid = getpid();
-	(void)setvbuf(stdout, NULL, _IOLBF, 0);
-	(void)setvbuf(stderr, NULL, _IOLBF, 0);
-#else	/* WIN32 */
-	(void)setvbuf(stdout, NULL, _IONBF, 0);
-	(void)setvbuf(stderr, NULL, _IONBF, 0);
-#endif
-#endif	/* end the ifndef DEBUG */
 
 	/* Protect from being killed by kernel */
 	daemon_protect(0, PBS_DAEMON_PROTECT_ON);
@@ -2904,7 +2897,7 @@ start_db()
  *		Try to start and connect to the database asynchronously. Database is
  *		started if "have_db_control" is 1.
  *
- *		When the database is up, it repeatedly calls pbs_db_connect_async to
+ *		When the database is up, it repeatedly calls pbs_db_connect to
  *		connect to the database.
  *
  *		Caller calls try_connect_database in a loop till a connection
@@ -2940,7 +2933,7 @@ try_connect_database(pbs_db_conn_t *conn)
 	}
 
 	if (conn->conn_have_db_control == 0) {
-		failcode = pbs_db_connect_async(conn); /* just try to connect */
+		failcode = pbs_db_connect(conn); /* just try to connect */
 	} else {
 		if (conn->conn_db_state == PBS_DB_DOWN) {
 			conn->conn_db_state = start_db();
@@ -2956,13 +2949,13 @@ try_connect_database(pbs_db_conn_t *conn)
 
 			i = MAX_DB_RETRIES;
 			/*
-			 * call pbs_db_connect_async a few times in a tight loop
+			 * call pbs_db_connect a few times in a tight loop
 			 * since an outer loop calling try_connect_database might have too
 			 * much of delays between its calls
 			 */
 			while (i > 0 && conn->conn_state != PBS_DB_CONNECT_STATE_CONNECTED &&
 				conn->conn_state != PBS_DB_CONNECT_STATE_FAILED) {
-				failcode = pbs_db_connect_async(conn);
+				failcode = pbs_db_connect(conn);
 				i--;
 			}
 		}
@@ -2996,6 +2989,8 @@ stop_db()
 	pbs_db_disconnect(svr_db_conn);
 	pbs_db_destroy_connection(svr_db_conn);
 	svr_db_conn = NULL;
+
+	return;
 
 	/* check status of db, shutdown if up */
 	db_oper_failed_times = 0;

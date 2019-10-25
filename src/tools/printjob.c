@@ -73,11 +73,7 @@
 #include "job.h"
 #ifdef PRINTJOBSVR
 #include "pbs_db.h"
-#include "db_postgres.h"
-pbs_db_conn_t *conn = NULL;
-#ifdef NAS /* localmod 005 */
-extern int pg_db_prepare_job_sqls(pbs_db_conn_t *conn);
-#endif /* localmod 005 */
+#include "db_impl.h"
 #endif
 
 #define BUF_SIZE 512
@@ -319,6 +315,7 @@ print_db_job(char *id, int no_attributes)
 	pbs_db_attr_info_t *attrs;
 	char *db_errmsg = NULL;
 	char errmsg[PBS_MAX_DB_CONN_INIT_ERR + 1];
+	void *conn;
 
 
 	if (conn == NULL) {
@@ -355,13 +352,6 @@ print_db_job(char *id, int no_attributes)
 			fprintf(stderr,
 				"Could not connect to PBS dataservice:[%s]\n",
 				(db_errmsg)?db_errmsg:"None");
-			exit(1);
-		}
-		if (pg_db_prepare_job_sqls(conn) != 0) {
-			get_db_errmsg(db_conn_error, &db_errmsg);
-			fprintf(stderr,
-				"Could not initialize PBS dataservice:[%s]\n",
-				(conn->conn_db_err)?(char *)conn->conn_db_err:"None");
 			exit(1);
 		}
 	}
@@ -459,6 +449,7 @@ char *argv[];
 	extern int optind;
 	char *job_id = NULL;
 	char job_script[BUF_SIZE];
+	void * conn;
 
 	/*
 	 * Check for the user. If the user is not root/administrator,

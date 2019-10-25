@@ -227,17 +227,6 @@ svr_migrate_data()
 		return (svr_migrate_data_from_fs());
 	}
 
-	/* if no fs serverdb exists then check db version */
-	if (pbs_db_get_schema_version(svr_db_conn, &db_maj_ver, &db_min_ver) != 0) {
-		log_err(-1, msg_daemonname, "Failed to get PBS datastore version");
-		fprintf(stderr, "Failed to get the PBS datastore version\n");
-		if (svr_db_conn->conn_db_err) {
-			fprintf(stderr, "[%s]\n", (char *)svr_db_conn->conn_db_err);
-			log_err(-1, msg_daemonname, svr_db_conn->conn_db_err);
-		}
-		return -1;
-	}
-
 	if (db_maj_ver == 1 && db_min_ver == 0) {
 		/* upgrade to current version */
 		/* read all data, including node data, and save all nodes again */

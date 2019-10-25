@@ -36,18 +36,18 @@
 # trademark licensing policies.
 
 # save env variables in a temp file
-env_save="/tmp/$$_$(date +'%s')_env_save"
-declare -x > "${env_save}"
+#env_save="/tmp/$$_$(date +'%s')_env_save"
+#declare -x > "${env_save}"
 
 . ${PBS_CONF_FILE:-/etc/pbs.conf}
 
 # re-apply saved env variables
-. "${env_save}"
+#. "${env_save}"
 
-rm -f "${env_save}"
+#rm -f "${env_save}"
 
 # Source the file that sets PGSQL_LIBSTR
-. "$PBS_EXEC"/libexec/pbs_pgsql_env.sh
+#. "$PBS_EXEC"/libexec/pbs_pgsql_env.sh
 
 
 # Loading dynamic library at PBS_EXEC/lib

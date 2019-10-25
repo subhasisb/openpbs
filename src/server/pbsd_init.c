@@ -722,16 +722,6 @@ pbsd_init(int type)
 #endif
 				need_y_response(type, "server database exists");
 
-			/* reinitialize schema by dropping PBS schema */
-			if (pbs_db_truncate_all(svr_db_conn) == -1) {
-				sprintf(log_buffer,
-					"Could not truncate PBS data:[%s]",
-					(char *) conn->conn_db_err);
-				log_event(PBSEVENT_ADMIN, PBS_EVENTCLASS_SERVER,
-					LOG_ALERT, msg_daemonname, log_buffer);
-				printf("%s\n", log_buffer);
-				return -1;
-			}
 		}
 
 		svr_save_db(&server, SVR_SAVE_NEW);
@@ -823,6 +813,8 @@ pbsd_init(int type)
 		server.sv_numjobs =0;
 	}
 
+	get_all_db_queues();
+#if 0
 	/* start a transaction */
 	if (pbs_db_begin_trx(conn, 0, 0) != 0)
 		return (-1);
@@ -876,6 +868,7 @@ pbsd_init(int type)
 	/* end the transaction */
 	if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0)
 		return (-1);
+#endif
 
 	/* Open and read in node list if one exists */
 	if ((rc = setup_nodes()) == -1) {
@@ -898,6 +891,7 @@ pbsd_init(int type)
 	sprintf(zone_dir, "%s%s", pbs_conf.pbs_exec_path, ICAL_ZONEINFO_DIR);
 	set_ical_zoneinfo(zone_dir);
 
+#if 0
 	/* start a transaction */
 	if (pbs_db_begin_trx(conn, 0, 0) != 0)
 		return (-1);
@@ -950,6 +944,7 @@ pbsd_init(int type)
 		pbs_db_reset_obj(&obj);
 	}
 	pbs_db_cursor_close(conn, state);
+#endif
 
 	/*
 	 * 9. If not "create" or "clean" recovery, recover the jobs.

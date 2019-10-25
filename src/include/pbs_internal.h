@@ -405,12 +405,6 @@ enum accrue_types {
 #endif
 #endif
 
-#if !defined(C99) && !defined(__cplusplus) 
-typedef enum { false, true } bool;
-#else
-#include "stdbool.h"
-#endif
-
 #ifdef _USRDLL		/* This is only for building Windows DLLs
 			 * and not their static libraries
 			 */

@@ -206,6 +206,7 @@ svr_to_db_sched(struct pbs_sched *ps, pbs_db_sched_info_t *pdbsched, int updatet
 {
 	pdbsched->sched_name[sizeof(pdbsched->sched_name) - 1] = '\0';
 	strncpy(pdbsched->sched_name, ps->sc_name, sizeof(pdbsched->sched_name));
+	pdbsched->partition_name[0] = '\0';
 
 	if (updatetype != PBS_UPDATE_DB_QUICK) {
 		if ((encode_attr_db(sched_attr_def,

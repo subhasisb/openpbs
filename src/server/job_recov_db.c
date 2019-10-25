@@ -126,7 +126,7 @@ extern time_t time_now;
 
 #ifndef PBS_MOM
 
-extern job *refresh_job(pbs_db_job_info_t *dbjob, int *refreshed);
+extern job *refresh_job(pbs_db_obj_info_t *dbobj, int *totcount);
 extern resc_resv *refresh_resv(pbs_db_resv_info_t *dbresv, int *refreshed);
 extern pbs_list_head	svr_allresvs;
 
@@ -248,8 +248,8 @@ db_to_svr_job(job *pjob,  pbs_db_job_info_t *dbjob)
 	pjob->ji_extended.ji_ext.ji_jid = 0;
 	pjob->ji_extended.ji_ext.ji_ash = 0;
 #else
-	strcpy(pjob->ji_extended.ji_ext.ji_4jid, dbjob->ji_4jid);
-	strcpy(pjob->ji_extended.ji_ext.ji_4ash, dbjob->ji_4ash);
+	//strcpy(pjob->ji_extended.ji_ext.ji_4jid, dbjob->ji_4jid);
+	//strcpy(pjob->ji_extended.ji_ext.ji_4ash, dbjob->ji_4ash);
 #endif
 	pjob->ji_extended.ji_ext.ji_credtype = dbjob->ji_credtype;
 
@@ -523,11 +523,10 @@ db_err:
  *
  */
 job *
-refresh_job(pbs_db_job_info_t *dbjob, int *refreshed) 
+refresh_job(pbs_db_obj_info_t *dbobj, int *totcount) 
 {
 	job *pj = NULL;
-	
-	*refreshed = 0;
+	pbs_db_job_info_t *dbjob = dbobj->pbs_db_un.pbs_db_job;
 
 	if (!(pj = find_job_avl(dbjob->ji_jobid))) {
 		if (!(pj = job_recov_db_spl(dbjob))) /* if job is not in AVL tree, load the job from database */
@@ -535,13 +534,13 @@ refresh_job(pbs_db_job_info_t *dbjob, int *refreshed)
 		
 		svr_enquejob(pj); /* add job into AVL tree */
 
-		*refreshed = 1;
+		(*totcount)++;
 		
 	} else if (strcmp(dbjob->ji_savetm, pj->ji_savetm) != 0) { /* if the job had really changed in the DB */
 		if (db_to_svr_job(pj, dbjob) != 0)
 			goto err;
 
-		*refreshed = 1;
+		(*totcount)++;
 	}
 
 	return pj;
@@ -565,9 +564,9 @@ err:
  *
  */
 pbs_queue *
-refresh_queue(pbs_db_que_info_t *dbque, int *refreshed) {
-
-	*refreshed = 0;
+refresh_queue(pbs_db_obj_info_t *dbobj, int *totcount) 
+{
+	pbs_db_que_info_t *dbque = dbobj->pbs_db_un.pbs_db_que;
 	char  *pc;
 	pbs_queue *pque = NULL;
 	char   qname[PBS_MAXDEST + 1];
@@ -590,12 +589,12 @@ refresh_queue(pbs_db_que_info_t *dbque, int *refreshed) {
 	if (pque) {
 		if (strcmp(dbque->qu_savetm, pque->qu_savetm) != 0) {
 			/* if queue had changed in db */
-			*refreshed = 1;
+			(*totcount)++;
 			return que_recov_db(dbque->qu_name, pque, 0);
 		}
 	} else {
 		/* if queue is not in memory, fetch it from db */
-		*refreshed = 1;
+		(*totcount)++;
 		return que_recov_db(dbque->qu_name, pque, 0);
 	}
 	return pque;

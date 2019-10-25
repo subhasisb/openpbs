@@ -43,14 +43,14 @@ libdb_a_CPPFLAGS = \
 	@database_inc@
 
 libdb_a_SOURCES = \
-	db_postgres.h \
-	db_postgres_impl.c \
-	db_postgres_common.c \
-	db_postgres_attr.c \
-	db_postgres_job.c \
-	db_postgres_resv.c \
-	db_postgres_svr.c \
-	db_postgres_que.c \
-	db_postgres_node.c \
-	db_postgres_sched.c
+	db_impl.h \
+	db_impl_common.c \
+	db_impl_attr.c \
+	db_impl_job.c \
+	db_impl_resv.c \
+	db_impl_svr.c \
+	db_impl_que.c \
+	db_impl_node.c \
+	db_impl_sched.c
+	
 

@@ -634,25 +634,11 @@ main(int argc, char *argv[])
 			snprintf(sqlbuff, sizeof(sqlbuff),
 				"select usename from pg_user where usename = '%s'",
 				userid);
-			if (pbs_db_execute_str(conn, sqlbuff) == 1) {
-				/* now attempt to create new user & set the database passwd to the un-encrypted password */
-				snprintf(sqlbuff, sizeof(sqlbuff),
-					"create user \"%s\" SUPERUSER ENCRYPTED PASSWORD '%s'",
-					userid, pquoted);
-			} else {
-				/* attempt to alter new user & set the database passwd to the un-encrypted password */
-				snprintf(sqlbuff, sizeof(sqlbuff),
-					"alter user \"%s\" SUPERUSER ENCRYPTED PASSWORD '%s'",
-					userid, pquoted);
-			}
+			
 			memset(passwd, 0, sizeof(passwd));
 			memset(passwd2, 0, sizeof(passwd2));
 			memset(pquoted, 0, (sizeof(char) * strlen(pquoted)));
-			if (pbs_db_execute_str(conn, sqlbuff) == -1) {
-				fprintf(stderr, "%s: Failed to create/alter user id %s\n", prog, userid);
-				(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
-				return -1;
-			}
+			
 		} else {
 			/* now attempt to set the database passwd to the un-encrypted password */
 			/* alter user ${user} SUPERUSER ENCRYPTED PASSWORD '${passwd}' */
@@ -661,11 +647,7 @@ main(int argc, char *argv[])
 			memset(passwd, 0, sizeof(passwd));
 			memset(passwd2, 0, sizeof(passwd2));
 			memset(pquoted, 0, (sizeof(char) * strlen(pquoted)));
-			if (pbs_db_execute_str(conn, sqlbuff) == -1) {
-				fprintf(stderr, "%s: Failed to create/alter user id %s\n", prog, userid);
-				(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
-				return -1;
-			}
+			
 		}
 	}
 
@@ -779,7 +761,6 @@ main(int argc, char *argv[])
 		}
 		/* delete the old user from the database */
 		sprintf(sqlbuff, "drop user \"%s\"", olduser);
-		pbs_db_execute_str(conn, sqlbuff);
 	}
 	printf("---> Success\n");
 

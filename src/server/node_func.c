@@ -1567,6 +1567,7 @@ setup_nodes()
 	tfree2(&ipaddrs);
 
 	svr_totnodes = 0;
+#if 0
 
 	/* start a transaction */
 	if (pbs_db_begin_trx(conn, 0, 0) != 0)
@@ -1653,6 +1654,7 @@ setup_nodes()
 		np->nd_modified = 0; /* clear nd_modified on node since create_pbsnode set it*/
 	}
 	svr_chngNodesfile = 0;	/* clear in case set while creating node */
+#endif
 
 	return (0);
 db_err:

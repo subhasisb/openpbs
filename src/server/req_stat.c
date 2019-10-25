@@ -120,7 +120,7 @@ extern int svr_chk_histjob(job *);
 
 static int bad;
 /*-------for stat server----------*/
-job *refresh_job(pbs_db_job_info_t *dbjob, int *refreshed);
+job *refresh_job(pbs_db_obj_info_t *dbobj, int *totcount);
 pbs_queue *refresh_queue(pbs_db_que_info_t *dbque, int *refreshed);
 resc_resv *refresh_resv(pbs_db_resv_info_t *dbresv, int *refreshed);
 
@@ -132,7 +132,7 @@ static int status_resv(resc_resv *, struct batch_request *, pbs_list_head *);
 extern pbs_sched *find_scheduler(char *sched_name);
 static int get_all_db_jobs();
 static int get_all_db_resv();
-static int get_all_db_queues();
+extern int get_all_db_queues();
 
 /**
  * @brief
@@ -435,7 +435,6 @@ get_all_db_jobs()
 	void *state = NULL;
 	int rc_cur = 0;
 	pbs_db_query_options_t opts;
-	int refreshed;
 	int count = 0;
 	static char jobs_from_time[DB_TIMESTAMP_LEN + 1] = {0};
 
@@ -452,27 +451,16 @@ get_all_db_jobs()
 	obj.pbs_db_un.pbs_db_job = &dbjob;
 	dbjob.attr_list.attributes = NULL;
 
-	state = pbs_db_cursor_init(conn, &obj, &opts);
+	state = pbs_db_search(conn, &obj, &opts, refresh_job);
 	if (state == NULL) {
 		sprintf(log_buffer, "%s", (char *) conn->conn_db_err);
 		log_err(-1, __func__, log_buffer);
-		pbs_db_cursor_close(conn, state);
 		(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
-		return (1);
-	}
-	
-	while ((rc_cur = pbs_db_cursor_next(conn, state, &obj)) == 0) {
-		if ((pj = refresh_job(&dbjob, &refreshed)) == NULL) {
-			sprintf(log_buffer, "Failed to refresh job %s", dbjob.ji_jobid);
-			log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_NOTICE, msg_daemonname, log_buffer);
-		}
-		if (refreshed)
-			count++;
-
-		pbs_db_reset_obj(&obj);
+		return (0);
 	}
 
-	pbs_db_cursor_close(conn, state);
+	count = pbs_db_cursor_close(conn, state);
+
 	if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0)
 		return (1);
 
@@ -493,7 +481,7 @@ get_all_db_jobs()
  * @return	0 - success
  * 			1 - fail/error
  */
-static int
+int
 get_all_db_queues() {
 	pbs_db_que_info_t	dbque;
 	pbs_db_obj_info_t	dbobj;
@@ -503,7 +491,6 @@ get_all_db_queues() {
 	pbs_queue *pque = NULL;
 	void *cur_state = NULL;
 	int rc_cur = 0;
-	int refreshed;
 	int count = 0;
 
 	if (pbs_db_begin_trx(conn, 0, 0) !=0) {
@@ -518,28 +505,16 @@ get_all_db_queues() {
 	dbobj.pbs_db_un.pbs_db_que = &dbque;
 	dbque.attr_list.attributes = NULL;
 
-	cur_state = pbs_db_cursor_init(conn, &dbobj, &opts);
+	cur_state = pbs_db_search(conn, &dbobj, &opts, refresh_queue);
 	if (cur_state == NULL) {
 		sprintf(log_buffer, "%s", (char *) conn->conn_db_err);
 		log_err(-1, __func__, log_buffer);
-		pbs_db_cursor_close(conn, cur_state);
 		(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
-		return (1);
+		return (0);
 	}
+	
+	count = pbs_db_cursor_close(conn, cur_state);
 
-	while ((rc_cur = pbs_db_cursor_next(conn, cur_state, &dbobj)) == 0) {
-		if ((pque = refresh_queue(&dbque, &refreshed)) == NULL) {
-			sprintf(log_buffer, "Failed to refresh queue %s", dbque.qu_name);
-			log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_NOTICE, msg_daemonname, log_buffer);
-		}
-
-		if (refreshed)
-			count++;
-
-		pbs_db_reset_obj(&dbobj);
-	}
-
-	pbs_db_cursor_close(conn, cur_state);
 	if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0)
 		return (1);
 
@@ -1019,7 +994,7 @@ req_stat_sched(struct batch_request *preq)
 		void *state = NULL;
 		pbs_db_query_options_t qry_options = {0};
 
-
+#if 0
 		if (pbs_db_begin_trx(conn, 0, 0) != 0)
 			return;
 
@@ -1078,7 +1053,7 @@ req_stat_sched(struct batch_request *preq)
 		/* end the transaction */
 		if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0)
 				return;
-
+#endif
 	}
 
 	if (!stat_reply) {
@@ -1287,7 +1262,7 @@ get_all_db_resv()
 	int count = 0;
 	pbs_db_query_options_t opts;
 	static char from_time[DB_TIMESTAMP_LEN + 1] = {0};
-
+#if 0
 	if (pbs_db_begin_trx(conn, 0, 0) !=0) {
 		(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
 		return (1);
@@ -1324,7 +1299,7 @@ get_all_db_resv()
 	pbs_db_cursor_close(conn, state);
 	if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0)
 		return (1);
-
+#endif
 	sprintf(log_buffer, "Refreshed %d joresvsbs", count);
 	log_err(-1, __func__, log_buffer);
 
