@@ -89,7 +89,7 @@ void			(*free_job_CPUs)(job *) = NULL;
 
 /* External Globals */
 
-extern  char            mom_host[];
+extern  char     mom_host[];
 extern char		*path_epilog;
 extern char		*path_jobs;
 extern unsigned int	default_server_port;
@@ -115,6 +115,7 @@ extern useconds_t	alps_release_jitter;
 #endif
 
 extern char		*path_hooks_workdir;
+extern int conn_slot;
 
 #ifndef WIN32
 /**
@@ -1925,22 +1926,28 @@ int internal_connect_mom(int channel, char *server, int port, char *extend_data)
  */
 
 int
-get_server_stream(char *svr, unsigned int port)
+get_server_stream(char *svr, unsigned int port, char *jobid)
 {
 	int	stream = -1;
-	if (pbs_conf.pbs_max_servers > 1) {		
-		int conn_slot;
-		int *jobid = NULL;
-		if ((conn_slot = initialise_connection_slot(NCONNECTS)) == -1) {
-			log_err(-1, __func__, "connection table initialization failed");
-			return -1;
-		}
+	if (pbs_conf.pbs_max_servers > 1) {				
+		if (conn_slot == -1) {
+			conn_slot = initialise_connection_slot(NCONNECTS);
+			if (conn_slot == -1) {
+				log_err(-1, __func__, "connection table initialization failed");
+				return 1;
+			}
 		set_new_shard_context(conn_slot);
+		}		
 		internal_connect = internal_connect_mom;
 		stream = get_svr_shard_connection(conn_slot, -1 , jobid);	
+	} else { 
+		if (server_stream == -1) {
+			if (svr == NULL)
+				svr = get_servername(&port);
+			stream = rpp_open(svr, port);
+		} else 
+			return server_stream;
 	}
-	else 
-		stream = rpp_open(svr, port);	
 	return stream;
 }
 
@@ -1966,7 +1973,7 @@ static void
 send_hellosvr_rpp(char *svr, unsigned int port)
 {
 	int	stream;
-	stream = get_server_stream(svr, port);
+	stream = get_server_stream(svr, port, NULL);
 
 	if (stream < 0) {
 		(void)sprintf(log_buffer, "rpp_open(%s, %d) failed", svr, port);

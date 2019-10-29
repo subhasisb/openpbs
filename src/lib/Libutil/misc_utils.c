@@ -112,6 +112,8 @@ struct {
 	{ND_Force_Exclhost,   VNS_FORCE_EXCLHOST}
 };
 
+int initialise_connection_slot(int table_size);
+
 /**
  * @brief
  * 	char_in_set - is the char c in the tokenset

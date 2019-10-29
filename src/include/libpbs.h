@@ -409,7 +409,7 @@ extern char *PBSD_modify_resv(int connect, char *resv_id,
 	struct attropl *attrib, char *extend);
 
 int initialise_connection_table(int table_size);
-int initialise_connection_slot(int table_size);
+extern int initialise_connection_slot(int table_size);
 #ifdef	__cplusplus
 }
 #endif
