@@ -1338,10 +1338,9 @@ find_counts_elm(counts *cts_list, char *name, resdef *rdef, counts **cnt, resour
 			*cnt = cts;
 		if (rdef == NULL)
 			return cts->running;
-		else {
-			if ((res_lim = find_resource_count(cts->rescts, rdef)) != NULL)
-				if (rcount != NULL)
-					*rcount = res_lim;
+		else if ((res_lim = find_resource_count(cts->rescts, rdef)) != NULL) {
+			if (rcount != NULL)
+				*rcount = res_lim;
 			return res_lim->amount;
 		}
 	}
