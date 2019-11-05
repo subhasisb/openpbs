@@ -844,13 +844,13 @@ req_quejob(struct batch_request *preq)
 
 		pj->ji_wattr[(int)JOB_ATR_ctime].at_val.at_long =(long)time_now;
 		pj->ji_wattr[(int)JOB_ATR_ctime].at_flags |=
-			ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
+			ATR_VFLAG_SET | ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 
 		/* set hop count = 1 */
 
 		pj->ji_wattr[(int)JOB_ATR_hopcount].at_val.at_long = 1;
 		pj->ji_wattr[(int)JOB_ATR_hopcount].at_flags |=
-			ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
+			ATR_VFLAG_SET | ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 
 		/* need to set certain environmental variables per POSIX */
 
@@ -877,7 +877,7 @@ req_quejob(struct batch_request *preq)
 			pj->ji_wattr[(int)JOB_ATR_outpath].at_val.at_str =
 				prefix_std_file(pj, (int)'o');
 			pj->ji_wattr[(int)JOB_ATR_outpath].at_flags |=
-				ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
+				ATR_VFLAG_SET | ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 		} else {
 			l = strlen(pj->ji_wattr[(int)JOB_ATR_outpath].at_val.at_str);
 			if (l > 0) {
@@ -897,7 +897,7 @@ req_quejob(struct batch_request *preq)
 			pj->ji_wattr[(int)JOB_ATR_errpath].at_val.at_str =
 				prefix_std_file(pj, (int)'e');
 			pj->ji_wattr[(int)JOB_ATR_errpath].at_flags |=
-				ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
+				ATR_VFLAG_SET | ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 		} else {
 			l = strlen(pj->ji_wattr[(int)JOB_ATR_errpath].at_val.at_str);
 			if (l > 0) {
@@ -954,7 +954,7 @@ req_quejob(struct batch_request *preq)
 		/* increment hop count */
 
 		pj->ji_wattr[(int)JOB_ATR_hopcount].at_flags |=
-			ATR_VFLAG_MODCACHE;
+			ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 		if (++pj->ji_wattr[(int)JOB_ATR_hopcount].at_val.at_long >
 			PBS_MAX_HOPCOUNT) {
 			job_purge(pj);
@@ -1081,7 +1081,7 @@ req_quejob(struct batch_request *preq)
 	pj->ji_wattr[(int)JOB_ATR_substate].at_val.at_long =
 		JOB_SUBSTATE_TRANSIN;
 	pj->ji_wattr[(int)JOB_ATR_substate].at_flags |=
-		ATR_VFLAG_SET|ATR_VFLAG_MODCACHE;
+		ATR_VFLAG_SET|ATR_VFLAG_MODCACHE|ATR_VFLAG_MODIFY;
 
 
 	/* If this is a reservation job", "reserve_start", "reserve_end",
@@ -1129,7 +1129,7 @@ req_quejob(struct batch_request *preq)
 	pj->ji_wattr[(int)JOB_ATR_state].at_val.at_char = 'T';
 
 	pj->ji_wattr[(int)JOB_ATR_mtime].at_val.at_long = (long)time_now;
-	pj->ji_wattr[(int)JOB_ATR_mtime].at_flags |= ATR_VFLAG_SET|ATR_VFLAG_MODCACHE;
+	pj->ji_wattr[(int)JOB_ATR_mtime].at_flags |= ATR_VFLAG_SET|ATR_VFLAG_MODCACHE|ATR_VFLAG_MODIFY;
 
 	pj->ji_qs.ji_un_type = JOB_UNION_TYPE_NEW;
 	pj->ji_qs.ji_un.ji_newt.ji_fromsock = sock;
@@ -1274,7 +1274,7 @@ req_quejob(struct batch_request *preq)
 			pjob->ji_wattr[(int)JOB_ATR_block].at_val.at_long = 0;
 			pjob->ji_wattr[(int)JOB_ATR_block].at_flags &= ~ATR_VFLAG_SET;
 			pjob->ji_wattr[(int)JOB_ATR_block].at_flags |=
-				ATR_VFLAG_MODCACHE;
+				ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 
 		}
 	}
@@ -1782,10 +1782,10 @@ req_commit_now(struct batch_request *preq, job *pj)
 	pj->ji_qs.ji_state = JOB_STATE_TRANSIT;
 	pj->ji_wattr[(int) JOB_ATR_state].at_val.at_char = 'T';
 	pj->ji_wattr[(int) JOB_ATR_state].at_flags |=
-		ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
+		ATR_VFLAG_SET | ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 	pj->ji_qs.ji_substate = JOB_SUBSTATE_TRANSICM;
 	pj->ji_wattr[(int) JOB_ATR_substate].at_flags |=
-		ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
+		ATR_VFLAG_SET | ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 
 #ifdef PBS_MOM	/* MOM only */
 
@@ -1880,7 +1880,7 @@ req_commit_now(struct batch_request *preq, job *pj)
 	/* set the queue rank attribute */
 	pj->ji_wattr[(int)JOB_ATR_qrank].at_val.at_long = time_msec;
 	pj->ji_wattr[(int)JOB_ATR_qrank].at_flags |=
-		ATR_VFLAG_SET|ATR_VFLAG_MODCACHE;
+		ATR_VFLAG_SET|ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 
 	/*
 	 * See if the job is qualified to go into the requested queue.
@@ -2412,7 +2412,7 @@ req_resvSub(struct batch_request *preq)
 		else  { /* If only 1 occurrence, treat it as an advance reservation */
 			presv->ri_wattr[RESV_ATR_resv_standing].at_val.at_long = 0;
 			presv->ri_wattr[RESV_ATR_resv_standing].at_flags |=\
-					ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
+					ATR_VFLAG_SET | ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 		}
 	}
 	(void)strcpy(presv->ri_qs.ri_resvID, rid);
@@ -2500,7 +2500,7 @@ req_resvSub(struct batch_request *preq)
 		presv->ri_wattr[(int)RESV_ATR_ctime]
 		.at_val.at_long =(long)time_now;
 		presv->ri_wattr[(int)RESV_ATR_ctime].at_flags |=
-			ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
+			ATR_VFLAG_SET | ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 
 		/* set hop count = 1 */
 		presv->ri_wattr[(int)RESV_ATR_hopcount].at_val.at_long = 1;

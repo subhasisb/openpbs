@@ -793,7 +793,7 @@ set_depend_hold(job *pjob, attribute *pattr)
 		if ((pjob->ji_qs.ji_substate == JOB_SUBSTATE_SYNCHOLD) ||
 			(pjob->ji_qs.ji_substate == JOB_SUBSTATE_DEPNHOLD)) {
 			pjob->ji_wattr[(int)JOB_ATR_hold].at_val.at_long &= ~HOLD_s;
-			pjob->ji_wattr[(int)JOB_ATR_hold].at_flags |= ATR_VFLAG_MODCACHE;
+			pjob->ji_wattr[(int)JOB_ATR_hold].at_flags |= ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 			svr_evaljobstate(pjob, &newstate, &newsubst, 0);
 			(void)svr_setjobstate(pjob, newstate, newsubst);
 		}
@@ -802,7 +802,7 @@ set_depend_hold(job *pjob, attribute *pattr)
 		/* there are dependencies, set system hold accordingly */
 
 		pjob->ji_wattr[(int)JOB_ATR_hold].at_val.at_long |= HOLD_s;
-		pjob->ji_wattr[(int)JOB_ATR_hold].at_flags |= ATR_VFLAG_SET|ATR_VFLAG_MODCACHE;
+		pjob->ji_wattr[(int)JOB_ATR_hold].at_flags |= ATR_VFLAG_SET|ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 		(void)svr_setjobstate(pjob, JOB_STATE_HELD, substate);
 	}
 	return;
@@ -863,7 +863,7 @@ static struct depend *make_depend(int type, attribute *pattr)
 	if (pdep) {
 		clear_depend(pdep, type, 0);
 		append_link(&pattr->at_val.at_list, &pdep->dp_link, pdep);
-		pattr->at_flags |= ATR_VFLAG_SET|ATR_VFLAG_MODCACHE;
+		pattr->at_flags |= ATR_VFLAG_SET|ATR_VFLAG_MODCACHE|ATR_VFLAG_MODIFY;
 	}
 	return (pdep);
 }

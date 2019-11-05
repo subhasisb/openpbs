@@ -196,7 +196,7 @@ check_and_provision_job(struct batch_request *preq, job *pjob, int *need_prov)
 		/* put system hold and move to held state */
 		pjob->ji_wattr[(int)JOB_ATR_hold].at_val.at_long |= HOLD_s;
 		pjob->ji_wattr[(int)JOB_ATR_hold].at_flags |=
-			ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
+			ATR_VFLAG_SET | ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 		(void)svr_setjobstate(pjob, JOB_STATE_HELD, JOB_SUBSTATE_HELD);
 		job_attr_def[(int)JOB_ATR_Comment].at_decode(
 			&pjob->ji_wattr[(int)JOB_ATR_Comment],
@@ -775,7 +775,7 @@ post_stagein(struct work_task *pwt)
 			pwait = &paltjob->ji_wattr[(int)JOB_ATR_exectime];
 			if ((pwait->at_flags & ATR_VFLAG_SET) == 0) {
 				pwait->at_val.at_long = time_now + PBS_STAGEFAIL_WAIT;
-				pwait->at_flags |= ATR_VFLAG_SET|ATR_VFLAG_MODCACHE;
+				pwait->at_flags |= ATR_VFLAG_SET|ATR_VFLAG_MODCACHE|ATR_VFLAG_MODIFY;
 				(void)job_set_wait(pwait, paltjob, 0);
 			}
 			(void)svr_setjobstate(paltjob, JOB_STATE_WAITING,
@@ -963,7 +963,7 @@ svr_startjob(job *pjob, struct batch_request *preq)
 		delay = pque->qu_attr[(int)QE_ATR_KillDelay].at_val.at_long;
 	pjob->ji_wattr[(int)JOB_ATR_job_kill_delay].at_val.at_long = delay;
 	pjob->ji_wattr[(int)JOB_ATR_job_kill_delay].at_flags |=
-		(ATR_VFLAG_SET | ATR_VFLAG_MODCACHE);
+		(ATR_VFLAG_SET | ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY);
 
 
 	/* Next, are there files to be staged-in? */
@@ -1035,10 +1035,10 @@ svr_strtjob2(job *pjob, struct batch_request *preq)
 	if ((pjob->ji_qs.ji_svrflags & JOB_SVFLG_CHKPT) == 0) {
 		++pjob->ji_wattr[(int)JOB_ATR_run_version].at_val.at_long;
 		pjob->ji_wattr[(int)JOB_ATR_run_version].at_flags |=
-			(ATR_VFLAG_SET | ATR_VFLAG_MODCACHE);
+			(ATR_VFLAG_SET | ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY);
 		++pjob->ji_wattr[(int)JOB_ATR_runcount].at_val.at_long;
 		pjob->ji_wattr[(int)JOB_ATR_runcount].at_flags |=
-			(ATR_VFLAG_SET | ATR_VFLAG_MODCACHE);
+			(ATR_VFLAG_SET | ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY);
 	}
 
 	/* send the job to MOM */
@@ -1126,7 +1126,7 @@ complete_running(job *jobp)
 			parent->ji_qs.ji_stime = time_now;
 			parent->ji_wattr[(int)JOB_ATR_stime].at_val.at_long = time_now;
 			parent->ji_wattr[(int)JOB_ATR_stime].at_flags |=
-			ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
+			ATR_VFLAG_SET | ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 
 			account_jobstr(parent);
 			job_attr_def[(int) JOB_ATR_Comment].at_decode(
@@ -1157,7 +1157,7 @@ complete_running(job *jobp)
 	jobp->ji_qs.ji_stime = time_now;
 	jobp->ji_wattr[(int)JOB_ATR_stime].at_val.at_long = time_now;
 	jobp->ji_wattr[(int)JOB_ATR_stime].at_flags |=
-		ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
+		ATR_VFLAG_SET | ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 
 	/* compute an upper bound on job end time if possible */
 	if ((wall = get_wall(jobp)) != -1)
@@ -1564,7 +1564,7 @@ post_sendmom(struct work_task *pwt)
 						      at_val.at_long |= HOLD_s;
 						jobp->ji_wattr[(int)JOB_ATR_hold].\
 							at_flags |=
-							ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
+							ATR_VFLAG_SET | ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 						job_attr_def[(int)JOB_ATR_Comment].\
 						at_decode(\
 					  &jobp->ji_wattr[(int)JOB_ATR_Comment],

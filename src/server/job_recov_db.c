@@ -388,7 +388,7 @@ job_save_db(job *pjob, int updatetype)
 	/* if ji_modified is set, ie an attribute changed, then update mtime */
 	if (pjob->ji_modified) {
 		pjob->ji_wattr[JOB_ATR_mtime].at_val.at_long = time_now;
-		pjob->ji_wattr[JOB_ATR_mtime].at_flags |= ATR_VFLAG_MODCACHE;
+		pjob->ji_wattr[JOB_ATR_mtime].at_flags |= ATR_VFLAG_MODCACHE|ATR_VFLAG_MODIFY;
 	}
 
 	if (pjob->ji_qs.ji_jsversion != JSVERSION) {
@@ -744,7 +744,7 @@ resv_save_db(resc_resv *presv, int updatetype)
 	/* if ji_modified is set, ie an attribute changed, then update mtime */
 	if (presv->ri_modified) {
 		presv->ri_wattr[RESV_ATR_mtime].at_val.at_long = time_now;
-		presv->ri_wattr[RESV_ATR_mtime].at_val.at_long |= ATR_VFLAG_MODCACHE;
+		presv->ri_wattr[RESV_ATR_mtime].at_val.at_long |= ATR_VFLAG_MODCACHE|ATR_VFLAG_MODIFY;
 	}
 
 	if (svr_to_db_resv(presv, &dbresv, savetype) != 0)

@@ -656,7 +656,7 @@ set_queue_type(attribute *pattr, void *pque, int mode)
 			if (pattr->at_val.at_str == NULL)
 				return (PBSE_SYSTEM);
 			(void)strcpy(pattr->at_val.at_str, qt[i].name);
-			pattr->at_flags |= ATR_VFLAG_MODCACHE;
+			pattr->at_flags |= ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 			return (0);
 		}
 	}
@@ -2832,7 +2832,7 @@ mgr_node_unset(struct batch_request *preq)
 				}
 				if ((prc->rs_value.at_flags & ATR_VFLAG_SET) == 0) {
 					prc->rs_value.at_val.at_long = pnode->nd_ncpus;
-					prc->rs_value.at_flags |= ATR_VFLAG_DEFLT | ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
+					prc->rs_value.at_flags |= ATR_VFLAG_DEFLT | ATR_VFLAG_SET | ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 				}
 
 				/* If the Mom attribute is unset, reset to default */
@@ -3236,7 +3236,7 @@ create_pbs_node2(char *objname, svrattrl *plist, int perms, int *bad, struct pbs
 		pnode->nd_attr[(int)ND_ATR_Port].at_val.at_long =
 			pbs_mom_port;
 		pnode->nd_attr[(int)ND_ATR_Port].at_flags =
-			ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
+			ATR_VFLAG_SET | ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 	}
 
 	/* OK, set the attributes specified */
@@ -3577,7 +3577,7 @@ struct batch_request *preq;
 	if (pnode->nd_pque != NULL) {
 		pnode->nd_pque->qu_attr[(int)QE_ATR_HasNodes].at_val.at_long = 0;
 		pnode->nd_pque->qu_attr[(int)QE_ATR_HasNodes].at_flags &= ~ATR_VFLAG_SET;
-		pnode->nd_pque->qu_attr[(int)QE_ATR_HasNodes].at_flags |= ATR_VFLAG_MODCACHE;
+		pnode->nd_pque->qu_attr[(int)QE_ATR_HasNodes].at_flags |= ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 	}
 
 	(void)sprintf(log_buffer, msg_manager, msg_man_del,
@@ -5383,7 +5383,7 @@ resize_prov_table(int newsize)
 	server.sv_attr[(int)SRV_ATR_max_concurrent_prov].at_val.at_long =
 		newsize;
 	server.sv_attr[(int)SRV_ATR_max_concurrent_prov].at_flags =
-		(ATR_VFLAG_SET | ATR_VFLAG_MODCACHE);
+		(ATR_VFLAG_SET | ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY);
 	svr_save_db(&server, SVR_SAVE_FULL);
 	return PBSE_NONE;
 }

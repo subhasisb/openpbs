@@ -662,7 +662,7 @@ svr_setjobstate(job *pjob, int newstate, int newsubstate)
 	pjob->ji_qs.ji_state = newstate;
 	pjob->ji_qs.ji_substate = newsubstate;
 	pjob->ji_wattr[(int)JOB_ATR_substate].at_val.at_long = newsubstate;
-	pjob->ji_wattr[(int)JOB_ATR_substate].at_flags |= ATR_VFLAG_MODCACHE;
+	pjob->ji_wattr[(int)JOB_ATR_substate].at_flags |= ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 
 	set_statechar(pjob);
 	Update_Resvstate_if_resv(pjob);
@@ -1495,7 +1495,7 @@ check_block(job *pjob, char *message)
 	 * a reference to the fact that a history job was a blocking job . Port number need not be recorded .
 	 */
 	pjob->ji_wattr[(int) JOB_ATR_block].at_val.at_long = -1;
-	pjob->ji_wattr[(int) JOB_ATR_block].at_flags |= ATR_VFLAG_MODCACHE;
+	pjob->ji_wattr[(int) JOB_ATR_block].at_flags |= ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 	pjob->ji_modified = 1;
 
 	phost = get_hostPart(pjob->ji_wattr[(int)JOB_ATR_job_owner].at_val.at_str);
@@ -2219,7 +2219,7 @@ set_chunk_sum(attribute  *pselectattr, attribute *pattr)
 			presc = add_resource_entry(pattr, pdef);
 		if (presc) {
 			presc->rs_value.at_val.at_long = total_chunks;
-			presc->rs_value.at_flags |= ATR_VFLAG_SET | ATR_VFLAG_DEFLT | ATR_VFLAG_MODCACHE;
+			presc->rs_value.at_flags |= ATR_VFLAG_SET | ATR_VFLAG_DEFLT | ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 		}
 	}
 	return 0;
@@ -2320,7 +2320,7 @@ set_deflt_resc(attribute *jb, attribute *dflt, int selflg)
 							SET) == 0)
 							prescjb->rs_value.at_flags |=
 								(ATR_VFLAG_SET|ATR_VFLAG_DEFLT);
-						jb->at_flags |= ATR_VFLAG_MODCACHE;
+						jb->at_flags |= ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 					}
 
 				}
@@ -2468,7 +2468,7 @@ set_statechar(job *pjob)
 	} else
 		pjob->ji_wattr[JOB_ATR_state].at_val.at_char =
 			*(statechars + pjob->ji_qs.ji_state);
-	pjob->ji_wattr[JOB_ATR_state].at_flags |= ATR_VFLAG_MODCACHE;
+	pjob->ji_wattr[JOB_ATR_state].at_flags |= ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 }
 
 /**
@@ -5013,7 +5013,7 @@ svr_clean_job_history(struct work_task *pwt)
 					pjob->ji_wattr[(int) JOB_ATR_history_timestamp].at_val.at_long =
 						pjob->ji_wattr[(int) JOB_ATR_stime].at_val.at_long + walltime_used;
 				}
-				pjob->ji_wattr[(int) JOB_ATR_history_timestamp].at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
+				pjob->ji_wattr[(int) JOB_ATR_history_timestamp].at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 				pjob->ji_modified = 1;
 				/* save the full job */
 				(void)job_save(pjob, SAVEJOB_FULL);
@@ -5144,7 +5144,7 @@ svr_histjob_update(job * pjob, int newstate, int newsubstate)
 	}
 	/* set the substate attr and cache it */
 	pjob->ji_wattr[(int)JOB_ATR_substate].at_val.at_long = newsubstate;
-	pjob->ji_wattr[(int)JOB_ATR_substate].at_flags |= ATR_VFLAG_MODCACHE;
+	pjob->ji_wattr[(int)JOB_ATR_substate].at_flags |= ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 
 	/* save the full job */
 	(void)job_save(pjob, SAVEJOB_FULL);
@@ -5336,14 +5336,14 @@ svr_setjob_histinfo(job *pjob, histjob_type type)
 				pjob->ji_wattr[(int)JOB_ATR_stageout_status].at_val.at_long =
 					stgout_status;
 				pjob->ji_wattr[(int)JOB_ATR_stageout_status].at_flags =
-					ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
+					ATR_VFLAG_SET | ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 			}
 			for (i=0; i<ptbl->tkm_ct; i++) {
 				if (ptbl->tkm_tbl[i].trk_exitstat) {
 					pjob->ji_wattr[(int)JOB_ATR_exit_status].at_val.at_long =
 						pjob->ji_qs.ji_un.ji_exect.ji_exitstat;
 					pjob->ji_wattr[(int)JOB_ATR_exit_status].at_flags =
-						ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
+						ATR_VFLAG_SET | ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 					break;
 				}
 			}
@@ -5390,7 +5390,7 @@ svr_setjob_histinfo(job *pjob, histjob_type type)
 
 	/* set the history timestamp */
 	pjob->ji_wattr[(int) JOB_ATR_history_timestamp].at_val.at_long = time_now;
-	pjob->ji_wattr[(int) JOB_ATR_history_timestamp].at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
+	pjob->ji_wattr[(int) JOB_ATR_history_timestamp].at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 	pjob->ji_modified = 1;
 	/* update the history job state and substate */
 	svr_histjob_update(pjob, newstate, newsubstate);

@@ -287,7 +287,7 @@ local_move(job *jobp, struct batch_request *req)
 	jobp->ji_qs.ji_queue[PBS_MAXQUEUENAME] = '\0';
 
 	jobp->ji_wattr[(int)JOB_ATR_qrank].at_val.at_long = time_now;
-	jobp->ji_wattr[(int)JOB_ATR_qrank].at_flags |= ATR_VFLAG_MODCACHE;
+	jobp->ji_wattr[(int)JOB_ATR_qrank].at_flags |= ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 
 	pattr = &jobp->ji_wattr[(int)JOB_ATR_reserve_ID];
 	if (qp->qu_resvp) {
@@ -808,7 +808,7 @@ send_job(job *jobp, pbs_net_t hostaddr, int port, int move_type,
 		(move_type != MOVE_TYPE_Exec)) {
 		tempval = ((long)time_now - jobp->ji_wattr[(int)JOB_ATR_sample_starttime].at_val.at_long);
 		jobp->ji_wattr[(int)JOB_ATR_eligible_time].at_val.at_long += tempval;
-		jobp->ji_wattr[(int)JOB_ATR_eligible_time].at_flags |= ATR_VFLAG_MODCACHE;
+		jobp->ji_wattr[(int)JOB_ATR_eligible_time].at_flags |= ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 	}
 
 	/* in windows code, a child process "w32_send_job" handles the send
@@ -1042,7 +1042,7 @@ send_job(job *jobp, pbs_net_t hostaddr, int port, int move_type,
 		(move_type != MOVE_TYPE_Exec)) {
 		tempval = ((long)time_now - jobp->ji_wattr[(int)JOB_ATR_sample_starttime].at_val.at_long);
 		jobp->ji_wattr[(int)JOB_ATR_eligible_time].at_val.at_long += tempval;
-		jobp->ji_wattr[(int)JOB_ATR_eligible_time].at_flags |= ATR_VFLAG_MODCACHE;
+		jobp->ji_wattr[(int)JOB_ATR_eligible_time].at_flags |= ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 	}
 
 	pattr = jobp->ji_wattr;

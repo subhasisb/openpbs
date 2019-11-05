@@ -748,7 +748,7 @@ status_que(pbs_queue *pque, struct batch_request *preq, pbs_list_head *pstathd)
 		pque->qu_attr[(int)QA_ATR_TotalJobs].at_val.at_long = pque->qu_numjobs -
 			(pque->qu_njstate[JOB_STATE_MOVED] + pque->qu_njstate[JOB_STATE_FINISHED] + pque->qu_njstate[JOB_STATE_EXPIRED]);
 	}
-	pque->qu_attr[(int)QA_ATR_TotalJobs].at_flags |= ATR_VFLAG_SET|ATR_VFLAG_MODCACHE;
+	pque->qu_attr[(int)QA_ATR_TotalJobs].at_flags |= ATR_VFLAG_SET|ATR_VFLAG_MODCACHE|ATR_VFLAG_MODIFY;
 
 	update_state_ct(&pque->qu_attr[(int)QA_ATR_JobsByState],
 		pque->qu_njstate,
@@ -970,7 +970,7 @@ req_stat_svr(struct batch_request *preq)
 	/* update count and state counts from sv_numjobs and sv_jobstates */
 
 	server.sv_attr[(int)SRV_ATR_TotalJobs].at_val.at_long = server.sv_numjobs;
-	server.sv_attr[(int)SRV_ATR_TotalJobs].at_flags |= ATR_VFLAG_SET|ATR_VFLAG_MODCACHE;
+	server.sv_attr[(int)SRV_ATR_TotalJobs].at_flags |= ATR_VFLAG_SET|ATR_VFLAG_MODCACHE|ATR_VFLAG_MODIFY;
 	update_state_ct(&server.sv_attr[(int)SRV_ATR_JobsByState],
 		server.sv_jobstates,
 		server.sv_jobstbuf);
@@ -1219,7 +1219,7 @@ update_state_ct(attribute *pattr, int *ct_array, char *buf)
 			*(ct_array + index));
 	}
 	pattr->at_val.at_str = buf;
-	pattr->at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
+	pattr->at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 }
 
 /**
@@ -1283,7 +1283,7 @@ update_license_ct(attribute *pattr, char *buf)
 		print_license_ct(last_valid_attempt, buf);
 
 	pattr->at_val.at_str = buf;
-	pattr->at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
+	pattr->at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 }
 
 /**

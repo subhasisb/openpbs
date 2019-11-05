@@ -182,7 +182,7 @@ encode_attr_db(struct attribute_def *padef, struct attribute *pattr, int numattr
 		if ((pattr+i)->at_flags & ATR_DFLAG_NOSAVM)
 			continue;
 
-		if (!((all == 1) || ((pattr+i)->at_flags & (ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE))))
+		if (!((all == 1) || ((pattr+i)->at_flags & ATR_VFLAG_MODIFY)))
 			continue;
 
 		rc = (padef+i)->at_encode(pattr+i, &lhead,

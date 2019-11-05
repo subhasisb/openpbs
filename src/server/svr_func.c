@@ -493,7 +493,7 @@ set_resc_assigned(void *pobj, int objtype, enum batch_op op)
 						return;
 				}
 				rscdef->rs_set(&pr->rs_value, &rescp->rs_value, op);
-				sysru->at_flags |= ATR_VFLAG_MODCACHE;
+				sysru->at_flags |= ATR_VFLAG_MODCACHE  | ATR_VFLAG_MODIFY;
 			}
 
 			/* update queue attribute of resources assigned */
@@ -506,7 +506,7 @@ set_resc_assigned(void *pobj, int objtype, enum batch_op op)
 						return;
 				}
 				rscdef->rs_set(&pr->rs_value, &rescp->rs_value, op);
-				queru->at_flags |= ATR_VFLAG_MODCACHE;
+				queru->at_flags |= ATR_VFLAG_MODCACHE  | ATR_VFLAG_MODIFY;
 			}
 		}
 		rescp = (resource *)GET_NEXT(rescp->rs_link);
@@ -4662,7 +4662,7 @@ disable_svr_prov()
 		ATR_VFLAG_SET) {
 		server.sv_attr[(int)SRV_ATR_ProvisionEnable].at_val.at_long = 0;
 		server.sv_attr[(int)SRV_ATR_ProvisionEnable].at_flags
-		= ATR_VFLAG_MODCACHE | ATR_VFLAG_SET;
+		= ATR_VFLAG_MODCACHE | ATR_VFLAG_SET | ATR_VFLAG_MODIFY;
 	}
 }
 
@@ -5271,7 +5271,7 @@ fail_vnode_job(struct prov_vnode_info * prov_vnode_info, int hold_or_que)
 		clear_exec_on_run_fail(pjob);
 		pjob->ji_wattr[(int)JOB_ATR_hold].at_val.at_long |= HOLD_s;
 		pjob->ji_wattr[(int)JOB_ATR_hold].at_flags |=
-			ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
+			ATR_VFLAG_SET | ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 		job_attr_def[(int)JOB_ATR_Comment].at_decode(
 			&pjob->ji_wattr[(int)JOB_ATR_Comment],
 			NULL, NULL,
@@ -6063,11 +6063,11 @@ set_srv_prov_attributes(void)
 	server.sv_attr[(int)SVR_ATR_provision_timeout].at_val.at_long =
 		provision_timeout;
 	server.sv_attr[(int)SVR_ATR_provision_timeout].at_flags |=
-		ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
+		ATR_VFLAG_SET | ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 
 	server.sv_attr[(int)SRV_ATR_ProvisionEnable].at_val.at_long=1;
 	server.sv_attr[(int)SRV_ATR_ProvisionEnable].at_flags |=
-		ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
+		ATR_VFLAG_SET | ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 #else
 	disable_svr_prov();
 	DBPRT(("%s: Python not enabled\n", __func__))

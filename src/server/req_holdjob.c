@@ -185,7 +185,7 @@ req_holdjob(struct batch_request *preq)
 	hold_val = &pjob->ji_wattr[(int)JOB_ATR_hold].at_val.at_long;
 	old_hold = *hold_val;
 	*hold_val |= temphold.at_val.at_long;
-	pjob->ji_wattr[(int)JOB_ATR_hold].at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
+	pjob->ji_wattr[(int)JOB_ATR_hold].at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 
 	/* Note the hold time in the job comment. */
 	now = time(NULL);
@@ -296,7 +296,7 @@ req_releasejob(struct batch_request *preq)
 		{
 			attribute *etime = &pjob->ji_wattr[(int)JOB_ATR_etime];
 			etime->at_val.at_long = time_now;
-			etime->at_flags |= ATR_VFLAG_SET|ATR_VFLAG_MODCACHE;
+			etime->at_flags |= ATR_VFLAG_SET|ATR_VFLAG_MODCACHE|ATR_VFLAG_MODIFY;
 #endif /* localmod 105 */
 		pjob->ji_modified = 1;	/* indicates attributes changed    */
 		svr_evaljobstate(pjob, &newstate, &newsub, 0);

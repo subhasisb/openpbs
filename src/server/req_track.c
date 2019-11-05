@@ -301,7 +301,7 @@ track_history_job(struct rq_track *prqt, char *extend)
 		pjob->ji_wattr[(int)JOB_ATR_substate].at_val.at_long =
 			JOB_SUBSTATE_FINISHED;
 		pjob->ji_wattr[(int)JOB_ATR_substate].at_flags |=
-			ATR_VFLAG_MODCACHE;
+			ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 		/* over write the default comment message */
 		comment = "Job finished at";
 	}

@@ -587,7 +587,7 @@ update_subjob_state_ct(job *pjob)
 
 	pjob->ji_wattr[(int)JOB_ATR_array_state_count].at_val.at_str = buf;
 	pjob->ji_wattr[(int)JOB_ATR_array_state_count].at_flags |=
-		ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
+		ATR_VFLAG_SET | ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 }
 /**
  * @brief
@@ -705,7 +705,7 @@ setup_arrayjob_attrs(attribute *pattr, void *pobj, int mode)
 	/* set attribute "array" True  and clear "array_state_count" */
 
 	pjob->ji_wattr[(int)JOB_ATR_array].at_val.at_long = 1;
-	pjob->ji_wattr[(int)JOB_ATR_array].at_flags = ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
+	pjob->ji_wattr[(int)JOB_ATR_array].at_flags = ATR_VFLAG_SET | ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 	job_attr_def[(int)JOB_ATR_array_state_count].at_free(&pjob->ji_wattr[(int)JOB_ATR_array_state_count]);
 
 	if ((mode == ATR_ACTION_NEW) || (mode == ATR_ACTION_RECOV)) {
@@ -940,7 +940,7 @@ create_subjob(job *parent, char *newjid, int *rc)
 #endif
 	/* set the queue rank attribute */
 	subj->ji_wattr[(int)JOB_ATR_qrank].at_val.at_long = time_msec;
-	subj->ji_wattr[(int)JOB_ATR_qrank].at_flags |= ATR_VFLAG_SET|ATR_VFLAG_MODCACHE;
+	subj->ji_wattr[(int)JOB_ATR_qrank].at_flags |= ATR_VFLAG_SET|ATR_VFLAG_MODCACHE|ATR_VFLAG_MODIFY;
 	if (svr_enquejob(subj) != 0) {
 		job_purge(subj);
 		*rc = PBSE_IVALREQ;

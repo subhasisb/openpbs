@@ -238,9 +238,9 @@ req_orderjob(struct batch_request *req)
 	rank = pjob1->ji_wattr[(int)JOB_ATR_qrank].at_val.at_long;
 	pjob1->ji_wattr[(int)JOB_ATR_qrank].at_val.at_long =
 		pjob2->ji_wattr[(int)JOB_ATR_qrank].at_val.at_long;
-	pjob1->ji_wattr[(int)JOB_ATR_qrank].at_flags |= ATR_VFLAG_MODCACHE;
+	pjob1->ji_wattr[(int)JOB_ATR_qrank].at_flags |= ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 	pjob2->ji_wattr[(int)JOB_ATR_qrank].at_val.at_long = rank;
-	pjob2->ji_wattr[(int)JOB_ATR_qrank].at_flags |= ATR_VFLAG_MODCACHE;
+	pjob2->ji_wattr[(int)JOB_ATR_qrank].at_flags |= ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 
 	if (find_queuebyname(pjob1->ji_qs.ji_queue, 0) != find_queuebyname(pjob2->ji_qs.ji_queue, 0)) {
 		(void)strcpy(tmpqn, pjob1->ji_qs.ji_queue);

@@ -708,7 +708,7 @@ initialize_pbsnode(struct pbsnode *pnode, char *pname, int ntype)
 									(prd->rs_flags & ATR_DFLAG_MOM)) {
 			presc = add_resource_entry(pat2, prd);
 			presc->rs_value.at_flags = ATR_VFLAG_SET |
-				ATR_VFLAG_MODCACHE;
+				ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 		}
 	}
 
@@ -1988,7 +1988,7 @@ node_pcpu_action(attribute *new, void *pobj, int actmode)
 		((prc->rs_value.at_flags & ATR_VFLAG_DEFLT) != 0)) {
 		if (prc->rs_value.at_val.at_long != new_np) {
 			prc->rs_value.at_val.at_long = new_np;
-			prc->rs_value.at_flags |= ATR_VFLAG_SET|ATR_VFLAG_MODCACHE|ATR_VFLAG_DEFLT;
+			prc->rs_value.at_flags |= ATR_VFLAG_SET|ATR_VFLAG_MODCACHE|ATR_VFLAG_DEFLT|ATR_VFLAG_MODIFY;
 			return (mod_node_ncpus(pnode, new_np, actmode));
 		}
 	}
@@ -2026,7 +2026,7 @@ mark_which_queues_have_nodes()
 	while (pque != NULL) {
 		pque->qu_attr[(int)QE_ATR_HasNodes].at_val.at_long = 0;
 		pque->qu_attr[(int)QE_ATR_HasNodes].at_flags &= ~ATR_VFLAG_SET;
-		pque->qu_attr[(int)QE_ATR_HasNodes].at_flags |= ATR_VFLAG_MODCACHE;
+		pque->qu_attr[(int)QE_ATR_HasNodes].at_flags |= ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 		pque = (pbs_queue *)GET_NEXT(pque->qu_link);
 	}
 
@@ -2035,7 +2035,7 @@ mark_which_queues_have_nodes()
 	for (i=0; i<svr_totnodes; i++) {
 		if (pbsndlist[i]->nd_pque) {
 			pbsndlist[i]->nd_pque->qu_attr[(int)QE_ATR_HasNodes].at_val.at_long = 1;
-			pbsndlist[i]->nd_pque->qu_attr[(int)QE_ATR_HasNodes].at_flags = ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
+			pbsndlist[i]->nd_pque->qu_attr[(int)QE_ATR_HasNodes].at_flags = ATR_VFLAG_SET | ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 			svr_quehasnodes = 1;
 		}
 	}

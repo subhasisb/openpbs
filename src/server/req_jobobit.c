@@ -851,7 +851,7 @@ on_job_exit(struct work_task *ptask)
 			}
 
 			pjob->ji_wattr[(int)JOB_ATR_stageout_status].at_val.at_long = stageout_status;
-			pjob->ji_wattr[(int)JOB_ATR_stageout_status].at_flags = ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
+			pjob->ji_wattr[(int)JOB_ATR_stageout_status].at_flags = ATR_VFLAG_SET | ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 
 			/*
 			 * files (generally) copied ok, move on to the next phase by
@@ -1876,7 +1876,7 @@ job_obit(struct resc_used_update *pruu, int stream)
 		pjob->ji_wattr[(int)JOB_ATR_exit_status].at_val.at_long = \
 								exitstatus;
 		pjob->ji_wattr[(int)JOB_ATR_exit_status].at_flags |=
-			(ATR_VFLAG_SET | ATR_VFLAG_MODCACHE);
+			(ATR_VFLAG_SET | ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY);
 	}
 
 	patlist = (svrattrl *)GET_NEXT(pruu->ru_attr);
@@ -2040,7 +2040,7 @@ job_obit(struct resc_used_update *pruu, int stream)
 
 				/* put job on password hold */
 				pjob->ji_wattr[(int)JOB_ATR_hold].at_val.at_long |= HOLD_bad_password;
-				pjob->ji_wattr[(int)JOB_ATR_hold].at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
+				pjob->ji_wattr[(int)JOB_ATR_hold].at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 
 				pjob->ji_qs.ji_substate = JOB_SUBSTATE_HELD;
 				pjob->ji_modified = 1;
@@ -2102,7 +2102,7 @@ RetryJob:
 				) {
 					pjob->ji_wattr[(int)JOB_ATR_hold].at_val.at_long |= HOLD_s;
 					pjob->ji_wattr[(int)JOB_ATR_hold].at_flags |=
-						ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
+						ATR_VFLAG_SET | ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
 					job_attr_def[(int)JOB_ATR_Comment].at_decode(
 						&pjob->ji_wattr[(int)JOB_ATR_Comment],
 						NULL, NULL,
