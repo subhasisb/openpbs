@@ -294,7 +294,8 @@ struct	pbsnode {
 	char		nd_creatm[DB_TIMESTAMP_LEN + 1];		/* time queue created */
 	char		nd_savetm[DB_TIMESTAMP_LEN + 1];		/* time queue last modified */
 	struct memcache_state	trx_status;
-	attribute		 nd_attr[ND_ATR_LAST];
+	time_t		nd_last_refresh_time;				/* node last refresh time */
+	attribute	nd_attr[ND_ATR_LAST];
 };
 typedef struct pbsnode pbs_node;
 

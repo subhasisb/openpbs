@@ -198,7 +198,7 @@ node_recov_db(char *nd_name, struct pbsnode *pnode, int lock)
 			return pnode;
 		strcpy(dbnode.nd_savetm, pnode->nd_savetm);
 	}
-	
+
 	if (pnode == NULL) {
 		log_err(errno, "node_recov", "error on recovering node table");
 		return NULL;
@@ -214,12 +214,12 @@ node_recov_db(char *nd_name, struct pbsnode *pnode, int lock)
 	if ((rc = pbs_db_load_obj(conn, &obj, lock)) == -1)
 		goto db_err;
 
-	/* if queue is marked as deleted in db then remove it from cache also */
-	if (dbnode.nd_deleted == 1) {
+	/* if node is marked as deleted in db then remove it from cache also 
+	   rc = 1, when no rows are returned. probably entry got deleted from db*/
+	if (dbnode.nd_deleted == 1 || rc == 1) {
 		if(pnode) {
-			sprintf(log_buffer, "Node marked as deleted");
+			sprintf(log_buffer, "Node is/marked deleted");
 			log_event(PBSEVENT_DEBUG3, PBS_EVENTCLASS_NODE, LOG_DEBUG, nd_name, log_buffer);
-			/* TODO: Remove all the jobs, related to this queue in the system */
 			effective_node_delete(pnode);
 			if (lock)
 				(void)pbs_db_end_trx(conn,PBS_DB_COMMIT);
@@ -241,6 +241,7 @@ db_commit:
 	}
 
 	pbs_db_reset_obj(&obj);
+	pnode->nd_last_refresh_time = time(NULL);
 
 	return pnode;
 
@@ -466,6 +467,7 @@ node_save_db(struct pbsnode *pnode)
 	strcpy(pnode->nd_savetm, dbnode.nd_savetm);
 
 	pbs_db_reset_obj(&obj);
+	pnode->nd_last_refresh_time = time(NULL);
 	pnode->nd_modified &= ~NODE_UPDATE_OTHERS;
 	if (pnode->nd_modified & NODE_LOCKED) {
 		if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0)

@@ -89,7 +89,7 @@
 #include "pbs_sched.h"
 #include "pbs_share.h"
 
-#define QUE_REFRESH_TIME_PERIOD 86400
+#define REFRESH_TIME_PERIOD 86400
 
 /* Global Data Items: */
 
@@ -676,8 +676,8 @@ req_stat_que(struct batch_request *preq)
 
 		pque = (pbs_queue *)GET_NEXT(svr_queues);
 		while (pque) {
-			if((time(0) - pque->qu_last_refresh_time) >= QUE_REFRESH_TIME_PERIOD) {
-				/* this que hasn't refreshed since from long time(24 hrs.) hence need to check it's existence.
+			if((time(0) - pque->qu_last_refresh_time) >= REFRESH_TIME_PERIOD) {
+				/* this que hasn't refreshed since from long time. Hence need to check it's existence.
 				 * If it's been deleted by other server instance then remove from this server as well
 				 * and remove all the related jobs as well.
 				 */
@@ -687,8 +687,8 @@ req_stat_que(struct batch_request *preq)
 				if(pque == NULL) {
 					que_removed = 1;
 					/* This que has been deleted by other server! */
-					sprintf(log_buffer, "Now, Queue %s doesn't exist in the system", bak_que_name);
-					log_err(-1, __func__, log_buffer);
+					sprintf(log_buffer, "Queue %s doesn't exist in the system", bak_que_name);
+					log_event(PBSEVENT_DEBUG3, PBS_EVENTCLASS_QUEUE, LOG_DEBUG, bak_que_name, log_buffer);
 				}
 			}
 			if(que_removed) {
@@ -836,6 +836,15 @@ req_stat_node(struct batch_request *preq)
 		get_all_db_nodes();
 		for (i = 0; i < svr_totnodes; i++) {
 			pnode = pbsndlist[i];
+
+			if((time(0) - pnode->nd_last_refresh_time) >= REFRESH_TIME_PERIOD) {
+				/* this node hasn't refreshed for long time, hence need to check it's existence.
+				 */
+				if ((pnode = node_recov_db(pnode->nd_name, pnode, 0)) == NULL) {
+					i--;
+					continue;
+				}
+			}
 
 			rc = status_node(pnode, preq,
 				&preply->brp_un.brp_status);

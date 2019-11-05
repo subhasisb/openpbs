@@ -391,7 +391,7 @@ pg_db_load_node(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int lock)
 	SET_PARAM_STR(conn, pnd->nd_name, 0);
 
 	if ((rc = pg_db_query(conn, STMT_SELECT_NODE, 1, lock, &res)) != 0)
-		return -1;
+		return rc;
 
 	rc = load_node(res, pnd, 0);
 
