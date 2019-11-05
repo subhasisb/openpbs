@@ -1953,6 +1953,19 @@ get_server_stream(char *svr, unsigned int port, char *jobid)
 
 
 
+void
+set_server_stream(unsigned int port, int stream)
+{
+	if (pbs_conf.pbs_max_servers > 1) {	
+		int srv_index = get_svr_index(port);
+		if (connection[conn_slot].ch_shards[srv_index]->state == SHARD_CONN_STATE_DOWN) {
+			connection[conn_slot].ch_shards[srv_index]->state = SHARD_CONN_STATE_CONNECTED;
+			connection[conn_slot].ch_shards[srv_index]->sd = stream;
+			connection[conn_slot].ch_shards[srv_index]->state_change_time = time(0);
+		}
+	}
+}		
+
 /**
  * @brief
  * 	send IS_HELLOSVR message to Server.

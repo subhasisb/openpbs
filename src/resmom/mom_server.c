@@ -132,6 +132,7 @@ extern void	mom_vnlp_report(vnl_t *vnl, char *header);
 extern	char	*path_hooks;
 extern	unsigned long	hooks_rescdef_checksum;
 extern	int	report_hook_checksums;
+extern void set_server_stream(unsigned int port, int stream);
 
 /*
  * Tree search generalized from Knuth (6.2.2) Algorithm T just like
@@ -755,6 +756,9 @@ is_request(int stream, int version)
 	command = disrsi(stream, &ret);
 	if (ret != DIS_SUCCESS)
 		goto err;
+
+	set_server_stream(port, stream);
+	
 
 	switch (command) {
 
