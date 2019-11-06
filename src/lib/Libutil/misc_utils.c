@@ -113,6 +113,7 @@ struct {
 	{ND_Force_Exclhost,   VNS_FORCE_EXCLHOST}
 };
 
+int initialise_connection_slot(int table_size);
 /**
  * @brief
  * 	char_in_set - is the char c in the tokenset
@@ -1460,6 +1461,26 @@ get_my_index()
 	}
 
 	return my_index;
+}
+
+int 
+get_svr_index(int port)
+{
+	static int svr_index = -1;
+	int i;
+
+	if (svr_index == -1) {
+		if (pbs_conf.pbs_current_servers > 1) {
+			/* find my index */
+			for(i = 0; i < pbs_conf.pbs_current_servers; i++) {
+				if (port == pbs_conf.psi[i]->port)
+					svr_index = i;
+			}
+		} else 
+			return 0;
+	}
+
+	return svr_index;
 }
 
 long long 

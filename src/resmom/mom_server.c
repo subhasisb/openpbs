@@ -126,11 +126,13 @@ extern  char		*msg_request;
 extern void req_commit(struct batch_request *preq);
 extern void req_quejob(struct batch_request *preq);
 extern void req_jobscript(struct batch_request *preq);
+extern int get_server_stream(char *svr, unsigned int port, char *jobid);
 
 extern void	mom_vnlp_report(vnl_t *vnl, char *header);
 extern	char	*path_hooks;
 extern	unsigned long	hooks_rescdef_checksum;
 extern	int	report_hook_checksums;
+extern void set_server_stream(unsigned int port, int stream);
 
 /*
  * Tree search generalized from Knuth (6.2.2) Algorithm T just like
@@ -500,11 +502,9 @@ send_hook_job_action(struct hook_job_action *phjba)
 	struct hook_job_action *pka;
 	unsigned int            count;
 	int			ret;
+	int shard_server_stream;
 
-	if (server_stream == -1) {
-		/* no stream to server, ok as item already queued to resend */
-		return;
-	}
+
 
 	if (phjba != NULL) {
 		/* single new item to send */
@@ -522,32 +522,34 @@ send_hook_job_action(struct hook_job_action *phjba)
 		}
 		pka = GET_NEXT(svr_hook_job_actions);
 	}
+	if (pka)
+		shard_server_stream = get_server_stream(NULL, default_server_port, pka->hja_jid);
 
-	if ((ret=is_compose(server_stream, IS_HOOK_JOB_ACTION)) != DIS_SUCCESS)
+	if ((ret=is_compose(shard_server_stream, IS_HOOK_JOB_ACTION)) != DIS_SUCCESS)
 		goto err;
 
-	ret = diswui(server_stream, count);
+	ret = diswui(shard_server_stream, count);
 	if (ret != DIS_SUCCESS)
 		goto err;
 	while (count--) {
-		ret = diswst(server_stream, pka->hja_jid);
+		ret = diswst(shard_server_stream, pka->hja_jid);
 		if (ret != DIS_SUCCESS)
 			goto err;
-		ret = diswul(server_stream, pka->hja_actid);
+		ret = diswul(shard_server_stream, pka->hja_actid);
 		if (ret != DIS_SUCCESS)
 			goto err;
-		ret = diswsi(server_stream, pka->hja_runct);
+		ret = diswsi(shard_server_stream, pka->hja_runct);
 		if (ret != DIS_SUCCESS)
 			goto err;
-		ret = diswsi(server_stream, pka->hja_action);
+		ret = diswsi(shard_server_stream, pka->hja_action);
 		if (ret != DIS_SUCCESS)
 			goto err;
-		ret = diswui(server_stream, pka->hja_huser);
+		ret = diswui(shard_server_stream, pka->hja_huser);
 		if (ret != DIS_SUCCESS)
 			goto err;
 		pka = GET_NEXT(pka->hja_link);
 	}
-	rpp_flush(server_stream);
+	rpp_flush(shard_server_stream);
 	return;
 
 err:
@@ -630,14 +632,12 @@ send_hook_checksums(void)
 	unsigned int            count;
 	hook			*phook;
 	int			ret;
+	int shard_server_stream;
+	shard_server_stream = get_server_stream(NULL, default_server_port, NULL);
 
 	if (!report_hook_checksums)
 		return DIS_SUCCESS;
 
-	if (server_stream == -1) {
-		/* no stream to server...ok */
-		return DIS_SUCCESS;
-	}
 
 	phook = (hook *)GET_NEXT(svr_allhooks);
 	count = 0;
@@ -646,36 +646,36 @@ send_hook_checksums(void)
 		count++;
 	}
 
-	if ((ret=is_compose(server_stream, IS_HOOK_CHECKSUMS)) != DIS_SUCCESS)
+	if ((ret=is_compose(shard_server_stream, IS_HOOK_CHECKSUMS)) != DIS_SUCCESS)
 		goto err;
 
-	ret = diswui(server_stream, count);
+	ret = diswui(shard_server_stream, count);
 	if (ret != DIS_SUCCESS)
 		goto err;
 
 	phook = (hook *)GET_NEXT(svr_allhooks);
 	while (count--) {
-		ret = diswst(server_stream, phook->hook_name);
+		ret = diswst(shard_server_stream, phook->hook_name);
 		if (ret != DIS_SUCCESS)
 			goto err;
-		ret = diswul(server_stream, phook->hook_control_checksum);
+		ret = diswul(shard_server_stream, phook->hook_control_checksum);
 		if (ret != DIS_SUCCESS)
 			goto err;
-		ret = diswul(server_stream, phook->hook_script_checksum);
+		ret = diswul(shard_server_stream, phook->hook_script_checksum);
 		if (ret != DIS_SUCCESS)
 			goto err;
-		ret = diswul(server_stream, phook->hook_config_checksum);
+		ret = diswul(shard_server_stream, phook->hook_config_checksum);
 		if (ret != DIS_SUCCESS)
 			goto err;
 		phook = (hook *)GET_NEXT(phook->hi_allhooks);
 	}
 
 
-	ret = diswul(server_stream, hooks_rescdef_checksum);
+	ret = diswul(shard_server_stream, hooks_rescdef_checksum);
 	if (ret != DIS_SUCCESS)
 		goto err;
 
-	(void)rpp_flush(server_stream);
+	(void)rpp_flush(shard_server_stream);
 
 	return DIS_SUCCESS;
 
@@ -756,6 +756,8 @@ is_request(int stream, int version)
 	command = disrsi(stream, &ret);
 	if (ret != DIS_SUCCESS)
 		goto err;
+
+	set_server_stream(port, stream);	
 
 	switch (command) {
 
@@ -1088,21 +1090,21 @@ is_request(int stream, int version)
 					mom_deljob(pjob);
 				}
 			}
-			if ((ret=is_compose(server_stream, IS_DISCARD_DONE)) != DIS_SUCCESS) {
+			if ((ret=is_compose(stream, IS_DISCARD_DONE)) != DIS_SUCCESS) {
 				free(jobid);
 				jobid = NULL;
 				goto err;
 			}
-			if ((ret=diswst(server_stream, jobid)) != DIS_SUCCESS) {
+			if ((ret=diswst(stream, jobid)) != DIS_SUCCESS) {
 				free(jobid);
 				jobid = NULL;
 				goto err;
 			}
 			free(jobid);	/* can be freed now */
 			jobid = NULL;
-			if ((ret=diswsi(server_stream, n)) != DIS_SUCCESS)
+			if ((ret=diswsi(stream, n)) != DIS_SUCCESS)
 				goto err;
-			rpp_flush(server_stream);
+			rpp_flush(stream);
 			break;
 
 		case IS_CMD:
@@ -1224,14 +1226,12 @@ hook_requests_to_server(pbs_list_head *plist)
 	struct hook_vnl_action *pvna;
 	vnl_t		        *pvnlph;
 	extern const		char *dis_emsg[];
+	int shard_server_stream;
 
 	if (plist == NULL)
 		return (0);	/* nothing to send */
 
-	if (server_stream < 0) {
-		/* log but keep going to link the changes to be sent later */
-		log_err(errno, __func__, "warning: unable to send hook requests to server: No server_stream! (to be retried)");
-	}
+
 
 	if (plist == &svr_hook_vnl_actions) {
 		/* we are resending the vnl lists on svr_hool_vnl_actions */
@@ -1251,7 +1251,7 @@ hook_requests_to_server(pbs_list_head *plist)
 			pvna = nxt;
 			continue;
 		}
-
+		shard_server_stream = get_server_stream(NULL, default_server_port, NULL);
 		/* We have hook changes to the vnodes to send to the Server */
 
 		if (resending == 0) {
@@ -1272,28 +1272,28 @@ hook_requests_to_server(pbs_list_head *plist)
 		}
 
 		/* Now send each update to the Server if we can */
-		if (server_stream == -1) {
+		if (shard_server_stream == -1) {
 			pvna = nxt;	/* next set of vnl changes */
 			continue;
 		}
 
-		ret = is_compose(server_stream, pvna->hva_update_cmd);
+		ret = is_compose(shard_server_stream, pvna->hva_update_cmd);
 		if (ret != DIS_SUCCESS)
 			goto hook_requests_to_server_err;
 
-		ret = diswul(server_stream, pvna->hva_actid);
+		ret = diswul(shard_server_stream, pvna->hva_actid);
 		if (ret != DIS_SUCCESS)
 			goto hook_requests_to_server_err;
 
-		ret = diswst(server_stream, pvna->hva_euser);
+		ret = diswst(shard_server_stream, pvna->hva_euser);
 		if (ret != DIS_SUCCESS)
 			goto hook_requests_to_server_err;
 
-		ret = vn_encode_DIS(server_stream, pvnlph);	/* vnode list */
+		ret = vn_encode_DIS(shard_server_stream, pvnlph);	/* vnode list */
 		if (ret != DIS_SUCCESS)
 			goto hook_requests_to_server_err;
 
-		rpp_flush(server_stream);
+		rpp_flush(shard_server_stream);
 
 		pvna = nxt;	/* next set of vnl changes */
 	}
@@ -1449,54 +1449,56 @@ void
 send_resc_used(int cmd, int count, struct resc_used_update *rud)
 {
 	int	ret;
+	int shard_server_stream;
 
 	if (count == 0 || rud == NULL || server_stream < 0)
 		return;
 	DBPRT(("send_resc_used update to server on stream %d\n", server_stream))
 
-	ret = is_compose(server_stream, cmd);
+	shard_server_stream = get_server_stream(NULL, default_server_port, rud->ru_pjobid);
+	ret = is_compose(shard_server_stream, cmd);
 	if (ret != DIS_SUCCESS)
 		goto err;
 
-	ret = diswui(server_stream, count);
+	ret = diswui(shard_server_stream, count);
 	if (ret != DIS_SUCCESS)
 		goto err;
 
 	while (rud) {
-		ret = diswst(server_stream, rud->ru_pjobid);
+		ret = diswst(shard_server_stream, rud->ru_pjobid);
 		if (ret != DIS_SUCCESS)
 			goto err;
 
 		if (rud->ru_comment) {
 			/* non-null comment: send "1" followed by comment */
-			ret = diswsi(server_stream, 1);
+			ret = diswsi(shard_server_stream, 1);
 			if (ret != DIS_SUCCESS)
 				goto err;
-			ret = diswst(server_stream, rud->ru_comment);
+			ret = diswst(shard_server_stream, rud->ru_comment);
 			if (ret != DIS_SUCCESS)
 				goto err;
 		} else {
 			/* null comment: send "0" */
-			ret = diswsi(server_stream, 0);
+			ret = diswsi(shard_server_stream, 0);
 			if (ret != DIS_SUCCESS)
 				goto err;
 		}
-		ret =diswsi(server_stream, rud->ru_status);
+		ret =diswsi(shard_server_stream, rud->ru_status);
 		if (ret != DIS_SUCCESS)
 			goto err;
 
-		ret = diswsi(server_stream, rud->ru_hop);
+		ret = diswsi(shard_server_stream, rud->ru_hop);
 		if (ret != DIS_SUCCESS)
 			goto err;
 
-		ret = encode_DIS_svrattrl(server_stream,
+		ret = encode_DIS_svrattrl(shard_server_stream,
 			(svrattrl *)GET_NEXT(rud->ru_attr));
 		if (ret != DIS_SUCCESS)
 			goto err;
 
 		rud = rud->ru_next;
 	}
-	rpp_flush(server_stream);
+	rpp_flush(shard_server_stream);
 	return;
 
 err:
@@ -1507,8 +1509,8 @@ err:
 		log_err(errno, "send_resc_used", log_buffer);
 
 	if (cmd != IS_RESCUSED_FROM_HOOK) {
-		rpp_close(server_stream);
-		server_stream = -1;
+		rpp_close(shard_server_stream);
+		shard_server_stream = -1;
 	}
 	return;
 }
@@ -1528,28 +1530,26 @@ void
 send_wk_job_idle(char *jobid, int idle)
 {
 	int	ret;
+	int shard_server_stream = get_server_stream(NULL, default_server_port, jobid);
 
-	if (server_stream < 0)
-		return;
-
-	ret = is_compose(server_stream, IS_IDLE);
+	ret = is_compose(shard_server_stream, IS_IDLE);
 	if (ret != DIS_SUCCESS)
 		goto err;
 
-	ret = diswui(server_stream, idle);
+	ret = diswui(shard_server_stream, idle);
 	if (ret != DIS_SUCCESS)
 		goto err;
-	ret = diswst(server_stream, jobid);
+	ret = diswst(shard_server_stream, jobid);
 	if (ret != DIS_SUCCESS)
 		goto err;
-	rpp_flush(server_stream);
+	rpp_flush(shard_server_stream);
 	return;
 
 err:
 	sprintf(log_buffer, "%s for %d", dis_emsg[ret], idle);
 	log_err(errno, "send_wk_job_idle", log_buffer);
-	rpp_close(server_stream);
-	server_stream = -1;
+	rpp_close(shard_server_stream);
+	shard_server_stream = -1;
 	return;
 }
 
@@ -1679,13 +1679,14 @@ int
 send_sched_recycle(char *hook_user)
 {
 	int ret;
-	ret = is_compose(server_stream, IS_HOOK_SCHEDULER_RESTART_CYCLE);
+	int shard_server_stream = get_server_stream(NULL, default_server_port, NULL);
+	ret = is_compose(shard_server_stream, IS_HOOK_SCHEDULER_RESTART_CYCLE);
 	if (ret != DIS_SUCCESS)
 		goto recycle_err;
-	ret = diswst(server_stream, hook_user);
+	ret = diswst(shard_server_stream, hook_user);
 	if (ret != DIS_SUCCESS)
 		goto recycle_err;
-	ret = rpp_flush(server_stream);
+	ret = rpp_flush(shard_server_stream);
 	if (ret != DIS_SUCCESS)
 		goto recycle_err;
 	return (0);

@@ -407,7 +407,7 @@ extern int DIS_wflush(int sock, int rpp);
 extern int engage_external_authentication(int out, int auth_type, int fromsvr, char *ebuf, int ebufsz);
 extern char *PBSD_modify_resv(int connect, char *resv_id,
 	struct attropl *attrib, char *extend);
-int initialise_connection_slot(int table_size);
+extern int initialise_connection_slot(int table_size);
 #ifdef	__cplusplus
 }
 #endif

@@ -58,6 +58,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <netinet/in.h>
 #include "dis.h"
 #include "libpbs.h"
 #include "list_link.h"
@@ -115,6 +116,7 @@ extern useconds_t	alps_release_jitter;
 #endif
 
 extern char		*path_hooks_workdir;
+extern int conn_slot;
 
 #ifndef WIN32
 /**
@@ -1905,6 +1907,66 @@ end_loop:
 		exiting_tasks = 0;	/* went through all jobs */
 }
 
+int internal_connect_mom(int channel, char *server, int port, char *extend_data)
+{
+	return rpp_open(server, port);
+}
+/**
+ * @brief
+ * 	Build and utilize the connection array to get the connect handle and 
+ *  utilize get_svr_shard_connection() to choose the shard server.
+ *
+ * @par
+ *	Open an RPP stream server/port, 
+ *
+ * @param[in]	svr  - name of Server to which to send the restart
+ * @param[in]	port - port Server would be expecting to receive IM messages
+ *
+ * @return	int
+ *
+ */
+
+int
+get_server_stream(char *svr, unsigned int port, char *jobid)
+{
+	int	stream = -1;
+	if (pbs_conf.pbs_max_servers > 1) {				
+		if (conn_slot == -1) {
+			conn_slot = initialise_connection_slot(NCONNECTS);
+			if (conn_slot == -1) {
+				log_err(-1, __func__, "connection table initialization failed");
+				return 1;
+			}
+		set_new_shard_context(conn_slot);
+		}		
+		internal_connect = internal_connect_mom;
+		stream = get_svr_shard_connection(conn_slot, -1 , jobid);	
+	} else { 
+		if (server_stream == -1) {
+			if (svr == NULL)
+				svr = get_servername(&port);
+			stream = rpp_open(svr, port);
+		} else 
+			return server_stream;
+	}
+	return stream;
+}
+
+
+
+void
+set_server_stream(unsigned int port, int stream)
+{
+	if (pbs_conf.pbs_max_servers > 1) {	
+		int srv_index = get_svr_index(port);
+		if (connection[conn_slot].ch_shards[srv_index]->state == SHARD_CONN_STATE_DOWN) {
+			connection[conn_slot].ch_shards[srv_index]->state = SHARD_CONN_STATE_CONNECTED;
+			connection[conn_slot].ch_shards[srv_index]->sd = stream;
+			connection[conn_slot].ch_shards[srv_index]->state_change_time = time(0);
+		}
+	}
+}		
+
 /**
  * @brief
  * 	send IS_HELLOSVR message to Server.
@@ -1924,9 +1986,18 @@ end_loop:
 static void
 send_hellosvr_rpp(char *svr, unsigned int port)
 {
-	int		stream;
-
-	stream = rpp_open(svr, port);
+	int	stream;
+	short	svr_port;
+	struct	sockaddr_in	*addr;
+	stream = get_server_stream(svr, port, NULL);
+	addr = rpp_getaddr(stream);
+	if (addr == NULL) {
+		sprintf(log_buffer, "Sender unknown");
+		log_err(-1, __func__, log_buffer);
+		rpp_close(stream);
+		return;
+	}
+	svr_port = ntohs((unsigned short)addr->sin_port);
 
 	if (stream < 0) {
 		(void)sprintf(log_buffer, "rpp_open(%s, %d) failed", svr, port);
@@ -1944,7 +2015,7 @@ send_hellosvr_rpp(char *svr, unsigned int port)
 	(void)diswui(stream, pbs_mom_port);
 	rpp_flush(stream);
 
-	(void)sprintf(log_buffer, "HELLOSVR sent to server at %s:%d", svr, port);
+	(void)sprintf(log_buffer, "HELLOSVR sent to server at %s:%u", svr, svr_port);
 	log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_NOTICE,
 		msg_daemonname, log_buffer);
 	server_stream = stream;
@@ -1968,6 +2039,7 @@ send_restart(void)
 {
 	unsigned int	port = default_server_port;
 	char	       *svr;
+	int j;
 
 	if (server_stream >= 0) {
 		sprintf(log_buffer, "Closing existing server stream %d",
@@ -1977,6 +2049,16 @@ send_restart(void)
 		rpp_flush(server_stream);
 		rpp_close(server_stream);
 		server_stream = -1;
+		for (j = 0; j < get_current_servers(); j++) {
+			if (server_stream == connection[conn_slot].ch_shards[j]->sd) {
+				sprintf(log_buffer, "Server closed connection; changing connection state");
+				log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_NOTICE,
+					__func__, log_buffer);
+				connection[conn_slot].ch_shards[j]->state = SHARD_CONN_STATE_DOWN;
+				connection[conn_slot].ch_shards[j]->state_change_time = time(0);
+				connection[conn_slot].shard_context = -1;
+			}
+		}
 	}
 
 	svr = get_servername(&port);

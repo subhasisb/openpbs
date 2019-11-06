@@ -294,6 +294,7 @@ void convert_duration_to_str(time_t duration, char* buf, int bufsize);
 int get_max_servers();
 int get_current_servers();
 int get_my_index();
+int get_svr_index(int port);
 long long get_next_hash(long long curr, long long max_id);
 long long get_last_hash(long long njobid);
 int get_server_shard(char * shard_hint);

@@ -118,7 +118,7 @@ extern  char   *msg_err_malloc;
 extern int
 write_pipe_data(int upfds, void *data, int data_size);
 char	task_fmt[] = "/%8.8X";
-
+extern int conn_slot;
 
 /* Function pointers
  **
@@ -2362,6 +2362,7 @@ void
 im_eof(int stream, int ret)
 {
 	int			num;
+	int			j;
 	job			*pjob;
 	hnodent			*np;
 	struct	sockaddr_in	*addr;
@@ -2377,6 +2378,17 @@ im_eof(int stream, int ret)
 		log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_NOTICE,
 			__func__, log_buffer);
 		server_stream = -1;
+	}
+
+	for (j = 0; j < get_current_servers(); j++) {
+		if (stream == connection[conn_slot].ch_shards[j]->sd) {
+			sprintf(log_buffer, "Server closed connection changing connection state");
+			log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_NOTICE,
+				__func__, log_buffer);
+			connection[conn_slot].ch_shards[j]->state = SHARD_CONN_STATE_DOWN;
+			connection[conn_slot].ch_shards[j]->state_change_time = time(0);
+			connection[conn_slot].shard_context = -1;
+		}
 	}
 
 	/*
