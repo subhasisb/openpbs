@@ -254,7 +254,6 @@ struct	pbssubn {
 
 struct	pbs_job_list {
 	char	*job_str;
-	ulong last_cpu_indx;
 	ulong buf_sz;
 	ulong offset;
 };
@@ -444,6 +443,7 @@ extern	void vnode_available(struct pbsnode *);
 extern	int find_degraded_occurrence(resc_resv *, struct pbsnode *, enum vnode_degraded_op);
 extern	int find_vnode_in_execvnode(char *, char *);
 extern	void set_vnode_state(struct pbsnode *, unsigned long , enum vnode_state_op);
+extern	void set_vnode_state2(struct pbsnode *, unsigned long , enum vnode_state_op, int);
 extern	struct resvinfo *find_vnode_in_resvs(struct pbsnode *, enum vnode_degraded_op);
 extern	void free_rinf_list(struct resvinfo *);
 extern	void degrade_offlined_nodes_reservations(void);
