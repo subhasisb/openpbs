@@ -1140,21 +1140,28 @@ send_ip_addrs_to_mom(int stream)
  * @param[in]	pbsnode	- The vnode
  * @param[in]	state_bits	- the value to set the vnode to
  * @param[in]	type	- The operation on the node
+ * @param[in]	savedb	- tells whether to save into the db.
  *
  * @return	void
  *
  * @par MT-safe: No
  */
 void
-set_vnode_state(struct pbsnode *pnode, unsigned long state_bits, enum vnode_state_op type)
+set_vnode_state2(struct pbsnode *pnode, unsigned long state_bits, enum vnode_state_op type, int save_db)
 {
 	unsigned long nd_prev_state;
 	int time_int_val;
+	int already_locked = 0;
 
 	time_int_val = time_now;
 
 	if (pnode == NULL)
 		return;
+
+	if (pnode->nd_modified & NODE_LOCKED || !save_db)
+		already_locked = 1;
+	else
+		pnode = find_nodebyname(pnode->nd_name, LOCK);
 
 	nd_prev_state = pnode->nd_state;
 	switch (type) {
@@ -1193,6 +1200,9 @@ set_vnode_state(struct pbsnode *pnode, unsigned long state_bits, enum vnode_stat
 		set_attr_svr(&(pnode->nd_attr[(int)ND_ATR_last_state_change_time]),
 			&node_attr_def[(int) ND_ATR_last_state_change_time], str_val);
 	}
+
+	if(!already_locked)
+		node_save_db(pnode);
 
 	if (pnode->nd_state & INUSE_PROV) {
 		if (!(pnode->nd_state & VNODE_UNAVAILABLE) ||	
@@ -1245,6 +1255,29 @@ set_vnode_state(struct pbsnode *pnode, unsigned long state_bits, enum vnode_stat
 		((!(pnode->nd_state & VNODE_UNAVAILABLE)) ||
 		(pnode->nd_state == INUSE_FREE)))
 		(void) vnode_available(pnode);
+}
+
+/**
+ * @brief
+ * 		Change the state of a vnode. See pbs_nodes.h for definition of node's
+ * 		availability and unavailability.
+ *
+ * 		This function detects the type of change, either from available to
+ * 		unavailable, and invokes the appropriate handler to handle the state
+ * 		change.
+ *
+ * @param[in]	pbsnode	- The vnode
+ * @param[in]	state_bits	- the value to set the vnode to
+ * @param[in]	type	- The operation on the node
+ *
+ * @return	void
+ *
+ * @par MT-safe: No
+ */
+void
+set_vnode_state(struct pbsnode *pnode, unsigned long state_bits, enum vnode_state_op type)
+{
+	set_vnode_state2(pnode, state_bits, type, 1);
 }
 
 /**
@@ -7045,31 +7078,15 @@ set_nodes(void *pobj, int objtype, char *execvnod_in, char **execvnod_out, char 
 						pnode->nd_nsnfree))
 				}
 			}
+
 			share_node = pnode->nd_attr[(int)ND_ATR_Sharing].at_val.at_long;
-			if (share_node == (int)VNS_FORCE_EXCL || share_node == (int)VNS_FORCE_EXCLHOST) {
-				set_vnode_state(pnode, INUSE_JOBEXCL, Nd_State_Or);
-			} else if (share_node == (int)VNS_IGNORE_EXCL) {
-				if (pnode->nd_nsnfree <= 0)
-					set_vnode_state(pnode, INUSE_JOB, Nd_State_Or);
-				else
-					set_vnode_state(pnode, ~(INUSE_JOB | INUSE_JOBEXCL), Nd_State_And);
-			} else if (share_node == (int)VNS_DFLT_EXCL || share_node == (int)VNS_DFLT_EXCLHOST) {
-				if (share_job == (int)VNS_IGNORE_EXCL) {
-					if (pnode->nd_nsnfree <= 0)
-						set_vnode_state(pnode, INUSE_JOB, Nd_State_Or);
-					else
-						set_vnode_state(pnode, ~(INUSE_JOB | INUSE_JOBEXCL), Nd_State_And);
-				} else {
+			if (share_node == (int)VNS_DFLT_EXCL || share_node == (int)VNS_DFLT_EXCLHOST) {
+				if (share_job != (int)VNS_IGNORE_EXCL) {
 					set_vnode_state(pnode, INUSE_JOBEXCL, Nd_State_Or);
 				}
 			} else if (share_job == VNS_FORCE_EXCL) {
 				set_vnode_state(pnode, INUSE_JOBEXCL, Nd_State_Or);
-			} else if (pnode->nd_nsnfree <= 0) {
-				set_vnode_state(pnode, INUSE_JOB, Nd_State_Or);
-			} else {
-				set_vnode_state(pnode, ~(INUSE_JOB | INUSE_JOBEXCL), Nd_State_And);
 			}
-
 
 			/*
 			 * now for each new chunk, add the job to the Mom job index

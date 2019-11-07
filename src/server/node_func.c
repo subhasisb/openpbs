@@ -427,6 +427,8 @@ pre_nodejob_query(struct pbsnode *pnode)
 	resource   *prsc;
 	attribute    *pattr = &pnode->nd_attr[(int)ND_ATR_ResourceAssn];
 
+	pnode->nd_nsnfree = pnode->nd_nsn;
+
 	/* clear all resc_assn values before reading afresh */
 	for (prsc = (resource *)GET_NEXT(pattr->at_val.at_list);
 			prsc != NULL;
@@ -455,14 +457,30 @@ pre_nodejob_query(struct pbsnode *pnode)
 void
 post_nodejob_query(struct pbsnode *pnode)
 {
-	resource   *prsc;
-	attribute    *pattr = &pnode->nd_attr[(int)ND_ATR_ResourceAssn];
+	resource	*prsc;
+	attribute	*pattr = &pnode->nd_attr[(int)ND_ATR_ResourceAssn];
+	long		share_node;
 
 	/* set the flags on another pass */
 	for (prsc = (resource *)GET_NEXT(pattr->at_val.at_list);
 			prsc != NULL;
 			prsc = (resource *)GET_NEXT(prsc->rs_link)) {
 		prsc->rs_value.at_flags |= ATR_VFLAG_SET;
+	}
+
+	/* set/unset state of node */
+	share_node = pnode->nd_attr[(int)ND_ATR_Sharing].at_val.at_long;
+	if (share_node == (int)VNS_FORCE_EXCL || share_node == (int)VNS_FORCE_EXCLHOST) {
+		set_vnode_state2(pnode, INUSE_JOBEXCL, Nd_State_Or, 0);
+	} else if (share_node == (int)VNS_IGNORE_EXCL) {
+		if (pnode->nd_nsnfree <= 0)
+			set_vnode_state2(pnode, INUSE_JOB, Nd_State_Or, 0);
+		else
+			set_vnode_state2(pnode, ~(INUSE_JOB | INUSE_JOBEXCL), Nd_State_And, 0);
+	} else if (pnode->nd_nsnfree <= 0) {
+		set_vnode_state2(pnode, INUSE_JOB, Nd_State_Or, 0);
+	} else if (pnode->nd_nsnfree == pnode->nd_nsn) {
+		set_vnode_state2(pnode, ~(INUSE_JOB | INUSE_JOBEXCL), Nd_State_And, 0);
 	}
 }
 

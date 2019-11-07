@@ -168,7 +168,6 @@ append_to_joblist(pbs_node *pnode, char *jobid, int ncpus)
 		pnode->job_list->job_str = malloc(1024);
 		pnode->job_list->buf_sz = 1024;
 		pnode->job_list->offset = 0;
-		pnode->job_list->last_cpu_indx = 0;
 	}
 	
 	jlist = pnode->job_list;
@@ -185,9 +184,9 @@ append_to_joblist(pbs_node *pnode, char *jobid, int ncpus)
 			jlist->offset +=sprintf(jlist->job_str + jlist->offset, ", ");
 		}
 		jlist->offset += sprintf(jlist->job_str + jlist->offset,
-					 "%s/%ld", jobid, jlist->last_cpu_indx);
+					 "%s/%ld", jobid, pnode->nd_nsn - pnode->nd_nsnfree);
 		if (ncpus)
-			jlist->last_cpu_indx += 1;
+			pnode->nd_nsnfree -= 1;
 	} while(--ncpus > 0);
 }
 
@@ -203,7 +202,6 @@ append_to_resvlist(pbs_node *pnode, char *resvid)
 		pnode->resv_list->job_str = malloc(1024);
 		pnode->resv_list->buf_sz = 1024;
 		pnode->resv_list->offset = 0;
-		pnode->resv_list->last_cpu_indx = 0;
 	}
 	
 	rlist = pnode->resv_list;
@@ -233,8 +231,6 @@ nodejob_db_to_attrlist(struct pbsnode *pnode, pbs_db_nodejob_info_t *db_obj)
 		attribute tmpattr;
 		pbs_db_attr_info_t *attrs = &db_obj->attr_list.attributes[i];
 
-		if (strcmp(attrs->attr_name, ATTR_rescassn))
-			continue;
 		memset(&tmpattr, 0, sizeof(attribute));
 		if ((node_attr_def + ND_ATR_ResourceAssn)->at_decode) {
 			(void)(node_attr_def + ND_ATR_ResourceAssn)->at_decode(
