@@ -2491,8 +2491,6 @@ mgr_node_set(struct batch_request *preq)
 				if ((pnode->nd_nsnfree == 0) && (pnode->nd_state == 0))
 					set_vnode_state(pnode, INUSE_JOB, Nd_State_Or);
 
-				(void)chk_characteristic(pnode, &need_todo);
-
 				mgr_log_attr(msg_man_set, plist,
 					PBS_EVENTCLASS_NODE, pnode->nd_name, NULL);
 			}
@@ -2539,19 +2537,10 @@ mgr_node_set(struct batch_request *preq)
 
 	warnmsg = warn_msg_build(WARN_ngrp, warn_nodes, warn_idx);
 
-	/* save_nodes_db calls write_node_state internally,
-	 * so call write_node_state only if save_nodes_db is not
-	 * being called
-	 */
 	if (need_todo & WRITE_NEW_NODESFILE) {
 		/*create/delete/prop/ntype change*/
-		if (!save_nodes_db(0, NULL)) {
+		if (!save_nodes_db(0, NULL))
 			need_todo &= ~(WRITE_NEW_NODESFILE); /*successful on update*/
-			need_todo &= ~(WRITENODE_STATE);
-		}
-	} else if (need_todo & WRITENODE_STATE) { /*nodes "offline"/comment changed*/
-		write_node_state();
-		need_todo &= ~(WRITENODE_STATE);
 	}
 
 	if (numnodes > 1) {          /*modification was for multiple vnodes  */
@@ -2840,8 +2829,6 @@ mgr_node_unset(struct batch_request *preq)
 					}
 				}
 
-				(void)chk_characteristic(pnode, &need_todo);
-
 				mgr_log_attr(msg_man_set, plist,
 					PBS_EVENTCLASS_NODE, pnode->nd_name, NULL);
 			}
@@ -2863,19 +2850,11 @@ mgr_node_unset(struct batch_request *preq)
 
 	warnmsg = warn_msg_build(WARN_ngrp, warn_nodes, warn_idx);
 
-	/* save_nodes_db calls write_node_state internally,
-	 * so call write_node_state only if save_nodes_db is not
-	 * being called
-	 */
 	if (need_todo & WRITE_NEW_NODESFILE) {
 		/*create/delete/prop/ntype change*/
 		if (!save_nodes_db(0, NULL)) {
 			need_todo &= ~(WRITE_NEW_NODESFILE);	/*successful on update*/
-			need_todo &= ~(WRITENODE_STATE);
 		}
-	} else if (need_todo & WRITENODE_STATE) {  /*nodes "offline"/comment changed */
-		write_node_state();
-		need_todo &= ~(WRITENODE_STATE);
 	}
 
 	if (numnodes > 1) {          /*modification was for all nodes  */
@@ -3015,11 +2994,6 @@ create_pbs_node2(char *objname, svrattrl *plist, int perms, int *bad, struct pbs
 			free(pname);
 			return (PBSE_SYSTEM);
 		}
-
-		if (update_node_cache(pnode, TREE_OP_ADD) != 0) {
-			free(pname);
-			return (PBSE_SYSTEM);
-		}
 	} else if (nodup == TRUE) {
 		/* duplicating/modifying vnode by qmgr is not allowed */
 		/* as what qmgr creates is the natural vnode          */
@@ -3144,8 +3118,8 @@ create_pbs_node2(char *objname, svrattrl *plist, int perms, int *bad, struct pbs
 		return (rc);
 	}
 
-	if (update_node_cache(pnode) != 0) {
-		free(pname);
+	if (update_node_cache(pnode, TREE_OP_ADD) != 0) {
+		effective_node_delete(pnode);
 		return (PBSE_SYSTEM);
 	}
 
@@ -3411,8 +3385,6 @@ struct batch_request *preq;
 			pnode = NULL; /* pnode has been freed, set it to NULL */
 			i--; /* the array has been coalesced, so reset i to the earlier position */
 
-			(void)chk_characteristic(pnode, &need_todo);
-
 			if (nodename) {
 				mgr_log_attr(msg_man_set, plist,
 					PBS_EVENTCLASS_NODE, nodename, NULL);
@@ -3424,18 +3396,10 @@ struct batch_request *preq;
 			break;
 	} /*bottom of the for()*/
 
-	/* save_nodes_db calls write_node_state internally,
-	 * so call write_node_state only if save_nodes_db is not
-	 * being called
-	 */
 	if (need_todo & WRITE_NEW_NODESFILE) {	/*create/delete/attr change*/
 		if (!save_nodes_db(1, NULL)) {
 			need_todo &= ~(WRITE_NEW_NODESFILE); /*successful on update*/
-			need_todo &= ~(WRITENODE_STATE);
 		}
-	} else if (need_todo & WRITENODE_STATE) {  /*nodes "offline"/comment changed */
-		write_node_state();
-		need_todo &= ~(WRITENODE_STATE);
 	}
 
 	if (numnodes > 1) {          /*modification was for all nodes  */
@@ -4941,32 +4905,6 @@ manager_oper_chk(attribute *pattr, void *pobject, int actmode)
 		}
 	}
 	return (err);
-}
-
-
-/**
- * @brief
- * 		node_comment - action routine for the comment attribute of a node
- *		if set to non-default, set flag to cause node_status file to
- *		be written.   The comment will be the last item on the status line.
- *
- * @param[in]	pattr	-     pointer to new attribute value
- * @param[in]	pobj    -     pointer to node
- * @param[in]	act     -     action mode
- *
- * @return	error code
- * @retval	0	- success
- */
-int
-node_comment(attribute *pattr, void *pobj, int act)
-{
-	if (pattr->at_flags & ATR_VFLAG_MODIFY) {
-		if (((pattr->at_flags & ATR_VFLAG_SET)  == 0) ||
-			((pattr->at_flags & ATR_VFLAG_DEFLT) == 0)) {
-			need_todo |= WRITENODE_STATE;
-		}
-	}
-	return 0;
 }
 
 

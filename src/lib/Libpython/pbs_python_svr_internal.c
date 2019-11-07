@@ -9301,7 +9301,6 @@ _pbs_python_do_vnode_set(void)
 			}
 			return;
 		} else {
-			(void)chk_characteristic(pnode, &need_todo);
 
 			mgr_log_attr(msg_man_set, plist,
 				PBS_EVENTCLASS_NODE, pnode->nd_name, hook_name);
@@ -9324,15 +9323,9 @@ _pbs_python_do_vnode_set(void)
 		vn_set_req = (vnode_set_req *) GET_NEXT(vn_set_req->all_reqs);
 	}
 
-	/* save_nodes_db calls write_node_state internally,
-	 * so call write_node_state only if save_nodes_db is not
-	 * being called
-	 */
 	if (need_todo & WRITE_NEW_NODESFILE) {
 		/*create/delete/prop/ntype change*/
 		(void)save_nodes_db(0, NULL);
-	} else if (need_todo & WRITENODE_STATE) {  /*nodes "offline"/comment changed*/
-		write_node_state();
 	}
 }
 

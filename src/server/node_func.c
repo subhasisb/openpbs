@@ -49,9 +49,6 @@
  *	find_nodebyname()   	-     given a node host name, search pbsndlist
  * 	save_characteristic() 	- save the the characteristics of the node along with
  *							the address of the node
- * 	chk_characteristic() 	-  check for changes to the node's set of
- *							characteristics and set appropriate flag bits in the "need_todo"
- *							location depending on which characteristics changed
  * 	status_nodeattrib() 	-    add status of each requested (or all) node-attribute
  *								to the status reply
  * 	initialize_pbsnode() 	-   performs node initialization on a new node
@@ -157,7 +154,6 @@ extern unsigned int pbs_rm_port;
 extern char	*resc_in_err;
 extern char	server_host[];
 extern AVL_IX_DESC *node_tree;
-extern int write_single_node_mom_attr(struct pbsnode *np);
 
 extern struct python_interpreter_data  svr_interp_data;
 
@@ -165,7 +161,6 @@ extern struct python_interpreter_data  svr_interp_data;
 /* External Functions Called */
 extern int node_recov_db_raw(void *nd, pbs_list_head *phead);
 extern int node_delete_db(struct pbsnode *pnode);
-extern int write_single_node_state(struct pbsnode *np);
 #endif /* localmod 005 */
 
 
@@ -189,7 +184,7 @@ update_node_cache(pbs_node *pnode, int op)
 				}
 			}
 
-			if (tree_add_del(node_tree, pnode->nd_name, pnode, op) != 0) {
+			if (tree_add_del(node_tree, pnode->nd_name, pnode, TREE_OP_ADD) != 0) {
 				DBPRT(("Addition to node tree has failed"))
 				free_pnode(pnode);
 				return (PBSE_SYSTEM);
@@ -213,6 +208,7 @@ update_node_cache(pbs_node *pnode, int op)
 			pnode->nd_arr_index = svr_totnodes; /* this is only in mem, not from db */
 			DBPRT(("pbsndlist_sz: %d, svr_totnodes: %d", pbsndlist_sz, svr_totnodes))
 			pbsndlist[svr_totnodes++] = pnode;
+			create_svrmom_struct(pnode);
 			break;
 
 		case TREE_OP_DEL:
@@ -228,8 +224,6 @@ update_node_cache(pbs_node *pnode, int op)
 				svr_totnodes--;
 			}
 	}
-
-	create_svrmom_struct(pnode);
 
 	return 0;
 }
@@ -249,8 +243,6 @@ refresh_node(char *nodename, char * nd_savetm, int lock)
 {
 	char		*pslash;
 	struct pbsnode *pnode = NULL;
-
-	DBPRT(("Entering %s", __func__))
 
 	if (nodename == NULL)
 		return NULL;
@@ -339,86 +331,6 @@ save_characteristic(struct pbsnode *pnode)
 	old_address = pnode;
 	old_state =   pnode->nd_state;
 
-}
-
-/**
- * @brief
- * 		Check the value of the characteristics against
- *		that which was saved earlier.
- *
- * @param[in]	pnode	- the node to check
- * @param[out]	pneed_todo - 	gets appropriate bit(s) set depending on the
- * 				results of the check.
- *
- * @return int
- * @retval	-1  if parent address doesn't match saved parent address
- * @retval	0   if successful check.
- */
-
-int
-chk_characteristic(struct pbsnode *pnode, int *pneed_todo)
-{
-	unsigned long	tmp;
-	int		i;
-	int		deleted=0;
-
-	if (pnode != old_address || pnode == NULL) {
-		/*
-		 **	didn't do save_characteristic() before
-		 **	issuing chk_characteristic()
-		 */
-
-		old_address = NULL;
-		return (-1);
-	}
-	pnode->nd_modified &= NODE_LOCKED; /* reset */
-
-	tmp = pnode->nd_state;
-	if (tmp != old_state) {
-		if (tmp & INUSE_DELETED && !(old_state & INUSE_DELETED)) {
-			*pneed_todo |= WRITE_NEW_NODESFILE; /*node being deleted*/
-			pnode->nd_modified |= NODE_UPDATE_OTHERS;
-			deleted = 1; /* no need to update other attributes */
-		} else {
-			if (tmp & INUSE_OFFLINE && !(old_state & INUSE_OFFLINE)) {
-				*pneed_todo |= WRITENODE_STATE; /*marked offline */
-				pnode->nd_modified |= NODE_UPDATE_STATE;
-			}
-
-			if (!(tmp & INUSE_OFFLINE) && old_state & INUSE_OFFLINE) {
-				*pneed_todo |= WRITENODE_STATE; /*removed offline*/
-				pnode->nd_modified |= NODE_UPDATE_STATE;
-			}
-
-			if (tmp & INUSE_OFFLINE_BY_MOM && !(old_state & INUSE_OFFLINE_BY_MOM)) {
-				*pneed_todo |= WRITENODE_STATE; /*marked offline */
-				pnode->nd_modified |= NODE_UPDATE_STATE;
-			}
-
-			if (!(tmp & INUSE_OFFLINE_BY_MOM) && old_state & INUSE_OFFLINE_BY_MOM) {
-				*pneed_todo |= WRITENODE_STATE; /*removed offline*/
-				pnode->nd_modified |= NODE_UPDATE_STATE;
-			}
-		}
-	}
-
-	if (!deleted) {
-		if (pnode->nd_attr[ND_ATR_Comment].at_flags & ATR_VFLAG_MODIFY) {
-			*pneed_todo |= WRITENODE_STATE;
-			pnode->nd_modified |= NODE_UPDATE_COMMENT;
-		}
-
-		for (i = 0; i < ND_ATR_LAST; i++) {
-			if ((i != ND_ATR_Comment && i != ND_ATR_state) &&
-				(pnode->nd_attr[i].at_flags & ATR_VFLAG_MODIFY)) {
-				*pneed_todo |= WRITE_NEW_NODESFILE;
-				pnode->nd_modified |= NODE_UPDATE_OTHERS;
-				break;
-			}
-		}
-	}
-	old_address = NULL;
-	return  0;
 }
 
 int
@@ -1073,98 +985,6 @@ process_host_name_part(char *objname, svrattrl *plist, char **pname, int *ntype)
 
 /**
  * @brief
- *		Static function to update the specified mom in the db. If the
- *		NODE_UPDATE_OTHERS flag is set: for each node, it also calls
- *		the "write_single_node_state" function to update the state and
- *		comment of the node.  If the NODE_UPDATE_MOM flag is set, it
- *		calls write_single_node_mom_attr to update the attribute of
- *		the node.
- *
- *		We don't need to write the nodes in any particular order anymore. The
- *		nodes (while reading) will be read sorted on the nd_index column, which
- *		is the value of the nd_nummoms (number of moms the node is part of).
- *		This ensures the nodes which belong only one mom are loaded first, and
- *		the nodes with multi moms are loaded later.
- *
- * @see
- * 		save_nodes_db, save_nodes_db_inner
- *
- * @return	error code
- * @retval	-1 - Failure
- * @retval	 0 - Success
- *
- */
-static int
-save_nodes_db_mom(mominfo_t *pmom)
-{
-	struct pbsnode *np;
-	pbs_list_head wrtattr;
-	mom_svrinfo_t *psvrm;
-	int	nchild;
-
-	CLEAR_HEAD(wrtattr);
-
-	if (pmom == NULL)
-		return -1;
-
-	psvrm = (mom_svrinfo_t *) pmom->mi_data;
-	for (nchild = 0; nchild < psvrm->msr_numvnds; ++nchild) {
-		np = psvrm->msr_children[nchild];
-		if (np == NULL)
-			continue;
-
-		if (np->nd_state & INUSE_DELETED) {
-			/* this shouldn't happen, if it does, ignore it */
-			continue;
-		}
-
-		if (np->nd_modified & NODE_UPDATE_OTHERS) {
-			if (node_save_db(np) != 0) {
-				log_event(PBSEVENT_ADMIN, PBS_EVENTCLASS_SERVER,
-					LOG_WARNING, __func__, "node_save_db() failed");
-				return (-1);
-			}
-		}
-	}
-
-	return 0;
-}
-
-/**
- * @brief
- *		Static function to update all the nodes in the db
- *
- * @see
- * 		save_nodes_db_mom
- *
- * @return	error code
- * @retval	-1 - Failure
- * @retval	 0 - Success
- *
- */
-static int
-save_nodes_db_inner(void)
-{
-	int i;
-	pbs_list_head wrtattr;
-	mominfo_t *pmom;
-
-	/* for each Mom ... */
-	CLEAR_HEAD(wrtattr);
-
-	for (i = 0; i < mominfo_array_size; ++i) {
-		pmom = mominfo_array[i];
-		if (pmom == NULL)
-			continue;
-
-		if(save_nodes_db_mom(pmom) == -1)
-			return -1;
-	}
-	return 0;
-}
-
-/**
- * @brief
  *		When called, this function will update
  *		all the nodes in the db. It will update the mominfo_time to the db
  *		and save all the nodes which has the NODE_UPDATE_OTHERS flag set. It
@@ -1185,16 +1005,8 @@ save_nodes_db_inner(void)
 int
 save_nodes_db(int changemodtime, void *p)
 {
-	struct pbsnode  *np;
 	pbs_db_mominfo_time_t mom_tm = {0,0};
 	pbs_db_obj_info_t obj;
-	int           num;
-	attribute    *pattr;
-	resource     *resc;
-	char         *rname;
-	resource_def *rscdef;
-	int	i;
-	mominfo_t    *pmom = (mominfo_t *) p;
 
 	DBPRT(("%s: entered\n", __func__))
 
@@ -1228,56 +1040,9 @@ save_nodes_db(int changemodtime, void *p)
 		if (pbs_db_save_obj(svr_db_conn, &obj, PBS_INSERT_DB) != 0) /* insert also failed */
 			goto db_err;
 	}
-
-	if (pmom) {
-		if (save_nodes_db_mom(pmom) == -1)
-			goto db_err;
-	} else {
-		if (save_nodes_db_inner() == -1)
-			goto db_err;
-	}
-
 	if (pbs_db_end_trx(svr_db_conn, PBS_DB_COMMIT) != 0)
 		goto db_err;
 
-	/*
-	 * Clear the ATR_VFLAG_MODIFY bit on each node attribute
-	 * and on the node_group_key resource, for those nodes
-	 * that possess a node_group_key resource
-	 */
-
-	if (server.sv_attr[SRV_ATR_NodeGroupKey].at_flags & ATR_VFLAG_SET  &&
-		server.sv_attr[SRV_ATR_NodeGroupKey].at_val.at_str)
-		rname = server.sv_attr[SRV_ATR_NodeGroupKey].at_val.at_str;
-	else
-		rname = NULL;
-
-	if (rname)
-		rscdef = find_resc_def(svr_resc_def, rname, svr_resc_size);
-	else
-		rscdef = NULL;
-
-	for (i=0; i<svr_totnodes; i++) {
-		np = pbsndlist[i];
-		if (np->nd_state & INUSE_DELETED)
-			continue;
-
-		/* reset only after transaction is committed */
-		np->nd_modified &= ~(NODE_UPDATE_OTHERS | NODE_UPDATE_STATE | NODE_UPDATE_COMMENT);
-
-		for (num=0; num<ND_ATR_LAST; num++) {
-
-			np->nd_attr[num].at_flags &= ~ATR_VFLAG_MODIFY;
-
-			if (num == ND_ATR_ResourceAvail)
-				if (rname != NULL && rscdef != NULL) {
-					pattr = &np->nd_attr[ND_ATR_ResourceAvail];
-					if ((resc = find_resc_entry(pattr, rscdef)))
-						resc->rs_value.at_flags &= ~ATR_VFLAG_MODIFY;
-				}
-
-		}
-	}
 	return (0);
 
 db_err:

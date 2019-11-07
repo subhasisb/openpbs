@@ -203,23 +203,11 @@ struct pbsnode *find_nodebyname(char *nname, int lock)
 	return NULL;
 }
 
-void
-write_node_state(void)
-{
-	return;
-}
-
 
 void
 save_characteristic(struct pbsnode *pnode)
 {
 	return;
-}
-
-int
-chk_characteristic(struct pbsnode *pnode, int *pneed_todo)
-{
-	return (0);
 }
 
 
@@ -619,12 +607,6 @@ void      *pobject;
 int	   actmode;
 {
 	return (0);
-}
-
-int
-node_comment(attribute *pattr, void *pobj, int act)
-{
-	return 0;
 }
 
 int

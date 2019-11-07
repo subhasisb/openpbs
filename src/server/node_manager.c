@@ -79,8 +79,6 @@
  * 	compare_short_hostname()
  * 	mom_running_jobs()
  * 	is_request()
- * 	write_single_node_state()
- * 	write_node_state()
  * 	free_prop()
  * 	number()
  * 	property()
@@ -227,7 +225,6 @@ extern void propagate_socket_licensing(mominfo_t *);
 extern vnpool_mom_t *vnode_pool_mom_list;
 
 static void check_and_set_multivnode(struct pbsnode *);
-int write_single_node_mom_attr(struct pbsnode *np);
 void stream_eof(int stream, int ret, char *msg);
 
 extern void free_db_attr_list(pbs_db_attr_list_t *attr_list);
@@ -3210,8 +3207,6 @@ cross_link_mom_vnode(struct pbsnode *pnode, mominfo_t *pmom)
 		node_attr_def[(int) ND_ATR_Mom].at_set(
 			&pnode->nd_attr[(int) ND_ATR_Mom],
 			&tmpmom, INCR);
-		if (!(pnode->nd_modified & NODE_UPDATE_OTHERS))
-			pnode->nd_modified |= NODE_UPDATE_MOM; /* since we modified nd_nummoms, save it */
 		node_attr_def[(int) ND_ATR_Mom].at_free(&tmpmom);
 	}
 
@@ -5255,262 +5250,6 @@ err:
 
 	stream_eof(stream, ret, "write_err");
 
-	return;
-}
-
-/**
- * @brief
- * 		Save a single node's state/comments to the database.
- *
- * @par
- *		This function updates a single node's
- *  	state/comment to the respective attributes in the DB.
- *
- * @param[in]	np	- Pointer to the node whose state/comment is to be saved
- *
- * @return	int
- * @retval  0 if okay
- * @retval -1 on error
- *
- * @par MT-safe: No
- */
-int
-write_single_node_state(struct pbsnode *np)
-{
-	static char *offline_str = NULL;
-	static int  offline_str_sz = 0;
-	char	*tmp_str = NULL;
-	int     isoff;
-	int     hascomment;
-	int     hascurrentaoe;
-	pbs_db_attr_info_t attr;	
-	pbs_db_attr_list_t attr_list;
-	extern char	*get_vnode_state_str(char *);
-
-	pbs_db_conn_t *conn = (pbs_db_conn_t *) svr_db_conn;
-	pbs_db_obj_info_t obj;
-	obj.pbs_db_un.pbs_db_node = NULL;
-	obj.pbs_db_obj_type = PBS_DB_NODE;
-
-	attr_list.attr_count = 1;
-	attr_list.attributes = &attr;
-	memset(&attr, 0, sizeof(pbs_db_attr_info_t));
-
-
-	DBPRT(("write_single_node_state: entered\n"))
-
-	isoff = np->nd_state & (INUSE_OFFLINE | INUSE_OFFLINE_BY_MOM | INUSE_SLEEP);
-
-	if (isoff) {
-		int sz;
-		char *p;
-		char offline_bits[8];
-
-		snprintf(offline_bits, sizeof(offline_bits), "%d", isoff);
-		p = get_vnode_state_str(offline_bits);
-		if (!p) {
-			log_err(errno, "write_single_node_state", "Could not decode offline bit");
-			return -1;
-		}
-		sz = strlen(p)+1;
-		if (sz > offline_str_sz) {
-			tmp_str = realloc(offline_str, sz);
-			if (!tmp_str) {
-				log_err(errno,
-					"write_single_node_state",
-						"Out of memory");
-				return -1;
-			}
-			offline_str = tmp_str;
-			offline_str_sz = sz;
-		}
-		strcpy(offline_str, p);
-	}
-
-	if (np->nd_state & INUSE_DELETED)
-		return 0;
-
-	hascomment = (np->nd_attr[(int) ND_ATR_Comment].at_flags &
-		(ATR_VFLAG_SET | ATR_VFLAG_DEFLT)) == ATR_VFLAG_SET;
-
-	hascurrentaoe = (np->nd_attr[(int) ND_ATR_current_aoe].at_flags &
-		(ATR_VFLAG_SET | ATR_VFLAG_DEFLT)) == ATR_VFLAG_SET;
-
-	attr.attr_flags = 0;
-	strcpy(attr.attr_resc, "");
-	/* work on node state */
-	if (np->nd_modified & NODE_UPDATE_STATE) {
-		/* Write node state / comment to database */
-		strcpy(attr.attr_name, ATTR_NODE_state);
-		if (isoff) {
-			attr.attr_value = offline_str;
-			if (pbs_db_add_update_attr_obj(svr_db_conn, &obj, np->nd_name, &attr_list) != 0) {
-				log_err(errno, "write_single_node_state", "Failed to update node state");
-				return -1;
-			}
-
-		} else {
-			/* remove offline */
-			if (pbs_db_delete_attr_obj(svr_db_conn, &obj, np->nd_name, &attr_list) != 0) {
-				log_err(errno, "write_single_node_state", "Failed to delete node state");
-				return -1;
-			}
-		}
-	}
-
-	/* work on node comment */
-	if (np->nd_modified & NODE_UPDATE_COMMENT) {
-		strcpy(attr.attr_name, ATTR_comment);
-		if (hascomment) {
-			attr.attr_value = np->nd_attr[(int) ND_ATR_Comment].at_val.at_str;
-			if (pbs_db_add_update_attr_obj(svr_db_conn, &obj, np->nd_name, &attr_list) != 0) {
-				log_err(errno, "write_single_node_state", "Failed to update node comment");
-				return -1;
-			}
-		} else {
-			/* remove comment attribute */
-			if (pbs_db_delete_attr_obj(conn, &obj, np->nd_name, &attr_list) != 0) {
-				log_err(errno, "write_single_node_state", "Failed to delete node comment");
-				return -1;
-			}
-		}
-	}
-
-	/* work on node current_aoe */
-	if (np->nd_modified & NODE_UPDATE_CURRENT_AOE) {
-		strcpy(attr.attr_name, ATTR_NODE_current_aoe);
-		if (hascurrentaoe) {
-			attr.attr_value = np->nd_attr[(int) ND_ATR_current_aoe].at_val.at_str;
-			if (pbs_db_add_update_attr_obj(svr_db_conn, &obj, np->nd_name, &attr_list) != 0) {
-				log_err(errno, "write_single_node_state", "Failed to update node current_aoe");
-				return -1;
-			}
-		} else {
-			/* remove current_aoe attribute */
-			if (pbs_db_delete_attr_obj(conn, &obj, np->nd_name, &attr_list) != 0) {
-				log_err(errno, "write_single_node_state", "Failed to delete node current_aoe");
-				return -1;
-			}
-		}
-	}
-
-	return 0;
-}
-
-/**
- * @brief Save a single node's mom attribute to the database.
- *
- * @par
- *
- *  This function updates a single node's
- *  mom attribute in the DB.
- *
- * @param[in] np - Pointer to the node whose mom attribute is to be saved
- *
- * @retval  0 if okay
- * @retval -1 on error
- *
- */
-int
-write_single_node_mom_attr(struct pbsnode *np)
-{
-	pbs_list_head     wrtattr;
-	svrattrl     *psvrl;
-
-	pbs_db_obj_info_t obj;
-	pbs_db_attr_info_t attr;
-	pbs_db_attr_list_t attr_list;
-	obj.pbs_db_un.pbs_db_node = NULL;
-	obj.pbs_db_obj_type = PBS_DB_NODE;
-
-	attr_list.attr_count = 1;
-	attr_list.attributes = &attr;
-	memset(&attr, 0, sizeof(pbs_db_attr_info_t));
-
-	if (np->nd_state & INUSE_DELETED)
-		return 0;
-
-	attr.attr_flags = 0;
-	strcpy(attr.attr_resc, "");
-
-	/* work on node state */
-	if (np->nd_modified & NODE_UPDATE_MOM) {
-		/* Write node state / comment to database */
-		strcpy(attr.attr_name, ATTR_NODE_Mom);
-
-		CLEAR_HEAD(wrtattr);
-
-		(void) node_attr_def[(int) ND_ATR_Mom].at_encode(&np->nd_attr[(int) ND_ATR_Mom],
-					&wrtattr, node_attr_def[(int) ND_ATR_Mom].at_name,
-					NULL, ATR_ENCODE_SVR, NULL);
-
-		if ((psvrl = (svrattrl *) GET_NEXT(wrtattr)) != NULL) {
-			attr.attr_value = psvrl->al_value;
-
-			if (pbs_db_add_update_attr_obj(svr_db_conn, &obj, np->nd_name, &attr_list) != 0) {
-					log_err(errno, "write_single_node_mom_attr",
-							"Failed to update 'Mom' attribute");
-					return -1;
-			}
-			delete_link(&psvrl->al_link);
-			(void)free(psvrl);
-		}
-		node_save_db(np); /* save node qs so that nd_index is updated as well */
-		np->nd_modified &= ~NODE_UPDATE_MOM;
-	}
-	return 0;
-}
-
-/**
- * @brief
- * 		Save node states/comments to the database.
- *
- * @par
- *		This function loops through the node list
- *  	and updates the state/comment to the
- *  	respective attributes in the DB.
- *
- * @return	void
- */
-void
-write_node_state()
-{
-	struct pbsnode *np;
-	int i;
-
-	DBPRT(("write_node_state: entered\n"))
-
-	if (pbs_db_begin_trx(svr_db_conn, 0, 0) !=0)
-		goto db_err;
-
-	/*
-	 **	The only state that carries forward is if the
-	 **	node has been marked offline.
-	 */
-	for (i=0; i<svr_totnodes; i++) {
-		np = pbsndlist[i];
-
-		if (np->nd_state & INUSE_DELETED)
-			continue;
-
-		if (write_single_node_state(np) != 0)
-			goto db_err;
-
-		/*
-		 * state is not so critical, so we update flag right away,
-		 * instead of a loop later, after transaction completion
-		 * In worst case scenario, the transaction could fail, but still
-		 * the flags are reset
-		 */
-		np->nd_modified &= ~(NODE_UPDATE_STATE | NODE_UPDATE_COMMENT);
-	}
-	if (pbs_db_end_trx(svr_db_conn, PBS_DB_COMMIT) != 0)
-		goto db_err;
-
-	return;
-
-db_err:
-	pbs_db_end_trx(svr_db_conn, PBS_DB_ROLLBACK);
 	return;
 }
 
@@ -7827,7 +7566,6 @@ mark_node_offline_by_mom(char *nodename, char *why)
 	if ((pnode = find_nodebyname(nodename, LOCK)) != NULL) {
 		/* XXXX fix see momptr_down() XXXX */
 		momptr_offline_by_mom(pnode->nd_moms[0], why);
-		pnode->nd_modified |= (NODE_UPDATE_STATE|NODE_UPDATE_COMMENT);
 		node_save_db(pnode);
 	}
 }
@@ -7875,7 +7613,6 @@ clear_node_offline_by_mom(char *nodename, char *why)
 	if ((pnode = find_nodebyname(nodename, LOCK)) != NULL) {
 		/* XXXX fix see momptr_down() XXXX */
 		momptr_clear_offline_by_mom(pnode->nd_moms[0], why);
-		pnode->nd_modified |= (NODE_UPDATE_STATE|NODE_UPDATE_COMMENT);
 		node_save_db(pnode);
 	}
 }

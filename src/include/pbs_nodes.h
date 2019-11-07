@@ -397,18 +397,9 @@ typedef enum node_topology_type ntt_t;
 
 #define PBSNODE_NTYPE_MASK	0xf		 /* relevant ntype bits */
 
-#define WRITENODE_STATE		0x1		 /*associated w/ offline*/
 #define WRITE_NEW_NODESFILE	0x2 /*changed: deleted,ntype,or properties*/
-
-/*
- * To indicate the type of attribute that needs to be updated in the datastore
- */
-#define NODE_UPDATE_STATE           0x1  /* state attribute to be updated */
-#define NODE_UPDATE_COMMENT         0x2  /* update comment attribute */
 #define NODE_UPDATE_OTHERS          0x4  /* other attributes need to be updated */
 #define NODE_UPDATE_VNL             0x8  /* this vnode updated in vnl by Mom  */
-#define NODE_UPDATE_CURRENT_AOE     0x10  /* current_aoe attribute to be updated */
-#define NODE_UPDATE_MOM             0x20 /* update only the mom attribute */
 #define NODE_LOCKED                 0x40 /* indicate whether node is already locked in db for update*/
 
 
@@ -461,16 +452,15 @@ extern  struct	pbssubn  *find_subnodebyname(char *);
 extern	struct	pbsnode  *find_nodebyname(char *, int);
 extern	struct	pbsnode  *refresh_node(char *, char *, int);
 extern	int update_node_cache(pbs_node *, int);
-extern	int update_node_cache(pbs_node *);
 extern	int get_all_db_nodes(char *);
 extern	struct	pbsnode  *find_nodebyaddr(pbs_net_t);
 extern	void	free_prop_list(struct prop*);
 extern	void	recompute_ntype_cnts(void);
 extern	int	process_host_name_part(char*, svrattrl*, char**, int*);
-extern  int     create_pbs_node(char *, svrattrl *, int, int *, struct pbsnode **, int);
-extern  int     create_pbs_node2(char *, svrattrl *, int, int *, struct pbsnode **, int, int);
-extern void get_firstname(char *, char *);
-extern  int     mgr_set_node_attr(struct pbsnode *, attribute_def *, int, svrattrl *, int, int *, void *, int);
+extern  int	create_pbs_node(char *, svrattrl *, int, int *, struct pbsnode **, int);
+extern  int	create_pbs_node2(char *, svrattrl *, int, int *, struct pbsnode **, int, int);
+extern void	get_firstname(char *, char *);
+extern  int	mgr_set_node_attr(struct pbsnode *, attribute_def *, int, svrattrl *, int, int *, void *, int);
 extern	int	node_queue_action(attribute *, void *, int);
 extern	int	node_pcpu_action(attribute *, void *, int);
 struct prop 	*init_prop(char *pname);
