@@ -571,7 +571,6 @@ get_all_db_nodes(char *hostname) {
 	static char nodes_from_time[DB_TIMESTAMP_LEN + 1] = {0};
 	pbs_node *pnode = NULL;
 	void *cur_state = NULL;
-	int rc_cur = 0;
 
 	DBPRT(("Entering %s", __func__))
 
@@ -601,7 +600,7 @@ get_all_db_nodes(char *hostname) {
 		return (1);
 	}
 
-	while ((rc_cur = pbs_db_cursor_next(conn, cur_state, &dbobj)) == 0) {
+	while (pbs_db_cursor_next(conn, cur_state, &dbobj) == 0) {
 		if ((pnode = refresh_node(dbnode.nd_name, dbnode.nd_savetm, NO_LOCK)) == NULL) {
 			sprintf(log_buffer, "Failed to refresh node %s", dbnode.nd_name);
 			log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_NOTICE, msg_daemonname, log_buffer);

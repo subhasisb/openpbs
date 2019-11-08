@@ -213,10 +213,10 @@ node_recov_db(char *nd_name, struct pbsnode *pnode, int lock)
 			log_event(PBSEVENT_DEBUG3, PBS_EVENTCLASS_NODE, LOG_DEBUG, nd_name, log_buffer);
 			if (pnode)
 				effective_node_delete(pnode);
-			if (lock)
-				(void)pbs_db_end_trx(conn,PBS_DB_COMMIT);
 			pbs_db_reset_obj(&obj);
 		}
+		if (lock)
+			(void)pbs_db_end_trx(conn,PBS_DB_COMMIT);
 		return NULL;
 	}
 

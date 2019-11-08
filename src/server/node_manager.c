@@ -1179,8 +1179,8 @@ set_vnode_state2(struct pbsnode *pnode, unsigned long state_bits, enum vnode_sta
 			pnode->nd_state = state_bits;
 	}
 
-	DBPRT(("%s(%5s): Requested state transition 0x%lx --> 0x%lx\n", __func__, pnode->nd_name,
-		nd_prev_state, pnode->nd_state))
+	/*	DBPRT(("%s(%5s): Requested state transition 0x%lx --> 0x%lx\n", __func__, pnode->nd_name,
+		nd_prev_state, pnode->nd_state))	*/
 
 	/* sync state attribute with nd_state */
 
@@ -1235,8 +1235,8 @@ set_vnode_state2(struct pbsnode *pnode, unsigned long state_bits, enum vnode_sta
 		return;
 	}
 
-	DBPRT(("%s(%5s): state transition 0x%lx --> 0x%lx\n", __func__, pnode->nd_name,
-		nd_prev_state, pnode->nd_state))
+	/*	DBPRT(("%s(%5s): state transition 0x%lx --> 0x%lx\n", __func__, pnode->nd_name,
+		nd_prev_state, pnode->nd_state))	*/
 
 	/* node is marked INUSE_DOWN | INUSE_PROV when provisioning.
 	 * need to check transition from INUSE_PROV to UNAVAILABLE

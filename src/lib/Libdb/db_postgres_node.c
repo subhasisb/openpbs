@@ -212,6 +212,7 @@ pg_db_prepare_node_sqls(pbs_db_conn_t *conn)
 		"nd_state, "
 		"nd_ntype, "
 		"nd_pque, "
+		"nd_deleted, "
 		"to_char(nd_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as nd_savetm, "
 		"to_char(nd_creattm, 'YYYY-MM-DD HH24:MI:SS.US') as nd_creattm, "
 		"hstore_to_array(attributes) as attributes "
