@@ -771,7 +771,6 @@ remove_mom_from_vnodes(mominfo_t *pmom)
 				}
 				pnode->nd_moms[imom] = NULL;
 				--pnode->nd_nummoms;
-				pnode->nd_modified |= NODE_UPDATE_OTHERS; /* since we modified nd_nummoms, flag for save */
 				/* remove (decr) Mom host from Mom attrbute */
 				(void)node_attr_def[(int)ND_ATR_Mom].at_set(
 					&pnode->nd_attr[(int)ND_ATR_Mom],
@@ -796,10 +795,18 @@ void
 free_pnode(struct pbsnode *pnode)
 {
 	if (pnode) {
-		(void)free(pnode->nd_name);
-		(void)free(pnode->nd_hostname);
-		(void)free(pnode->nd_moms);
-		(void)free(pnode); /* delete the pnode from memory */
+		free(pnode->nd_name);
+		free(pnode->nd_hostname);
+		free(pnode->nd_moms);
+		if (pnode->job_list) {
+			free(pnode->job_list->job_str);
+			free(pnode->job_list);
+		}
+		if (pnode->resv_list) {
+			free(pnode->resv_list->job_str);
+			free(pnode->resv_list);
+		}
+		free(pnode); /* delete the pnode from memory */
 		pnode = NULL;
 	}
 }
@@ -984,12 +991,8 @@ process_host_name_part(char *objname, svrattrl *plist, char **pname, int *ntype)
 
 /**
  * @brief
- *		When called, this function will update
- *		all the nodes in the db. It will update the mominfo_time to the db
- *		and save all the nodes which has the NODE_UPDATE_OTHERS flag set. It
- *		saves the nodes by calling a helper function save_nodes_db_inner.
- *
- *  	The updates are done under a single transaction.
+ * 	Updates the mom info table.
+ *	The updates are done under a single transaction.
  *  	Upon successful conclusion the transaction is commited.
  *
  * @param[in]	changemodtime - flag to change the mom modification time or not
@@ -2111,7 +2114,6 @@ set_node_topology(attribute *new, void *pobj, int op)
 					 *	node's License and LicenseInfo attributes.
 					 */
 					clear_attr(ppnl, pnadl);
-					pnode->nd_modified |= NODE_UPDATE_OTHERS;
 					sockets_release(ppnli->at_val.at_long);
 					if (sockets_consume(node_nsockets) == 0) {
 						ppnl->at_val.at_char = ND_LIC_TYPE_locked;
@@ -2143,7 +2145,6 @@ set_node_topology(attribute *new, void *pobj, int op)
 					ppnl->at_val.at_char = ND_LIC_TYPE_locked;
 					ppnl->at_flags  |= ATR_VFLAG_SET |
 						ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
-					pnode->nd_modified |= NODE_UPDATE_OTHERS;
 					sprintf(log_buffer, msg_sockets_initialized,
 						pnode->nd_name, node_nsockets, license_type,
 						node_nsockets == 1 ? "" : "s", ND_LIC_TYPE_locked);
@@ -2174,8 +2175,6 @@ set_node_topology(attribute *new, void *pobj, int op)
 					node_nsockets == 1 ? "" : "s", ND_LIC_TYPE_locked);
 				log_event(PBSEVENT_DEBUG3, PBS_EVENTCLASS_SERVER,
 					LOG_DEBUG, __func__, log_buffer);
-
-				pnode->nd_modified |= NODE_UPDATE_OTHERS;
 			} else {
 				/*
 				 * In this case, we don't have enough license for this node.

@@ -397,10 +397,7 @@ typedef enum node_topology_type ntt_t;
 
 #define PBSNODE_NTYPE_MASK	0xf		 /* relevant ntype bits */
 
-#define WRITE_NEW_NODESFILE	0x2 /*changed: deleted,ntype,or properties*/
-#define NODE_UPDATE_OTHERS          0x4  /* other attributes need to be updated */
-#define NODE_UPDATE_VNL             0x8  /* this vnode updated in vnl by Mom  */
-#define NODE_LOCKED                 0x40 /* indicate whether node is already locked in db for update*/
+#define NODE_LOCKED		0x1	/* indicate whether node is already locked in db for update*/
 
 
 #define NODE_SAVE_FULL  0

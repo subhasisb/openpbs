@@ -3438,11 +3438,6 @@ update2_to_vnode(vnal_t *pvnal, int new, mominfo_t *pmom, int *madenew, int from
 
 	if (!from_hook) {
 		for (i=0; i < ND_ATR_LAST; ++i) {
-			/* if this vnode has been updated earlier in this update2 */
-			/* then don't free anything but topology */
-			if ((i != ND_ATR_TopologyInfo) && (pnode->nd_modified & NODE_UPDATE_VNL))
-				continue;  /* seeing vnl update for node just updated, don't clear */
-
 			if (i != ND_ATR_ResourceAvail) {
 				if ((pnode->nd_attr[i].at_flags & (ATR_VFLAG_SET|ATR_VFLAG_DEFLT)) == (ATR_VFLAG_SET|ATR_VFLAG_DEFLT)) {
 					node_attr_def[i].at_free(&pnode->nd_attr[i]);
@@ -3459,13 +3454,9 @@ update2_to_vnode(vnal_t *pvnal, int new, mominfo_t *pmom, int *madenew, int from
 				}
 			}
 		}
-		/* Again, if the vnode has been updated in this cycle, */
-		/* don't reset sharing as it likely was set then       */
-		if ((pnode->nd_modified & NODE_UPDATE_VNL) == 0) {
-			pnode->nd_attr[(int)ND_ATR_Sharing].at_val.at_long = VNS_DFLT_SHARED;
-			pnode->nd_attr[(int)ND_ATR_Sharing].at_flags =
-				(ATR_VFLAG_SET |ATR_VFLAG_DEFLT);
-		}
+		pnode->nd_attr[(int)ND_ATR_Sharing].at_val.at_long = VNS_DFLT_SHARED;
+		pnode->nd_attr[(int)ND_ATR_Sharing].at_flags =
+			(ATR_VFLAG_SET |ATR_VFLAG_DEFLT);
 	}
 
 	/* set attributes/resources if not already non-default */
@@ -4607,10 +4598,6 @@ found:
 						if (pbs_conf.pbs_use_tcp == 0)
 							(void)rpp_io();
 					}
-					/* clear the NODE_UPDATE_VNL on all vnodes for this Mom */
-					/* It was set in update2_to_vnode() */
-					for (i=0; i<psvrmom->msr_numvnds; ++i)
-						(psvrmom->msr_children[i])->nd_modified &= ~NODE_UPDATE_VNL;
 
 					/* if multiple vnodes indicated (above) and
 					 * if the vnodes (except the first) have
@@ -7974,7 +7961,6 @@ set_last_used_time_node(void *pobj, int type)
 				snprintf(str_val, sizeof(str_val), "%d", time_int_val);
 				set_attr_svr(&(pnode->nd_attr[(int)ND_ATR_last_used_time]),
 						&node_attr_def[(int) ND_ATR_last_used_time], str_val);
-				pnode->nd_modified |= NODE_UPDATE_OTHERS;
 			}
 			node_save_db(pnode);
 		}

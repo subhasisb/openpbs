@@ -171,7 +171,6 @@ vnpool_mom_t    *vnode_pool_mom_list = NULL;
 
 static char *all_quename = "_All_";
 static char *all_nodes = "_All_";
-static int   need_todo = 0;
 enum res_op_flag {
 	INDIRECT_RES_UNLINK,
 	INDIRECT_RES_CHECK,
@@ -2538,12 +2537,6 @@ mgr_node_set(struct batch_request *preq)
 
 	warnmsg = warn_msg_build(WARN_ngrp, warn_nodes, warn_idx);
 
-	if (need_todo & WRITE_NEW_NODESFILE) {
-		/*create/delete/prop/ntype change*/
-		if (!save_nodes_db(0, NULL))
-			need_todo &= ~(WRITE_NEW_NODESFILE); /*successful on update*/
-	}
-
 	if (numnodes > 1) {          /*modification was for multiple vnodes  */
 
 		if (problem_cnt) {  /*one or more problems encountered*/
@@ -2850,13 +2843,6 @@ mgr_node_unset(struct batch_request *preq)
 	} /* bottom of the while() */
 
 	warnmsg = warn_msg_build(WARN_ngrp, warn_nodes, warn_idx);
-
-	if (need_todo & WRITE_NEW_NODESFILE) {
-		/*create/delete/prop/ntype change*/
-		if (!save_nodes_db(0, NULL)) {
-			need_todo &= ~(WRITE_NEW_NODESFILE);	/*successful on update*/
-		}
-	}
 
 	if (numnodes > 1) {          /*modification was for all nodes  */
 
@@ -3396,12 +3382,6 @@ struct batch_request *preq;
 		if (numnodes == 1)
 			break;
 	} /*bottom of the for()*/
-
-	if (need_todo & WRITE_NEW_NODESFILE) {	/*create/delete/attr change*/
-		if (!save_nodes_db(1, NULL)) {
-			need_todo &= ~(WRITE_NEW_NODESFILE); /*successful on update*/
-		}
-	}
 
 	if (numnodes > 1) {          /*modification was for all nodes  */
 

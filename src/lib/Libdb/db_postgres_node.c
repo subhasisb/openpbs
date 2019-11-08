@@ -94,7 +94,7 @@ pg_db_prepare_node_sqls(pbs_db_conn_t *conn)
 		"nd_pque = $7, "
 		"nd_deleted = $8, "
 		"nd_savetm = localtimestamp, "
-		"attributes = hstore($9::text[]) "
+		"attributes = attributes || hstore($9::text[]) "
 		" where nd_name = $1 "
 		"returning to_char(nd_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as nd_savetm");
 	if (pg_prepare_stmt(conn, STMT_UPDATE_NODE, conn->conn_sql, 8) != 0)

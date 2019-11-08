@@ -171,7 +171,7 @@ append_to_joblist(pbs_node *pnode, char *jobid, int ncpus)
 	}
 	
 	jlist = pnode->job_list;
-	if (jlist->offset + (strlen(jobid) + 15) * ncpus > jlist->buf_sz) {
+	if ((jlist->offset + (strlen(jobid) + 15) * (ncpus + 1)) > jlist->buf_sz) {
 		char *tmp_str = realloc(jlist->job_str, jlist->buf_sz * 2);
 		if (tmp_str != NULL) {
 			jlist->job_str = tmp_str;

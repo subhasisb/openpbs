@@ -7052,7 +7052,6 @@ get_server_hook_results(char *input_file, int *accept_flag, int *reject_flag, ch
 	int	bad = 0;
 	char	*pbse_err;
 	char	raw_err[10];
-	int	update_db = 0;
 
 	/* Preset hook_euser for later.  If we are reading a job related     */
 	/* copy of hook results, there will be one or more (one per hook)    */
@@ -7411,10 +7410,6 @@ get_server_hook_results(char *input_file, int *accept_flag, int *reject_flag, ch
 			goto get_hook_results_end;
 		}
 		line_data[0] = '\0';
-	}
-	if (update_db & WRITE_NEW_NODESFILE) {
-		/*create/delete/prop/ntype change*/
-		(void)save_nodes_db(0, NULL);
 	}
 
 	rc = 0;
