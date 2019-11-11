@@ -113,7 +113,7 @@ struct {
 	{ND_Force_Exclhost,   VNS_FORCE_EXCLHOST}
 };
 
-int initialise_connection_slot(int table_size);
+int initialise_connection_slot(int table_size, enum from client);
 /**
  * @brief
  * 	char_in_set - is the char c in the tokenset
@@ -1560,7 +1560,7 @@ set_nodelay(int fd)
 }
 
 int
-initialise_connection_slot(int table_size)
+initialise_connection_slot(int table_size, enum from client)
 {
 	int i;
 	int j;
@@ -1576,7 +1576,9 @@ initialise_connection_slot(int table_size)
 				connection[i].ch_secondary_socket = -1;
 				connection[i].ch_errtxt = NULL;
 				connection[i].shard_context = -1;
-				connection[i].conn_exists = 1;
+				if (client == sched)
+					connection[i].conn_exists = 1;
+				connection[i].conn_exists = 0;
 
 				if (get_max_servers() > 1) {
 					if (connection[i].ch_shards == NULL) {

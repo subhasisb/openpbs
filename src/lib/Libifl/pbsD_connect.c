@@ -720,12 +720,12 @@ tryagain:
 				connection[channel].ch_socket = sd;
 			} else if (connection[channel].ch_shards[srv_index]->state == SHARD_CONN_STATE_CONNECTED) {
 				DBG_TRACE_SHARD((stderr, "already connected!\n"))
+				return  connection[channel].ch_shards[srv_index]->sd;
 			}
 		} else {
 			if ( connection[channel].ch_shards[srv_index]->state == SHARD_CONN_STATE_CONNECTED)
 				return  connection[channel].ch_shards[srv_index]->sd;
 			else {
-				connection[channel].conn_exists = 0;
 				goto tryagain;
 			}
 		}

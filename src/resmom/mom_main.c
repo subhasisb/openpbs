@@ -8056,7 +8056,6 @@ net_restore_handler(void *data)
 	mom_net_up = 1;
 	mom_net_up_time = time(0);
 	log_tppmsg(LOG_INFO, msg_daemonname, "net restore handler called");
-	send_restart();
 }
 
 /*

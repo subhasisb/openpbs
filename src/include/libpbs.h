@@ -135,6 +135,12 @@ extern int * __pbs_tcperrno_location(void);
 
 extern char pbs_current_group[];
 
+enum from {
+	sched,
+	mom
+};
+
+
 #define NCONNECTS 50
 
 #define SHARD_CONN_STATE_DOWN 			 0
@@ -407,7 +413,7 @@ extern int DIS_wflush(int sock, int rpp);
 extern int engage_external_authentication(int out, int auth_type, int fromsvr, char *ebuf, int ebufsz);
 extern char *PBSD_modify_resv(int connect, char *resv_id,
 	struct attropl *attrib, char *extend);
-extern int initialise_connection_slot(int table_size);
+extern int initialise_connection_slot(int table_size, enum from client);
 #ifdef	__cplusplus
 }
 #endif
