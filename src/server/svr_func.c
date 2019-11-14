@@ -1815,7 +1815,6 @@ static int que_newstyle[] = {
 	-1
 };
 
-extern pbs_list_head svr_queues;
 /**
  * @brief
  * 		is_attrs_in_list_set - for a list of certain attributes, is any of them

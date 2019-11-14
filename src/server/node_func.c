@@ -148,7 +148,6 @@ extern int	 svr_totnodes;
 extern char	*path_nodes_new;
 extern char	*path_nodes;
 extern char	*path_nodestate;
-extern pbs_list_head svr_queues;
 extern unsigned int pbs_mom_port;
 extern unsigned int pbs_rm_port;
 extern char	*resc_in_err;

@@ -169,6 +169,8 @@ struct pbs_queue {
 };
 typedef struct pbs_queue pbs_queue;
 
+extern pbs_list_head svr_queues;
+
 extern pbs_queue *find_queuebyname(char *, int);
 #ifdef NAS /* localmod 075 */
 extern pbs_queue *find_resvqueuebyname(char *);

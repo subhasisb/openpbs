@@ -95,7 +95,6 @@
 
 extern struct server server;
 extern pbs_list_head svr_alljobs;
-extern pbs_list_head svr_queues;
 extern char          server_name[];
 extern attribute_def svr_attr_def[];
 extern attribute_def que_attr_def[];

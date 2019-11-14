@@ -104,7 +104,6 @@
 
 #ifndef PBS_MOM
 extern pbs_db_conn_t	*svr_db_conn;
-extern pbs_list_head svr_queues;
 #endif
 
 #ifdef NAS /* localmod 005 */
@@ -531,8 +530,8 @@ refresh_job(pbs_db_job_info_t *dbjob, int *refreshed)
 	
 	*refreshed = 0;
 
-	if (!(pj = find_job_avl(dbjob->ji_jobid))) {
-		if (!(pj = job_recov_db_spl(dbjob))) /* if job is not in AVL tree, load the job from database */
+	if ((pj = find_job_avl(dbjob->ji_jobid)) == NULL) {
+		if ((pj = job_recov_db_spl(dbjob)) == NULL) /* if job is not in AVL tree, load the job from database */
 			goto err;
 		
 		svr_enquejob(pj); /* add job into AVL tree */
@@ -552,55 +551,6 @@ err:
 	snprintf(log_buffer, LOG_BUF_SIZE, "Failed to refresh job attribute %s", dbjob->ji_jobid);
 	log_err(-1, __func__, log_buffer);
 	return NULL;
-}
-
-/**
- * @brief
- *	Refresh/retrieve queue from database and add it into AVL tree if not present
- *
- *	@param[in]	dbque - The pointer to the wrapper queue object of type pbs_db_que_info_t
- *  @param[in]  refreshed - To count the no. of queues refreshed
- *
- * @return	The recovered queue
- * @retval	NULL - Failure
- * @retval	!NULL - Success, pointer to queue structure recovered
- *
- */
-pbs_queue *
-refresh_queue(pbs_db_que_info_t *dbque, int *refreshed) {
-
-	*refreshed = 0;
-	char  *pc;
-	pbs_queue *pque = NULL;
-	char   qname[PBS_MAXDEST + 1];
-
-	(void)strncpy(qname, dbque->qu_name, PBS_MAXDEST);
-	qname[PBS_MAXDEST] ='\0';
-	pc = strchr(qname, (int)'@');	/* strip off server (fragment) */
-	if (pc)
-		*pc = '\0';
-	/* get the old pointer of the queue, if queue is already in memory */
-	pque = (pbs_queue *)GET_NEXT(svr_queues);
-	while (pque != NULL) {
-		if (strcmp(qname, pque->qu_qs.qu_name) == 0)
-			break;
-		pque = (pbs_queue *)GET_NEXT(pque->qu_link);
-	}
-	if (pc)
-		*pc = '@';	/* restore '@' server portion */
-
-	if (pque) {
-		if (strcmp(dbque->qu_savetm, pque->qu_savetm) != 0) {
-			/* if queue had changed in db */
-			*refreshed = 1;
-			return que_recov_db(dbque->qu_name, pque, 0);
-		}
-	} else {
-		/* if queue is not in memory, fetch it from db */
-		*refreshed = 1;
-		return que_recov_db(dbque->qu_name, pque, 0);
-	}
-	return pque;
 }
 
 
