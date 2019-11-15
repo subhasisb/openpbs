@@ -265,9 +265,6 @@ extern int sync_mom_hookfiles_proc_running;
  */
 extern void  est_start_timed_task(struct work_task *);
 extern void db_to_svr_svr(struct server *ps, pbs_db_svr_info_t *pdbsvr);
-#ifdef NAS /* localmod 005 */
-extern int write_single_node_state(struct pbsnode *np);
-#endif /* localmod 005 */
 
 char primary_host[PBS_MAXHOSTNAME+1]; /* host_name of primary */
 
@@ -1818,7 +1815,6 @@ static int que_newstyle[] = {
 	-1
 };
 
-extern pbs_list_head svr_queues;
 /**
  * @brief
  * 		is_attrs_in_list_set - for a list of certain attributes, is any of them
@@ -5357,12 +5353,6 @@ mark_prov_vnode_offline(pbsnode *pnode, char * comment)
 	/* set node to down state */
 	set_vnode_state(pnode, INUSE_OFFLINE, Nd_State_Or);
 	set_vnode_state(pnode, ~INUSE_PROV, Nd_State_And);
-
-
-
-	/* write the node state and current_aoe */
-	pnode->nd_modified |= (NODE_UPDATE_CURRENT_AOE | NODE_UPDATE_STATE);
-	pnode->nd_modified &= ~(NODE_UPDATE_CURRENT_AOE | NODE_UPDATE_STATE);
 
 	if (comment != NULL) {
 		/* log msg about marking node as offline */

@@ -340,6 +340,7 @@ typedef struct pbs_db_jobscr_info pbs_db_jobscr_info_t;
 struct pbs_db_query_options {
 	int	flags;
 	char *timestamp;
+	char *hostname;
 };
 typedef struct pbs_db_query_options pbs_db_query_options_t;
 

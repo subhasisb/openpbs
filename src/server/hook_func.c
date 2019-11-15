@@ -7050,7 +7050,6 @@ get_server_hook_results(char *input_file, int *accept_flag, int *reject_flag, ch
 	svrattrl *plist = NULL;
 	struct pbsnode *pnode;
 	int	bad = 0;
-	int	ndtype_flag = 0;
 	char	*pbse_err;
 	char	raw_err[10];
 	int	update_db = 0;
@@ -7392,9 +7391,6 @@ get_server_hook_results(char *input_file, int *accept_flag, int *reject_flag, ch
 								pbse_err ? pbse_err : raw_err);
 						log_err(PBSE_SYSTEM, __func__, log_buffer);
 					} else {
-						(void)chk_characteristic(pnode, &ndtype_flag);
-						update_db |= ndtype_flag;
-
 						mgr_log_attr(msg_man_set, plist,
 							PBS_EVENTCLASS_NODE, pnode->nd_name, NULL);
 					}
@@ -7419,8 +7415,6 @@ get_server_hook_results(char *input_file, int *accept_flag, int *reject_flag, ch
 	if (update_db & WRITE_NEW_NODESFILE) {
 		/*create/delete/prop/ntype change*/
 		(void)save_nodes_db(0, NULL);
-	} else if (update_db & WRITENODE_STATE) {
-		write_node_state();
 	}
 
 	rc = 0;

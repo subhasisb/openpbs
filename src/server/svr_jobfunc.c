@@ -175,7 +175,6 @@ extern char  *msg_also_deleted_job_history;
 extern char   server_name[];
 extern char  *pbs_server_name;
 extern char   server_host[];
-extern pbs_list_head svr_queues;
 extern int    comp_resc_lt;
 extern int    comp_resc_gt;
 extern time_t time_now;

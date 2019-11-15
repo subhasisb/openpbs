@@ -439,6 +439,7 @@ pbs_db_begin_trx(pbs_db_conn_t *conn, int isolation_level, int async)
 		conn->conn_trx_rollback = 0; /* reset rollback flag at toplevel */
 	}
 	conn->conn_trx_nest++;
+	DBPRT(("end of %s: conn->conn_trx_nest: %d", __func__, conn->conn_trx_nest))
 	return 0;
 }
 
@@ -493,6 +494,7 @@ pbs_db_end_trx(pbs_db_conn_t *conn, int commit)
 			conn->conn_trx_rollback = 1; /* mark transaction to rollback */
 	}
 	conn->conn_trx_nest--;
+	DBPRT(("end of %s: conn->conn_trx_nest: %d", __func__, conn->conn_trx_nest))
 
 	return rc;
 }

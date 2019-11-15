@@ -85,7 +85,6 @@
 extern char     *msg_err_unlink;
 extern char	*path_queues;
 extern struct    server server;
-extern pbs_list_head svr_queues;
 extern time_t	 time_now;
 extern long	 svr_history_enable;
 #ifndef PBS_MOM
@@ -452,7 +451,7 @@ action_queue_partition(attribute *pattr, void *pobj, int actmode)
 	if (((pbs_queue *)pobj)->qu_qs.qu_type  == QTYPE_RoutePush)
 		return PBSE_ROUTE_QUE_NO_PARTITION;
 
-	get_all_db_nodes();
+	get_all_db_nodes(NULL);
 	for (i=0; i < svr_totnodes; i++) {
 		if (pbsndlist[i]->nd_pque) {
 			if (strcmp(pbsndlist[i]->nd_pque->qu_qs.qu_name, ((pbs_queue *) pobj)->qu_qs.qu_name) == 0) {

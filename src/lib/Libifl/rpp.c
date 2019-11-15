@@ -1546,12 +1546,11 @@ hostbyaddr(const char *addr, int len, int type)
  * @retval      NULL                    error
  *
  */
-static
-struct	hostent		*
+struct	hostent*
 __rpp_get_cname(struct sockaddr_in *addr)
 {
 	struct	hostent		*hp;
-	char			*hname;
+	char			*hname = NULL;
 
 	if ((hp = hostbyaddr((void *)&addr->sin_addr,
 		sizeof(struct in_addr),
@@ -1564,8 +1563,7 @@ __rpp_get_cname(struct sockaddr_in *addr)
 		return NULL;
 
 	if ((hp = hostbyname(hname)) == NULL) {
-		DBPRT((DBTO,
-			"%s: canonical name %s not found, h_errno=%d errno=%d\n",
+		DBPRT((DBTO, "%s: canonical name %s not found, h_errno=%d errno=%d\n",
 			__func__, hname, h_errno, errno))
 	}
 	free(hname);

@@ -499,7 +499,6 @@ extern int      node_state      (attribute*, void*, int);
 extern int      node_np_action  (attribute*, void*, int);
 extern int      node_ntype(attribute*, void*, int);
 extern int      node_prop_list(attribute*, void*, int);
-extern int      node_comment(attribute *, void *, int);
 extern int	is_true_or_false(char *val);
 extern void unset_entlim_resc(attribute *, char *);
 extern int      action_node_partition(attribute *, void *, int);

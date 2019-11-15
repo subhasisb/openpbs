@@ -127,6 +127,8 @@ extern void			(*pfn_DIS_rpp_reset)();
 extern void			(*pfn_DIS_rpp_setup)(int);
 extern void			(*pfn_rpp_add_close_func)(int, void (*func)(int));
 
+extern struct	hostent		*__rpp_get_cname(struct sockaddr_in *);
+
 #define rpp_open(x, y)		(*pfn_rpp_open)(x, y)
 #define rpp_bind(x)		(*pfn_rpp_bind)(x)
 #define rpp_poll()		(*pfn_rpp_poll)()
@@ -149,6 +151,7 @@ extern void			(*pfn_rpp_add_close_func)(int, void (*func)(int));
 #define DIS_rpp_reset()		(*pfn_DIS_rpp_reset)()
 #define DIS_rpp_setup(x)	(*pfn_DIS_rpp_setup)(x)
 #define rpp_add_close_func(x, y) (*pfn_rpp_add_close_func)(x, y)
+#define rpp_get_cname(x)	__rpp_get_cname(x)
 
 extern char	*netaddr(struct sockaddr_in *);
 extern char *get_all_ips(char *, char *, size_t);

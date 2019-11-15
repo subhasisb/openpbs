@@ -96,7 +96,6 @@
 
 extern struct server server;
 extern pbs_list_head svr_alljobs;
-extern pbs_list_head svr_queues;
 extern char          server_name[];
 extern attribute_def svr_attr_def[];
 extern attribute_def que_attr_def[];
@@ -570,12 +569,14 @@ get_all_db_queues() {
  * @brief
  * 		Get all the nodes from database which are newly added/modified
  * 		by other servers after the given time interval.
+ * 
+ * @param[in]	hostname: hostname which can be used to filter nodes.
  *
  * @return	0 - success
  * 		1 - fail/error
  */
 int
-get_all_db_nodes() {
+get_all_db_nodes(char *hostname) {
 	pbs_db_node_info_t	dbnode;
 	pbs_db_obj_info_t	dbobj;
 	pbs_db_conn_t		*conn = (pbs_db_conn_t *) svr_db_conn;
@@ -583,7 +584,6 @@ get_all_db_nodes() {
 	static char nodes_from_time[DB_TIMESTAMP_LEN + 1] = {0};
 	pbs_node *pnode = NULL;
 	void *cur_state = NULL;
-	int rc_cur = 0;
 
 	DBPRT(("Entering %s", __func__))
 
@@ -593,8 +593,13 @@ get_all_db_nodes() {
 	}
 
 	/* fill in options */
-	opts.flags = 0;
-	opts.timestamp = nodes_from_time;
+	if (hostname) {
+		opts.flags = 1;
+		opts.hostname = hostname;
+	} else {
+		opts.flags = 0;
+		opts.timestamp = nodes_from_time;
+	}
 	dbobj.pbs_db_obj_type = PBS_DB_NODE;
 	dbobj.pbs_db_un.pbs_db_node = &dbnode;
 	dbnode.attr_list.attributes = NULL;
@@ -608,7 +613,7 @@ get_all_db_nodes() {
 		return (1);
 	}
 
-	while ((rc_cur = pbs_db_cursor_next(conn, cur_state, &dbobj)) == 0) {
+	while (pbs_db_cursor_next(conn, cur_state, &dbobj) == 0) {
 		if ((pnode = refresh_node(dbnode.nd_name, dbnode.nd_savetm, NO_LOCK)) == NULL) {
 			sprintf(log_buffer, "Failed to refresh node %s", dbnode.nd_name);
 			log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_NOTICE, msg_daemonname, log_buffer);
@@ -818,7 +823,7 @@ req_stat_node(struct batch_request *preq)
 	 */
 
 	if (pbsndlist == 0  ||  svr_totnodes <= 0) {
-		get_all_db_nodes();
+		get_all_db_nodes(NULL);
 		if (pbsndlist == 0  ||  svr_totnodes <= 0) {
 			req_reject(PBSE_NONODES, 0, preq);
 			return;
@@ -847,7 +852,7 @@ req_stat_node(struct batch_request *preq)
 		rc = status_node(pnode, preq, &preply->brp_un.brp_status);
 
 	} else {			/* get status of all nodes */
-		get_all_db_nodes();
+		get_all_db_nodes(NULL);
 		for (i = 0; i < svr_totnodes; i++) {
 			pnode = pbsndlist[i];
 

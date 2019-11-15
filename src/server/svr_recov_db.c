@@ -86,7 +86,6 @@
 /* Global Data Items: */
 
 extern struct server server;
-extern pbs_list_head svr_queues;
 extern attribute_def svr_attr_def[];
 extern char	*path_priv;
 extern time_t	time_now;

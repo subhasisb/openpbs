@@ -90,9 +90,6 @@ extern int   svr_connect(pbs_net_t, unsigned int, void (*)(int), enum conn_type,
 extern void  svr_force_disconnect(int);
 extern void  svr_shutdown(int);
 extern int   svr_get_privilege(char *, char *);
-extern void  write_node_state(void);
-extern int   write_single_node_state(struct pbsnode *);
-extern int   setup_nodes(void);
 extern int   setup_resc(int);
 extern void  mark_node_down(char *, char *);
 extern void  mark_node_offline_by_mom(char *, char *);
@@ -285,7 +282,6 @@ extern void  set_last_used_time_node(void *pobj, int type);
 extern int   check_que_enable(attribute *, void *, int);
 extern int   set_queue_type(attribute *, void *, int);
 extern void  save_characteristic(struct pbsnode	*pnode);
-extern int   chk_characteristic(struct pbsnode *pnode, int *pneed_todo);
 extern int   is_valid_str_resource(attribute *pattr, void *pobject, int actmode);
 extern int   setup_arrayjob_attrs(attribute *, void *, int);
 extern int   deflt_chunk_action(attribute *pattr, void *pobj, int mode);

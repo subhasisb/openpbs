@@ -189,19 +189,10 @@ node_recov_db(char *nd_name, struct pbsnode *pnode, int lock)
 	dbnode.nd_savetm[0] = '\0';
 	dbnode.attr_list.attributes = NULL;
 
-	if (!pnode) {
-		pnode = malloc(sizeof(struct pbsnode));
-		initialize_pbsnode(pnode, strdup(nd_name), NTYPE_PBS);
-		DBPRT(("Initializing pbsnode..."))
-	} else {
+	if (pnode) {
 		if (memcache_good(&pnode->trx_status, lock))
 			return pnode;
 		strcpy(dbnode.nd_savetm, pnode->nd_savetm);
-	}
-
-	if (pnode == NULL) {
-		log_err(errno, "node_recov", "error on recovering node table");
-		return NULL;
 	}
 
 	obj.pbs_db_obj_type = PBS_DB_NODE;
@@ -220,16 +211,23 @@ node_recov_db(char *nd_name, struct pbsnode *pnode, int lock)
 		if(pnode) {
 			sprintf(log_buffer, "Node is/marked deleted");
 			log_event(PBSEVENT_DEBUG3, PBS_EVENTCLASS_NODE, LOG_DEBUG, nd_name, log_buffer);
-			effective_node_delete(pnode);
-			if (lock)
-				(void)pbs_db_end_trx(conn,PBS_DB_COMMIT);
+			if (pnode)
+				effective_node_delete(pnode);
 			pbs_db_reset_obj(&obj);
 		}
+		if (lock)
+			(void)pbs_db_end_trx(conn,PBS_DB_COMMIT);
 		return NULL;
 	}
 
 	if (rc == -2)
 		goto db_commit;
+
+	if (!pnode) {
+		pnode = malloc(sizeof(struct pbsnode));
+		initialize_pbsnode(pnode, strdup(nd_name), NTYPE_PBS);
+		DBPRT(("Initializing pbsnode..."))
+	}
 
 	if (db_to_svr_node(pnode, &dbnode) != 0)
 		goto db_err;

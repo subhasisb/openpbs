@@ -554,6 +554,10 @@ send_job_exec(job *jobp, pbs_net_t hostaddr, int port, struct batch_request *req
 	pmom = tfind2((unsigned long) jobp->ji_qs.ji_un.ji_exect.ji_momaddr,
 		jobp->ji_qs.ji_un.ji_exect.ji_momport,
 		&ipaddrs);
+	if (pmom == NULL)
+		pmom = recover_mom((unsigned long) jobp->ji_qs.ji_un.ji_exect.ji_momaddr,
+					jobp->ji_qs.ji_un.ji_exect.ji_momport);
+	
 	if (!pmom || (((mom_svrinfo_t *)(pmom->mi_data))->msr_state & INUSE_DOWN)) {
 		log_event(PBSEVENT_ERROR, PBS_EVENTCLASS_REQUEST, LOG_WARNING, "", "Mom is down");
 		pbs_errno = PBSE_NORELYMOM;

@@ -84,6 +84,7 @@
 #include "attribute.h"
 #include "work_task.h"
 #include "log.h"
+#include "rpp.h"
 
 
 
@@ -135,6 +136,7 @@ svr_connect(pbs_net_t hostaddr, unsigned int port, void (*func)(int), enum conn_
 	int sock;
 	mominfo_t *pmom = 0;
 	conn_t *conn = NULL;
+	int stream = -1;
 
 	/* First, determine if the request is to another server or ourselves */
 
@@ -142,6 +144,9 @@ svr_connect(pbs_net_t hostaddr, unsigned int port, void (*func)(int), enum conn_
 		return (PBS_LOCAL_CONNECTION);	/* special value for local */
 
 	pmom = tfind2((unsigned long)hostaddr, port, &ipaddrs);
+	if (pmom == NULL)
+		pmom = recover_mom(hostaddr, port);
+
 	if ((pmom != NULL) && (port == pmom->mi_port)) {
 		if (((mom_svrinfo_t *)(pmom->mi_data))->msr_state & INUSE_DOWN) {
 			pbs_errno = PBSE_NORELYMOM;
@@ -154,7 +159,13 @@ svr_connect(pbs_net_t hostaddr, unsigned int port, void (*func)(int), enum conn_
 			pbs_errno = PBSE_SYSTEM;
 			return (PBS_NET_RC_RETRY);
 		}
-		return ((mom_svrinfo_t *) (pmom->mi_data))->msr_stream;
+		stream =  ((mom_svrinfo_t *) (pmom->mi_data))->msr_stream;
+		if (stream >= 0)
+			return stream;
+		stream = rpp_open(pmom->mi_host, port);
+		((mom_svrinfo_t *) (pmom->mi_data))->msr_stream = stream;
+		tinsert2((u_long)stream, 0, pmom, &streams);
+		return stream;
 	}
 
 	/* obtain the connection to the other server */
