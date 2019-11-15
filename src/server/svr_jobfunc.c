@@ -4922,6 +4922,7 @@ svr_saveorpurge_finjobhist(job *pjob)
 		svr_setjob_histinfo(pjob, T_FIN_JOB);
 		if (pjob->ji_ajtrk)
 			pjob->ji_ajtrk->tkm_flags &= ~TKMFLG_CHK_ARRAY;
+		delete_nodejob_entry(pjob);
 	} else {
 		if (pjob->ji_deletehistory && flag) {
 			log_event(PBSEVENT_DEBUG, PBS_EVENTCLASS_JOB,

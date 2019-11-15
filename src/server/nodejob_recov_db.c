@@ -156,12 +156,23 @@ db_err:
 	return rc;
 }
 
+int
+delete_nodejob_entry(job *pjob)
+{
+	pbs_db_obj_info_t obj;
+	pbs_db_nodejob_info_t db_nj;
+	pbs_db_query_options_t opts;
+
+	obj.pbs_db_obj_type = PBS_DB_NODEJOB;
+	obj.pbs_db_un.pbs_db_nodejob = &db_nj;
+	strcpy(db_nj.job_id, pjob->ji_qs.ji_jobid);
+	return pbs_db_delete_obj(svr_db_conn, &obj, &opts);
+}
+
 void
 append_to_joblist(pbs_node *pnode, char *jobid, int ncpus)
-{	
+{
 	struct pbs_job_list *jlist;
-
-	DBPRT(("Entering: %s", __func__))
 	
 	jlist = pnode->job_list;
 	jlist->njobs++;

@@ -136,7 +136,6 @@ svr_connect(pbs_net_t hostaddr, unsigned int port, void (*func)(int), enum conn_
 	int sock;
 	mominfo_t *pmom = 0;
 	conn_t *conn = NULL;
-	int stream = -1;
 
 	/* First, determine if the request is to another server or ourselves */
 
@@ -145,10 +144,10 @@ svr_connect(pbs_net_t hostaddr, unsigned int port, void (*func)(int), enum conn_
 
 	pmom = tfind2((unsigned long)hostaddr, port, &ipaddrs);
 	if (pmom == NULL)
-		pmom = recover_mom(hostaddr, port);
+		pmom = recover_mom(hostaddr, port, 1);
 
 	if ((pmom != NULL) && (port == pmom->mi_port)) {
-		if (((mom_svrinfo_t *)(pmom->mi_data))->msr_state & INUSE_DOWN) {
+		if ((((mom_svrinfo_t *)(pmom->mi_data))->msr_state & INUSE_DOWN) && (open_momstream(pmom, port) < 0)) {
 			pbs_errno = PBSE_NORELYMOM;
 			return (PBS_NET_RC_FATAL);
 		}
@@ -159,13 +158,7 @@ svr_connect(pbs_net_t hostaddr, unsigned int port, void (*func)(int), enum conn_
 			pbs_errno = PBSE_SYSTEM;
 			return (PBS_NET_RC_RETRY);
 		}
-		stream =  ((mom_svrinfo_t *) (pmom->mi_data))->msr_stream;
-		if (stream >= 0)
-			return stream;
-		stream = rpp_open(pmom->mi_host, port);
-		((mom_svrinfo_t *) (pmom->mi_data))->msr_stream = stream;
-		tinsert2((u_long)stream, 0, pmom, &streams);
-		return stream;
+		return ((mom_svrinfo_t *) (pmom->mi_data))->msr_stream;
 	}
 
 	/* obtain the connection to the other server */

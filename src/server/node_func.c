@@ -207,7 +207,8 @@ update_node_cache(pbs_node *pnode, int op)
 			pnode->nd_arr_index = svr_totnodes; /* this is only in mem, not from db */
 			DBPRT(("pbsndlist_sz: %d, svr_totnodes: %d", pbsndlist_sz, svr_totnodes))
 			pbsndlist[svr_totnodes++] = pnode;
-			create_svrmom_struct(pnode);
+			if (pnode->nd_nummoms == 0)
+				create_svrmom_struct(pnode);
 			break;
 
 		case TREE_OP_DEL:
@@ -347,13 +348,6 @@ get_ncpu_ct(struct pbsnode *pnode)
 	return 0;
 }
 
-/*
-This piece of code is to avoid crashes related to subnode code!
-need to remove them after we clean up subnode structure code
-*/
-static int nd_nsn;
-static int nd_nsnfree;
-
 
 int
 pre_nodejob_query(struct pbsnode *pnode)
@@ -361,8 +355,6 @@ pre_nodejob_query(struct pbsnode *pnode)
 	resource   *prsc;
 	attribute    *pattr = &pnode->nd_attr[(int)ND_ATR_ResourceAssn];
 
-	nd_nsn = pnode->nd_nsn;
-	nd_nsnfree = pnode->nd_nsnfree;
 	pnode->nd_nsn = get_ncpu_ct(pnode);
 	pnode->nd_nsnfree = pnode->nd_nsn;
 
@@ -432,9 +424,6 @@ post_nodejob_query(struct pbsnode *pnode)
 	} else if (pnode->nd_nsnfree == pnode->nd_nsn || ((pnode->nd_nsnfree != pnode->nd_nsn) && (pnode->job_list->njobs != 1))) {
 		set_vnode_state2(pnode, ~(INUSE_JOB | INUSE_JOBEXCL), Nd_State_And, 0);
 	}
-
-	pnode->nd_nsn = nd_nsn;
-	pnode->nd_nsnfree = nd_nsnfree;
 }
 
 int
@@ -444,8 +433,6 @@ encode_nodejob(struct pbsnode *pnode)
 	pbs_db_obj_info_t	obj;
 	void		*state = NULL;
 	pbs_db_conn_t *conn = (pbs_db_conn_t *) svr_db_conn;
-
-	DBPRT(("----------------Entering encode_nodejob()------------"))
 
 	/* start a transaction */
 	if (pbs_db_begin_trx(conn, 0, 0) != 0)

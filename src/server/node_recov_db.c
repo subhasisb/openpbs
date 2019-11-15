@@ -159,6 +159,8 @@ db_to_svr_node(struct pbsnode *pnode, pbs_db_node_info_t *pdbnd)
 		pnode->nd_attr, (int) ND_ATR_LAST, 0)) != 0)
 		return -1;
 
+	mod_node_ncpus(pnode, get_ncpu_ct(pnode), ATR_ACTION_ALTER);
+
 	return 0;
 }
 
@@ -182,8 +184,6 @@ node_recov_db(char *nd_name, struct pbsnode *pnode, int lock)
 	pbs_db_conn_t *conn = (pbs_db_conn_t *) svr_db_conn;
 	pbs_db_node_info_t dbnode;
 	int rc = 0;
-
-	DBPRT(("Inside node_recov_db"))
 
 	strcpy(dbnode.nd_name, nd_name);
 	dbnode.nd_savetm[0] = '\0';
@@ -237,10 +237,8 @@ db_commit:
 		pnode->nd_modified |= NODE_LOCKED;
 		memcache_update_state(&pnode->trx_status, lock);
 	}
-
 	pbs_db_reset_obj(&obj);
 	pnode->nd_last_refresh_time = time(NULL);
-
 	return pnode;
 
 db_err:

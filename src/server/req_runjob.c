@@ -489,6 +489,7 @@ req_runjob(struct batch_request *preq)
 		/* just a regular job, pass it on down the line and be done */
 		if (call_to_process_hooks(preq, hook_msg, sizeof(hook_msg),
 				pbs_python_set_interrupt) == 0) {
+			
 			reply_text(preq, PBSE_HOOKERROR, hook_msg);
 			return;
 		}

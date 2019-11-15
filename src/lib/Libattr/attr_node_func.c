@@ -556,8 +556,6 @@ encode_resvs(attribute *pattr, pbs_list_head *ph, char *aname, char *rname, int 
 	svrattrl	*pal;
 	struct pbs_job_list 	*rlist;
 
-	DBPRT(("Entering %s", __func__))
-
 	if (!pattr)
 		return (-1);
 

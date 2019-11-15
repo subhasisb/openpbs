@@ -2205,7 +2205,6 @@ del_objects_from_db(struct work_task *ptask)
 	if (pbs_db_delete_obj(conn, &obj, &opts) != 0) {
 		log_err(-1, __func__, "deletion of queues from datastore failed");
 	}
-	pbs_db_reset_obj(&obj);
 
 	/* delete all the nodes */
 	strcpy(dbnode.nd_name, "DEL_ALL_NODES");

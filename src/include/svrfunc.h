@@ -282,6 +282,7 @@ extern void  set_last_used_time_node(void *pobj, int type);
 extern int   check_que_enable(attribute *, void *, int);
 extern int   set_queue_type(attribute *, void *, int);
 extern void  save_characteristic(struct pbsnode	*pnode);
+extern int   get_ncpu_ct(struct pbsnode *);
 extern int   is_valid_str_resource(attribute *pattr, void *pobject, int actmode);
 extern int   setup_arrayjob_attrs(attribute *, void *, int);
 extern int   deflt_chunk_action(attribute *pattr, void *pobj, int mode);

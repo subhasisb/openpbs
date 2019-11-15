@@ -374,7 +374,7 @@ create_svrmom_entry(char *hostname, unsigned int port, unsigned long *pul)
 		return NULL;
 	}
 
-	psvrmom->msr_state =INUSE_UNKNOWN | INUSE_DOWN;
+	psvrmom->msr_state = INUSE_UNKNOWN | INUSE_DOWN;
 	psvrmom->msr_pcpus = 0;
 	psvrmom->msr_acpus = 0;
 	psvrmom->msr_pmem  = 0;
@@ -410,12 +410,28 @@ create_svrmom_entry(char *hostname, unsigned int port, unsigned long *pul)
 	return pmom;
 }
 
+int
+open_momstream(mominfo_t *pmom, uint port)
+{
+	int stream = -1;
+
+	port  = pmom->mi_rmport;
+	stream = rpp_open(pmom->mi_host, port);
+	((mom_svrinfo_t *) (pmom->mi_data))->msr_stream = stream;
+	if (stream >= 0) {
+		((mom_svrinfo_t *) (pmom->mi_data))->msr_state &= ~(INUSE_UNKNOWN | INUSE_DOWN);
+		tinsert2((u_long)stream, 0, pmom, &streams);
+	}
+	return stream;
+}
+
 mominfo_t *
-recover_mom(pbs_net_t hostaddr, unsigned int port)
+recover_mom(pbs_net_t hostaddr, unsigned int port, int rpp_open)
 {
 	struct sockaddr_in	addr;
 	struct	hostent		*hp;
 	char 		 realfirsthost[PBS_MAXHOSTNAME+1];
+	mominfo_t	*pmom = NULL;
 
 	DBPRT(("Entering %s", __func__))
 
@@ -425,8 +441,13 @@ recover_mom(pbs_net_t hostaddr, unsigned int port)
 		return NULL;
 	get_firstname(hp->h_name, realfirsthost);
 	get_all_db_nodes(realfirsthost);
-
-	return tfind2((unsigned long)hostaddr, port, &ipaddrs);
+	pmom = tfind2((unsigned long)hostaddr, port, &ipaddrs);
+	if (pmom == NULL)
+		return NULL;
+	if (((mom_svrinfo_t *) (pmom->mi_data))->msr_stream >= 0 || !rpp_open)
+		return pmom;
+	(void) open_momstream(pmom, port);
+	return pmom;
 }
 
 /**

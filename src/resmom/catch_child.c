@@ -1930,23 +1930,23 @@ int
 get_server_stream(char *svr, unsigned int port, char *jobid)
 {
 	int	stream = -1;
-	if (pbs_conf.pbs_max_servers > 1) {				
+	if (pbs_conf.pbs_max_servers > 1) {
 		if (conn_slot == -1) {
 			conn_slot = initialise_connection_slot(NCONNECTS);
 			if (conn_slot == -1) {
 				log_err(-1, __func__, "connection table initialization failed");
 				return 1;
 			}
-		set_new_shard_context(conn_slot);
+			set_new_shard_context(conn_slot);
 		}		
 		internal_connect = internal_connect_mom;
 		stream = get_svr_shard_connection(conn_slot, -1 , jobid);	
-	} else { 
+	} else {
 		if (server_stream == -1) {
 			if (svr == NULL)
 				svr = get_servername(&port);
 			stream = rpp_open(svr, port);
-		} else 
+		} else
 			return server_stream;
 	}
 	return stream;

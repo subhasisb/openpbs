@@ -1189,7 +1189,7 @@ on_job_rerun(struct work_task *ptask)
 			&ipaddrs);
 		if (pmom == NULL)
 			pmom = recover_mom((unsigned long) pjob->ji_qs.ji_un.ji_exect.ji_momaddr,
-						pjob->ji_qs.ji_un.ji_exect.ji_momport);
+						pjob->ji_qs.ji_un.ji_exect.ji_momport, 1);
 		if (!pmom || (((mom_svrinfo_t *)(pmom->mi_data))->msr_state & INUSE_DOWN))
 			return;
 		mom_tasklist_ptr = &(((mom_svrinfo_t *)(pmom->mi_data))->msr_deferred_cmds);
