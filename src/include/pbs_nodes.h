@@ -257,6 +257,7 @@ struct	pbs_job_list {
 	char	*job_str;
 	ulong buf_sz;
 	ulong offset;
+	ulong njobs;
 };
 
 union ndu_ninfo {

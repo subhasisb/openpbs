@@ -333,11 +333,37 @@ save_characteristic(struct pbsnode *pnode)
 }
 
 int
+get_ncpu_ct(struct pbsnode *pnode)
+{
+	resource_def		*prd;
+	resource		*prc;
+	attribute		*pala;
+
+	pala = &pnode->nd_attr[(int)ND_ATR_ResourceAvail];
+	prd = find_resc_def(svr_resc_def, "ncpus", svr_resc_size);
+	prc = find_resc_entry(pala, prd);
+	if (prc)
+		return prc->rs_value.at_val.at_long;
+	return 0;
+}
+
+/*
+This piece of code is to avoid crashes related to subnode code!
+need to remove them after we clean up subnode structure code
+*/
+static int nd_nsn;
+static int nd_nsnfree;
+
+
+int
 pre_nodejob_query(struct pbsnode *pnode)
 {
 	resource   *prsc;
 	attribute    *pattr = &pnode->nd_attr[(int)ND_ATR_ResourceAssn];
 
+	nd_nsn = pnode->nd_nsn;
+	nd_nsnfree = pnode->nd_nsnfree;
+	pnode->nd_nsn = get_ncpu_ct(pnode);
 	pnode->nd_nsnfree = pnode->nd_nsn;
 
 	/* clear all resc_assn values before reading afresh */
@@ -350,18 +376,31 @@ pre_nodejob_query(struct pbsnode *pnode)
 							NULL)) != 0)
 			return rc;
 	}
-	/* clear the job_list */
-	if (pnode->job_list) {
-		free(pnode->job_list->job_str);
-		free(pnode->job_list);
+	/* initialize job_list */
+	if (pnode->job_list == NULL) {
+		pnode->job_list = malloc(sizeof(struct pbs_job_list));
+		pnode->job_list->job_str = malloc(1024);
+		pnode->job_list->job_str[0] = '\0';
+		pnode->job_list->buf_sz = 1024;
+		pnode->job_list->offset = 0;
+		pnode->job_list->njobs = 0;
+	} else {
+		pnode->job_list->job_str[0] = '\0';
+		pnode->job_list->offset = 0;
+		pnode->job_list->njobs = 0;
 	}
-	pnode->job_list = NULL;
-	/* clear the resv_list */
-	if (pnode->resv_list) {
-		free(pnode->resv_list->job_str);
-		free(pnode->resv_list);
+	/* initialize resv_list */
+	if (pnode->resv_list == NULL) {
+		pnode->resv_list = malloc(sizeof(struct pbs_job_list));
+		pnode->resv_list->job_str = malloc(1024);
+		pnode->resv_list->job_str[0] = '\0';
+		pnode->resv_list->buf_sz = 1024;
+		pnode->resv_list->offset = 0;
+	} else {
+		pnode->resv_list->job_str[0] = '\0';
+		pnode->resv_list->offset = 0;
+		pnode->resv_list->njobs = 0;
 	}
-	pnode->resv_list = NULL;
 	return 0;
 }
 
@@ -390,9 +429,12 @@ post_nodejob_query(struct pbsnode *pnode)
 			set_vnode_state2(pnode, ~(INUSE_JOB | INUSE_JOBEXCL), Nd_State_And, 0);
 	} else if (pnode->nd_nsnfree <= 0) {
 		set_vnode_state2(pnode, INUSE_JOB, Nd_State_Or, 0);
-	} else if (pnode->nd_nsnfree == pnode->nd_nsn) {
+	} else if (pnode->nd_nsnfree == pnode->nd_nsn || ((pnode->nd_nsnfree != pnode->nd_nsn) && (pnode->job_list->njobs != 1))) {
 		set_vnode_state2(pnode, ~(INUSE_JOB | INUSE_JOBEXCL), Nd_State_And, 0);
 	}
+
+	pnode->nd_nsn = nd_nsn;
+	pnode->nd_nsnfree = nd_nsnfree;
 }
 
 int
@@ -1120,7 +1162,7 @@ struct pbssubn *create_subnode(struct pbsnode *pnode, struct pbssubn *lstsn)
 
 	if(lstsn) /* If not null, then append new subnode directly to the last node */
 		lstsn->next = psubn;
-	else{
+	else {
 		nxtsn = &pnode->nd_psn;	   /* link subnode onto parent node's list */
 		while (*nxtsn)
 			nxtsn = &((*nxtsn)->next);

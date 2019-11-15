@@ -509,7 +509,7 @@ encode_jobs(attribute *pattr, pbs_list_head *ph, char *aname, char *rname, int m
 	if (!(pattr->at_flags & ATR_VFLAG_SET) || !pattr->at_val.at_jinfo)
 		return (0);		/*nothing to report back   */
 	jlist = pattr->at_val.at_jinfo->job_list;
-	if (!jlist)
+	if (!jlist || (jlist->njobs == 0))
 		return 0;
 
 	pal = attrlist_create(aname, rname,  jlist->offset + 1);

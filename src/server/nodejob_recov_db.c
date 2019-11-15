@@ -162,15 +162,10 @@ append_to_joblist(pbs_node *pnode, char *jobid, int ncpus)
 	struct pbs_job_list *jlist;
 
 	DBPRT(("Entering: %s", __func__))
-
-	if (pnode->job_list == NULL) {
-		pnode->job_list = malloc(sizeof(struct pbs_job_list));
-		pnode->job_list->job_str = malloc(1024);
-		pnode->job_list->buf_sz = 1024;
-		pnode->job_list->offset = 0;
-	}
 	
 	jlist = pnode->job_list;
+	jlist->njobs++;
+	/* buffer allocation logic */
 	if ((jlist->offset + (strlen(jobid) + 15) * (ncpus + 1)) > jlist->buf_sz) {
 		char *tmp_str = realloc(jlist->job_str, jlist->buf_sz * 2);
 		if (tmp_str != NULL) {
@@ -196,13 +191,6 @@ append_to_resvlist(pbs_node *pnode, char *resvid)
 	struct pbs_job_list *rlist;
 
 	DBPRT(("Entering: %s", __func__))
-
-	if (pnode->resv_list == NULL) {
-		pnode->resv_list = malloc(sizeof(struct pbs_job_list));
-		pnode->resv_list->job_str = malloc(1024);
-		pnode->resv_list->buf_sz = 1024;
-		pnode->resv_list->offset = 0;
-	}
 	
 	rlist = pnode->resv_list;
 	if (rlist->offset + strlen(resvid) >= rlist->buf_sz) {

@@ -6805,6 +6805,11 @@ set_nodes(void *pobj, int objtype, char *execvnod_in, char **execvnod_out, char 
 				}
 			}
 
+			/*
+			The rest of the code is moved to stat_nodes. This can be moved only after
+			storing info about whether the job has requested forced exclusive in
+			node-job table. For now job force exclusive node wont function
+			*/
 			share_node = pnode->nd_attr[(int)ND_ATR_Sharing].at_val.at_long;
 			if (share_node == (int)VNS_DFLT_EXCL || share_node == (int)VNS_DFLT_EXCLHOST) {
 				if (share_job != (int)VNS_IGNORE_EXCL) {
@@ -6998,10 +7003,9 @@ free_nodes(job *pjob)
 		}
 
 		for (ivnd = 0; ivnd < psvrmom->msr_numvnds; ++ivnd) {
-			pnode = GET_NODEBYINDX_LOCKED(psvrmom->msr_children, ivnd);
+			pnode = psvrmom->msr_children[ivnd];
 			still_has_jobs = 0;
 			for (np = pnode->nd_psn; np; np = np->next) {
-
 				for (prev=NULL, jp=np->jobs; jp; jp=next) {
 					next = jp->next;
 					if (jp->job != pjob) {
@@ -7031,28 +7035,13 @@ free_nodes(job *pjob)
 					DBPRT(("%s: upping free count to %ld\n", __func__,
 						pnode->nd_nsnfree))
 				}
-				if (np->jobs == NULL) {
-					np->inuse &= ~(INUSE_JOB|INUSE_JOBEXCL);
-				}
 			}
-			if (still_has_jobs) {
-				/* if the vnode still has jobs, then don't clear JOBEXCL */
-				if (pnode->nd_nsnfree > 0) {
-					/* some cpus free, clear "job-busy" state */
-					set_vnode_state(pnode, ~INUSE_JOB, Nd_State_And);
-				}
-			} else {
-				/* no jobs at all, clear both JOBEXCL and "job-busy" */
-				set_vnode_state(pnode,
-					~(INUSE_JOB|INUSE_JOBEXCL),
-					Nd_State_And);
-
+			if (!still_has_jobs) {
 				/* call function to check and free the node from the prov list
 				 and reset wait_prov flag, if set */
 				if (pjob->ji_qs.ji_substate == JOB_SUBSTATE_PROVISION)
 					free_prov_vnode(pnode);
 			}
-			node_save_db(pnode);
 		}
 		special_case = 0;
 	}
