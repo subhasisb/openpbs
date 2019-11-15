@@ -115,7 +115,6 @@
 #include "pbs_version.h"
 #include "buckets.h"
 
-
 #ifdef NAS
 #include "site_code.h"
 #endif
