@@ -312,7 +312,7 @@ parse_psi(char * conf_value)
 		count++;
 	}
 	free(tmp);
-
+	
 	pbs_conf.pbs_current_servers = count;
 	return 0;
 }

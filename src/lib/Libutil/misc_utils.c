@@ -1466,21 +1466,18 @@ get_my_index()
 int 
 get_svr_index(int port)
 {
-	static int svr_index = -1;
 	int i;
 
-	if (svr_index == -1) {
-		if (pbs_conf.pbs_current_servers > 1) {
-			/* find my index */
-			for(i = 0; i < pbs_conf.pbs_current_servers; i++) {
-				if (port == pbs_conf.psi[i]->port)
-					svr_index = i;
-			}
-		} else 
-			return 0;
-	}
+	if (pbs_conf.pbs_current_servers > 1) {
+		/* find my index */
+		for(i = 0; i < pbs_conf.pbs_current_servers; i++) {
+			if (port == pbs_conf.psi[i]->port)
+				return i;
+		}
+	} else 
+		return 0;
 
-	return svr_index;
+	return -1;
 }
 
 long long 

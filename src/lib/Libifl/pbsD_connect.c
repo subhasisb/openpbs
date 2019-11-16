@@ -653,7 +653,7 @@ get_svr_shard_connection(int channel, int req_type, void *shard_hint)
 		internal_connect = internal_connect_cli;
 
 	if (pbs_conf.pbs_max_servers > 1) {
-		if (connection[channel].shard_context == -1) {
+		if (shard_hint || connection[channel].shard_context == -1) {
 			srv_index = get_server_shard(shard_hint);
 			connection[channel].shard_context = srv_index; /* reuse the same server in case of a dialogue */
 		} else {
