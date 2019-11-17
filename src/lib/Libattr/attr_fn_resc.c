@@ -204,13 +204,13 @@ decode_resc(struct attribute *patr, char *name, char *rescn, char *val)
 int
 encode_resc(attribute *attr, pbs_list_head *phead, char *atname, char *rsname, int mode, svrattrl **rtnl)
 {
-	resource   *prsc;
-	int	    rc;
-	int	    grandtotal = 0;
-	int	    perm;
-	int	    first = 1;
-	svrattrl   *xrtnl;
-	svrattrl   *xprior = NULL;
+	resource	*prsc;
+	int		rc;
+	int		grandtotal = 0;
+	int		perm;
+	int		first = 1;
+	svrattrl	*xrtnl;
+	svrattrl	*xprior = NULL;
 
 	if (!attr)
 		return (-1);

@@ -2489,7 +2489,7 @@ mgr_node_set(struct batch_request *preq)
 				warnings_update(WARN_ngrp, warn_nodes, &warn_idx, pnode);
 
 				if ((pnode->nd_nsnfree == 0) && (pnode->nd_state == 0))
-					set_vnode_state(pnode, INUSE_JOB, Nd_State_Or);
+					set_vnode_state2(pnode, INUSE_JOB, Nd_State_Or, 0);
 
 				mgr_log_attr(msg_man_set, plist,
 					PBS_EVENTCLASS_NODE, pnode->nd_name, NULL);

@@ -414,12 +414,19 @@ int
 open_momstream(mominfo_t *pmom, uint port)
 {
 	int stream = -1;
+	mom_svrinfo_t *psvrmom;
 
+	psvrmom = (mom_svrinfo_t *)pmom->mi_data;
+	/* take existing stream out of tree */
+	if (psvrmom->msr_stream >= 0) {
+		(void)rpp_destroy(psvrmom->msr_stream);
+		tdelete2((unsigned long)psvrmom->msr_stream , 0, &streams);
+	}
 	port  = pmom->mi_rmport;
 	stream = rpp_open(pmom->mi_host, port);
-	((mom_svrinfo_t *) (pmom->mi_data))->msr_stream = stream;
+	psvrmom->msr_stream = stream;
 	if (stream >= 0) {
-		((mom_svrinfo_t *) (pmom->mi_data))->msr_state &= ~(INUSE_UNKNOWN | INUSE_DOWN);
+		psvrmom->msr_state &= ~(INUSE_UNKNOWN | INUSE_DOWN);
 		tinsert2((u_long)stream, 0, pmom, &streams);
 	}
 	return stream;
@@ -773,7 +780,7 @@ delete_svrmom_entry(mominfo_t *pmom)
 		}
 
 		/* take stream out of tree */
-		if (psvrmom->msr_stream >=0) {
+		if (psvrmom->msr_stream >= 0) {
 			(void)rpp_close(psvrmom->msr_stream);
 			tdelete2((unsigned long)psvrmom->msr_stream , 0, &streams);
 		}

@@ -313,7 +313,7 @@ svr_to_db_node(struct pbsnode *pnode, pbs_db_node_info_t *pdbnd)
 		if (node_attr_def[j].at_flags & ATR_DFLAG_NOSAVM)
 			continue;
 
-		if (!(pnode->nd_attr[j].at_flags & ATR_VFLAG_MODIFY))
+		if (((pnode->nd_attr[j].at_flags & ATR_VFLAG_MODIFY) == 0) && (pnode->nd_attr[j].at_type != ATR_TYPE_RESC))
 			continue;
 
 		(void) node_attr_def[j].at_encode(&pnode->nd_attr[j],

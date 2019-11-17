@@ -11,7 +11,12 @@ port=$2
 
 echo "Starting $n Servers with port starting from $port"
 
-. /etc/pbs.conf
+newconf=/etc/pbs.conf
+cp /etc/pbs.conf /etc/pbs.conf_bak
+sed -i "s;\(^[[:space:]]*PBS_START_SERVER=\)[^[:space:]]*;\10;" "$newconf"
+sed -i "s;\(^[[:space:]]*PBS_MAX_SERVERS=\)[^[:space:]]*;\1$n;" "$newconf"
+sed -i "s;\(^[[:space:]]*PBS_SERVER_INSTANCES=\)[^[:space:]]*;\1:$port;" "$newconf"
+. $newconf
 
 ulimit -n 10000
 ulimit -c unlimited
@@ -25,6 +30,7 @@ do
 	
 	i=`expr $i + 1`
 	port=`expr $port + 1`
+	[ $i -le $n ] && sed -i "/PBS_SERVER_INSTANCES/s/$/,:$port/" "$newconf"
 done
 
 echo "Done"

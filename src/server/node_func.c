@@ -1144,7 +1144,7 @@ struct pbssubn *create_subnode(struct pbsnode *pnode, struct pbssubn *lstsn)
 		 * node to lose its INUSE_PROV flag. Prb occurred when OS with low
 		 * ncpus booted into OS with higher ncpus.
 		 */
-		set_vnode_state(pnode, ~INUSE_JOB, Nd_State_And);
+		set_vnode_state2(pnode, ~INUSE_JOB, Nd_State_And, 0);
 	}
 
 	if(lstsn) /* If not null, then append new subnode directly to the last node */

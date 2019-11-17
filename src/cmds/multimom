@@ -8,7 +8,7 @@ fi
 . /etc/pbs.conf
 
 l=$1
-n=0
+n=1
 port=$2
 mom_name=`hostname`
 if [ $# -eq 3 ]; then
@@ -55,7 +55,7 @@ fi
 echo Current PBS_HOME=$pbs_home
 echo Homes for new moms=$pbs_newhome
 
-n=0
+n=1
 
 echo creating mom directories
 while [ $n -le $l ]
@@ -71,7 +71,7 @@ do
 	n=`expr $n + 1`
 done
 
-n=0
+n=1
 port=$2
 echo editing pbs.conf file and mom_priv/config
 while [ $n -le $l ]
@@ -100,7 +100,7 @@ do
 	n=`expr $n + 1`
 done
 
-n=0
+n=1
 while [ $n -le $l ]
 do
 	echo starting mom $n
