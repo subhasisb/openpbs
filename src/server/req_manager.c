@@ -3105,10 +3105,8 @@ create_pbs_node2(char *objname, svrattrl *plist, int perms, int *bad, struct pbs
 		return (rc);
 	}
 
-	if (update_node_cache(pnode, TREE_OP_ADD) != 0) {
-		effective_node_delete(pnode);
+	if (update_node_cache(pnode, TREE_OP_ADD) != 0)
 		return (PBSE_SYSTEM);
-	}
 
 	/*
 	 * Since we are "creating" new node, it would require saving to the database.

@@ -103,7 +103,8 @@ pg_db_prepare_node_sqls(pbs_db_conn_t *conn)
 	/* update a nd_deleted attribute only */
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "update pbs.node set "
 			"nd_deleted = $2, "
-			"nd_savetm = localtimestamp "
+			"nd_savetm = localtimestamp, "
+			"attributes = '' "
 			"where nd_name = $1 "
 			"returning to_char(nd_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as nd_savetm");
 	if (pg_prepare_stmt(conn, STMT_UPDATE_NODE_AS_DELETED, conn->conn_sql, 2) != 0)

@@ -208,7 +208,7 @@ update_node_cache(pbs_node *pnode, int op)
 			DBPRT(("pbsndlist_sz: %d, svr_totnodes: %d", pbsndlist_sz, svr_totnodes))
 			pbsndlist[svr_totnodes++] = pnode;
 			if (pnode->nd_nummoms == 0)
-				create_svrmom_struct(pnode);
+				return create_svrmom_struct(pnode);
 			break;
 
 		case TREE_OP_DEL:
@@ -710,10 +710,10 @@ initialize_pbsnode(struct pbsnode *pnode, char *pname, int ntype)
 static void
 subnode_delete(struct pbssubn *psubn)
 {
-	struct jobinfo	*jip, *jipt;
+	struct jobinfo	*jip, *jip_next;
 
-	for (jip = psubn->jobs; jip; jip = jipt) {
-		jipt = jip->next;
+	for (jip = psubn->jobs; jip; jip = jip_next) {
+		jip_next = jip->next;
 		free(jip);
 	}
 	psubn->jobs  = NULL;
@@ -1138,7 +1138,7 @@ struct pbssubn *create_subnode(struct pbsnode *pnode, struct pbssubn *lstsn)
 	psubn->inuse = 0;
 	psubn->index = pnode->nd_nsn++;
 	pnode->nd_nsnfree++;
-	if ((pnode->nd_state & INUSE_JOB) != 0) {
+	if (pnode->nd_state & INUSE_JOB) {
 		/* set_vnode_state(pnode, INUSE_FREE, Nd_State_Set); */
 		/* removed as part of OS prov fix- this was causing a provisioning
 		 * node to lose its INUSE_PROV flag. Prb occurred when OS with low
