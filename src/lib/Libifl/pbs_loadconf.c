@@ -298,6 +298,16 @@ parse_psi(char * conf_value)
 		}
 		host = token;
 		if (*host == '\0') {
+			if (!pbs_conf.pbs_server_name) {
+				pbs_conf.pbs_server_name = malloc(PBS_MAXHOSTNAME);
+				*pbs_conf.pbs_server_name = '\0';
+			}
+			if (*pbs_conf.pbs_server_name == '\0') {
+				if ((gethostname(pbs_conf.pbs_server_name, PBS_MAXHOSTNAME-1)) != 0) {
+					free(pbs_conf.pbs_server_name);
+					pbs_conf.pbs_server_name = NULL;
+				}
+			}
 			host = pbs_conf.pbs_server_name;
 		}
 

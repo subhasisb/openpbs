@@ -613,6 +613,9 @@ create_svrmom_struct(pbs_node *pnode)
 	DBPRT(("Entering %s", __func__))
 
 	pattr = &pnode->nd_attr[(int)ND_ATR_Mom];
+	if ((pattr->at_flags & ATR_VFLAG_SET) == 0)
+		return PBSE_SYSTEM;
+
 	for (iht = 0; iht < pattr->at_val.at_arst->as_usedptr; ++iht) {
 		unsigned int nport;
 
