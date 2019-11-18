@@ -264,7 +264,7 @@ extern int sync_mom_hookfiles_proc_running;
  * Miscellaneous server functions
  */
 extern void  est_start_timed_task(struct work_task *);
-extern void db_to_svr_svr(struct server *ps, pbs_db_svr_info_t *pdbsvr);
+extern void db_to_svr_svr(struct server *ps, pbs_db_svr_info_t *pdbsvr, int);
 
 char primary_host[PBS_MAXHOSTNAME+1]; /* host_name of primary */
 

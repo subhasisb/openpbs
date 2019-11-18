@@ -179,11 +179,11 @@ svr_to_db_svr(struct server *ps, pbs_db_svr_info_t *pdbsvr, int updatetype)
  * @return   0     - Success
  */
 int
-db_to_svr_svr(struct server *ps, pbs_db_svr_info_t *pdbsvr)
+db_to_svr_svr(struct server *ps, pbs_db_svr_info_t *pdbsvr, int act_reqd)
 {
 	strcpy(ps->sv_savetm, pdbsvr->sv_savetm);
 
-	if ((decode_attr_db(ps, &pdbsvr->attr_list, svr_attr_def, ps->sv_attr, (int) SRV_ATR_LAST, 0)) != 0)
+	if ((decode_attr_db(ps, &pdbsvr->attr_list, svr_attr_def, ps->sv_attr, (int) SRV_ATR_LAST, 0, act_reqd)) != 0)
 		return -1;
 
 	return 0;
@@ -268,7 +268,7 @@ svr_recov_db(int lock)
 		return 0;
 	}
 
-	if (db_to_svr_svr(&server, &dbsvr) != 0)
+	if (db_to_svr_svr(&server, &dbsvr, 1) != 0)
 		goto db_err;
 
 	pbs_db_reset_obj(&obj);

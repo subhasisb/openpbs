@@ -128,7 +128,7 @@ extern int make_pbs_list_attr_db(void *parent, pbs_db_attr_list_t *attr_list, st
  *
  */
 static int
-db_to_svr_node(struct pbsnode *pnode, pbs_db_node_info_t *pdbnd)
+db_to_svr_node(struct pbsnode *pnode, pbs_db_node_info_t *pdbnd, int act_reqd)
 {
 	DBPRT(("Entering %s", __func__))
 	if (pdbnd->nd_name && pdbnd->nd_name[0] != 0) {
@@ -156,7 +156,7 @@ db_to_svr_node(struct pbsnode *pnode, pbs_db_node_info_t *pdbnd)
 	strcpy(pnode->nd_savetm, pdbnd->nd_savetm);
 
 	if ((decode_attr_db(pnode, &pdbnd->attr_list, node_attr_def,
-		pnode->nd_attr, (int) ND_ATR_LAST, 0)) != 0)
+		pnode->nd_attr, (int) ND_ATR_LAST, 0, act_reqd)) != 0)
 		return -1;
 
 	mod_node_ncpus(pnode, get_ncpu_ct(pnode), ATR_ACTION_ALTER);
@@ -184,6 +184,7 @@ node_recov_db(char *nd_name, struct pbsnode *pnode, int lock)
 	pbs_db_conn_t *conn = (pbs_db_conn_t *) svr_db_conn;
 	pbs_db_node_info_t dbnode;
 	int rc = 0;
+	int act_reqd = 0;
 
 	strcpy(dbnode.nd_name, nd_name);
 	dbnode.nd_savetm[0] = '\0';
@@ -227,9 +228,10 @@ node_recov_db(char *nd_name, struct pbsnode *pnode, int lock)
 		pnode = malloc(sizeof(struct pbsnode));
 		initialize_pbsnode(pnode, strdup(nd_name), NTYPE_PBS);
 		DBPRT(("Initializing pbsnode..."))
+		act_reqd = 1;
 	}
 
-	if (db_to_svr_node(pnode, &dbnode) != 0)
+	if (db_to_svr_node(pnode, &dbnode, act_reqd) != 0)
 		goto db_err;
 
 db_commit:

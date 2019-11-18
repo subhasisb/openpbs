@@ -203,7 +203,7 @@ svr_to_db_job(job *pjob, pbs_db_job_info_t *dbjob, int updatetype)
  * @retval   0    Success
  */
 static int
-db_to_svr_job(job *pjob,  pbs_db_job_info_t *dbjob)
+db_to_svr_job(job *pjob,  pbs_db_job_info_t *dbjob, int act_reqd)
 {
 	/* Variables assigned constant values are not stored in the DB */
 	pjob->ji_qs.ji_jsversion = JSVERSION;
@@ -249,7 +249,7 @@ db_to_svr_job(job *pjob,  pbs_db_job_info_t *dbjob)
 #endif
 	pjob->ji_extended.ji_ext.ji_credtype = dbjob->ji_credtype;
 
-	if ((decode_attr_db(pjob, &dbjob->attr_list, job_attr_def, pjob->ji_wattr, (int)JOB_ATR_LAST, (int) JOB_ATR_UNKN)) != 0)
+	if ((decode_attr_db(pjob, &dbjob->attr_list, job_attr_def, pjob->ji_wattr, (int)JOB_ATR_LAST, (int) JOB_ATR_UNKN, act_reqd)) != 0)
 		return -1;
 
 	return 0;
@@ -313,7 +313,7 @@ svr_to_db_resv(resc_resv *presv,  pbs_db_resv_info_t *dbresv, int updatetype)
  * @retval   0    Success
  */
 static int
-db_to_svr_resv(resc_resv *presv, pbs_db_resv_info_t *pdresv)
+db_to_svr_resv(resc_resv *presv, pbs_db_resv_info_t *pdresv, int act_reqd)
 {
 	strcpy(presv->ri_qs.ri_resvID, pdresv->ri_resvid);
 	strcpy(presv->ri_qs.ri_queue, pdresv->ri_queue);
@@ -336,7 +336,7 @@ db_to_svr_resv(resc_resv *presv, pbs_db_resv_info_t *pdresv)
 
 	if ((decode_attr_db(presv, &pdresv->attr_list, resv_attr_def,
 		presv->ri_wattr,
-		(int) RESV_ATR_LAST, (int) RESV_ATR_UNKN)) != 0)
+		(int) RESV_ATR_LAST, (int) RESV_ATR_UNKN, act_reqd)) != 0)
 		return -1;
 
 	return 0;
@@ -494,7 +494,7 @@ job_recov_db_spl(pbs_db_job_info_t *dbjob)
 		return ((job *)0);
 	}
 
-	if (db_to_svr_job(pj, dbjob) != 0)
+	if (db_to_svr_job(pj, dbjob, 0) != 0)
 		goto db_err;
 
 	return (pj);
@@ -536,7 +536,7 @@ refresh_job(pbs_db_job_info_t *dbjob, int *refreshed)
 		*refreshed = 1;
 		
 	} else if (strcmp(dbjob->ji_savetm, pj->ji_savetm) != 0) { /* if the job had really changed in the DB */
-		if (db_to_svr_job(pj, dbjob) != 0)
+		if (db_to_svr_job(pj, dbjob, 1) != 0)
 			goto err;
 
 		*refreshed = 1;
@@ -593,7 +593,7 @@ refresh_resv(pbs_db_resv_info_t *dbresv, int *refreshed)
 		*refreshed = 1;
 
 	} else if (strcmp(dbresv->ri_savetm, presv->ri_savetm) != 0) { /* if the job had really changed in the DB */
-		if (db_to_svr_resv(presv, dbresv) != 0)
+		if (db_to_svr_resv(presv, dbresv, 0) != 0)
 			goto err;
 		
 		*refreshed = 1;
@@ -800,7 +800,7 @@ resv_recov_db(char *resvid, resc_resv  *presv, int lock)
 		return presv;
 	}
 
-	if (db_to_svr_resv(presv, &dbresv) != 0)
+	if (db_to_svr_resv(presv, &dbresv, 1) != 0)
 		goto db_err;
 
 	memcache_update_state(&presv->trx_status, lock);
