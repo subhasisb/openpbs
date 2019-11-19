@@ -186,8 +186,9 @@ append_to_joblist(pbs_node *pnode, char *jobid, int ncpus)
 	}
 
 	do {
-		if (jlist->offset != 0) {
-			jlist->offset +=sprintf(jlist->job_str + jlist->offset, ", ");
+		if (jlist->offset) {
+			strcpy(jlist->job_str + jlist->offset, ", ");
+			jlist->offset += 2;
 		}
 		jlist->offset += sprintf(jlist->job_str + jlist->offset,
 					 "%s/%ld", jobid, pnode->nd_nsn - pnode->nd_nsnfree);
@@ -200,8 +201,6 @@ void
 append_to_resvlist(pbs_node *pnode, char *resvid)
 {	
 	struct pbs_job_list *rlist;
-
-	DBPRT(("Entering: %s", __func__))
 	
 	rlist = pnode->resv_list;
 	if (rlist->offset + strlen(resvid) >= rlist->buf_sz) {
@@ -212,10 +211,11 @@ append_to_resvlist(pbs_node *pnode, char *resvid)
 		}
 	}
 
-	if (rlist->offset != 0) {
-		rlist->offset +=sprintf(rlist->job_str + rlist->offset, ", ");
+	if (rlist->offset) {
+		strcpy(rlist->job_str + rlist->offset, ", ");
+		rlist->offset += 2;
 	}
-	rlist->offset += sprintf(rlist->job_str + rlist->offset, "%s", resvid);
+	rlist->offset += stpcpy(rlist->job_str + rlist->offset, resvid) - rlist->job_str;
 }
 
 int
