@@ -62,7 +62,8 @@ pbs_mom_LDADD = \
 	@mom_mach_libs@ \
 	@libz_lib@ \
 	-lssl \
-	-lcrypto
+	-lcrypto \
+	@libundolr_lib@
 
 pbs_mom_SOURCES = \
 	$(top_builddir)/src/lib/Libattr/job_attr_def.c \
@@ -111,10 +112,6 @@ if CPUSET_V4
 pbs_mom_LDADD += -lbitmask
 endif
 pbs_mom_SOURCES += linux/cpuset_misc.c
-endif
-
-if UNDOLR_ENABLED
-pbs_mom_LDADD += @libundolr_lib@
 endif
 
 EXTRA_DIST = \

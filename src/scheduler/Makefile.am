@@ -119,7 +119,7 @@ common_libs = \
 	@libical_lib@
 
 pbs_sched_CPPFLAGS = ${common_cppflags}
-pbs_sched_LDADD = ${common_libs}
+pbs_sched_LDADD = ${common_libs} @libundolr_lib@
 pbs_sched_SOURCES = pbs_sched.c
 
 pbsfs_CPPFLAGS = ${common_cppflags}
@@ -133,6 +133,3 @@ dist_sysconf_DATA = \
 	pbs_resource_group \
 	pbs_sched_config
 
-if UNDOLR_ENABLED
-common_libs += @libundolr_lib@
-endif

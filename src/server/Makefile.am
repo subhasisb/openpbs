@@ -66,7 +66,8 @@ pbs_server_bin_LDADD = \
 	@PYTHON_LDFLAGS@ \
 	@PYTHON_LIBS@ \
 	-lssl \
-	-lcrypto
+	-lcrypto \
+	@libundolr_lib@
 
 pbs_server_bin_SOURCES = \
 	accounting.c \
@@ -143,11 +144,7 @@ pbs_comm_LDADD = \
 	-lpthread \
 	@libz_lib@ \
 	@socket_lib@ \
-	-lm
+	-lm \
+	@libundolr_lib@
 
 pbs_comm_SOURCES = pbs_comm.c
-
-if UNDOLR_ENABLED
-pbs_server_bin_LDADD += @libundolr_lib@
-pbs_comm_LDADD += @libundolr_lib@
-endif
