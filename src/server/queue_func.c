@@ -119,6 +119,7 @@ que_alloc(char *name)
 	pq->qu_qs.qu_type = QTYPE_Unset;
 	pq->qu_qs.qu_deleted = Obj_Exist;
 	pq->qu_last_refresh_time = 0;
+	*pq->qu_savetm = '\0';
 	CLEAR_HEAD(pq->qu_jobs);
 	CLEAR_LINK(pq->qu_link);
 

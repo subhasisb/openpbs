@@ -131,18 +131,19 @@ svr_to_db_que(pbs_queue *pque, pbs_db_que_info_t *pdbque, int updatetype)
  *@return !=0    Failure
  */
 int
-db_to_svr_que(pbs_queue *pque, pbs_db_que_info_t *pdbque, int act_reqd)
+db_to_svr_que(pbs_queue *pque, pbs_db_que_info_t *pdbque)
 {
 	pque->qu_qs.qu_name[sizeof(pque->qu_qs.qu_name) - 1] = '\0';
 	strncpy(pque->qu_qs.qu_name, pdbque->qu_name, sizeof(pque->qu_qs.qu_name));
 	pque->qu_qs.qu_type = pdbque->qu_type;
 	pque->qu_qs.qu_deleted = pdbque->qu_deleted;
 	strcpy(pque->qu_creattm, pdbque->qu_creattm);
-	strcpy(pque->qu_savetm, pdbque->qu_savetm);
 
 	if ((decode_attr_db(pque, &pdbque->attr_list, que_attr_def,
-		pque->qu_attr, (int) QA_ATR_LAST, 0, act_reqd)) != 0)
+		pque->qu_attr, (int) QA_ATR_LAST, 0, pque->qu_savetm)) != 0)
 		return -1;
+
+	strcpy(pque->qu_savetm, pdbque->qu_savetm);
 
 	return 0;
 }
@@ -241,7 +242,6 @@ que_recov_db(char *qname, pbs_queue *pq, int lock)
 	pbs_db_obj_info_t	obj;
 	pbs_db_conn_t		*conn = (pbs_db_conn_t *) svr_db_conn;
 	int rc;
-	int act_reqd = 0;
 
 	obj.pbs_db_obj_type = PBS_DB_QUEUE;
 	obj.pbs_db_un.pbs_db_que = &dbque;
@@ -258,7 +258,6 @@ que_recov_db(char *qname, pbs_queue *pq, int lock)
 			return NULL;
 		}
 		dbque.qu_savetm[0] = '\0';
-		act_reqd = 1;
 	}
 
 	/* read in job fixed sub-structure */
@@ -285,7 +284,7 @@ que_recov_db(char *qname, pbs_queue *pq, int lock)
 		return pq;
 	}
 	
-	if (db_to_svr_que(pq, &dbque, act_reqd) != 0)
+	if (db_to_svr_que(pq, &dbque) != 0)
 		goto db_err;
 
 	pbs_db_reset_obj(&obj);

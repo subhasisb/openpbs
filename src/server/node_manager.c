@@ -7250,7 +7250,7 @@ adj_resc_on_node(void *obj, int is_resv, char *noden, enum batch_op op, resource
 
 	/* if the request is from sched_spec, job might have requed and database may not have cleaned up.
 	   so, start afresh! */
-	if (pjob && (pjob->ji_qs.ji_state & JOB_STATE_RUNNING) && (pjob->ji_qs.ji_substate & JOB_SUBSTATE_PRERUN))
+	if (pjob && (pjob->ji_qs.ji_state == JOB_STATE_RUNNING) && (pjob->ji_qs.ji_substate == JOB_SUBSTATE_PRERUN))
 		cur_val = NULL;
 	else
 		cur_val = cur_attr ? cur_attr->attr_value : NULL;

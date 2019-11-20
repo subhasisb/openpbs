@@ -258,7 +258,7 @@ decode_attr_db(
 	struct attribute_def *padef,
 	struct attribute *pattr,
 	int limit,
-	int unknown, int act_reqd)
+	int unknown, char *savetm)
 {
 	int amt;
 	int index;
@@ -410,7 +410,7 @@ decode_attr_db(
 				} else {
 					if (padef[index].at_decode) {
 						padef[index].at_decode(&pattr[index], pal->al_name, pal->al_resc, pal->al_value);
-						if (act_reqd && padef[index].at_action)
+						if (*savetm == '\0' && padef[index].at_action)
 							padef[index].at_action(&pattr[index], parent, ATR_ACTION_RECOV);
 					}
 				}

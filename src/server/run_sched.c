@@ -703,7 +703,6 @@ recov_sched_from_db(char *partition, char *sched_name, int lock)
 	pbs_sched *ps = NULL;
 	char *sname = "new";
 	pbs_db_conn_t *conn = (pbs_db_conn_t *) svr_db_conn;
-	int act_reqd = 0;
 
 	obj.pbs_db_obj_type = PBS_DB_SCHED;
 	obj.pbs_db_un.pbs_db_sched = &dbsched;
@@ -730,7 +729,6 @@ recov_sched_from_db(char *partition, char *sched_name, int lock)
 			return NULL;
 		}
 		dbsched.sched_savetm[0] = '\0';
-		act_reqd = 1;
 	}
 
 	/* recover sched */
@@ -743,7 +741,7 @@ recov_sched_from_db(char *partition, char *sched_name, int lock)
 		return ps;
 	}
 
-	if (db_to_svr_sched(ps, &dbsched, act_reqd) != 0)
+	if (db_to_svr_sched(ps, &dbsched) != 0)
 		goto db_err;
 
 	pbs_db_reset_obj(&obj);
@@ -770,16 +768,17 @@ db_err:
  *
  */
 int
-db_to_svr_sched(struct pbs_sched *ps, pbs_db_sched_info_t *pdbsched, int act_reqd)
+db_to_svr_sched(struct pbs_sched *ps, pbs_db_sched_info_t *pdbsched)
 {
 	/* Following code is for the time being only */
 	strcpy(ps->sc_name, pdbsched->sched_name);
-	strcpy(ps->sch_svtime, pdbsched->sched_savetm);
 	/* since we dont need the sched_name and sched_sv_name free here */
 	if ((decode_attr_db(ps, &pdbsched->attr_list, sched_attr_def,
 		ps->sch_attr,
-		(int) SCHED_ATR_LAST, 0, act_reqd)) != 0)
+		(int) SCHED_ATR_LAST, 0, ps->sch_svtime)) != 0)
 		return -1;
+
+	strcpy(ps->sch_svtime, pdbsched->sched_savetm);
 
 	return 0;
 }

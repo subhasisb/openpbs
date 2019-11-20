@@ -628,6 +628,7 @@ initialize_pbsnode(struct pbsnode *pnode, char *pname, int ntype)
 	pnode->job_list = NULL;
 	pnode->resv_list = NULL;
 	pnode->nd_last_refresh_time = 0;
+	*pnode->nd_savetm = '\0';
 
 	/* first, clear the attributes */
 
