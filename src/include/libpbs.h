@@ -135,9 +135,9 @@ extern int * __pbs_tcperrno_location(void);
 
 extern char pbs_current_group[];
 
-enum from {
-	sched,
-	mom
+enum CONN_ORIGIN {
+	SCHED,
+	MOM
 };
 
 
@@ -413,7 +413,7 @@ extern int DIS_wflush(int sock, int rpp);
 extern int engage_external_authentication(int out, int auth_type, int fromsvr, char *ebuf, int ebufsz);
 extern char *PBSD_modify_resv(int connect, char *resv_id,
 	struct attropl *attrib, char *extend);
-extern int initialise_connection_slot(int table_size, enum from client);
+extern int initialise_connection_slot(int table_size, enum CONN_ORIGIN client);
 #ifdef	__cplusplus
 }
 #endif

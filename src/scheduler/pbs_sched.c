@@ -1350,7 +1350,7 @@ main(int argc, char *argv[])
 		}
 	}
 
-	connector = initialise_connection_slot(NCONNECTS, sched);
+	connector = initialise_connection_slot(NCONNECTS, SCHED);
 	if (connector == -1) {
 		log_err(-1, __func__, "connection table initialization failed");
 		die(0);
