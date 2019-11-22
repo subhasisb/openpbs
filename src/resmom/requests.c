@@ -1145,7 +1145,7 @@ req_modifyjob(struct batch_request *preq)
 		return;
 	}
 
-	(void)job_save(pjob, SAVEJOB_FULL);
+	(void)job_save(pjob);
 	(void)sprintf(log_buffer, msg_manager, msg_jobmod,
 		preq->rq_user, preq->rq_host);
 	log_event(PBSEVENT_JOB, PBS_EVENTCLASS_JOB, LOG_DEBUG,
@@ -1345,7 +1345,7 @@ post_suspend(job *pjob, int err)
 
 			pjob->ji_qs.ji_substate = JOB_SUBSTATE_SUSPEND;
 			pjob->ji_qs.ji_svrflags |= JOB_SVFLG_Suspend;
-			(void)job_save(pjob, SAVEJOB_QUICK);
+			(void)job_save(pjob);
 
 			mom_hook_input_init(&hook_input);
 			hook_input.pjob = pjob;
@@ -1404,7 +1404,7 @@ post_resume(job *pjob, int err)
 			pjob->ji_polltime = time_now;
 		pjob->ji_qs.ji_substate = JOB_SUBSTATE_RUNNING;
 		pjob->ji_qs.ji_svrflags &= ~JOB_SVFLG_Suspend;
-		(void)job_save(pjob, SAVEJOB_QUICK);
+		(void)job_save(pjob);
 	}
 	else
 		pjob->ji_flags &= ~MOM_SISTER_ERR;
@@ -1762,7 +1762,7 @@ susp_resum(job *pjob, int which, struct batch_request *preq)
 		if (pjob->ji_qs.ji_svrflags & JOB_SVFLG_Actsuspd) {
 			/* already suspended for keyboard activity */
 			pjob->ji_qs.ji_svrflags |= JOB_SVFLG_Suspend;
-			(void)job_save(pjob, SAVEJOB_QUICK);
+			(void)job_save(pjob);
 			reply_ack(preq);
 			return;
 		}
@@ -1770,7 +1770,7 @@ susp_resum(job *pjob, int which, struct batch_request *preq)
 		if (pjob->ji_qs.ji_svrflags & JOB_SVFLG_Actsuspd) {
 			/* keep suspended for keyboard activity */
 			pjob->ji_qs.ji_svrflags &= ~JOB_SVFLG_Suspend;
-			(void)job_save(pjob, SAVEJOB_QUICK);
+			(void)job_save(pjob);
 			reply_ack(preq);
 			return;
 		}
@@ -1918,7 +1918,7 @@ terminate_job(job *pjob, int internal)
 		}
 		i = -2;
 	}
-	(void)job_save(pjob, SAVEJOB_QUICK);
+	(void)job_save(pjob);
 	return i;
 }
 
@@ -2665,7 +2665,7 @@ post_cpyfile(struct work_task *pwt)
 			(void)reply_text(preq, PBSE_NOCOPYFILE, buf);
 			if (pjob) {
 				pjob->ji_qs.ji_svrflags |= JOB_SVFLG_StgoFal;
-				(void)job_save(pjob, SAVEJOB_FULLFORCE);
+				(void)job_save(pjob);
 			}
 			break;
 		case STAGEFILE_FATAL:
@@ -2794,7 +2794,7 @@ req_cpyfile(struct batch_request *preq)
 			(JOB_SVFLG_CHKPT|JOB_SVFLG_ChkptMig)) {
 			pjob->ji_qs.ji_svrflags &=
 				~(JOB_SVFLG_CHKPT|JOB_SVFLG_ChkptMig);
-			(void)job_save(pjob, SAVEJOB_QUICK);
+			(void)job_save(pjob);
 		}
 		/*
 		 * change substate so Mom doesn't send another obit
@@ -3045,7 +3045,7 @@ req_delfile(struct batch_request *preq)
 			(JOB_SVFLG_CHKPT|JOB_SVFLG_ChkptMig)) {
 			pjob->ji_qs.ji_svrflags &=
 				~(JOB_SVFLG_CHKPT|JOB_SVFLG_ChkptMig);
-			(void)job_save(pjob, SAVEJOB_QUICK);
+			(void)job_save(pjob);
 		}
 
 		if (pjob->ji_qs.ji_substate == JOB_SUBSTATE_OBIT) {
@@ -3223,7 +3223,7 @@ req_cpyfile(struct batch_request *preq)
 			(JOB_SVFLG_CHKPT|JOB_SVFLG_ChkptMig)) {
 			pjob->ji_qs.ji_svrflags &=
 				~(JOB_SVFLG_CHKPT|JOB_SVFLG_ChkptMig);
-			(void)job_save(pjob, SAVEJOB_QUICK);
+			(void)job_save(pjob);
 		}
 		/* change substate so Mom doesn't send another obit     */
 		/* do not record to disk, so Obit is resent on recovery */
@@ -3803,7 +3803,7 @@ errout:
 	if (hasold) {
 		if (rename(oldp, path) == -1) {
 			pjob->ji_qs.ji_svrflags &= ~JOB_SVFLG_CHKPT;
-			(void)job_save(pjob, SAVEJOB_QUICK);
+			(void)job_save(pjob);
 		}
 	}
 	return ckerr;
@@ -3964,7 +3964,7 @@ post_chkpt(job *pjob, int  ev)
 			ptask->ti_flags &= ~TI_FLAGS_SAVECKP;
 		}
 		pjob->ji_qs.ji_svrflags |= JOB_SVFLG_CHKPT;
-		(void)job_save(pjob, SAVEJOB_QUICK);
+		(void)job_save(pjob);
 		return;
 	}
 	pjob->ji_flags &= ~MOM_SISTER_ERR;
@@ -4038,7 +4038,7 @@ post_chkpt(job *pjob, int  ev)
 
 	/* clear checkpoint active flag so a following checkpoint can happen */
 	pjob->ji_flags &= ~MOM_CHKPT_ACTIVE;
-	(void)job_save(pjob, SAVEJOB_QUICK);
+	(void)job_save(pjob);
 	return;
 }
 
@@ -4117,7 +4117,7 @@ local_checkpoint(job *pjob,
 			pjob->ji_qs.ji_un.ji_momt.ji_exitstat = JOB_EXEC_CHKP;
 		}
 
-		(void)job_save(pjob, SAVEJOB_QUICK);
+		(void)job_save(pjob);
 
 		post_chkpt(pjob, rc);
 
@@ -4142,7 +4142,7 @@ local_checkpoint(job *pjob,
 		pjob->ji_flags |= MOM_CHKPT_ACTIVE;
 		pjob->ji_qs.ji_un.ji_momt.ji_exitstat = JOB_EXEC_CHKP;
 	}
-	(void)job_save(pjob, SAVEJOB_QUICK);
+	(void)job_save(pjob);
 #endif
 
 	return PBSE_NONE;	/* parent return */
@@ -4560,7 +4560,7 @@ local_restart(job *pjob,
 	pjob->ji_mompost = post_restart;
 	pjob->ji_actalarm = 0;
 	pjob->ji_flags |= MOM_RESTART_ACTIVE;
-	(void)job_save(pjob, SAVEJOB_QUICK);
+	(void)job_save(pjob);
 #endif
 
 	return PBSE_NONE;		/* parent return */

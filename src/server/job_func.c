@@ -405,8 +405,6 @@ job_alloc(void)
 	CLEAR_HEAD(pj->ji_rejectdest);
 	pj->ji_terminated = 0;
 	pj->ji_deletehistory = 0;
-	pj->ji_newjob = 0;
-	pj->ji_modified = 0;
 	pj->ji_script = NULL;
 #endif
 	pj->ji_qs.ji_jsversion = JSVERSION;
@@ -1500,7 +1498,6 @@ update_resources_list(job *pjob, char *res_list_name,
 			}
 			pr = next;
 		}
-		pjob->ji_modified = 1;
 	}
 
 	rc = 0;
@@ -1595,7 +1592,6 @@ update_resources_list_error:
 	job_attr_def[res_list_index].at_set(
 			&pjob->ji_wattr[res_list_index],
 			&pjob->ji_wattr[backup_res_list_index], INCR);
-	pjob->ji_modified = 1;
 	return (1);
 }
 
@@ -1617,9 +1613,9 @@ resc_resv_alloc(void)
 {
 	resc_resv	*resvp;
 
-	resvp = (resc_resv *)malloc(sizeof(resc_resv));
+	resvp = (resc_resv *) calloc(1, sizeof(resc_resv));
 	if (resvp == NULL) {
-		log_err(errno, "resc_resv_alloc", "no memory");
+		log_err(errno, __func__, "no memory");
 		return NULL;
 	}
 	(void)memset((char *)resvp, (int)0, (size_t)sizeof(resc_resv));
@@ -2038,18 +2034,13 @@ add_resc_resv_to_job(job *pjob)
 		/*case where have "reservation job" in a reservation*/
 		presv->ri_parent = pjob->ji_myResv;
 
-	presv->ri_modified = 1;
-
-	presv->ri_qs.ri_state = pjob->ji_wattr[JOB_ATR_reserve_state]
-		.at_val.at_long;
+	presv->ri_qs.ri_state = pjob->ji_wattr[JOB_ATR_reserve_state].at_val.at_long;
 	presv->ri_qs.ri_substate = presv->ri_qs.ri_state;
 	presv->ri_qs.ri_type = RESV_JOB_OBJECT;
 
 	(void)strcpy(presv->ri_qs.ri_resvID, pjob->ji_qs.ji_jobid);
 
-	(void)strcpy(presv->ri_qs.ri_fileprefix,
-		pjob->ji_qs.ji_jobid);
-
+	(void)strcpy(presv->ri_qs.ri_fileprefix, pjob->ji_qs.ji_jobid);
 
 	/* A resc_resv's "ri_queue" is not the empty string if a
 	 * queue has been specifically established to support the
@@ -2088,13 +2079,10 @@ add_resc_resv_to_job(job *pjob)
 	}
 
 
-	presv->ri_wattr[(int)RESV_ATR_resv_type]
-	.at_val.at_long = presv->ri_qs.ri_type;
-	presv->ri_wattr[(int)RESV_ATR_resv_type].at_flags |= ATR_VFLAG_SET |
-		ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
+	presv->ri_wattr[(int)RESV_ATR_resv_type].at_val.at_long = presv->ri_qs.ri_type;
+	presv->ri_wattr[(int)RESV_ATR_resv_type].at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 
-	eval_resvState(presv, RESVSTATE_add_resc_resv_to_job,
-		0, &state, &sub);
+	eval_resvState(presv, RESVSTATE_add_resc_resv_to_job, 0, &state, &sub);
 	(void)resv_setResvState(presv, state, sub);
 
 	/* process reservation window, duration, wall info */
@@ -2110,10 +2098,6 @@ add_resc_resv_to_job(job *pjob)
 	 */
 
 	(void)set_resc_deflt((void *)presv, RESC_RESV_OBJECT, NULL);
-
-	/* write of disk image for this resc_resv structure
-	 * occurs when function job_or_resv_save () is called
-	 */
 
 	/* put onto the "timed task" list a task that causes
 	 * deletion of the reservation if the window passes

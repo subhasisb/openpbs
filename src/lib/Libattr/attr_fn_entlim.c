@@ -417,7 +417,6 @@ int
 encode_entlim_db(attribute *attr, pbs_list_head *phead, char *atname, char *rsname, int mode, svrattrl **rtnl)
 {
 	void *ctx;
-	int grandtotal = 0;
 	pbs_entlim_key_t *pkey = NULL;
 	char rescn[PBS_MAX_RESC_NAME + 1];
 	char etname[PBS_MAX_RESC_NAME + 1];
@@ -531,7 +530,6 @@ encode_entlim_db(attribute *attr, pbs_list_head *phead, char *atname, char *rsna
 						*pkey->key, etname, tmpsvl->al_atopl.value);
 				}
 				free(tmpsvl);
-				++grandtotal;
 			}
 		}
 		pkey = entlim_get_next(pkey, ctx);
@@ -571,7 +569,7 @@ encode_entlim_db(attribute *attr, pbs_list_head *phead, char *atname, char *rsna
 	if (db_attrlist)
 		free(db_attrlist);
 
-	return (grandtotal);
+	return (cursize);
 
 err:
 	if (pkey)

@@ -406,13 +406,13 @@ svr_enquejob(job *pjob)
 	pjob->ji_wattr[(int)JOB_ATR_queuetype].at_val.at_char =
 		*pque->qu_attr[(int)QA_ATR_QType].at_val.at_str;
 	pjob->ji_wattr[(int)JOB_ATR_queuetype].at_flags |=
-		ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
+		ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 
 	if ((pjob->ji_wattr[(int)JOB_ATR_qtime].at_flags &
 		ATR_VFLAG_SET) == 0) {
 		pjob->ji_wattr[(int)JOB_ATR_qtime].at_val.at_long = time_now;
 		pjob->ji_wattr[(int)JOB_ATR_qtime].at_flags |=
-			ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
+			ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 	}
 
 	/*
@@ -483,7 +483,7 @@ svr_enquejob(job *pjob)
 			pjob->ji_wattr[(int)JOB_ATR_etime].at_val.at_long =
 				time_now;
 			pjob->ji_wattr[(int)JOB_ATR_etime].at_flags |=
-				ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
+				ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 
 			/* better notify the Scheduler we have a new job */
 
@@ -601,7 +601,6 @@ svr_dequejob(job *pjob)
 int
 svr_setjobstate(job *pjob, int newstate, int newsubstate)
 {
-	int    changed = 0;
 	pbs_queue *pque = pjob->ji_qhdr;
 	pbs_sched *psched;
 
@@ -609,7 +608,8 @@ svr_setjobstate(job *pjob, int newstate, int newsubstate)
 	 * If the job has already finished, then do not make any new changes
 	 * to job state or substate.
 	 */
-	if (pjob->ji_qs.ji_state == JOB_STATE_FINISHED)
+	if (pjob->ji_qs.ji_state == JOB_STATE_FINISHED || 
+		((pjob->ji_qs.ji_state == newstate) && (pjob->ji_qs.ji_substate == newsubstate)))
 		return (0);
 
 	/*
@@ -620,16 +620,9 @@ svr_setjobstate(job *pjob, int newstate, int newsubstate)
 	if (pjob->ji_qs.ji_substate != JOB_SUBSTATE_TRANSICM) {
 		int oldstate;
 
-		/* Not a new job, update the counts and save if needed */
-
-		if (pjob->ji_qs.ji_substate != newsubstate)
-			changed = 1;
-
 		/* if the state is changing, also update the state counts */
 
 		if ((oldstate = pjob->ji_qs.ji_state) != (long)newstate) {
-
-			changed = 1;
 			server.sv_jobstates[oldstate]--;
 			server.sv_jobstates[newstate]++;
 			if (pque != NULL) {
@@ -644,8 +637,7 @@ svr_setjobstate(job *pjob, int newstate, int newsubstate)
 
 				if ((pque->qu_qs.qu_type == QTYPE_Execution) &&
 					(newstate == JOB_STATE_QUEUED)) {
-					attribute *etime = &pjob->
-						ji_wattr[(int)JOB_ATR_etime];
+					attribute *etime = &pjob->ji_wattr[(int)JOB_ATR_etime];
 
 					if (find_assoc_sched_jid(pjob->ji_qs.ji_jobid, &psched))
 						set_scheduler_flag(SCH_SCHEDULE_NEW, psched);
@@ -654,24 +646,17 @@ svr_setjobstate(job *pjob, int newstate, int newsubstate)
 						log_err(-1, __func__, log_buffer);
 					}
 
-					if ((etime->at_flags & ATR_VFLAG_SET)
-						== 0) {
+					if ((etime->at_flags & ATR_VFLAG_SET) == 0) {
 						etime->at_val.at_long = time_now;
-						etime->at_flags |=
-							ATR_VFLAG_SET|
-						ATR_VFLAG_MODCACHE;
+						etime->at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 					}
 					/* clear start time (stime) */
-					job_attr_def[(int)JOB_ATR_stime].
-					at_free(&pjob->
-						ji_wattr[(int)JOB_ATR_stime]);
+					job_attr_def[(int)JOB_ATR_stime].at_free(&pjob->ji_wattr[(int)JOB_ATR_stime]);
 
-				} else if ((newstate == JOB_STATE_HELD) ||
-					(newstate == JOB_STATE_WAITING)) {
+				} else if ((newstate == JOB_STATE_HELD) || (newstate == JOB_STATE_WAITING)) {
 					/* on hold or wait, clear etime */
-					job_attr_def[(int)JOB_ATR_etime].
-					at_free(&pjob->
-						ji_wattr[(int)JOB_ATR_etime]);
+					job_attr_def[(int)JOB_ATR_etime].at_free(&pjob->ji_wattr[(int)JOB_ATR_etime]);
+					/* TODO: remove attr etime from database */
 				}
 			}
 			/* if subjob, update parent Array Job */
@@ -682,11 +667,10 @@ svr_setjobstate(job *pjob, int newstate, int newsubstate)
 	}
 
 	/* set the states accordingly */
-
 	pjob->ji_qs.ji_state = newstate;
 	pjob->ji_qs.ji_substate = newsubstate;
 	pjob->ji_wattr[(int)JOB_ATR_substate].at_val.at_long = newsubstate;
-	pjob->ji_wattr[(int)JOB_ATR_substate].at_flags |= ATR_VFLAG_MODCACHE;
+	pjob->ji_wattr[(int)JOB_ATR_substate].at_flags |= ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 
 	set_statechar(pjob);
 	Update_Resvstate_if_resv(pjob);
@@ -712,11 +696,10 @@ svr_setjobstate(job *pjob, int newstate, int newsubstate)
 		}
 	}
 
-	if (pjob->ji_modified)
-		return (job_save(pjob, SAVEJOB_FULL));
-	else if(changed)
-		return (job_save(pjob, SAVEJOB_QUICK));
-	return (0);
+	if (pjob->ji_savetm[0] == '\0') /* object was never saved/loaded before, so new object */
+		return 0;
+
+	return (job_save_db(pjob));
 }
 
 /**
@@ -1634,8 +1617,7 @@ check_block(job *pjob, char *message)
 	 * a reference to the fact that a history job was a blocking job . Port number need not be recorded .
 	 */
 	pjob->ji_wattr[(int) JOB_ATR_block].at_val.at_long = -1;
-	pjob->ji_wattr[(int) JOB_ATR_block].at_flags |= ATR_VFLAG_MODCACHE;
-	pjob->ji_modified = 1;
+	pjob->ji_wattr[(int) JOB_ATR_block].at_flags |= ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 
 	phost = pjob->ji_wattr[(int)JOB_ATR_submit_host].at_val.at_str;
 	if (port == 0 || phost == NULL) {
@@ -1721,7 +1703,6 @@ job_wait_over(struct work_task *pwt)
 	/* clear the exectime attribute */
 	job_attr_def[(int)JOB_ATR_exectime].
 	at_free(&pjob->ji_wattr[(int)JOB_ATR_exectime]);
-	pjob->ji_modified = 1;
 	svr_evaljobstate(pjob, &newstate, &newsub, 0);
 	(void)svr_setjobstate(pjob, newstate, newsub);
 }
@@ -2295,7 +2276,7 @@ set_chunk_sum(attribute  *pselectattr, attribute *pattr)
 			presc = add_resource_entry(pattr, pdef);
 		if (presc) {
 			presc->rs_value.at_val.at_long = total_chunks;
-			presc->rs_value.at_flags |= ATR_VFLAG_SET | ATR_VFLAG_DEFLT | ATR_VFLAG_MODCACHE;
+			presc->rs_value.at_flags |= ATR_VFLAG_SET | ATR_VFLAG_DEFLT | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 		}
 	}
 	return 0;
@@ -2396,7 +2377,7 @@ set_deflt_resc(attribute *jb, attribute *dflt, int selflg)
 							SET) == 0)
 							prescjb->rs_value.at_flags |=
 								(ATR_VFLAG_SET|ATR_VFLAG_DEFLT);
-						jb->at_flags |= ATR_VFLAG_MODCACHE;
+						jb->at_flags |= ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 					}
 
 				}
@@ -2544,7 +2525,7 @@ set_statechar(job *pjob)
 	} else
 		pjob->ji_wattr[JOB_ATR_state].at_val.at_char =
 			*(statechars + pjob->ji_qs.ji_state);
-	pjob->ji_wattr[JOB_ATR_state].at_flags |= ATR_VFLAG_MODCACHE;
+	pjob->ji_wattr[JOB_ATR_state].at_flags |= ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 }
 
 /**
@@ -2722,9 +2703,7 @@ Update_Resvstate_if_resv(job *pjob)
 
 			if (ap->at_val.at_long != RESV_FINISHED) {
 				ap->at_val.at_long = RESV_FINISHED;
-				ap->at_flags |= ATR_VFLAG_SET |
-					ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
-				pjob->ji_modified = 1;
+				ap->at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 			}
 			return;
 		}
@@ -2738,25 +2717,19 @@ Update_Resvstate_if_resv(job *pjob)
 		case JOB_STATE_TRANSIT:
 			if (pjob->ji_qs.ji_substate == JOB_SUBSTATE_TRANSIN) {
 				ap->at_val.at_long = RESV_UNCONFIRMED;
-				ap->at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODIFY
-					| ATR_VFLAG_MODCACHE;
-				pjob->ji_modified = 1;
+				ap->at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 			}
 			break;
 		case JOB_STATE_HELD:
 			if (ap->at_val.at_long != presv->ri_qs.ri_state) {
 				ap->at_val.at_long = presv->ri_qs.ri_state;
-				ap->at_flags |= ATR_VFLAG_SET |
-					ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
-				pjob->ji_modified = 1;
+				ap->at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 			}
 			if (beyondStart) {
 				if (presv->ri_qs.ri_state == RESV_CONFIRMED) {
 					if (ap->at_val.at_long != RESV_TIME_TO_RUN) {
 						ap->at_val.at_long = RESV_TIME_TO_RUN;
-						ap->at_flags |= ATR_VFLAG_SET |
-							ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
-						pjob->ji_modified = 1;
+						ap->at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 					}
 				}
 			}
@@ -2765,31 +2738,23 @@ Update_Resvstate_if_resv(job *pjob)
 			if (beyondStart) {
 				if (ap->at_val.at_long != RESV_TIME_TO_RUN) {
 					ap->at_val.at_long = RESV_TIME_TO_RUN;
-					ap->at_flags |= ATR_VFLAG_SET |
-						ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
-					pjob->ji_modified = 1;
+					ap->at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 				}
 			} else if (ap->at_val.at_long != RESV_CONFIRMED) {
 				ap->at_val.at_long = RESV_CONFIRMED;
-				ap->at_flags |= ATR_VFLAG_SET |
-					ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
-				pjob->ji_modified = 1;
+				ap->at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 			}
 			break;
 		case JOB_STATE_QUEUED:
 			if (beyondStart) {
 				if (ap->at_val.at_long != RESV_TIME_TO_RUN) {
 					ap->at_val.at_long = RESV_TIME_TO_RUN;
-					ap->at_flags |= ATR_VFLAG_SET |
-						ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
-					pjob->ji_modified = 1;
+					ap->at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 				}
 			} else {
 				if (ap->at_val.at_long != RESV_CONFIRMED) {
 					ap->at_val.at_long = RESV_CONFIRMED;
-					ap->at_flags |= ATR_VFLAG_SET |
-						ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
-					pjob->ji_modified = 1;
+					ap->at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 				}
 			}
 
@@ -2799,18 +2764,14 @@ Update_Resvstate_if_resv(job *pjob)
 				/*operator didn't run the job early*/
 				if (ap->at_val.at_long != RESV_RUNNING) {
 					ap->at_val.at_long = RESV_RUNNING;
-					ap->at_flags |= ATR_VFLAG_SET |
-						ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
-					pjob->ji_modified = 1;
+					ap->at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 				}
 			}
 			break;
 		case JOB_STATE_EXITING:
 			if (ap->at_val.at_long != RESV_BEING_DELETED) {
 				ap->at_val.at_long = RESV_BEING_DELETED;
-				ap->at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODIFY |
-					ATR_VFLAG_MODCACHE;
-				pjob->ji_modified = 1;
+				ap->at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 			}
 			break;
 	}
@@ -3439,22 +3400,18 @@ Time4occurrenceFinish(resc_resv *presv)
 	newend = (time_t)(newstart + presv->ri_qs.ri_duration);
 
 	presv->ri_wattr[RESV_ATR_start].at_val.at_long = newstart;
-	presv->ri_wattr[RESV_ATR_start].at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODIFY
-		| ATR_VFLAG_MODCACHE;
+	presv->ri_wattr[RESV_ATR_start].at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 	presv->ri_qs.ri_stime = newstart;
 
 	presv->ri_wattr[RESV_ATR_end].at_val.at_long = newend;
-	presv->ri_wattr[RESV_ATR_end].at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODIFY
-		| ATR_VFLAG_MODCACHE;
+	presv->ri_wattr[RESV_ATR_end].at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 	presv->ri_qs.ri_etime = newend;
 
 	presv->ri_wattr[RESV_ATR_resv_idx].at_val.at_long = ridx;
-	presv->ri_wattr[RESV_ATR_resv_idx].at_flags |= ATR_VFLAG_SET
-		| ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
+	presv->ri_wattr[RESV_ATR_resv_idx].at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 
 	presv->ri_wattr[RESV_ATR_duration].at_val.at_long = presv->ri_qs.ri_duration;
-	presv->ri_wattr[RESV_ATR_duration].at_flags |= ATR_VFLAG_SET
-		| ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
+	presv->ri_wattr[RESV_ATR_duration].at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 
 	rscdef = find_resc_def(svr_resc_def, "walltime", svr_resc_size);
 	prsc = find_resc_entry(&presv->ri_wattr[RESV_ATR_resource], rscdef);
@@ -3538,8 +3495,7 @@ Time4occurrenceFinish(resc_resv *presv)
 	/* Set the reservation state and substate */
 	resv_setResvState(presv, state, sub);
 
-	if (presv->ri_modified)
-		(void)job_or_resv_save((void *)presv, SAVERESV_FULL, RESC_RESV_OBJECT);
+	resv_save_db(presv);
 }
 
 /**
@@ -3874,13 +3830,12 @@ resv_setResvState(resc_resv *presv, int state, int sub)
 	presv->ri_qs.ri_substate = sub;
 
 	presv->ri_wattr[(int)RESV_ATR_state].at_val.at_long = state;
-	presv->ri_wattr[(int)RESV_ATR_state].at_flags |= ATR_VFLAG_SET |
-		ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
+	presv->ri_wattr[(int)RESV_ATR_state].at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 
 	presv->ri_wattr[(int)RESV_ATR_substate].at_val.at_long = sub;
-	presv->ri_wattr[(int)RESV_ATR_substate].at_flags |= ATR_VFLAG_SET |
-		ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
-	presv->ri_modified = 1;
+	presv->ri_wattr[(int)RESV_ATR_substate].at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
+
+	resv_save_db(presv);
 	return;
 }
 
@@ -4658,10 +4613,8 @@ start_end_dur_wall(void *pobj, int objtype)
 				rc = -1;
 			}
 			else {
-				pstime->at_flags |= ATR_VFLAG_SET |
-					ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
-				pstime->at_val.at_long = petime->at_val.at_long -
-					pduration->at_val.at_long;
+				pstime->at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
+				pstime->at_val.at_long = petime->at_val.at_long - pduration->at_val.at_long;
 			}
 			break;
 
@@ -4670,12 +4623,9 @@ start_end_dur_wall(void *pobj, int objtype)
 				(prsc->rs_value.at_val.at_long <= 0))
 				rc = -1;
 			else {
-				petime->at_flags |= ATR_VFLAG_SET |
-					ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
-				petime->at_val.at_long = pstime->at_val.at_long +
-					prsc->rs_value.at_val.at_long;
-				pduration->at_flags |= ATR_VFLAG_SET |
-					ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
+				petime->at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
+				petime->at_val.at_long = pstime->at_val.at_long + prsc->rs_value.at_val.at_long;
+				pduration->at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 				pduration->at_val.at_long = prsc->rs_value.at_val.at_long;
 			}
 			break;
@@ -4687,12 +4637,9 @@ start_end_dur_wall(void *pobj, int objtype)
 				rc = -1;
 			}
 			else {
-				pstime->at_flags |= ATR_VFLAG_SET |
-					ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
-				pstime->at_val.at_long = petime->at_val.at_long -
-					prsc->rs_value.at_val.at_long;
-				pduration->at_flags |= ATR_VFLAG_SET |
-					ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
+				pstime->at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
+				pstime->at_val.at_long = petime->at_val.at_long - prsc->rs_value.at_val.at_long;
+				pduration->at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 				pduration->at_val.at_long = prsc->rs_value.at_val.at_long;
 			}
 			break;
@@ -4704,8 +4651,7 @@ start_end_dur_wall(void *pobj, int objtype)
 					prsc->rs_value.at_val.at_long))
 				rc = -1;
 			else {
-				pduration->at_flags |= ATR_VFLAG_SET |
-					ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
+				pduration->at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 				pduration->at_val.at_long = prsc->rs_value.at_val.at_long;
 			}
 			break;
@@ -4716,8 +4662,7 @@ start_end_dur_wall(void *pobj, int objtype)
 				(pduration->at_val.at_long <= 0))
 				rc = -1;
 			else {
-				petime->at_flags |= ATR_VFLAG_SET |
-					ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
+				petime->at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 				petime->at_val.at_long = pstime->at_val.at_long +
 					presv->ri_qs.ri_duration;
 			}
@@ -5003,12 +4948,9 @@ update_eligible_time(long newaccruetype, job *pjob)
 			pjob->ji_wattr[(int)JOB_ATR_accrue_type].at_val.at_long = newaccruetype;
 			pjob->ji_wattr[(int)JOB_ATR_sample_starttime].at_val.at_long = timestamp;
 
-			pjob->ji_wattr[(int)JOB_ATR_sample_starttime].at_flags |=
-				(ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE);
-			pjob->ji_wattr[(int)JOB_ATR_accrue_type].at_flags |=
-				(ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE);
-			pjob->ji_wattr[(int)JOB_ATR_eligible_time].at_flags |=
-				(ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE);
+			pjob->ji_wattr[(int)JOB_ATR_sample_starttime].at_flags |= (ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE);
+			pjob->ji_wattr[(int)JOB_ATR_accrue_type].at_flags |= (ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE);
+			pjob->ji_wattr[(int)JOB_ATR_eligible_time].at_flags |= (ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE);
 			break;
 		case JOB_INELIGIBLE:
 		case JOB_RUNNING:
@@ -5017,12 +4959,9 @@ update_eligible_time(long newaccruetype, job *pjob)
 			pjob->ji_wattr[(int)JOB_ATR_accrue_type].at_val.at_long = newaccruetype;
 			pjob->ji_wattr[(int)JOB_ATR_sample_starttime].at_val.at_long = timestamp;
 
-			pjob->ji_wattr[(int)JOB_ATR_sample_starttime].at_flags |=
-				(ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE);
-			pjob->ji_wattr[(int)JOB_ATR_accrue_type].at_flags |=
-				(ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE);
-			pjob->ji_wattr[(int)JOB_ATR_eligible_time].at_flags |=
-				(ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE);
+			pjob->ji_wattr[(int)JOB_ATR_sample_starttime].at_flags |= (ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE);
+			pjob->ji_wattr[(int)JOB_ATR_accrue_type].at_flags |= (ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE);
+			pjob->ji_wattr[(int)JOB_ATR_eligible_time].at_flags |= (ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE);
 			break;
 
 		default:
@@ -5229,14 +5168,11 @@ svr_clean_job_history(struct work_task *pwt)
 					pjob->ji_wattr[(int) JOB_ATR_history_timestamp].at_val.at_long =
 						pjob->ji_wattr[(int) JOB_ATR_stime].at_val.at_long + walltime_used;
 				}
-				pjob->ji_wattr[(int) JOB_ATR_history_timestamp].at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
-				pjob->ji_modified = 1;
-				/* save the full job */
-				(void)job_save(pjob, SAVEJOB_FULL);
+				pjob->ji_wattr[(int) JOB_ATR_history_timestamp].at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
+				job_save_db(pjob);
 			}
 
-			if (time_now >= (pjob->ji_wattr[(int) JOB_ATR_history_timestamp].at_val.at_long
-				+ svr_history_duration)) {
+			if (time_now >= (pjob->ji_wattr[(int) JOB_ATR_history_timestamp].at_val.at_long + svr_history_duration)) {
 				job_purge(pjob);
 				pjob = NULL;
 			}
@@ -5360,10 +5296,9 @@ svr_histjob_update(job * pjob, int newstate, int newsubstate)
 	}
 	/* set the substate attr and cache it */
 	pjob->ji_wattr[(int)JOB_ATR_substate].at_val.at_long = newsubstate;
-	pjob->ji_wattr[(int)JOB_ATR_substate].at_flags |= ATR_VFLAG_MODCACHE;
+	pjob->ji_wattr[(int)JOB_ATR_substate].at_flags |= ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 
-	/* save the full job */
-	(void)job_save(pjob, SAVEJOB_FULL);
+	job_save_db(pjob);
 }
 
 /**
@@ -5548,17 +5483,13 @@ svr_setjob_histinfo(job *pjob, histjob_type type)
 				}
 			}
 			if (stgout_status != -1) {
-				pjob->ji_wattr[(int)JOB_ATR_stageout_status].at_val.at_long =
-					stgout_status;
-				pjob->ji_wattr[(int)JOB_ATR_stageout_status].at_flags =
-					ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
+				pjob->ji_wattr[(int)JOB_ATR_stageout_status].at_val.at_long = stgout_status;
+				pjob->ji_wattr[(int)JOB_ATR_stageout_status].at_flags = ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 			}
 			for (i=0; i<ptbl->tkm_ct; i++) {
 				if (ptbl->tkm_tbl[i].trk_exitstat) {
-					pjob->ji_wattr[(int)JOB_ATR_exit_status].at_val.at_long =
-						pjob->ji_qs.ji_un.ji_exect.ji_exitstat;
-					pjob->ji_wattr[(int)JOB_ATR_exit_status].at_flags =
-						ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
+					pjob->ji_wattr[(int)JOB_ATR_exit_status].at_val.at_long = pjob->ji_qs.ji_un.ji_exect.ji_exitstat;
+					pjob->ji_wattr[(int)JOB_ATR_exit_status].at_flags = ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 					break;
 				}
 			}
@@ -5605,8 +5536,7 @@ svr_setjob_histinfo(job *pjob, histjob_type type)
 
 	/* set the history timestamp */
 	pjob->ji_wattr[(int) JOB_ATR_history_timestamp].at_val.at_long = time_now;
-	pjob->ji_wattr[(int) JOB_ATR_history_timestamp].at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
-	pjob->ji_modified = 1;
+	pjob->ji_wattr[(int) JOB_ATR_history_timestamp].at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 	/* update the history job state and substate */
 	svr_histjob_update(pjob, newstate, newsubstate);
 
@@ -6263,7 +6193,6 @@ recreate_exec_vnode(job *pjob, char *vnodelist, char *keep_select, char *err_msg
 			NULL,
 			NULL,
 			new_exec_vnode);
-		pjob->ji_modified = 1;
 
 		(void)update_resources_list(pjob, ATTR_l,
 			JOB_ATR_resource, new_exec_vnode, INCR, 0,
@@ -6279,7 +6208,6 @@ recreate_exec_vnode(job *pjob, char *vnodelist, char *keep_select, char *err_msg
 			NULL,
 			NULL,
 			new_deallocated_execvnode);
-		pjob->ji_modified = 1;
 	}
 
 	if (new_exec_host && *new_exec_host) {
@@ -6304,7 +6232,6 @@ recreate_exec_vnode(job *pjob, char *vnodelist, char *keep_select, char *err_msg
 			NULL,
 			NULL,
 			new_exec_host);
-		pjob->ji_modified = 1;
 	} else {
 		log_err(-1, __func__, "new_exec_host is null or empty string");
 		goto recreate_exec_vnode_exit;
@@ -6317,7 +6244,6 @@ recreate_exec_vnode(job *pjob, char *vnodelist, char *keep_select, char *err_msg
 			NULL,
 			NULL,
 			new_exec_host2);
-		pjob->ji_modified = 1;
 	} else {
 		log_err(-1, __func__, "new_exec_host2 is null or empty string");
 		goto recreate_exec_vnode_exit;
