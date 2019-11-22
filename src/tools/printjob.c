@@ -316,7 +316,6 @@ print_db_job(char *id, int no_attributes)
 	pbs_db_jobscr_info_t jobscr;
 	job xjob;
 	int db_conn_error;
-	pbs_db_attr_info_t *attrs;
 	char *db_errmsg = NULL;
 	char errmsg[PBS_MAX_DB_CONN_INIT_ERR + 1];
 
@@ -412,17 +411,16 @@ print_db_job(char *id, int no_attributes)
 		db_to_svr_job(&xjob, &dbjob);
 		prt_job_struct(&xjob);
 
-		attrs = dbjob.attr_list.attributes;
 		if (no_attributes == 0) {
-			int i;
+			svrattrl *pal;
 			printf("--attributes--\n");
-			for (i=0; i< dbjob.attr_list.attr_count; i++) {
-				printf("%s", attrs[i].attr_name);
-				if (attrs[i].attr_resc && attrs[i].attr_resc[0] != 0)
-					printf(".%s", attrs[i].attr_resc);
+			for (pal = (svrattrl *)GET_NEXT(dbjob.db_attr_list.attrs); pal != NULL; pal = (svrattrl *)GET_NEXT(pal->al_link)) {
+				printf("%s", pal->al_atopl.name);
+				if (pal->al_atopl.resource && pal->al_atopl.resource[0] != 0)
+					printf(".%s", pal->al_atopl.resource);
 				printf(" = ");
-				if (attrs[i].attr_value)
-					printf("%s", show_nonprint_chars(attrs[i].attr_value));
+				if (pal->al_atopl.value)
+					printf("%s", pal->al_atopl.value);
 				printf("\n");
 			}
 

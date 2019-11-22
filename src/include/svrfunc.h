@@ -90,8 +90,6 @@ extern int   svr_connect(pbs_net_t, unsigned int, void (*)(int), enum conn_type,
 extern void  svr_force_disconnect(int);
 extern void  svr_shutdown(int);
 extern int   svr_get_privilege(char *, char *);
-extern void  write_node_state(void);
-extern int   write_single_node_state(struct pbsnode *);
 extern int   setup_nodes(void);
 extern int   setup_resc(int);
 extern void  update_job_node_rassn(job *, attribute *, enum batch_op);
@@ -119,14 +117,10 @@ extern void svr_saveorpurge_finjobhist(job *);
 extern int recreate_exec_vnode(job *, char *, char *, int);
 extern void unset_extra_attributes(job *);
 extern int node_delete_db(struct pbsnode *);
-extern int node_recov_db_raw(void *, pbs_list_head *);
-extern int save_attr_db(pbs_db_conn_t *, pbs_db_attr_info_t *,	struct attribute_def *, struct attribute *, int , int);
-extern int recov_attr_db(pbs_db_conn_t *, void *, pbs_db_attr_info_t *, struct attribute_def *, struct attribute *, int , int);
 extern int pbsd_init(int);
-extern int resv_save_db(resc_resv *, int);
+extern int resv_save_db(resc_resv *);
 extern int svr_chk_histjob(job *);
 extern int chk_and_update_db_svrhost(void);
-extern int recov_attr_db_raw(pbs_db_conn_t *, pbs_db_attr_info_t *, pbs_list_head *);
 extern int apply_aoe_inchunk_rules(resource *, attribute *, void *, int);
 extern int apply_select_inchunk_rules(resource *, attribute *, void *, int, int);
 extern int svr_create_tmp_jobscript(job *, char *);
@@ -138,6 +132,7 @@ extern enum failover_state are_we_primary(void);
 extern void license_more_nodes(void);
 extern void reset_svr_sequence_window(void);
 extern void reply_preempt_jobs_request(int code, int aux, struct job *pjob);
+extern long long get_next_svr_sequence_id(void);
 
 #ifdef	_PROVISION_H
 extern int find_prov_vnode_list(job *pjob, exec_vnode_listtype *prov_vnodes, char **aoe_name);
@@ -285,7 +280,6 @@ extern void  set_last_used_time_node(void *pobj, int type);
 #ifdef	_ATTRIBUTE_H
 extern int   check_que_enable(attribute *, void *, int);
 extern int   set_queue_type(attribute *, void *, int);
-extern void  save_characteristic(struct pbsnode	*pnode);
 extern int   chk_characteristic(struct pbsnode *pnode, int *pneed_todo);
 extern int   is_valid_str_resource(attribute *pattr, void *pobject, int actmode);
 extern int   setup_arrayjob_attrs(attribute *, void *, int);

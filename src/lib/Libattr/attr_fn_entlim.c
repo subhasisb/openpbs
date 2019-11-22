@@ -571,7 +571,8 @@ encode_entlim_db(attribute *attr, pbs_list_head *phead, char *atname, char *rsna
 	if (db_attrlist)
 		free(db_attrlist);
 
-	return (grandtotal);
+	//return (grandtotal);
+	return (cursize);
 
 err:
 	if (pkey)

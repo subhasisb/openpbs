@@ -65,9 +65,7 @@ pg_db_fn_t db_fn_arr[PBS_DB_NUM_TYPES] =
 		pg_db_load_job,
 		pg_db_find_job,
 		pg_db_next_job,
-		pg_db_del_attr_job,
-		NULL,
-		pg_db_reset_job
+		pg_db_del_attr_job
 	},
 	{ /* PBS_DB_RESV */
 		pg_db_save_resv,
@@ -75,9 +73,7 @@ pg_db_fn_t db_fn_arr[PBS_DB_NUM_TYPES] =
 		pg_db_load_resv,
 		pg_db_find_resv,
 		pg_db_next_resv,
-		pg_db_del_attr_resv,
-		NULL,
-		pg_db_reset_resv
+		pg_db_del_attr_resv
 	},
 	{ /* PBS_DB_SVR */
 		pg_db_save_svr,
@@ -85,9 +81,7 @@ pg_db_fn_t db_fn_arr[PBS_DB_NUM_TYPES] =
 		pg_db_load_svr,
 		NULL,
 		NULL,
-		pg_db_del_attr_svr,
-		NULL,
-		pg_db_reset_svr
+		pg_db_del_attr_svr
 	},
 	{ /* PBS_DB_NODE */
 		pg_db_save_node,
@@ -95,9 +89,7 @@ pg_db_fn_t db_fn_arr[PBS_DB_NUM_TYPES] =
 		pg_db_load_node,
 		pg_db_find_node,
 		pg_db_next_node,
-		pg_db_del_attr_node,
-		pg_db_add_update_attr_node,
-		pg_db_reset_node
+		pg_db_del_attr_node
 	},
 	{ /* PBS_DB_QUE */
 		pg_db_save_que,
@@ -105,16 +97,12 @@ pg_db_fn_t db_fn_arr[PBS_DB_NUM_TYPES] =
 		pg_db_load_que,
 		pg_db_find_que,
 		pg_db_next_que,
-		pg_db_del_attr_que,
-		NULL,
-		pg_db_reset_que
+		pg_db_del_attr_que
 	},
 	{ /* PBS_DB_JOBSCR */
 		pg_db_save_jobscr,
 		NULL,
 		pg_db_load_jobscr,
-		NULL,
-		NULL,
 		NULL,
 		NULL,
 		NULL
@@ -125,9 +113,7 @@ pg_db_fn_t db_fn_arr[PBS_DB_NUM_TYPES] =
 		pg_db_load_sched,
 		pg_db_find_sched,
 		pg_db_next_sched,
-		pg_db_del_attr_sched,
-		NULL,
-		pg_db_reset_sched
+		pg_db_del_attr_sched
 	},
 
 	{ /* PBS_DB_MOMINFO_TIME */
@@ -136,9 +122,7 @@ pg_db_fn_t db_fn_arr[PBS_DB_NUM_TYPES] =
 		pg_db_load_mominfo_tm,
 		NULL,
 		NULL,
-		NULL,
-		NULL,
-		pg_db_reset_mominfo
+		NULL
 	}
 };
 
@@ -399,7 +383,8 @@ pbs_db_begin_trx(pbs_db_conn_t *conn, int isolation_level, int async)
 	if (conn->conn_trx_nest == 0) {
 		res = PQexec((PGconn *) conn->conn_db_handle, "BEGIN");
 		if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-			pg_set_error(conn, "Transaction", "begin");
+			char *sql_error = PQresultErrorField(res, PG_DIAG_SQLSTATE);
+			pg_set_error(conn, "Transaction", "begin", sql_error);
 			PQclear(res);
 			return -1;
 		}
@@ -412,7 +397,8 @@ pbs_db_begin_trx(pbs_db_conn_t *conn, int isolation_level, int async)
 			res = PQexec((PGconn *) conn->conn_db_handle,
 				conn->conn_sql);
 			if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-				pg_set_error(conn, "Transaction", conn->conn_sql);
+				char *sql_error = PQresultErrorField(res, PG_DIAG_SQLSTATE);
+				pg_set_error(conn, "Transaction", conn->conn_sql, sql_error);
 				PQclear(res);
 				return -1;
 			}
@@ -462,7 +448,8 @@ pbs_db_end_trx(pbs_db_conn_t *conn, int commit)
 
 		res = PQexec((PGconn *) conn->conn_db_handle, str);
 		if (PQresultStatus(res) != PGRES_COMMAND_OK) {
-			pg_set_error(conn, "Transaction", str);
+			char *sql_error = PQresultErrorField(res, PG_DIAG_SQLSTATE);
+			pg_set_error(conn, "Transaction", str, sql_error);
 			PQclear(res);
 			conn->conn_trx_nest--;
 			return -1;
@@ -501,7 +488,8 @@ pbs_db_execute_str(pbs_db_conn_t *conn, char *sql)
 	res = PQexec((PGconn*) conn->conn_db_handle, sql);
 	status = PQresultStatus(res);
 	if (status != PGRES_COMMAND_OK && status != PGRES_TUPLES_OK) {
-		pg_set_error(conn, "Execution of string statement\n", sql);
+		char *sql_error = PQresultErrorField(res, PG_DIAG_SQLSTATE);
+		pg_set_error(conn, "Execution of string statement", sql, sql_error);
 		PQclear(res);
 		return -1;
 	}
@@ -553,7 +541,7 @@ is_conn_error(pbs_db_conn_t *conn, int *failcode)
 {
 	/* Check to see that the backend connection was successfully made */
 	if (PQstatus(conn->conn_db_handle) == CONNECTION_BAD) {
-		pg_set_error(conn, "Connection:", "");
+		pg_set_error(conn, "Connection:", "", "");
 		if (strstr((char *) conn->conn_db_err, "Connection refused") || strstr((char *) conn->conn_db_err, "No such file or directory"))
 			*failcode = PBS_DB_CONNREFUSED;
 		else if (strstr((char *) conn->conn_db_err, "authentication"))
@@ -865,41 +853,35 @@ pbs_db_save_obj(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
  *
  */
 int
-pbs_db_delete_attr_obj(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, void *obj_id, pbs_db_attr_list_t *attr_list) {
-	return (db_fn_arr[obj->pbs_db_obj_type].pg_db_del_attr_obj(conn, obj, obj_id, attr_list));
-}
-
-/**
- * @brief
- *	Add/update attributes of an object to the database
- *
- * @param[in]	conn - Connected database handle
- * @param[in]	pbs_db_obj_info_t - Wrapper object that describes the object
- * @param[in]	id - Object id
- * @param[in]	attr_list - list of attributes to add/update
- *
- * @return      Error code
- * @retval       0  - success
- * @retval      -1  - Failure
- *
- */
-int
-pbs_db_add_update_attr_obj(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, void *obj_id, pbs_db_attr_list_t *attr_list) {
-	return (db_fn_arr[obj->pbs_db_obj_type].pg_db_add_update_attr_obj(conn, obj, obj_id, attr_list));
-}
-
-/**
- * @brief
- *	Frees allocate memory of an Object
- *
- * @param[in]	obj - db object
- *
- * @return None
- *
- */
-void
-pbs_db_reset_obj(pbs_db_obj_info_t *obj)
+pbs_db_delete_attr_obj(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, void *obj_id, char *sv_time, pbs_db_attr_list_t *cache_attr_list, pbs_db_attr_list_t *db_attr_list) 
 {
-	db_fn_arr[obj->pbs_db_obj_type].pg_db_reset_obj(obj);
 
+	/* are there attributes to remove from memory / local cache? */
+	if (cache_attr_list->attr_count > 0) {
+		if (dist_cache_del_attrs(obj_id, cache_attr_list) != 0)
+			return -1;
+	}
+	return (db_fn_arr[obj->pbs_db_obj_type].pg_db_del_attr_obj(conn, obj_id, sv_time, db_attr_list));
+}
+
+int 
+dist_cache_recov_attrs(char *id, char *last_savetm, pbs_db_attr_list_t *attr_list)
+{
+	attr_list->attr_count = 0;
+	CLEAR_HEAD(attr_list->attrs);
+	return 0;
+}
+
+int 
+dist_cache_save_attrs(char *id, pbs_db_attr_list_t *attr_list)
+{
+	return 0;
+}
+
+int
+dist_cache_del_attrs(char *id, pbs_db_attr_list_t *attr_list)
+{
+	attr_list->attr_count = 0;
+	CLEAR_HEAD(attr_list->attrs);
+	return 0;
 }

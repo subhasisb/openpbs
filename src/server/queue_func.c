@@ -110,7 +110,6 @@ que_alloc(char *name)
 	int        i;
 	pbs_queue *pq;
 
-
 	pq = (pbs_queue *)malloc(sizeof(pbs_queue));
 	if (pq == NULL) {
 		log_err(errno, "que_alloc", "no memory");
@@ -118,6 +117,7 @@ que_alloc(char *name)
 	}
 	(void)memset((char *)pq, (int)0, (size_t)sizeof(pbs_queue));
 	pq->qu_qs.qu_type = QTYPE_Unset;
+	pq->qu_newque = 0;
 	CLEAR_HEAD(pq->qu_jobs);
 	CLEAR_LINK(pq->qu_link);
 

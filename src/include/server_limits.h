@@ -43,6 +43,7 @@ extern "C" {
 #ifdef WIN32
 #include "win.h"
 #endif
+#include <openssl/sha.h>
 
 /*
  * This section contains size limit definitions

@@ -59,6 +59,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "list_link.h"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -79,9 +80,12 @@ extern "C" {
 #define PBS_MAX_DB_CONN_INIT_ERR  500
 #define MAX_SCHEMA_VERSION_LEN 9
 
-#define PBS_UPDATE_DB_FULL 0
-#define PBS_UPDATE_DB_QUICK 1
-#define PBS_INSERT_DB 2
+#define DB_TIMESTAMP_LEN 50
+#define UNIQUE_KEY_VIOLATION 23505 /* postgres throws this error code in case of primary key violation */
+
+/* type of saves bit wise flags - see savetype */
+#define OBJ_SAVE_NEW 			1
+#define OBJ_SAVE_QS				2
 
 /**
  * @brief
@@ -133,23 +137,9 @@ typedef int       INTEGER;
 typedef long long BIGINT;
 typedef char      *TEXT;
 
-/**
- * @brief
- *  Structure used to map database attr structure to C
- *
- */
-struct pbs_db_attr_info {
-	char	attr_name[PBS_MAXATTRNAME+1];
-	char	attr_resc[PBS_MAXATTRRESC+1];
-	TEXT    attr_value;
-	INTEGER attr_flags;
-};
-
-typedef struct pbs_db_attr_info pbs_db_attr_info_t;
-
 struct pbs_db_attr_list {
 	int attr_count;
-	pbs_db_attr_info_t *attributes;
+	pbs_list_head attrs;
 };
 
 typedef struct pbs_db_attr_list pbs_db_attr_list_t;
@@ -184,9 +174,10 @@ struct pbs_db_job_info {
 	char     ji_4ash[8];
 	INTEGER  ji_credtype;
 	INTEGER  ji_qrank;
-	BIGINT   ji_savetm;
-	BIGINT   ji_creattm;
-	pbs_db_attr_list_t attr_list; /* list of attributes */
+	char     ji_savetm[DB_TIMESTAMP_LEN + 1];
+	char     ji_creattm[DB_TIMESTAMP_LEN + 1];
+	pbs_db_attr_list_t db_attr_list; /* list of attributes for database */
+	pbs_db_attr_list_t cache_attr_list; /* list of attributes to save in cache */
 };
 typedef struct pbs_db_job_info pbs_db_job_info_t;
 
@@ -211,9 +202,10 @@ struct pbs_db_resv_info {
 	INTEGER ri_un_type;
 	INTEGER ri_fromsock;
 	BIGINT  ri_fromaddr;
-	BIGINT  ri_creattm;
-	BIGINT  ri_savetm;
-	pbs_db_attr_list_t attr_list; /* list of attributes */
+	char    ri_creattm[DB_TIMESTAMP_LEN + 1];
+	char    ri_savetm[DB_TIMESTAMP_LEN + 1];
+	pbs_db_attr_list_t cache_attr_list; /* list of attributes */
+	pbs_db_attr_list_t db_attr_list; /* list of attributes */
 };
 typedef struct pbs_db_resv_info pbs_db_resv_info_t;
 
@@ -223,14 +215,10 @@ typedef struct pbs_db_resv_info pbs_db_resv_info_t;
  *
  */
 struct pbs_db_svr_info {
-	INTEGER sv_numjobs;
-	INTEGER sv_numque;
-	BIGINT  sv_jobidnumber;
-	BIGINT  sv_svraddr; /* host addr of Server */
-	INTEGER sv_svrport; /* port of host server */
-	BIGINT  sv_creattm;
-	BIGINT  sv_savetm;
-	pbs_db_attr_list_t attr_list; /* list of attributes */
+	char  sv_creattm[DB_TIMESTAMP_LEN + 1];
+	char  sv_savetm[DB_TIMESTAMP_LEN + 1];
+	pbs_db_attr_list_t cache_attr_list; /* list of attributes */
+	pbs_db_attr_list_t db_attr_list; /* list of attributes */
 };
 typedef struct pbs_db_svr_info pbs_db_svr_info_t;
 
@@ -241,9 +229,10 @@ typedef struct pbs_db_svr_info pbs_db_svr_info_t;
  */
 struct pbs_db_sched_info {
 	char    sched_name[PBS_MAXSCHEDNAME+1];
-	BIGINT  sched_creattm;
-	BIGINT  sched_savetm;
-	pbs_db_attr_list_t attr_list; /* list of attributes */
+	char    sched_creattm[DB_TIMESTAMP_LEN + 1];
+	char    sched_savetm[DB_TIMESTAMP_LEN + 1];
+	pbs_db_attr_list_t cache_attr_list; /* list of attributes */
+	pbs_db_attr_list_t db_attr_list; /* list of attributes */
 };
 typedef struct pbs_db_sched_info pbs_db_sched_info_t;
 
@@ -255,9 +244,10 @@ typedef struct pbs_db_sched_info pbs_db_sched_info_t;
 struct pbs_db_que_info {
 	char    qu_name[PBS_MAXQUEUENAME +1];
 	INTEGER qu_type;
-	BIGINT  qu_ctime;
-	BIGINT  qu_mtime;
-	pbs_db_attr_list_t attr_list; /* list of attributes */
+	char    qu_ctime[DB_TIMESTAMP_LEN + 1];
+	char    qu_mtime[DB_TIMESTAMP_LEN + 1];
+	pbs_db_attr_list_t cache_attr_list; /* list of attributes */
+	pbs_db_attr_list_t db_attr_list; /* list of attributes */
 };
 typedef struct pbs_db_que_info pbs_db_que_info_t;
 
@@ -274,9 +264,10 @@ struct pbs_db_node_info {
 	INTEGER nd_state;
 	INTEGER nd_ntype;
 	char	nd_pque[PBS_MAXSERVERNAME+1];
-	BIGINT  nd_creattm;
-	BIGINT  nd_svtime;
-	pbs_db_attr_list_t attr_list; /* list of attributes */
+	char    nd_creattm[DB_TIMESTAMP_LEN + 1];
+	char    nd_savetm[DB_TIMESTAMP_LEN + 1];
+	pbs_db_attr_list_t cache_attr_list; /* list of attributes */
+	pbs_db_attr_list_t db_attr_list; /* list of attributes */
 };
 typedef struct pbs_db_node_info pbs_db_node_info_t;
 
@@ -666,24 +657,7 @@ int pbs_db_delete_obj(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj);
  *
  */
 
-int pbs_db_delete_attr_obj(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, void *obj_id, pbs_db_attr_list_t *attr_list);
-
-/**
- * @brief
- *	Update/add attributes of an existing object to the database
- *
- * @param[in]	conn - Connected database handle
- * @param[in]	pbs_db_obj_info_t - Wrapper object that describes the object
- * @param[in]   obj_id - The object id of the parent (jobid, node-name etc)
- * @param[in]	attr_list - List of attributes to Update/add
- *
- * @return      int
- * @retval      -1  - Failure
- * @retval       0  - success
- * @retval       1 -  Success but no rows deleted
- *
- */
-int pbs_db_add_update_attr_obj(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, void *obj_id, pbs_db_attr_list_t *attr_list);
+int pbs_db_delete_attr_obj(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, void *obj_id, char *sv_time, pbs_db_attr_list_t *cache_attr_list, pbs_db_attr_list_t *db_attr_list);
 
 /**
  * @brief
@@ -950,6 +924,8 @@ void pbs_db_free_conn_info(pbs_db_conn_t *conn);
  *
  */
 int pbs_db_get_schema_version(pbs_db_conn_t *conn, int *db_maj_ver, int *db_min_ver);
+int pg_db_load_maxid(pbs_db_conn_t *conn, long long *sv_jobidnumber);
+int pg_db_save_instdata(pbs_db_conn_t *conn, char *sv_id, long long sv_jobidnumber);
 
 /**
  * @brief
@@ -1007,16 +983,19 @@ int pg_db_delete_svrattr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj);
  */
 int resize_buff(pbs_db_sql_buffer_t *dest, int size);
 
-/**
- * @brief
- *	Resets database object
- *
- * @param[in]	obj - db object
- *
- * @return      None
- *
- */
-void pbs_db_reset_obj(pbs_db_obj_info_t *obj);
+int obj_qs_modified(void *qs, int len, void *oldhash);
+
+int dist_cache_recov_attrs(char *id, char *last_savetm, pbs_db_attr_list_t *attr_list);
+
+int dist_cache_save_attrs(char *id, pbs_db_attr_list_t *attr_list);
+
+int dist_cache_del_attrs(char *id, pbs_db_attr_list_t *attr_list);
+
+int get_save_type(int newobj, int dbattr_count);
+
+long long pbs_db_get_maxjobid(pbs_db_conn_t *conn, int svr_max_job_sequence_id);
+
+void free_db_attr_list(pbs_db_attr_list_t *attr_list);
 
 #ifdef	__cplusplus
 }

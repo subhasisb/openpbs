@@ -104,6 +104,7 @@ extern attribute_def sched_attr_def[];
 
 typedef struct pbs_sched {
 	pbs_list_link	sc_link;		/* forward/backward links */
+	int	sc_newsched;
 	int scheduler_sock;
 	int scheduler_sock2;
 	int svr_do_schedule;
@@ -115,6 +116,7 @@ typedef struct pbs_sched {
 	struct preempt_ordering preempt_order[PREEMPT_ORDER_MAX + 1];
 	/* sched object's attributes  */
 	attribute sch_attr[SCHED_ATR_LAST];
+	char	  sc_savetm[DB_TIMESTAMP_LEN + 1];
 } pbs_sched;
 
 

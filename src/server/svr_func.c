@@ -493,7 +493,7 @@ set_resc_assigned(void *pobj, int objtype, enum batch_op op)
 						return;
 				}
 				rscdef->rs_set(&pr->rs_value, &rescp->rs_value, op);
-				sysru->at_flags |= ATR_VFLAG_MODCACHE;
+				sysru->at_flags |= ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 			}
 
 			/* update queue attribute of resources assigned */
@@ -506,7 +506,7 @@ set_resc_assigned(void *pobj, int objtype, enum batch_op op)
 						return;
 				}
 				rscdef->rs_set(&pr->rs_value, &rescp->rs_value, op);
-				queru->at_flags |= ATR_VFLAG_MODCACHE;
+				queru->at_flags |= ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 			}
 		}
 		rescp = (resource *)GET_NEXT(rescp->rs_link);
@@ -809,7 +809,7 @@ void
 set_sched_sock(int s, pbs_sched *psched)
 {
 	psched->scheduler_sock = s;
-	server.sv_attr[(int)SRV_ATR_State].at_flags |= ATR_VFLAG_MODCACHE;
+	server.sv_attr[(int)SRV_ATR_State].at_flags |= ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 }
 
 
@@ -953,7 +953,7 @@ action_svr_iteration(attribute *pattr, void *pobj, int mode)
 			dflt_scheduler->sch_attr[SCHED_ATR_schediteration].at_val.at_long = pattr->at_val.at_long;
 			dflt_scheduler->sch_attr[SCHED_ATR_schediteration].at_flags |=
 					ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
-			(void)sched_save_db(dflt_scheduler, SVR_SAVE_FULL);
+			sched_save_db(dflt_scheduler);
 		}
 	}
 	return PBSE_NONE;
@@ -1673,11 +1673,11 @@ eligibletime_action(attribute *pattr, void *pobject, int actmode)
 					pj->ji_wattr[(int)JOB_ATR_accrue_type].at_val.at_long = accruetype;
 
 				pj->ji_wattr[(int)JOB_ATR_accrue_type].at_flags |=
-					(ATR_VFLAG_SET | ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY);
+					(ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE);
 				pj->ji_wattr[(int)JOB_ATR_eligible_time].at_flags |=
-					(ATR_VFLAG_SET | ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY);
+					(ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE);
 				pj->ji_wattr[(int)JOB_ATR_sample_starttime].at_flags |=
-					(ATR_VFLAG_SET | ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY);
+					(ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE);
 			}
 
 			pj = (job *)GET_NEXT(pj->ji_alljobs);
@@ -4659,8 +4659,7 @@ disable_svr_prov()
 	if (server.sv_attr[(int)SRV_ATR_ProvisionEnable].at_flags &
 		ATR_VFLAG_SET) {
 		server.sv_attr[(int)SRV_ATR_ProvisionEnable].at_val.at_long = 0;
-		server.sv_attr[(int)SRV_ATR_ProvisionEnable].at_flags
-		= ATR_VFLAG_MODCACHE | ATR_VFLAG_SET;
+		server.sv_attr[(int)SRV_ATR_ProvisionEnable].at_flags = ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE | ATR_VFLAG_SET;
 	}
 }
 
@@ -5274,12 +5273,10 @@ fail_vnode_job(struct prov_vnode_info * prov_vnode_info, int hold_or_que)
 
 	/* release resource, put system hold and move to held state */
 	if (hold_or_que == 0) {
-		pjob->ji_modified = 1;
 		rel_resc(pjob);
 		clear_exec_on_run_fail(pjob);
 		pjob->ji_wattr[(int)JOB_ATR_hold].at_val.at_long |= HOLD_s;
-		pjob->ji_wattr[(int)JOB_ATR_hold].at_flags |=
-			ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
+		pjob->ji_wattr[(int)JOB_ATR_hold].at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 		job_attr_def[(int)JOB_ATR_Comment].at_decode(
 			&pjob->ji_wattr[(int)JOB_ATR_Comment],
 			NULL, NULL,
@@ -5366,12 +5363,8 @@ mark_prov_vnode_offline(pbsnode *pnode, char * comment)
 	set_vnode_state(pnode, INUSE_OFFLINE, Nd_State_Or);
 	set_vnode_state(pnode, ~INUSE_PROV, Nd_State_And);
 
-
-
 	/* write the node state and current_aoe */
-	pnode->nd_modified |= (NODE_UPDATE_CURRENT_AOE | NODE_UPDATE_STATE);
-	write_single_node_state(pnode);
-	pnode->nd_modified &= ~(NODE_UPDATE_CURRENT_AOE | NODE_UPDATE_STATE);
+	node_save_db(pnode);
 
 	if (comment != NULL) {
 		/* log msg about marking node as offline */
@@ -5673,9 +5666,7 @@ is_vnode_prov_done(char * vnode)
 	}
 
 	/* save the state of this node to the nodes file */
-	pnode->nd_modified |= NODE_UPDATE_STATE;
-	write_single_node_state(pnode);
-	pnode->nd_modified &= ~NODE_UPDATE_STATE;
+	node_save_db(pnode);
 
 	/* log msg about prov of node success */
 	sprintf(log_buffer, "Provisioning of Vnode %s successful",
@@ -5765,7 +5756,6 @@ prov_startjob(struct work_task *ptask)
 
 	DBPRT(("%s: calling [svr_startjob] from prov_startjob\n", __func__))
 	/* Move the job to MOM */
-	pjob->ji_modified = 1;
 	if ((rc = svr_startjob(pjob, 0))!=0) {
 		DBPRT(("%s: Jobid: %s - startjob failed - rc:%d\n",
 			__func__, pjob->ji_qs.ji_jobid, rc))
@@ -5875,9 +5865,7 @@ prov_request_deferred(struct work_task *wtask)
 
 
 		/* write the node current_aoe */
-		pnode->nd_modified |= NODE_UPDATE_CURRENT_AOE;
-		write_single_node_state(pnode);
-		pnode->nd_modified &= ~NODE_UPDATE_CURRENT_AOE;
+		node_save_db(pnode);
 
 		/* if exit_status says app_prov returned success, reset down
 		 * that we set. after setting the state, is_vnode_prov_done()
@@ -6069,11 +6057,11 @@ set_srv_prov_attributes(void)
 	server.sv_attr[(int)SVR_ATR_provision_timeout].at_val.at_long =
 		provision_timeout;
 	server.sv_attr[(int)SVR_ATR_provision_timeout].at_flags |=
-		ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
+		ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 
 	server.sv_attr[(int)SRV_ATR_ProvisionEnable].at_val.at_long=1;
 	server.sv_attr[(int)SRV_ATR_ProvisionEnable].at_flags |=
-		ATR_VFLAG_SET | ATR_VFLAG_MODCACHE;
+		ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 #else
 	disable_svr_prov();
 	DBPRT(("%s: Python not enabled\n", __func__))
@@ -6393,9 +6381,7 @@ start_vnode_provisioning(struct prov_vnode_info * prov_vnode_info)
 
 
 	/* write the node current_aoe */
-	pnode->nd_modified |= NODE_UPDATE_CURRENT_AOE;
-	write_single_node_state(pnode);
-	pnode->nd_modified &= ~NODE_UPDATE_CURRENT_AOE;
+	node_save_db(pnode);
 
 	/*
 	 * Parent process creates two work tasks

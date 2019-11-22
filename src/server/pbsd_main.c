@@ -253,7 +253,7 @@ char		server_name[PBS_MAXSERVERNAME+1]; /* host_name[:service|port] */
 char		server_host[PBS_MAXHOSTNAME+1];	  /* host_name of this svr */
 int		reap_child_flag = 0;
 time_t		secondary_delay = 30;
-struct server	server;		/* the server structure */
+struct server	server = {{0}};		/* the server structure */
 pbs_sched	*dflt_scheduler = NULL; /* the default scheduler */
 int		shutdown_who;		/* see req_shutdown() */
 char	       *mom_host = server_host;
@@ -732,8 +732,6 @@ main(int argc, char **argv)
 	char			lockfile[MAXPATHLEN+1];
 	char			**origevp;
 	char			*pc;
-	job			*pjob;
-	resc_resv		*presv;
 	pbs_queue		*pque;
 	char			*servicename;
 	time_t			svrlivetime;
@@ -1110,8 +1108,7 @@ main(int argc, char **argv)
 	 * it controls which events are logged.
 	 */
 	server.sv_attr[(int)SRV_ATR_log_events].at_val.at_long = PBSEVENT_MASK;
-	server.sv_attr[(int)SRV_ATR_log_events].at_flags =
-		ATR_VFLAG_SET|ATR_VFLAG_MODCACHE;
+	server.sv_attr[(int)SRV_ATR_log_events].at_flags = ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 	log_event_mask = &server.sv_attr[SRV_ATR_log_events].at_val.at_long;
 	(void)sprintf(path_log, "%s/%s", pbs_conf.pbs_home_path, PBS_LOGFILES);
 
@@ -1860,31 +1857,9 @@ try_db_again:
 	}
 	DBPRT(("Server out of main loop, state is %ld\n", *state))
 
-	svr_save_db(&server, SVR_SAVE_FULL);	/* final recording of server */
+	svr_save_db(&server);	/* final recording of server */
+	pg_db_save_instdata(svr_db_conn, "0", server.sv_qs.sv_jobidnumber);
 	track_save(NULL);	/* save tracking data	     */
-
-	/* save any jobs that need saving */
-	for (pjob = (job *)GET_NEXT(svr_alljobs);
-		pjob;
-		pjob = (job *)GET_NEXT(pjob->ji_alljobs)) {
-		if (pjob->ji_modified)
-			(void)job_save(pjob, SAVEJOB_FULLFORCE);
-	}
-
-	/* save any reservations that need saving */
-	for (presv = (resc_resv *)GET_NEXT(svr_allresvs);
-		presv;
-		presv = (resc_resv *)GET_NEXT(presv->ri_allresvs)) {
-
-		if (presv->ri_modified)
-			(void)job_or_resv_save((void *)presv,
-				SAVEJOB_FULL, RESC_RESV_OBJECT);
-	}
-
-	if (svr_chngNodesfile) {/*nodes created/deleted, or props changed and*/
-		/*update in req_manager failed; try again    */
-		(void)save_nodes_db(0, NULL);
-	}
 
 	/* if brought up the Secondary Scheduler, take it down */
 

@@ -527,7 +527,6 @@ struct job {
 	pbs_list_link       ji_jobque;	/* SVR: links to jobs in same queue */
 	/* MOM: links to polled jobs */
 	pbs_list_link	ji_unlicjobs;	/* links to unlicensed jobs */
-	int		ji_modified;	/* struct changed, needs to be saved */
 	int		ji_momhandle;	/* open connection handle to MOM */
 	int		ji_mom_prot;	/* rpp or tcp */
 	struct batch_request *ji_rerun_preq;	/* outstanding rerun request */
@@ -656,7 +655,9 @@ struct job {
 	 *
 	 * This area CANNOT contain any pointers!
 	 */
-
+#ifndef PBS_MOM
+	char qs_hash[SHA_DIGEST_LENGTH];
+#endif
 	struct jobfix {
 		int	    ji_jsversion;	/* job structure version - JSVERSION */
 		int	    ji_state;		/* internal copy of state */
@@ -738,6 +739,8 @@ struct job {
 	 */
 
 	attribute	ji_wattr[JOB_ATR_LAST]; /* decoded attributes  */
+
+	char     ji_savetm[DB_TIMESTAMP_LEN + 1];
 };
 
 typedef struct job job;
@@ -923,15 +926,6 @@ task_find	(job		*pjob,
  * 0x100000 bit set. Refer SPM229744
  */
 #define JOB_SVFLG_AdmSuspd 0x200000 /* Job is suspended for maintenance */
-
-
-/*
- * Related defines
- */
-#define SAVEJOB_QUICK     0
-#define SAVEJOB_FULL      1
-#define SAVEJOB_NEW       2
-#define SAVEJOB_FULLFORCE 3
 
 #define MAIL_NONE  (int)'n'
 #define MAIL_ABORT (int)'a'
@@ -1152,25 +1146,18 @@ extern int   do_tolerate_node_failures(job *);
 #ifdef PBS_MOM
 
 extern job  *job_recov_fs(char *);
-extern int   job_save_fs(job *, int);
-extern int   job_or_resv_save_fs(void *, int, int);
-void*	job_or_resv_recov_fs(char *, int);
-#define job_recov job_recov_fs
+extern int   job_save_fs(job *);
+
 #define job_save job_save_fs
-#define job_or_resv_save job_or_resv_save_fs
-#define job_or_resv_recov job_or_resv_recov_fs
+#define job_recov job_recov_fs
 
 #else
 
-extern job  *job_recov_db(char *);
-extern void *job_or_resv_recov_db(char *, int);
-extern int  job_save_db(job *, int);
-extern int   job_or_resv_save_db(void *, int, int);
-#define job_recov job_recov_db
+extern job  *job_recov_db(char *, job *pjob);
+extern int  job_save_db(job *);
+
 #define job_save job_save_db
-#define job_or_resv_save job_or_resv_save_db
-#define job_or_resv_recov job_or_resv_recov_db
-/* server uses the db versions so just redefine - saves lots of code changes */
+#define job_recov job_recov_db
 
 extern char *get_job_credid(char *jobid);
 
