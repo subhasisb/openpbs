@@ -1028,6 +1028,10 @@ main(int argc, char **argv)
 
 	if (get_max_servers() > 1) {
 		char buf[PBS_MAXHOSTNAME+8];
+		if (get_my_index() == -1) {
+			fprintf(stderr, "Wrong Multi Server configuration. Please start server after correcting /etc/pbs.conf\n");
+			return 1;
+		}
 
 		sprintf(buf, "%s_%d", daemonname, pbs_conf.batch_service_port);
 		strcpy(daemonname, buf);

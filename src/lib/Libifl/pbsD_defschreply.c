@@ -91,6 +91,13 @@ pbs_defschreply(int c, int cmd, char *id, int err, char *txt, char *extend)
 	if (pbs_client_thread_lock_connection(c) != 0)
 		return pbs_errno;
 
+	set_new_shard_context(c);
+	sock = get_svr_shard_connection(c, PBS_BATCH_DefSchReply, id);
+	if (sock == -1) {
+		return (pbs_errno = PBSE_NOSERVER);
+	}
+
+
 	/* setup DIS support routines for following DIS calls */
 
 	DIS_tcp_setup(sock);
