@@ -75,6 +75,7 @@
 #include <pbs_internal.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <pwd.h>
 #include <math.h>
 #ifndef WIN32
@@ -1515,22 +1516,27 @@ get_last_hash(long long njobid)
 int
 get_server_shard(char *shard_hint)
 {
-	int ind;
-	int nshardid;
-	static int seeded = 0;
+        int ind;
+        int nshardid;
+        static int seeded = 0;
+        struct timeval tv;
+        unsigned long time_in_micros;
 
-	if (shard_hint) {
-		nshardid = strtoull(shard_hint, NULL, 10);
-		ind = nshardid % get_max_servers();
-	} else {
-		if (!seeded) {
-			srand(time(0)); /* seed the random generator */
-			seeded = 1;
-		}
-		ind = rand() % get_current_servers();
-	}
-	return ind;
+        if (shard_hint) {
+                nshardid = strtoull(shard_hint, NULL, 10);
+                ind = nshardid % get_max_servers();
+        } else {
+                if (!seeded) {
+                        gettimeofday(&tv,NULL);
+                        time_in_micros = 1000000 * tv.tv_sec + tv.tv_usec;
+                        srand(time_in_micros); /* seed the random generator */
+                        seeded = 1;
+                }
+                ind = rand() % get_current_servers();
+        }
+        return ind;
 }
+
 
 /**
  * @brief
