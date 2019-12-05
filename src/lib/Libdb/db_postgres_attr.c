@@ -75,6 +75,8 @@ struct pg_array {
 	/* data follows this portion */
 };
 
+extern char *fcopyS(char *d, char *s);
+
 /**
  * @brief
  *	Converts a postgres hstore(which is in the form of array) to attribute list.
@@ -137,14 +139,8 @@ convert_array_to_db_attr_list(char *raw_array, pbs_db_attr_list_t *attr_list)
 		} else
 			attrs[i].attr_name[0] = 0;
 
-		if (attr_value && (p = strchr(attr_value, '.'))) {
-			*p ='\0';
-			attrs[i].attr_flags = atol(attr_value);
-			attrs[i].attr_value = strdup(p + 1);
-		} else {
-			attrs[i].attr_flags = 0;
-			attrs[i].attr_value = NULL;
-		}
+		attrs[i].attr_flags = (int) *attr_value++;
+		attrs[i].attr_value = strdup(attr_value+1);
 	}
 	attr_list->attr_count = i;
 	return 0;
@@ -171,6 +167,7 @@ convert_db_attr_list_to_array(char **raw_array, pbs_db_attr_list_t *attr_list)
 	int len = 0;
 	struct str_data *val = NULL;
 	int attr_val_len = 0;
+	char *p;
 
 	len = sizeof(struct pg_array);
 	for (i = 0; i < attr_list->attr_count; i++) {
@@ -192,13 +189,21 @@ convert_db_attr_list_to_array(char **raw_array, pbs_db_attr_list_t *attr_list)
 	val = (struct str_data *)((char *) array + sizeof(struct pg_array));
 
 	for (i = 0; i < attr_list->attr_count; ++i) {
-		sprintf(val->str, "%s.%s", attrs[i].attr_name, attrs[i].attr_resc);
-		val->len = htonl(strlen(val->str));
+		p = fcopyS(val->str, attrs[i].attr_name);
+		*p++ = '.';
+		p = fcopyS(p, attrs[i].attr_resc);
+		*p = '\0';
 
+		val->len = htonl(strlen(val->str));
 		val = (struct str_data *)(val->str + ntohl(val->len)); /* point to end */
-		sprintf(val->str, "%d.%s", attrs[i].attr_flags, attrs[i].attr_value == NULL ? "": attrs[i].attr_value);
-		val->len = htonl(strlen(val->str));
 
+		p = val->str;
+		*p++ = (char) attrs[i].attr_flags;
+		*p++ = '.';
+		p = fcopyS(p, attrs[i].attr_value == NULL ? "": attrs[i].attr_value);
+		*p = '\0';
+
+		val->len = htonl(strlen(val->str));
 		val = (struct str_data *)(val->str + ntohl(val->len)); /* point to end */
 	}
 	*raw_array = (char *) array;

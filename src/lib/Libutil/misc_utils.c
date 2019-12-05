@@ -1609,5 +1609,16 @@ initialise_connection_slot(int table_size, enum CONN_ORIGIN client)
 		return (-1);
 }
 
+char *fcopyS(char *d, char *s)
+{
+	while (*s) {
+		*d = *s;
+		s++;
+		d++;
+	}
+	return d;
+}
+
+
 #endif /* malloc_info */
 #endif /* WIN32 */
