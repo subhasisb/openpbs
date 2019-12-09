@@ -107,6 +107,7 @@ struct svrattrl {
 	struct attropl	al_atopl;    /* name,resource,value, see pbs_ifl.h   */
 	int		al_tsize;    /* size of this structure (variable)    */
 	int		al_nameln;   /* len of name string (including null)  */
+	int		al_idx; /* index of the attribute in the attribute def */
 	int		al_rescln;   /* len of resource name string (+ null) */
 	int		al_valln;    /* len of value, may contain many nulls */
 	unsigned int	al_flags:ATRVFLAG;  /* copy of attribute value flags */

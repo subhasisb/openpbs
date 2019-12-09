@@ -143,7 +143,6 @@ extern int find_prov_vnode_list(job *pjob, exec_vnode_listtype *prov_vnodes, cha
 
 #if !defined(PBS_MOM) && defined(_AVLTREE_H)
 extern AVL_IX_DESC *AVL_jctx;
-extern AVL_IX_REC  *svr_avlkey_create(const char *keystr);
 #endif
 
 #ifdef	_RESERVATION_H

@@ -182,7 +182,7 @@ node_recov_db(char *nd_name, struct pbsnode *pnode, int lock)
 {
 	pbs_db_obj_info_t obj;
 	pbs_db_conn_t *conn = (pbs_db_conn_t *) svr_db_conn;
-	pbs_db_node_info_t dbnode;
+	pbs_db_node_info_t dbnode = {{0}};
 	int rc = 0;
 
 	strcpy(dbnode.nd_name, nd_name);
@@ -268,6 +268,9 @@ svr_to_db_node(struct pbsnode *pnode, pbs_db_node_info_t *pdbnd)
 	int numattr = 0;
 	int count = 0;
 	int vnode_sharing = 0;
+	svrattrl *rtnval = NULL;
+	svrattrl *pal;
+	int rc;
 
 	if (pnode->nd_name)
 		strcpy(pdbnd->nd_name, pnode->nd_name);
@@ -316,12 +319,20 @@ svr_to_db_node(struct pbsnode *pnode, pbs_db_node_info_t *pdbnd)
 		if (((pnode->nd_attr[j].at_flags & ATR_VFLAG_MODIFY) == 0) && (pnode->nd_attr[j].at_type != ATR_TYPE_RESC))
 			continue;
 
-		(void) node_attr_def[j].at_encode(&pnode->nd_attr[j],
+		rc = node_attr_def[j].at_encode(&pnode->nd_attr[j],
 		                                  &wrtattr,
 		                                  node_attr_def[j].at_name,
 		                                  NULL,
 		                                  ATR_ENCODE_DB,
-		                                  NULL);
+		                                  &rtnval);
+
+		count = 0;
+		pal = rtnval;
+		while (pal && count < rc) {
+			pal->al_idx = j;
+			pal = (svrattrl *)GET_NEXT(pal->al_link);
+			count++;
+		}
 
 		pnode->nd_attr[j].at_flags &= ~ATR_VFLAG_MODIFY;
 	}
@@ -341,12 +352,14 @@ svr_to_db_node(struct pbsnode *pnode, pbs_db_node_info_t *pdbnd)
 	if (wrote_np == 0) {
 		numattr++;
 	}
+
 	pdbnd->attr_list.attributes = calloc(sizeof(pbs_db_attr_info_t), numattr);
 	if (!pdbnd->attr_list.attributes)
 			return -1;
 	pdbnd->attr_list.attr_count = 0;
 	attrs = pdbnd->attr_list.attributes;
 
+	count = 0;
 	while ((psvrl = (svrattrl *) GET_NEXT(wrtattr)) != NULL) {
 
 		if (wrote_np == 0 && strcmp(psvrl->al_name, ATTR_NODE_pcpus) == 0) {
@@ -358,8 +371,7 @@ svr_to_db_node(struct pbsnode *pnode, pbs_db_node_info_t *pdbnd)
 		}
 
 		/* every attribute to this point we write to database */
-		attrs[count].attr_name[sizeof(attrs[count].attr_name) - 1] = '\0';
-		strncpy(attrs[count].attr_name, psvrl->al_name, sizeof(attrs[count].attr_name));
+		attrs[count].attr_idx = psvrl->al_idx;
 		if (psvrl->al_resc) {
 			attrs[count].attr_resc[sizeof(attrs[count].attr_resc) - 1] = '\0';
 			strncpy(attrs[count].attr_resc, psvrl->al_resc, sizeof(attrs[count].attr_resc));
@@ -387,8 +399,8 @@ svr_to_db_node(struct pbsnode *pnode, pbs_db_node_info_t *pdbnd)
 	if (wrote_np == 0) {
 		char pcpu_str[10];
 		/* write the default value for the num of cpus */
-		attrs[count].attr_name[sizeof(attrs[count].attr_name) - 1] = '\0';
-		strncpy(attrs[count].attr_name, ATTR_NODE_pcpus, sizeof(attrs[count].attr_name));
+		attrs[count].attr_idx = ND_ATR_pcpus;
+
 		strcpy(attrs[count].attr_resc, "");
 		sprintf(pcpu_str, "%ld", pnode->nd_nsn);
 		attrs[count].attr_value = strdup(pcpu_str);
@@ -400,8 +412,7 @@ svr_to_db_node(struct pbsnode *pnode, pbs_db_node_info_t *pdbnd)
 		char *vn_str;
 		vn_str = vnode_sharing_to_str((enum vnode_sharing) pnode->nd_attr[ND_ATR_Sharing].at_val.at_long);
 
-		attrs[count].attr_name[sizeof(attrs[count].attr_name) - 1] = '\0';
-		strncpy(attrs[count].attr_name, ATTR_NODE_Sharing, sizeof(attrs[count].attr_name));
+		attrs[count].attr_idx = ND_ATR_Sharing;
 		strcpy(attrs[count].attr_resc, "");
 		attrs[count].attr_value = strdup(vn_str);
 		attrs[count].attr_flags = pnode->nd_attr[ND_ATR_Sharing].at_flags;

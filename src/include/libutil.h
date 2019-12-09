@@ -299,6 +299,7 @@ long long get_next_hash(long long curr, long long max_id);
 long long get_last_hash(long long njobid);
 int get_server_shard(char * shard_hint);
 
+
 #ifdef  __cplusplus
 }
 #endif

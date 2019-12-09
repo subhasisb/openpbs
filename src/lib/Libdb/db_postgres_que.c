@@ -83,7 +83,7 @@ pg_db_prepare_que_sqls(pbs_db_conn_t *conn)
 			"qu_type = $2, "
 			"qu_deleted = $3, "
 			"qu_savetm = localtimestamp, "
-			"attributes = hstore($4::text[])"
+			"attributes = attributes || hstore($4::text[])"
 			" where qu_name = $1 "
 			"returning to_char(qu_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as qu_savetm");
 	if (pg_prepare_stmt(conn, STMT_UPDATE_QUE_FULL, conn->conn_sql, 4) != 0)

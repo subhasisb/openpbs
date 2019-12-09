@@ -1137,7 +1137,7 @@ mgr_unset_attr(attribute *pattr, attribute_def *pdef, int limit, svrattrl *plist
 		attr_list.attr_count = 1;
 		attr_list.attributes = &attr;
 		memset(&attr, 0, sizeof(pbs_db_attr_info_t));
-		strcpy(attr.attr_name, plist->al_atopl.name);
+		attr.attr_idx = index;
 		if (plist->al_atopl.resource)
 			strcpy(attr.attr_resc, plist->al_atopl.resource);
 		else

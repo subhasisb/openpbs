@@ -7262,7 +7262,7 @@ adj_resc_on_node(void *obj, int is_resv, char *noden, enum batch_op op, resource
 	rc = prdef->rs_set(&rs_value, &tmpattr, op);
 
 	new_attr = (pbs_db_attr_info_t *) malloc(sizeof(pbs_db_attr_info_t));
-	strncpy(new_attr->attr_name, ATTR_rescassn, PBS_MAXATTRNAME);
+	new_attr->attr_idx = ND_ATR_ResourceAssn;
 	strncpy(new_attr->attr_resc, prdef->rs_name, PBS_MAXATTRRESC);
 	new_attr->attr_flags = ATR_VFLAG_SET;
 	new_attr->attr_value = get_resc_value(prdef, &rs_value);

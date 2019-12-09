@@ -294,18 +294,18 @@ struct tcpdisbuf * tcp_get_readbuf(int fd)
 	struct	tcpdisbuf	*tp;
 	int rc;
 
-	rc = pbs_client_thread_lock_tcp();
-	assert(rc == 0);
+	//rc = pbs_client_thread_lock_tcp();
+	//assert(rc == 0);
 
 #ifdef WIN32
 	tp = &(DIS_find_tcp_chan(fd)->readbuf);
 #else
 	tp = &tcparray[fd]->readbuf;
 #endif
-	rc = pbs_client_thread_unlock_tcp();
-	assert(rc == 0);
+	//rc = pbs_client_thread_unlock_tcp();
+	//assert(rc == 0);
 
-	assert(tp != NULL);
+	//assert(tp != NULL);
 	return (tp);
 }
 

@@ -180,12 +180,12 @@ struct tcpdisbuf * tcp_get_writebuf(int fd)
 	int rc;
 
 	rc = pbs_client_thread_lock_tcp();
-	assert(rc == 0);
+	//assert(rc == 0);
 	tp = &tcparray[fd]->writebuf;
 	rc = pbs_client_thread_unlock_tcp();
-	assert(rc == 0);
+	//assert(rc == 0);
 
-	assert(tp != NULL);
+	//assert(tp != NULL);
 	return (tp);
 }
 

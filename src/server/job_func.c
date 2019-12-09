@@ -1013,7 +1013,7 @@ find_job_avl(char *jobid)
 	AVL_IX_REC *pkey;
 	job  *pj = NULL;
 
-	if ((AVL_jctx != NULL) && ((pkey = svr_avlkey_create(jobid)) != NULL)) {
+	if ((AVL_jctx != NULL) && ((pkey = str_avlkey_create(jobid)) != NULL)) {
 		if (avl_find_key(pkey, AVL_jctx) == AVL_IX_OK)
 			pj = (job *) pkey->recptr;
 		free(pkey);

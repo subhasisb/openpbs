@@ -417,7 +417,7 @@ print_db_job(char *id, int no_attributes)
 			int i;
 			printf("--attributes--\n");
 			for (i=0; i< dbjob.attr_list.attr_count; i++) {
-				printf("%s", attrs->attr_name);
+				printf("%d", attrs->attr_idx);
 				if (attrs->attr_resc && attrs->attr_resc[0] != 0)
 					printf(".%s", attrs->attr_resc);
 				printf(" = ");

@@ -161,7 +161,7 @@ svr_to_db_svr(struct server *ps, pbs_db_svr_info_t *pdbsvr, int updatetype)
 	if (updatetype != PBS_UPDATE_DB_QUICK) {
 		if ((encode_attr_db(svr_attr_def,
 			ps->sv_attr,
-			(int)SRV_ATR_LAST, &pdbsvr->attr_list, 1)) != 0) /* encode all attributes */
+			(int)SRV_ATR_LAST, &pdbsvr->attr_list, 0)) != 0)
 			return -1;
 	}
 
@@ -209,7 +209,7 @@ svr_to_db_sched(struct pbs_sched *ps, pbs_db_sched_info_t *pdbsched, int updatet
 	if (updatetype != PBS_UPDATE_DB_QUICK) {
 		if ((encode_attr_db(sched_attr_def,
 			ps->sch_attr,
-			(int)SCHED_ATR_LAST, &pdbsched->attr_list, 1)) != 0) /* encode all attributes */
+			(int)SCHED_ATR_LAST, &pdbsched->attr_list, 0)) != 0)
 			return -1;
 	}
 

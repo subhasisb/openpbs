@@ -398,6 +398,19 @@ pbsd_init(int type)
 	save_env();
 #endif
 
+
+	{
+		/* create attr def trees */
+		extern int cr_attrdef_tree(int objtype, void *attr_def, int limit);
+
+		cr_attrdef_tree(PBS_DB_SVR, svr_attr_def, SRV_ATR_LAST);
+		cr_attrdef_tree(PBS_DB_SCHED, sched_attr_def, SCHED_ATR_LAST);
+		cr_attrdef_tree(PBS_DB_QUEUE, que_attr_def, QA_ATR_LAST);
+		cr_attrdef_tree(PBS_DB_NODE, node_attr_def, ND_ATR_LAST);
+		cr_attrdef_tree(PBS_DB_JOB, job_attr_def, JOB_ATR_LAST);
+		cr_attrdef_tree(PBS_DB_RESV, resv_attr_def, RESV_ATR_LAST);	
+	}
+
 	/* The following is code to reduce security risks                */
 
 	if (setup_env(pbs_conf.pbs_environment)==-1)

@@ -78,7 +78,7 @@ pg_db_prepare_svr_sqls(pbs_db_conn_t *conn)
 	/* replace all attributes for a FULL update */
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "update pbs.server set "
 		"sv_savetm = localtimestamp, "
-		"attributes = hstore($1::text[]) "
+		"attributes = attributes || hstore($1::text[]) "
 		"returning to_char(sv_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as sv_savetm");
 	if (pg_prepare_stmt(conn, STMT_UPDATE_SVR_FULL, conn->conn_sql, 1) != 0)
 		return -1;

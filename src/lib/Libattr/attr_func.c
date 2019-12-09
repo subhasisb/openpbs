@@ -44,11 +44,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <ctype.h>
 #include "pbs_ifl.h"
 #include "list_link.h"
 #include "attribute.h"
 #include "pbs_error.h"
 #include "libpbs.h"
+#include "avltree.h"
 
 /**
  * @file	attr_func.c
@@ -126,19 +128,119 @@ clear_attr(attribute *pattr, struct attribute_def *pdef)
  *
  */
 
+static AVL_IX_DESC *svr_attrdef_tree = NULL;
+static AVL_IX_DESC *sched_attrdef_tree = NULL;
+static AVL_IX_DESC *que_attrdef_tree = NULL;
+static AVL_IX_DESC *node_attrdef_tree = NULL;
+static AVL_IX_DESC *nodejob_attrdef_tree = NULL;
+static AVL_IX_DESC *job_attrdef_tree = NULL;
+static AVL_IX_DESC *resv_attrdef_tree = NULL;
+
+static attribute_def *lsvr_attr_def = NULL;
+static attribute_def *lsched_attr_def = NULL;
+static attribute_def *lque_attr_def = NULL;
+static attribute_def *lnode_attr_def = NULL;
+static attribute_def *lnodejob_attr_def = NULL;
+static attribute_def *ljob_attr_def = NULL;
+static attribute_def *lresv_attr_def = NULL;
+
+int
+cr_attrdef_tree(int objtype, void *attr_def, int limit)
+{
+	AVL_IX_DESC *AVL_attrdef = NULL;
+	struct attribute_def *adef = attr_def;
+	int index;
+	int rc = AVL_IX_OK;
+	AVL_IX_REC *pkey;
+
+	AVL_attrdef = (AVL_IX_DESC *) malloc(sizeof(AVL_IX_DESC));
+	if (AVL_attrdef == NULL) {
+		return (-1);
+	}
+
+	/* create the attribute tree */
+	avl_create_index_case(AVL_attrdef, AVL_NO_DUP_KEYS, 1, 0);
+
+	/* add all attributes to the tree with key as the attr name */
+	for (index = 0; index < limit; index++) {
+		pkey = str_avlkey_create(adef->at_name);
+		if (pkey == NULL)
+			return -1;
+
+		pkey->recptr = adef;
+		rc = avl_add_key(pkey, AVL_attrdef);
+		free(pkey);
+		if (rc != AVL_IX_OK) 
+			return -1;
+		
+		adef++;
+	}
+
+	if (objtype == PBS_DB_SVR) {
+		lsvr_attr_def = attr_def;
+		svr_attrdef_tree = AVL_attrdef;
+	} if (objtype == PBS_DB_SCHED) {
+		lsched_attr_def = attr_def;
+		sched_attrdef_tree = AVL_attrdef;
+	} if (objtype == PBS_DB_QUEUE) {
+		lque_attr_def = attr_def;
+		que_attrdef_tree = AVL_attrdef;
+	} if (objtype == PBS_DB_NODE) {
+		lnode_attr_def = attr_def;
+		node_attrdef_tree = AVL_attrdef;
+	} if (objtype == PBS_DB_JOB) {
+		ljob_attr_def = attr_def;
+		job_attrdef_tree = AVL_attrdef;
+	} if (objtype == PBS_DB_RESV) {
+		lresv_attr_def = attr_def;
+		resv_attrdef_tree = AVL_attrdef;
+	}
+
+	return 0;
+}
+
+AVL_IX_DESC *
+get_attrdef_tree(struct attribute_def *attr_def)
+{
+	AVL_IX_DESC *AVL_attrdef = NULL;
+	
+
+	
+	if (attr_def == lsvr_attr_def)
+		AVL_attrdef = svr_attrdef_tree;
+	else if (attr_def == lsched_attr_def)
+		AVL_attrdef = sched_attrdef_tree;
+	else if (attr_def == lque_attr_def)
+		AVL_attrdef = que_attrdef_tree;
+	else if (attr_def == lnode_attr_def)
+		AVL_attrdef = node_attrdef_tree;
+	else if (attr_def == lnodejob_attr_def)
+		AVL_attrdef = nodejob_attrdef_tree;
+	else if (attr_def == ljob_attr_def)
+		AVL_attrdef = job_attrdef_tree;
+	else if (attr_def == lresv_attr_def)
+		AVL_attrdef = resv_attrdef_tree;
+
+	return AVL_attrdef;
+}
+
 int
 find_attr(struct attribute_def *attr_def, char *name, int limit)
 {
-	int index;
+	int index = -1;
+	AVL_IX_DESC *AVL_attrdef = NULL;
+	AVL_IX_REC *pkey;
+	struct attribute_def *found_def = NULL;
 
-	if (attr_def) {
-		for (index = 0; index < limit; index++) {
-			if (!strcasecmp(attr_def->at_name, name))
-				return (index);
-			attr_def++;
+	AVL_attrdef = get_attrdef_tree(attr_def);
+	if ((AVL_attrdef != NULL) && ((pkey = (AVL_IX_REC *) str_avlkey_create(name)) != NULL)) {
+		if (avl_find_key(pkey, AVL_attrdef) == AVL_IX_OK) {
+			found_def = (struct attribute_def *) pkey->recptr;
+			index = (found_def - attr_def);
 		}
+		free(pkey);
 	}
-	return (-1);
+	return index;
 }
 
 /**

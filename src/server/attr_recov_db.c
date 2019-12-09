@@ -91,18 +91,19 @@ extern struct attribute_def	que_attr_def[];
  *
  */
 static svrattrl *
-make_attr(char *attr_name, char *attr_resc,
+make_attr(struct attribute_def *padef,
+	int attr_idx, char *attr_resc,
 	char *attr_value, int attr_flags)
 {
 	int tsize;
 	char *p;
 	svrattrl *psvrat = NULL;
+	int namelen;
 
 	tsize = sizeof(svrattrl);
-	if (!attr_name)
-		return NULL;
 
-	tsize += strlen(attr_name) + 1;
+	namelen = strlen(padef[attr_idx].at_name);
+	tsize += namelen + 1;
 	if (attr_resc) tsize += strlen(attr_resc) + 1;
 	if (attr_value) tsize += strlen(attr_value) + 1;
 
@@ -121,9 +122,10 @@ make_attr(char *attr_name, char *attr_resc,
 	psvrat->al_valln = 0;
 	psvrat->al_flags = attr_flags;
 	psvrat->al_refct = 1;
+	psvrat->al_idx = attr_idx;
 
-	strcpy(psvrat->al_name, attr_name);
-	psvrat->al_nameln = strlen(attr_name);
+	strcpy(psvrat->al_name, padef[attr_idx].at_name);
+	psvrat->al_nameln = namelen;
 	p = psvrat->al_name + psvrat->al_nameln + 1;
 
 	if (attr_resc && strlen(attr_resc) > 0) {
@@ -170,6 +172,7 @@ encode_attr_db(struct attribute_def *padef, struct attribute *pattr, int numattr
 	int rc = 0;
 	int count = 0;
 	pbs_db_attr_info_t *attrs = NULL;
+	svrattrl *rtnval = NULL;
 
 	attr_list->attr_count = 0;
 
@@ -187,9 +190,17 @@ encode_attr_db(struct attribute_def *padef, struct attribute *pattr, int numattr
 
 		rc = (padef+i)->at_encode(pattr+i, &lhead,
 			(padef+i)->at_name,
-			(char *)0, ATR_ENCODE_DB, NULL);
+			(char *)0, ATR_ENCODE_DB, &rtnval);
 		if (rc < 0)
 			return -1;
+
+		count = 0;
+		pal = rtnval;
+		while (pal && count < rc) {
+			pal->al_idx = i;
+			pal = (svrattrl *)GET_NEXT(pal->al_link);
+			count++;
+		}
 
 		(pattr+i)->at_flags &= ~ATR_VFLAG_MODIFY;
 	}
@@ -213,10 +224,8 @@ encode_attr_db(struct attribute_def *padef, struct attribute *pattr, int numattr
 	attrs = attr_list->attributes;
 
 	/* now that attribute has been encoded, update to db */
-	while ((pal = (svrattrl *)GET_NEXT(lhead)) !=
-		(svrattrl *)0) {
-		attrs[j].attr_name[sizeof(attrs[j].attr_name) - 1] = '\0';
-		strncpy(attrs[j].attr_name, pal->al_atopl.name, sizeof(attrs[j].attr_name));
+	while ((pal = (svrattrl *)GET_NEXT(lhead)) != (svrattrl *)0) {
+		attrs[j].attr_idx = pal->al_idx;
 		if (pal->al_atopl.resource) {
 			attrs[j].attr_resc[sizeof(attrs[j].attr_resc) - 1] = '\0';
 			strncpy(attrs[j].attr_resc, pal->al_atopl.resource, sizeof(attrs[j].attr_resc));
@@ -282,24 +291,8 @@ decode_attr_db(
 	resc_access_perm = ATR_DFLAG_ACCESS;
 
 	for (i = 0; i < attr_list->attr_count; i++) {
-		/* Below ensures that a server or queue resource is not set */
-		/* if that resource is not known to the current server. */
-		if ( (attrs[i].attr_resc != NULL) && (strlen(attrs[i].attr_resc) > 0) && ((padef == svr_attr_def) || (padef == que_attr_def)) ) {
-			resource_def	*prdef;
-
-			prdef = find_resc_def(svr_resc_def, attrs[i].attr_resc, svr_resc_size);
-			if (prdef == (resource_def *)0) {
-				snprintf(log_buffer, sizeof(log_buffer),
-					"%s's unknown resource \"%s.%s\" ignored",
-					((padef == svr_attr_def)?"server":"queue"),
-					attrs[i].attr_name,
-					attrs[i].attr_resc);
-				log_err(-1, __func__, log_buffer);
-				continue;
-			}
-		}
-
-		pal = make_attr(attrs[i].attr_name,
+		pal = make_attr(padef,
+						attrs[i].attr_idx,
 		                attrs[i].attr_resc,
 		                attrs[i].attr_value,
 		                attrs[i].attr_flags);
@@ -312,37 +305,13 @@ decode_attr_db(
 			goto out;
 		}
 
-		amt = pal->al_tsize - sizeof(svrattrl);
-		if (amt < 1) {
-			snprintf(log_buffer,LOG_BUF_SIZE, "Invalid attr list size in DB");
-			log_err(-1, __func__, log_buffer);
-			goto out;
-		}
 		CLEAR_LINK(pal->al_link);
 
 		pal->al_refct = 1;	/* ref count reset to 1 */
 
-		/* find the attribute definition based on the name */
-		index = find_attr(padef, pal->al_name, limit);
-		if (index < 0) {
+		/* the index to the def is now part of the data stored in the attribute */
 
-			/*
-			 * There are two ways this could happen:
-			 * 1. if the (job) attribute is in the "unknown" list -
-			 *    keep it there;
-			 * 2. if the server was rebuilt and an attribute was
-			 *    deleted, -  the fact is logged and the attribute
-			 *    is discarded (system,queue) or kept (job)
-			 */
-			if (unknown > 0) {
-				index = unknown;
-			} else {
-				snprintf(log_buffer,LOG_BUF_SIZE, "unknown attribute \"%s\" discarded", pal->al_name);
-				log_err(-1, __func__, log_buffer);
-				(void)free(pal);
-				continue;
-			}
-		}
+		index = pal->al_idx;
 		if (palarray[index] == NULL)
 			palarray[index] = pal;
 		else {
@@ -472,7 +441,8 @@ make_pbs_list_attr_db(
 
 	for (i = 0; i < attr_list->attr_count; i++) {
 		pal = make_attr(
-			attrs[i].attr_name,
+			padef,
+			attrs[i].attr_idx,
 			attrs[i].attr_resc,
 			attrs[i].attr_value,
 			attrs[i].attr_flags);

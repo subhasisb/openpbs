@@ -127,18 +127,16 @@ convert_array_to_db_attr_list(char *raw_array, pbs_db_attr_list_t *attr_list)
 		attr_value = val->str;
 		val = (struct str_data *)((char *) val->str + ntohl(val->len));
 
-		if (attr_name) {
-			attrs[i].attr_name[sizeof(attrs[i].attr_name) -1] = '\0';
-			strncpy(attrs[i].attr_name, attr_name, sizeof(attrs[i].attr_name));
-			if ((p = strchr(attrs[i].attr_name, '.'))) {
-				*p = '\0';
-				attrs[i].attr_resc[sizeof(attrs[i].attr_resc) -1] = '\0';
-				strncpy(attrs[i].attr_resc, p + 1, sizeof(attrs[i].attr_resc));
-			} else
-				attrs[i].attr_resc[0] = '\0';
+		if ((p = strchr(attr_name, '.'))) {
+			*p = '\0';
+			attrs[i].attr_resc[sizeof(attrs[i].attr_resc) -1] = '\0';
+			strncpy(attrs[i].attr_resc, p + 1, sizeof(attrs[i].attr_resc));
 		} else
-			attrs[i].attr_name[0] = 0;
+			attrs[i].attr_resc[0] = '\0';
 
+		/* set the attr_idx value now */
+		attrs[i].attr_idx = (int) *attr_name;
+	
 		attrs[i].attr_flags = (int) *attr_value++;
 		attrs[i].attr_value = strdup(attr_value+1);
 	}
@@ -171,7 +169,7 @@ convert_db_attr_list_to_array(char **raw_array, pbs_db_attr_list_t *attr_list)
 
 	len = sizeof(struct pg_array);
 	for (i = 0; i < attr_list->attr_count; i++) {
-		len += sizeof(int32_t) + PBS_MAXATTRNAME + PBS_MAXATTRRESC + 1; /* include space for dot */
+		len += sizeof(int32_t) + 1 + PBS_MAXATTRRESC + 1; /* include space for dot */
 		attr_val_len = (attr_list->attributes[i].attr_value == NULL? 0:strlen(attr_list->attributes[i].attr_value));
 		len += sizeof(int32_t) + 3 + attr_val_len + 1; /* include space for dot */
 	}
@@ -189,7 +187,9 @@ convert_db_attr_list_to_array(char **raw_array, pbs_db_attr_list_t *attr_list)
 	val = (struct str_data *)((char *) array + sizeof(struct pg_array));
 
 	for (i = 0; i < attr_list->attr_count; ++i) {
-		p = fcopyS(val->str, attrs[i].attr_name);
+		//p = fcopyS(val->str, attrs[i].attr_name);
+		p = val->str;
+		*p++ = (char) attrs[i].attr_idx;
 		*p++ = '.';
 		p = fcopyS(p, attrs[i].attr_resc);
 		*p = '\0';

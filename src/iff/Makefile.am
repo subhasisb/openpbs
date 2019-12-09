@@ -44,6 +44,7 @@ pbs_iff_LDADD = \
 	$(top_builddir)/src/lib/Libnet/libnet.a \
 	$(top_builddir)/src/lib/Libpbs/.libs/libpbs.a \
 	$(top_builddir)/src/lib/Libsec/libsec.a \
+	$(top_builddir)/src/lib/Libutil/libutil.a \
 	-lpthread \
 	@socket_lib@ \
 	-lm

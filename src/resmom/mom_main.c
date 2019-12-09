@@ -9681,6 +9681,13 @@ main(int argc, char *argv[])
 #endif	/* CPUSET_VERSION >= 4 */
 #endif	/* MOM_CPUSET */
 
+	{
+		/* create attr def trees */
+		extern int cr_attrdef_tree(int objtype, void *attr_def, int limit);
+
+		cr_attrdef_tree(PBS_DB_JOB, job_attr_def, JOB_ATR_LAST);
+	}
+
 	/* record the fact that we are up and running */
 	(void)sprintf(log_buffer, msg_startup1, pbs_version, recover);
 	log_event(PBSEVENT_SYSTEM | PBSEVENT_ADMIN | PBSEVENT_FORCE,

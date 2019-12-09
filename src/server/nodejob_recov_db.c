@@ -233,7 +233,8 @@ nodejob_db_to_attrlist(struct pbsnode *pnode, pbs_db_nodejob_info_t *db_obj)
 		memset(&tmpattr, 0, sizeof(attribute));
 		if ((node_attr_def + ND_ATR_ResourceAssn)->at_decode) {
 			(void)(node_attr_def + ND_ATR_ResourceAssn)->at_decode(
-							&tmpattr, attrs->attr_name,
+							&tmpattr,  
+							(node_attr_def + ND_ATR_ResourceAssn)->at_name,
 							attrs->attr_resc,
 							attrs->attr_value);
 		}

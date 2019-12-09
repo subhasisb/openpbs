@@ -58,6 +58,7 @@ EXTRA_PROGRAMS = \
 
 common_libs = \
 	$(top_builddir)/src/lib/Libpbs/.libs/libpbs.a \
+	$(top_builddir)/src/lib/Libutil/libutil.a \
 	-lpthread \
 	@socket_lib@ \
 	-lm
@@ -75,6 +76,7 @@ pbs_ds_monitor_LDADD = \
 	$(top_builddir)/src/lib/Libutil/libutil.a \
 	$(top_builddir)/src/lib/Libpbs/.libs/libpbs.a \
 	$(top_builddir)/src/lib/Libnet/libnet.a \
+	$(top_builddir)/src/lib/Libutil/libutil.a \
 	-lpthread \
 	@socket_lib@ \
 	@database_ldflags@ \
@@ -160,6 +162,7 @@ pbs_wish_LDADD = \
 	$(top_builddir)/src/lib/Liblog/liblog.a \
 	$(top_builddir)/src/lib/Libpbs/.libs/libpbs.a \
 	$(top_builddir)/src/lib/Libnet/libnet.a \
+	$(top_builddir)/src/lib/Libutil/libutil.a \
 	-lpthread \
 	@socket_lib@ \
 	@tk_lib@
@@ -181,6 +184,7 @@ printjob_svr_bin_LDADD = \
 	$(top_builddir)/src/lib/Libdb/libdb.a \
 	$(top_builddir)/src/lib/Libpbs/.libs/libpbs.a \
 	$(top_builddir)/src/lib/Libnet/libnet.a \
+	$(top_builddir)/src/lib/Libutil/libutil.a \
 	-lpthread \
 	@socket_lib@ \
 	@database_ldflags@ \

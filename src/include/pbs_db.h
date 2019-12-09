@@ -150,7 +150,7 @@ typedef char      *TEXT;
  *
  */
 struct pbs_db_attr_info {
-	char	attr_name[PBS_MAXATTRNAME+1];
+	INTEGER	attr_idx;
 	char	attr_resc[PBS_MAXATTRRESC+1];
 	TEXT    attr_value;
 	INTEGER attr_flags;

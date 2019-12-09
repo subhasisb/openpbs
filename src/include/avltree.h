@@ -71,6 +71,7 @@ typedef struct {
 	void		*root;
 	int		keylength; /* zero for null-terminated strings */
 	int		dup_keys;
+	int		case_cmp;
 } AVL_IX_DESC;
 
 /*  return codes  */
@@ -85,6 +86,7 @@ typedef struct {
 
 extern void *get_avl_tls(void);
 extern void	avl_create_index(AVL_IX_DESC *pix, int dup, int keylength);
+extern void	avl_create_index_case(AVL_IX_DESC *pix, int dup, int casecmp, int keylength);
 extern void	avl_destroy_index(AVL_IX_DESC *pix);
 extern int	avl_find_key(AVL_IX_REC *pe, AVL_IX_DESC *pix);
 extern int	avl_locate_key(AVL_IX_REC *pe, AVL_IX_DESC *pix);
@@ -101,6 +103,7 @@ int tree_add_del(AVL_IX_DESC *root, void *key, void *data, int op);
 void *find_tree(AVL_IX_DESC *root, void *key);
 AVL_IX_DESC *create_tree(int dups, int keylen);
 AVL_IX_REC *avlkey_create(AVL_IX_DESC *tree, void *key);
+AVL_IX_REC  *str_avlkey_create(const char *keystr);
 
 /* Operation types for addition/deletion from AVL tree */
 #define TREE_OP_ADD	0

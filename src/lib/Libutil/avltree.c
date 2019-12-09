@@ -121,6 +121,7 @@ typedef struct {
 	int __ix_dupkeys;	/* set from AVL_IX_DESC */
 	int __rec_keylength;		/* set from actual key */
 	int __node_overhead;
+	int __ix_casecmp;
 
 	node **__t;
 	node *__r;
@@ -176,6 +177,7 @@ get_avl_tls(void)
 
 #define ix_keylength     (((avl_tls_t *) get_avl_tls())->__ix_keylength)
 #define ix_dupkeys 	     (((avl_tls_t *) get_avl_tls())->__ix_dupkeys)
+#define ix_casecmp 	     (((avl_tls_t *) get_avl_tls())->__ix_casecmp)
 #define rec_keylength 	 (((avl_tls_t *) get_avl_tls())->__rec_keylength)
 #define node_overhead 	 (((avl_tls_t *) get_avl_tls())->__node_overhead)
 
@@ -250,11 +252,19 @@ freenode(node *n)
 static int
 compkey(rectype *r1, rectype *r2)
 {
-	int n= ix_keylength ?
-		memcmp(r1->key, r2->key, ix_keylength) :
-		strcmp(r1->key, r2->key);
+	int n;
+	if (ix_keylength)
+		n = memcmp(r1->key, r2->key, ix_keylength);
+	else {
+		if (ix_casecmp)
+			n = strcasecmp(r1->key, r2->key);
+		else
+			n = strcmp(r1->key, r2->key);
+	}
+	
 	if (n  ||  ix_dupkeys == AVL_NO_DUP_KEYS)
 		return n;
+	
 	return memcmp(&(r1->recptr), &(r2->recptr), sizeof(AVL_RECPOS));
 }
 
@@ -665,8 +675,9 @@ avltree_clear(node **tt)
  * @return	Void
  *
  */
+
 void
-avl_create_index(AVL_IX_DESC *pix, int dup, int keylength)
+avl_create_index_case(AVL_IX_DESC *pix, int dup, int casecmp, int keylength)
 {
 	if (dup != AVL_NO_DUP_KEYS  &&
 		dup != AVL_DUP_KEYS_OK  &&
@@ -684,7 +695,13 @@ avl_create_index(AVL_IX_DESC *pix, int dup, int keylength)
 	pix->root = NULL;
 	pix->keylength = keylength;
 	pix->dup_keys=dup;
+	pix->case_cmp = casecmp;
+}
 
+void
+avl_create_index(AVL_IX_DESC *pix, int dup, int keylength)
+{
+	avl_create_index_case(pix, dup, 0, keylength);
 }
 
 /**
@@ -721,7 +738,7 @@ avl_find_key(AVL_IX_REC *pe, AVL_IX_DESC *pix)
 {
 	rectype *ptr;
 
-	ix_keylength=pix->keylength; ix_dupkeys=pix->dup_keys;
+	ix_keylength=pix->keylength; ix_dupkeys=pix->dup_keys; ix_casecmp = pix->case_cmp;
 
 	memset((void *)&(pe->recptr), 0, sizeof(AVL_RECPOS));
 	ptr=avltree_search((node **)&(pix->root), pe,
@@ -753,7 +770,7 @@ avl_locate_key(AVL_IX_REC *pe, AVL_IX_DESC *pix)
 	rectype	*ptr;
 	int	ret;
 
-	ix_keylength=pix->keylength; ix_dupkeys=pix->dup_keys;
+	ix_keylength=pix->keylength; ix_dupkeys=pix->dup_keys; ix_casecmp = pix->case_cmp;
 	memset((void *)&(pe->recptr), 0, sizeof(AVL_RECPOS));
 	ptr=avltree_search((node **)&(pix->root), pe,
 		SRF_FINDEQUAL|SRF_SETMARK|SRF_FINDGREAT);
@@ -780,7 +797,7 @@ avl_locate_key(AVL_IX_REC *pe, AVL_IX_DESC *pix)
 int
 avl_add_key(AVL_IX_REC *pe, AVL_IX_DESC *pix)
 {
-	ix_keylength=pix->keylength; ix_dupkeys=pix->dup_keys;
+	ix_keylength=pix->keylength; ix_dupkeys=pix->dup_keys; ix_casecmp = pix->case_cmp;
 	if (ix_keylength == 0)
 		rec_keylength = strlen(pe->key) + 1;
 	if (avltree_insert((node **)&(pix->root), pe)==NULL  &&
@@ -806,7 +823,7 @@ avl_delete_key(AVL_IX_REC *pe, AVL_IX_DESC *pix)
 {
 	rectype *ptr;
 
-	ix_keylength=pix->keylength; ix_dupkeys=pix->dup_keys;
+	ix_keylength=pix->keylength; ix_dupkeys=pix->dup_keys;ix_casecmp = pix->case_cmp;
 
 	ptr=avltree_search((node **)&(pix->root), pe, SRF_FINDEQUAL|SRF_SETMARK);
 	if (ptr==NULL)
@@ -862,7 +879,7 @@ int
 avl_next_key(AVL_IX_REC *pe, AVL_IX_DESC *pix)
 {
 	rectype *ptr;
-	ix_keylength=pix->keylength; ix_dupkeys=pix->dup_keys;
+	ix_keylength=pix->keylength; ix_dupkeys=pix->dup_keys;ix_casecmp = pix->case_cmp;
 	if ((ptr=avltree_search((node **)&(pix->root), pe, /* pe not used */
 		SRF_FROMMARK|SRF_SETMARK|SRF_FINDGREAT))==NULL)
 		return AVL_EOIX;
@@ -886,7 +903,7 @@ int
 avl_prev_key(AVL_IX_REC *pe, AVL_IX_DESC *pix)
 {
 	rectype *ptr;
-	ix_keylength=pix->keylength; ix_dupkeys=pix->dup_keys;
+	ix_keylength=pix->keylength; ix_dupkeys=pix->dup_keys;ix_casecmp = pix->case_cmp;
 	if ((ptr=avltree_search((node **)&(pix->root), pe, /* pe not used */
 		SRF_FROMMARK|SRF_SETMARK|SRF_FINDLESS))==NULL)
 		return AVL_EOIX;
@@ -909,7 +926,7 @@ int
 avl_find_exact(AVL_IX_REC *pe, AVL_IX_DESC *pix)
 {
 	rectype *ptr;
-	ix_keylength=pix->keylength; ix_dupkeys=pix->dup_keys;
+	ix_keylength=pix->keylength; ix_dupkeys=pix->dup_keys;ix_casecmp = pix->case_cmp;
 	ptr=avltree_search((node **)&(pix->root), pe,
 		SRF_FINDEQUAL|SRF_FINDGREAT|SRF_SETMARK);
 	if (ptr==NULL)
@@ -1077,4 +1094,43 @@ tree_add_del(AVL_IX_DESC *root, void *key, void *data, int op)
 	}
 	free(pkey);
 	return rc;
+}
+
+
+/**
+ * @brief
+ *		Creates the avl key from jobid string.
+ *
+ * @param[in]	keystr	-	jobid string
+ *
+ * @see
+ * 		svr_enquejob()
+ *		svr_dequejob()
+ *		find_job()
+ *
+ * @return	Pointer to AVL_IX_REC record for success.
+ * @retval	NULL	: failure.
+ *
+ * @par	Reentrancy:
+ *		MT-unsafe
+ *
+ */
+AVL_IX_REC *
+str_avlkey_create(const char *keystr)
+{
+	size_t keylen;
+	AVL_IX_REC *pkey;
+
+	if (keystr == NULL)
+		return NULL;
+
+	keylen = sizeof(AVL_IX_REC) + strlen(keystr) + 1;
+	pkey = malloc(keylen);
+	if (pkey == NULL)
+		return NULL;
+
+	//memset((void *)pkey, 0, keylen);
+	(void)strcpy(pkey->key, keystr);
+	return (pkey);
+
 }

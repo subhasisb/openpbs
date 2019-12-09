@@ -77,7 +77,7 @@ pg_db_prepare_sched_sqls(pbs_db_conn_t *conn)
 	/* rewrite all attributes for a FULL update */
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "update pbs.scheduler set "
 		"sched_savetm = localtimestamp, "
-		"attributes = hstore($2::text[]) "
+		"attributes = attributes || hstore($2::text[]) "
 		"where sched_name = $1 "
 		"returning to_char(sched_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as sched_savetm");
 	if (pg_prepare_stmt(conn, STMT_UPDATE_SCHED_FULL, conn->conn_sql, 2) != 0)
