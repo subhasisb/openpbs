@@ -583,7 +583,7 @@ send_job_exec(job *jobp, pbs_net_t hostaddr, int port, struct batch_request *req
 	(void) strcpy(job_id, jobp->ji_qs.ji_jobid);
 
 	pqjatr = &((svrattrl *) GET_NEXT(attrl))->al_atopl;
-	jobid = PBSD_queuejob(stream, jobp->ji_qs.ji_jobid, destin, pqjatr, NULL, rpp, &msgid, &commit_done);
+	jobid = PBSD_queuejob(stream, jobp->ji_qs.ji_jobid, destin, pqjatr, NULL, rpp, &msgid, &commit_done); /* commit_done is not filled in rpp since it is async reply */
 	free_attrlist(&attrl);
 	if (jobid == NULL)
 		goto send_err;
@@ -600,7 +600,8 @@ send_job_exec(job *jobp, pbs_net_t hostaddr, int port, struct batch_request *req
 	/* add to pjob->svrtask list so its automatically cleared when job is purged */
 	append_link(&jobp->ji_svrtask, &ptask->wt_linkobj, ptask);
 
-	if (commit_done)
+	if (!(jobp->ji_qs.ji_svrflags & JOB_SVFLG_SCRIPT || credlen > 0 || 
+		((jobp->ji_qs.ji_svrflags & JOB_SVFLG_HASRUN) && (hostaddr != pbs_server_addr))))
 		goto done;
 
 	/* we cannot use the same msgid, since it is not part of the preq,

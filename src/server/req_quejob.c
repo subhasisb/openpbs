@@ -355,13 +355,6 @@ req_quejob(struct batch_request *preq)
 			}
 		}
 
-		if (!strcasecmp(psatl->al_name, ATTR_executable) &&
-			((psatl->al_value != NULL) &&
-			(psatl->al_value[0] != '\0'))) {
-				job_executable = 1;
-		}
-
-
 		psatl = (svrattrl *)GET_NEXT(psatl->al_link);
 	}
 
@@ -625,6 +618,12 @@ req_quejob(struct batch_request *preq)
 	psatl = (svrattrl *)GET_NEXT(preq->rq_ind.rq_queuejob.rq_attr);
 	resc_access_perm_save = resc_access_perm; /* save perm */
 	while (psatl) {
+
+		if (!strcasecmp(psatl->al_name, ATTR_executable) &&
+			((psatl->al_value != NULL) &&
+			(psatl->al_value[0] != '\0'))) {
+				job_executable = 1;
+		}
 
 		/* identify the attribute by name */
 
@@ -1179,21 +1178,22 @@ req_quejob(struct batch_request *preq)
 	}
 #endif
 
+	/* if executable job, not rerun, and not with credentials, then dont do a direct commit without other messages */
+	if (job_executable && pj->ji_extended.ji_ext.ji_credtype == PBS_CREDTYPE_NONE && (!(pj->ji_qs.ji_svrflags & JOB_SVFLG_HASRUN))) {
+		req_commit_now(preq, pj);
+		return;
+	}
+
 	/* acknowledge the request with the job id */
 	if (!preq->isrpp) {
-		if (job_executable) {
-			req_commit_now(preq, pj);
-			return;
-		} else {
-			pj->ji_qs.ji_un.ji_newt.ji_fromaddr = get_connectaddr(sock);
-			/* acknowledge the request with the job id */
-			if (reply_jobid(preq, pj->ji_qs.ji_jobid, BATCH_REPLY_CHOICE_Queue) != 0) {
-				/* reply failed, purge the job and close the connection */
+		pj->ji_qs.ji_un.ji_newt.ji_fromaddr = get_connectaddr(sock);
+		/* acknowledge the request with the job id */
+		if (reply_jobid(preq, pj->ji_qs.ji_jobid, BATCH_REPLY_CHOICE_Queue) != 0) {
+			/* reply failed, purge the job and close the connection */
 
-				close_client(sock);
-				job_purge(pj);
-				return;
-			}
+			close_client(sock);
+			job_purge(pj);
+			return;
 		}
 	} else {
 		struct sockaddr_in* addr = rpp_getaddr(sock);
