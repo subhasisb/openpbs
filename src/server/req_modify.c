@@ -189,7 +189,7 @@ req_modifyjob(struct batch_request *preq)
 	}
 
 	if (pseldef == NULL)  /* do one time to keep handy */
-		pseldef = find_resc_def(svr_resc_def, "select", svr_resc_size);
+		pseldef = &svr_resc_def[SVR_RESC_SELECT];
 
 	pjob = chk_job_request(preq->rq_ind.rq_modify.rq_objname, preq, &jt);
 	if (pjob == NULL)
@@ -320,7 +320,7 @@ req_modifyjob(struct batch_request *preq)
 	}
 
 	if (outsideselect) {
-		presc = find_resc_entry(&pjob->ji_wattr[(int)JOB_ATR_resource],
+		presc = find_resc_entry(&pjob->ji_wattr[(int)JOB_ATR_resource], 
 			pseldef);
 		if (presc &&
 			((presc->rs_value.at_flags & ATR_VFLAG_DEFLT) == 0)) {
@@ -372,7 +372,7 @@ req_modifyjob(struct batch_request *preq)
 	}
 
 	if (pjob->ji_wattr[(int)JOB_ATR_resource].at_flags & ATR_VFLAG_MODIFY) {
-		presc = find_resc_entry(&pjob->ji_wattr[(int)JOB_ATR_resource],
+		presc = find_resc_entry(&pjob->ji_wattr[(int)JOB_ATR_resource], 
 			pseldef);
 		if (presc && (presc->rs_value.at_flags & ATR_VFLAG_DEFLT)) {
 			/* changing Resource_List and select is a default   */

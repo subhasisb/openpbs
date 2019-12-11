@@ -324,20 +324,18 @@ init_server_attrs()
 	/* an update_to FLicenses()  and pbs_float_lic must already exist */
 	pbs_float_lic = &server.sv_attr[(int)SVR_ATR_FLicenses];
 
-	prdef = find_resc_def(svr_resc_def, "ncpus", svr_resc_size);
-	if (prdef) {
-		presc = add_resource_entry(
-			&server.sv_attr[(int)SVR_ATR_DefaultChunk], prdef);
-		if (presc) {
-			presc->rs_value.at_val.at_long = 1;
-			presc->rs_value.at_flags =
-				ATR_VFLAG_DEFLT|ATR_VFLAG_SET|ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
-			server.sv_attr[(int)SVR_ATR_DefaultChunk].at_flags =
-				ATR_VFLAG_DEFLT|ATR_VFLAG_SET|ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
-			(void)deflt_chunk_action(
-				&server.sv_attr[(int)SVR_ATR_DefaultChunk],
-				(void *)&server, ATR_ACTION_NEW);
-		}
+	prdef = &svr_resc_def[SVR_RESC_NCPUS];
+	presc = add_resource_entry(
+		&server.sv_attr[(int)SVR_ATR_DefaultChunk], prdef);
+	if (presc) {
+		presc->rs_value.at_val.at_long = 1;
+		presc->rs_value.at_flags =
+			ATR_VFLAG_DEFLT|ATR_VFLAG_SET|ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
+		server.sv_attr[(int)SVR_ATR_DefaultChunk].at_flags =
+			ATR_VFLAG_DEFLT|ATR_VFLAG_SET|ATR_VFLAG_MODCACHE | ATR_VFLAG_MODIFY;
+		(void)deflt_chunk_action(
+			&server.sv_attr[(int)SVR_ATR_DefaultChunk],
+			(void *)&server, ATR_ACTION_NEW);
 	}
 }
 
@@ -409,6 +407,9 @@ pbsd_init(int type)
 		cr_attrdef_tree(PBS_DB_NODE, node_attr_def, ND_ATR_LAST);
 		cr_attrdef_tree(PBS_DB_JOB, job_attr_def, JOB_ATR_LAST);
 		cr_attrdef_tree(PBS_DB_RESV, resv_attr_def, RESV_ATR_LAST);	
+
+		/* now create the resc_def tree */
+		cr_rescdef_tree(svr_resc_def, svr_resc_size);
 	}
 
 	/* The following is code to reduce security risks                */

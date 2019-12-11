@@ -935,8 +935,7 @@ mom_set_use(job *pjob)
 
 	at->at_flags |= (ATR_VFLAG_MODIFY|ATR_VFLAG_SET);
 
-	rd = find_resc_def(svr_resc_def, "cput", svr_resc_size);
-	assert(rd != NULL);
+	rd = &svr_resc_def[SVR_RESC_CPUT];
 	pres = find_resc_entry(at, rd);
 	if (pres == NULL) {
 		pres = add_resource_entry(at, rd);
@@ -950,8 +949,7 @@ mom_set_use(job *pjob)
 	}
 
 
-	rd = find_resc_def(svr_resc_def, "ncpus", svr_resc_size);
-	assert(rd != NULL);
+	rd = &svr_resc_def[SVR_RESC_NCPUS];
 	pres = add_resource_entry(at, rd);
 	if (pres == NULL) {
 		pres->rs_value.at_flags |= ATR_VFLAG_SET;
@@ -966,8 +964,7 @@ mom_set_use(job *pjob)
 
 	update_walltime(pjob);
 
-	rd = find_resc_def(svr_resc_def, "mem", svr_resc_size);
-	assert(rd != NULL);
+	rd = &svr_resc_def[SVR_RESC_MEM];
 	pres = find_resc_entry(at, rd);
 	if (pres == NULL) {
 		pres = add_resource_entry(at, rd);

@@ -2401,10 +2401,8 @@ get_hook_results(char *input_file, int *accept_flag, int *reject_flag,
 					resource_def *prdef;
 					svrattrl *plist, *plist2, *plist_next;
 
-					prdef = find_resc_def(svr_resc_def,
-						"|unknown|", svr_resc_size);
-					prsc = find_resc_entry(\
-					    &pjob2->ji_wattr[index], prdef);
+					prdef = &svr_resc_def[SVR_RESC_UNKN];
+					prsc = find_resc_entry(&pjob2->ji_wattr[index], prdef);
 
 					if ((prdef == NULL) || (prsc == NULL)) {
 						log_err(-1, __func__, "bad unknown resc");
@@ -2413,21 +2411,18 @@ get_hook_results(char *input_file, int *accept_flag, int *reject_flag,
 						continue;
 					}
 
-					plist = (svrattrl *)GET_NEXT(\
-				      	     prsc->rs_value.at_val.at_list);
+					plist = (svrattrl *)GET_NEXT(prsc->rs_value.at_val.at_list);
 
 					do {
 						if (plist == NULL)
 							break;
 
-						plist_next = (svrattrl *)GET_NEXT(\
-							   plist->al_link);
+						plist_next = (svrattrl *)GET_NEXT(plist->al_link);
 
 						/* check for duplicate resource */
 						/* entry. The later ones take */
 						/* precedence */
-						plist2 = (svrattrl *)GET_NEXT(\
-							plist->al_link);
+						plist2 = (svrattrl *)GET_NEXT(plist->al_link);
 						while (plist2 != NULL) {
 							if (strcmp(plist->al_resc,
 								plist2->al_resc) == 0) {
@@ -2435,8 +2430,7 @@ get_hook_results(char *input_file, int *accept_flag, int *reject_flag,
 								free(plist);
 								break;
 							}
-							plist2 = (svrattrl *)GET_NEXT(\
-							   plist2->al_link);
+							plist2 = (svrattrl *)GET_NEXT(plist2->al_link);
 						}
 
 						plist = plist_next;

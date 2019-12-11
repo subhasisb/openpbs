@@ -52,6 +52,7 @@
 #include "resource.h"
 #include "pbs_error.h"
 #include "pbs_share.h"
+#include <avltree.h>
 
 
 /**
@@ -135,7 +136,7 @@ decode_resc(struct attribute *patr, char *name, char *rescn, char *val)
 		 * accept unknown resources
 		 */
 		rc = PBSE_UNKRESC;
-		prdef = find_resc_def(svr_resc_def, RESOURCE_UNKNOWN, svr_resc_size);
+		prdef = &svr_resc_def[SVR_RESC_UNKN];; 
 	}
 
 	prsc = find_resc_entry(patr, prdef);
@@ -463,19 +464,60 @@ free_resc(attribute *pattr)
  * @retval	NULL					Error
  *
  */
+static AVL_IX_DESC *resv_attrdef_tree = NULL;
+
+int
+cr_rescdef_tree(void *resc_def, int limit)
+{
+	AVL_IX_DESC *AVL_rescdef = NULL;
+	resource_def *rdef = resc_def;
+	int index;
+	int rc = AVL_IX_OK;
+	AVL_IX_REC *pkey;
+
+	AVL_rescdef = (AVL_IX_DESC *) malloc(sizeof(AVL_IX_DESC));
+	if (AVL_rescdef == NULL) {
+		return (-1);
+	}
+
+	/* create the attribute tree */
+	avl_create_index_case(AVL_rescdef, AVL_NO_DUP_KEYS, 1, 0);
+
+	/* add all attributes to the tree with key as the attr name */
+	for (index = 0; index < limit; index++) {
+		pkey = str_avlkey_create(rdef->rs_name);
+		if (pkey == NULL)
+			return -1;
+
+		pkey->recptr = rdef;
+		rc = avl_add_key(pkey, AVL_rescdef);
+		free(pkey);
+		if (rc != AVL_IX_OK) 
+			return -1;
+		
+		rdef++;
+	}
+
+	resv_attrdef_tree = AVL_rescdef;
+	return 0;
+}
 
 resource_def *
 find_resc_def(resource_def *rscdf, char *name, int limit)
 {
+	AVL_IX_REC *pkey;
+	resource_def *found_def = NULL;
+
 	if (rscdf == NULL || name == NULL)
 		return NULL;
 
-	while (limit--) {
-		if (strcasecmp(rscdf->rs_name, name) == 0)
-			return (rscdf);
-		rscdf = rscdf->rs_next;
+	if ((resv_attrdef_tree != NULL) && ((pkey = (AVL_IX_REC *) str_avlkey_create(name)) != NULL)) {
+		if (avl_find_key(pkey, resv_attrdef_tree) == AVL_IX_OK)
+			found_def = (resource_def *) pkey->recptr;
+		free(pkey);
 	}
-	return NULL;
+
+	return found_def;
 }
 
 /**
@@ -495,28 +537,19 @@ is_builtin(resource_def *rscdef)
 {
 	int i;
 	resource_def *svr_rsdef;
-	int builtin_resc = 1;
+	resource_def *rd;
+	int builtin_resc = 0;
 
 	if (rscdef == NULL) {
 		return -1;
+	}
 
+	rd = find_resc_def(svr_resc_def, rscdef->rs_name, svr_resc_size);
+	if (!rd || (rd && strcmp(rd->rs_name, RESOURCE_UNKNOWN) != 0)) {
+		builtin_resc = 1;
 	}
-	for (i=0, svr_rsdef=svr_resc_def; i < svr_resc_size; i++) {
-		/* the |unknown| resource is the delimiter between builtins
-		 * and custom
-		 */
-		if (strcmp(svr_rsdef->rs_name, RESOURCE_UNKNOWN) == 0) {
-			builtin_resc = 0;
-		}
-		else if (strcasecmp(svr_rsdef->rs_name, rscdef->rs_name) == 0) {
-			if (builtin_resc) {
-				return 1;
-			}
-			return 0;
-		}
-		svr_rsdef = svr_rsdef->rs_next;
-	}
-	return -1;
+		
+	return builtin_resc;
 }
 
 /**

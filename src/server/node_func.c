@@ -341,7 +341,7 @@ get_ncpu_ct(struct pbsnode *pnode)
 	attribute		*pala;
 
 	pala = &pnode->nd_attr[(int)ND_ATR_ResourceAvail];
-	prd = find_resc_def(svr_resc_def, "ncpus", svr_resc_size);
+	prd = &svr_resc_def[SVR_RESC_NCPUS];
 	prc = find_resc_entry(pala, prd);
 	if (prc)
 		return prc->rs_value.at_val.at_long;
@@ -663,16 +663,13 @@ initialize_pbsnode(struct pbsnode *pnode, char *pname, int ntype)
 	pat1 = &pnode->nd_attr[(int)ND_ATR_ResourceAvail];
 	pat2 = &pnode->nd_attr[(int)ND_ATR_ResourceAssn];
 
-	prd  = find_resc_def(svr_resc_def, "arch", svr_resc_size);
-	assert(prd != NULL);
+	prd  = &svr_resc_def[SVR_RESC_ARCH];
 	(void)add_resource_entry(pat1, prd);
 
-	prd  = find_resc_def(svr_resc_def, "mem", svr_resc_size);
-	assert(prd != NULL);
+	prd  = &svr_resc_def[SVR_RESC_MEM];
 	(void)add_resource_entry(pat1, prd);
 
-	prd  = find_resc_def(svr_resc_def, "ncpus", svr_resc_size);
-	assert(prd != NULL);
+	prd  = &svr_resc_def[SVR_RESC_NCPUS];
 	(void)add_resource_entry(pat1, prd);
 
 	/* add to resources_assigned any resource with ATR_DFLAG_FNASSN */
@@ -1571,14 +1568,14 @@ node_np_action(attribute *new, void *pobj, int actmode)
 		return (PBSE_IVALREQ);
 
 	/* 1. prevent change of "host" or "vnode" */
-	prdef = find_resc_def(svr_resc_def, "host", svr_resc_size);
+	prdef = &svr_resc_def[SVR_RESC_HOST];
 	presc = find_resc_entry(new, prdef);
 	if ((presc != NULL) &&
 		(presc->rs_value.at_flags & ATR_VFLAG_MODIFY)) {
 		if (actmode != ATR_ACTION_NEW)
 			return (PBSE_ATTRRO);
 	}
-	prdef = find_resc_def(svr_resc_def, "vnode", svr_resc_size);
+	prdef = &svr_resc_def[SVR_RESC_VNODE];
 	presc = find_resc_entry(new, prdef);
 	if ((presc != NULL) &&
 		(presc->rs_value.at_flags & ATR_VFLAG_MODIFY)) {
@@ -1586,7 +1583,7 @@ node_np_action(attribute *new, void *pobj, int actmode)
 			return (PBSE_ATTRRO);
 	}
 	/* prevent change of "aoe" */
-	prdef = find_resc_def(svr_resc_def, "aoe", svr_resc_size);
+	prdef = &svr_resc_def[SVR_RESC_AOE];
 	presc = find_resc_entry(new, prdef);
 	if ((presc != NULL) &&
 		(presc->rs_value.at_flags & ATR_VFLAG_MODIFY)) {
@@ -1600,7 +1597,7 @@ node_np_action(attribute *new, void *pobj, int actmode)
 	}
 
 	/* 2. If changing ncpus, fix subnodes */
-	prdef = find_resc_def(svr_resc_def, "ncpus", svr_resc_size);
+	prdef = &svr_resc_def[SVR_RESC_NCPUS];
 	presc = find_resc_entry(new, prdef);
 
 	if (presc == NULL)
@@ -1663,9 +1660,7 @@ node_pcpu_action(attribute *new, void *pobj, int actmode)
 	pnode->nd_ncpus = new_np;
 
 	/* now get ncpus */
-	prd = find_resc_def(svr_resc_def, "ncpus", svr_resc_size);
-	if (prd == 0)
-		return PBSE_SYSTEM;
+	prd = &svr_resc_def[SVR_RESC_NCPUS];
 	prc = find_resc_entry(&pnode->nd_attr[(int)ND_ATR_ResourceAvail], prd);
 	if (prc == 0) {
 		return (0); /* if this error happens - ignore it */

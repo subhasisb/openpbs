@@ -235,8 +235,7 @@ getplacesharing(job *pjob)
 	 *	Compute the "Resource_List.place" index for vnss[][]:
 	 */
 	if (prsdef == NULL) {
-		prsdef = find_resc_def(svr_resc_def, "place",
-			svr_resc_size);
+		prsdef = &svr_resc_def[SVR_RESC_PLACE];
 	}
 	if (prsdef != NULL) {
 		char	*placeval = NULL;

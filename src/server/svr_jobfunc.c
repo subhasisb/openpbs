@@ -1001,7 +1001,7 @@ chk_svr_resc_limit(attribute *jobatr, attribute *queatr,
 	static resource_def *noderesc = NULL;
 
 	if (noderesc == NULL) {
-		noderesc = find_resc_def(svr_resc_def, "nodes", svr_resc_size);
+		noderesc = 	&svr_resc_def[SVR_RESC_NODES];
 	}
 	comp_resc_gt = 0;
 	comp_resc_lt = 0;
@@ -1149,7 +1149,7 @@ chk_wt_limits_STF(resource *resc_minwt, resource *resc_maxwt, pbs_queue *pque, a
 	 * to queue's resources_max.walltime. */
 	if (resc_maxwt == NULL && pattr != NULL
 		&& (have_max_queue_limit || have_max_server_limit)) {
-		rscdef = find_resc_def(svr_resc_def, MAX_WALLTIME, svr_resc_size);
+		rscdef = &svr_resc_def[SVR_RESC_MAX_WALLTIME];
 		new_res = add_resource_entry(pattr , rscdef);
 		if (have_max_queue_limit)
 			new_res->rs_defin->rs_set(&new_res->rs_value, &wt_max_queue_limit, SET);
@@ -1962,9 +1962,9 @@ set_select_and_place(int objtype, void *pobj, attribute *patr)
 			cvt_len = CVT_SIZE;
 	}
 
-	prdefpc = find_resc_def(svr_resc_def, "place", svr_resc_size);
-	prdefnd = find_resc_def(svr_resc_def, "nodes", svr_resc_size);
-	prdefsl = find_resc_def(svr_resc_def, "select", svr_resc_size);
+	prdefpc = &svr_resc_def[SVR_RESC_PLACE];
+	prdefnd = &svr_resc_def[SVR_RESC_NODES];
+	prdefsl = &svr_resc_def[SVR_RESC_SELECT];
 	presc   = find_resc_entry(patr, prdefnd);
 
 	/* add "select" and "place" resource */
@@ -2211,7 +2211,7 @@ set_chunk_sum(attribute  *pselectattr, attribute *pattr)
 
 	/* set pseudo-resource "nodect" to the number of chunks */
 
-	pdef = find_resc_def(svr_resc_def, "nodect", svr_resc_size);
+	pdef = &svr_resc_def[SVR_RESC_NODECT];
 	if (pdef) {
 		presc = find_resc_entry(pattr, pdef);
 		if (presc == NULL)
@@ -2285,8 +2285,8 @@ set_deflt_resc(attribute *jb, attribute *dflt, int selflg)
 	resource_def   *seldef;
 	resource_def   *plcdef;
 
-	seldef = find_resc_def(svr_resc_def, "select", svr_resc_size);
-	plcdef = find_resc_def(svr_resc_def, "place",  svr_resc_size);
+	seldef = &svr_resc_def[SVR_RESC_SELECT];
+	plcdef = &svr_resc_def[SVR_RESC_PLACE];
 
 	if (dflt->at_flags & ATR_VFLAG_SET) {
 
@@ -2412,14 +2412,14 @@ set_resc_deflt(void *pobj, int objtype, pbs_queue *pque)
 
 	/* if needed, set "select" and "place" from the other resources */
 
-	prdefsl = find_resc_def(svr_resc_def, "select", svr_resc_size);
+	prdefsl = &svr_resc_def[SVR_RESC_SELECT];
 	presc   = find_resc_entry(pdest, prdefsl);
 	/* if not set, set select/place */
 	if ((presc == NULL) || ((presc->rs_value.at_flags & ATR_VFLAG_SET)==0))
 		if ((rc = set_select_and_place(objtype, pobj, pdest)) != 0)
 			return rc;
 
-	prdefpc = find_resc_def(svr_resc_def, "place", svr_resc_size);
+	prdefpc = &svr_resc_def[SVR_RESC_PLACE];
 	presc = find_resc_entry(pdest, prdefpc);
 	/* if "place" still not set, force to "free" */
 	if ((presc == NULL) || ((presc->rs_value.at_flags&ATR_VFLAG_SET)==0)) {
@@ -2759,9 +2759,7 @@ get_wall(job *jp)
 	resource_def	*rscdef;
 	resource	*pres;
 
-	rscdef = find_resc_def(svr_resc_def, "walltime", svr_resc_size);
-	if (rscdef == 0)
-		return (-1);
+	rscdef = &svr_resc_def[SVR_RESC_WALLTIME];
 	pres = find_resc_entry(&jp->ji_wattr[JOB_ATR_resource], rscdef);
 	if (pres == 0)
 		return (-1);
@@ -2793,9 +2791,7 @@ get_used_wall(job *jp)
 	resource_def	*rscdef;
 	resource	*pres;
 
-	rscdef = find_resc_def(svr_resc_def, "walltime", svr_resc_size);
-	if (rscdef == 0)
-		return (-1);
+	rscdef = &svr_resc_def[SVR_RESC_WALLTIME];
 	pres = find_resc_entry(&jp->ji_wattr[JOB_ATR_resc_used], rscdef);
 	if (pres == 0)
 		return (-1);
@@ -3267,7 +3263,7 @@ Time4occurrenceFinish(resc_resv *presv)
 	presv->ri_wattr[RESV_ATR_duration].at_flags |= ATR_VFLAG_SET
 		| ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 
-	rscdef = find_resc_def(svr_resc_def, "walltime", svr_resc_size);
+	rscdef = &svr_resc_def[SVR_RESC_WALLTIME];
 	prsc = find_resc_entry(&presv->ri_wattr[RESV_ATR_resource], rscdef);
 	atemp.at_flags = ATR_VFLAG_SET;
 	atemp.at_type = ATR_TYPE_LONG;
@@ -4332,7 +4328,7 @@ start_end_dur_wall(void *pobj, int objtype)
 	if (pobj == 0)
 		return (-1);
 
-	rscdef = find_resc_def(svr_resc_def, "walltime", svr_resc_size);
+	rscdef = &svr_resc_def[SVR_RESC_WALLTIME];
 
 	if (objtype == JOB_OBJECT) {
 		pjob = (job *)pobj;
@@ -6001,8 +5997,7 @@ recreate_exec_vnode(job *pjob, char *vnodelist, char *err_msg,
 	}
 
 	if (new_select[0] != '\0') {
-		prdefsl = find_resc_def(svr_resc_def, "select",
-							svr_resc_size);
+		prdefsl = &svr_resc_def[SVR_RESC_SELECT];
 		/* re-generate "select" resource */
 		if (prdefsl != NULL) {
 			presc = find_resc_entry(

@@ -4611,7 +4611,7 @@ check_req_aoe_available(struct pbsnode * pnode, char * aoe_req)
 	/* get the resources_available.aoe arst */
 	pala = &pnode->nd_attr[(int)ND_ATR_ResourceAvail];
 
-	prd = find_resc_def(svr_resc_def, "aoe", svr_resc_size);
+	prd = &svr_resc_def[SVR_RESC_AOE];
 	if (prd == NULL)
 		return -1;
 	prc = find_resc_entry(pala, prd);
@@ -4779,7 +4779,7 @@ node_need_prov(struct pbsnode *pnode, char *aoe_name)
 	if (pnode == NULL || aoe_name == NULL)
 		return -1;
 
-	prdef = find_resc_def(svr_resc_def, "aoe", svr_resc_size);
+	prdef = &svr_resc_def[SVR_RESC_AOE];
 	pattr = &pnode->nd_attr[(int)ND_ATR_ResourceAvail];
 	presc = find_resc_entry(pattr, prdef);
 

@@ -147,13 +147,12 @@ dup_svr_entlim_leaf(svr_entlim_leaf_t *orig)
 int
 alloc_svrleaf(char *resc_name, svr_entlim_leaf_t **pplf)
 {
-	struct resource_def	*prdef;
+	resource_def	*prdef;
 	svr_entlim_leaf_t	*plf;
 
 	if (resc_name == NULL) {
 		/* use "ncpus" resource_def for the various functions	*/
-		/* as it is a simple integer type as needed here	*/
-		prdef = find_resc_def(svr_resc_def, "ncpus", svr_resc_size);
+		prdef = &svr_resc_def[SVR_RESC_NCPUS];
 	} else {
 		prdef = find_resc_def(svr_resc_def, resc_name, svr_resc_size);
 	}

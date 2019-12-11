@@ -6831,14 +6831,13 @@ calc_cpupercent(job *pjob, u_long oldcput, u_long newcput, time_t sampletime)
 		return;
 
 	ncpus_req = 0;
-	rd = find_resc_def(svr_resc_def, "ncpus", svr_resc_size);
+	rd = &svr_resc_def[SVR_RESC_NCPUS];
 	at_req = &pjob->ji_wattr[(int)JOB_ATR_resource];
 	pres_req = find_resc_entry(at_req, rd);
 	if (pres_req != NULL)
 		ncpus_req = MAX(0, pres_req->rs_value.at_val.at_long);
 
-	rd = find_resc_def(svr_resc_def, "cpupercent", svr_resc_size);
-	assert(rd != NULL);
+	rd = &svr_resc_def[SVR_RESC_CPUPERCENT];
 	at_used = &pjob->ji_wattr[(int)JOB_ATR_resc_used];
 	pres = find_resc_entry(at_used, rd);
 	if (pres == NULL)
@@ -6872,8 +6871,7 @@ calc_cpupercent(job *pjob, u_long oldcput, u_long newcput, time_t sampletime)
 		 *   never allow percent to rise above (*lp)
 		 */
 		long	wallt = -1;
-		rd = find_resc_def(svr_resc_def, "Walltime", svr_resc_size);
-		assert(rd != NULL);
+		rd = &svr_resc_def[SVR_RESC_WALLTIME];
 		preswalltime = find_resc_entry(at_used, rd);
 		if ((preswalltime != NULL) &&
 			((preswalltime->rs_value.at_flags & ATR_VFLAG_SET) != 0)) {
@@ -7113,8 +7111,8 @@ mom_over_limit(job *pjob)
 
 		at = &pjob->ji_wattr[(int)JOB_ATR_resc_used];
 		assert(at->at_type == ATR_TYPE_RESC);
-		rd = find_resc_def(svr_resc_def, "cpupercent", svr_resc_size);
-		assert(rd != NULL);
+		
+		rd = &svr_resc_def[SVR_RESC_CPUPERCENT];
 		prescpup = find_resc_entry(at, rd);
 		if ((prescpup != NULL) &&
 			((prescpup->rs_value.at_flags & ATR_VFLAG_SET) != 0)) {
@@ -7134,17 +7132,14 @@ mom_over_limit(job *pjob)
 					pjob->ji_qs.ji_svrflags |= JOB_SVFLG_cpuperc;
 				}
 			}
-			rd = find_resc_def(svr_resc_def, "walltime",
-				svr_resc_size);
-			assert(rd != NULL);
+
+			rd = &svr_resc_def[SVR_RESC_WALLTIME];
 			preswalltime = find_resc_entry(at, rd);
 			if ((preswalltime != NULL) &&
 				((preswalltime->rs_value.at_flags & ATR_VFLAG_SET) != 0)) {
 				walltime_sum = preswalltime->rs_value.at_val.at_long;
 				if (walltime_sum > average_trialperiod) {
-					rd = find_resc_def(svr_resc_def, "cput",
-						svr_resc_size);
-					assert(rd != NULL);
+					rd = &svr_resc_def[SVR_RESC_CPUT];
 					prescput = find_resc_entry(at, rd);
 					if ((prescput != NULL) &&
 						((prescput->rs_value.at_flags & ATR_VFLAG_SET) != 0)) {
@@ -7176,7 +7171,7 @@ mom_over_limit(job *pjob)
 	/* check vmem useage locally */
 	llvalue = pjob->ji_hosts[pjob->ji_nodeid].hn_nrlimit.rl_vmem << 10;
 	if (llvalue != 0) {
-		rd = find_resc_def(svr_resc_def, "vmem", svr_resc_size);
+		rd = &svr_resc_def[SVR_RESC_VMEM];
 		used = find_resc_entry(uattr, rd);
 		retval = local_getsize(used, &llnum);
 		if (retval == PBSE_NONE) {
@@ -7198,7 +7193,7 @@ mom_over_limit(job *pjob)
 	/* check mem usage locally */
 	llvalue = pjob->ji_hosts[pjob->ji_nodeid].hn_nrlimit.rl_mem << 10;
 	if (llvalue != 0) {
-		rd = find_resc_def(svr_resc_def, "mem", svr_resc_size);
+		rd = &svr_resc_def[SVR_RESC_MEM];
 		used = find_resc_entry(uattr, rd);
 		retval = local_getsize(used, &llnum);
 		if (retval == PBSE_NONE) {
@@ -7661,7 +7656,7 @@ dorestrict_user(void)
 		return;
 
 	if (prsdef == NULL)
-		prsdef = find_resc_def(svr_resc_def, "place", svr_resc_size);
+		prsdef = &svr_resc_def[SVR_RESC_PLACE];
 
 #ifndef WIN32
 	if (mom_sid == -1) {
@@ -9372,8 +9367,8 @@ main(int argc, char *argv[])
 	}
 
 	/* locate cput resource definition, needed for checking chkpt time */
-	rdcput = find_resc_def(svr_resc_def, "cput", svr_resc_size);
-	rdwall = find_resc_def(svr_resc_def, "walltime", svr_resc_size);
+	rdcput = &svr_resc_def[SVR_RESC_CPUT];
+	rdwall = &svr_resc_def[SVR_RESC_WALLTIME];
 	/* locate the checkpoint path */
 	path_checkpoint_from_getenv = getenv("PBS_CHECKPOINT_PATH");
 	path_checkpoint_default = mk_dirs("checkpoint/");
@@ -9686,6 +9681,9 @@ main(int argc, char *argv[])
 		extern int cr_attrdef_tree(int objtype, void *attr_def, int limit);
 
 		cr_attrdef_tree(PBS_DB_JOB, job_attr_def, JOB_ATR_LAST);
+
+		/* now create the resc_def tree */
+		cr_rescdef_tree(svr_resc_def, svr_resc_size);
 	}
 
 	/* record the fact that we are up and running */

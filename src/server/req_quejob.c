@@ -382,9 +382,9 @@ req_quejob(struct batch_request *preq)
 				LOG_INFO, "", "queuejob event: accept req by default");
 	}
 
-	prdefsel = find_resc_def(svr_resc_def, "select", svr_resc_size);
-	prdefplc = find_resc_def(svr_resc_def, "place",  svr_resc_size);
-	prdefnod = find_resc_def(svr_resc_def, "nodes", svr_resc_size);
+	prdefsel = &svr_resc_def[SVR_RESC_SELECT];
+	prdefplc = &svr_resc_def[SVR_RESC_PLACE];
+	prdefnod = &svr_resc_def[SVR_RESC_NODES];
 
 	/*
 	 * if the job id is supplied, the request had better be
@@ -3195,7 +3195,7 @@ validate_place_req_of_job_in_reservation(job *pj)
 	if (pj->ji_myResv == NULL)
 		return 1;
 
-	prsdef = find_resc_def(svr_resc_def, "place", svr_resc_size);
+	prsdef = &svr_resc_def[SVR_RESC_PLACE];
 	jattr = &pj->ji_wattr[(int) JOB_ATR_resource];
 	rattr = &pj->ji_myResv->ri_wattr[(int) RESV_ATR_resource];
 
