@@ -1,0 +1,111 @@
+#!/usr/bin/sh
+
+if [ $# -lt 2 ]
+then
+	echo "Usage is: $0 <end> <port no.> [mom-name]"
+	exit 
+fi
+. /etc/pbs.conf
+
+l=$1
+n=1
+port=$2
+mom_name=`hostname`
+if [ $# -eq 3 ]; then
+	mom_name=$3
+fi
+
+. /etc/pbs.conf
+
+ulimit -n 10000
+ulimit -c unlimited
+
+echo "Moms required to be created are from $n to $l with port starting from $port"
+
+start_time=`date +%s`
+while [ $n -le $l ]
+do
+	#echo "Adding node mom$n"
+	if [ ! -z "$mom_name" ]; then
+		$PBS_EXEC/bin/qmgr -c "c n mom$n mom=$mom_name, port=$port"
+	else
+		$PBS_EXEC/bin/qmgr -c "c n mom$n mom=mom$n, port=$port"
+	fi
+	port=`expr $port + 5`
+	n=`expr $n + 1`
+done
+
+pbs_home=$PBS_HOME
+pbs_newhome=`dirname $pbs_home`
+if [ -z "$pbs_newhome" ]; then 
+	echo "Could not detect new home"
+	exit 1
+fi
+
+if [ ! -d "$pbs_newhome" ]; then 
+	echo "$pbs_newhome is not a directory"
+	exit 1
+fi
+
+if [ "$pbs_newhome" = "/" ]; then
+	echo "pbs_newhome resolves to /. Cannot work"
+	exit 1
+fi
+
+echo Current PBS_HOME=$pbs_home
+echo Homes for new moms=$pbs_newhome
+
+n=1
+
+echo creating mom directories
+while [ $n -le $l ]
+do
+	mkdir $pbs_newhome/mom$n > /dev/null 2>&1
+	cp -r -p $pbs_home/aux $pbs_newhome/mom$n
+	cp -r -p $pbs_home/checkpoint $pbs_newhome/mom$n
+	cp -r -p $pbs_home/mom_logs $pbs_newhome/mom$n
+	cp -r -p $pbs_home/pbs_environment $pbs_newhome/mom$n
+	cp -r -p $pbs_home/mom_priv $pbs_newhome/mom$n
+	cp -r -p $pbs_home/spool $pbs_newhome/mom$n
+	cat /etc/pbs.conf > $pbs_newhome/mom$n/pbs.conf
+	n=`expr $n + 1`
+done
+
+n=1
+port=$2
+echo editing pbs.conf file and mom_priv/config
+while [ $n -le $l ]
+do
+	mom_home=$pbs_newhome/mom$n
+	conf_file=$mom_home/pbs.conf
+	mom_conf=$mom_home/mom_priv/config
+
+	if [ ! -f "$conf_file" ]; then
+		echo "File $conf_file missing"
+		exit 1
+	fi
+
+	if [ ! -f "$mom_conf" ]; then
+		echo "File $mom_conf missing"
+		exit 1
+	fi
+
+	echo "PBS_MOM_SERVICE_PORT=$port" >> $conf_file
+	echo "PBS_MANAGER_SERVICE_PORT=`expr $port + 1`" >> $conf_file
+	echo "PBS_HOME=$mom_home" >> $conf_file
+
+	chown -R root ${mom_home}
+
+	port=`expr $port + 5`
+	n=`expr $n + 1`
+done
+
+n=1
+while [ $n -le $l ]
+do
+	echo starting mom $n
+	PBS_CONF_FILE=$pbs_newhome/mom$n/pbs.conf $PBS_EXEC/sbin/pbs_mom
+	n=`expr $n + 1`
+done
+
+echo "Done"
