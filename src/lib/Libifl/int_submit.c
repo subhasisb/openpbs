@@ -556,6 +556,10 @@ PBSD_queuejob(int connect, char *jobid, char *destin, struct attropl *attrib, ch
 	char  *return_jobid = NULL;
 	int    rc;
 	int    sock;
+	void   *buf;
+	ns(PBS_Header_ref_t) hdr_ref;
+	ns(PBS_QueuejobReq_ref_t) quejob_ref;
+	ns(PBS_Extend_ref_t) ext_ref;
 
 	*commit_done = 0;
 
@@ -574,13 +578,17 @@ PBSD_queuejob(int connect, char *jobid, char *destin, struct attropl *attrib, ch
 		}
 	}
 
-	/* first, set up the body of the Queue Job request */
+	/* get buffer here */
+	buf = get_encode_buffer(connect);
 
-	if ((rc = encode_DIS_ReqHdr(sock, PBS_BATCH_QueueJob, pbs_current_user)) ||
-		(rc = encode_DIS_QueueJob(sock, jobid, destin, attrib)) ||
-		(rc = encode_DIS_ReqExtend(sock, extend))) {
+	/* first, set up the body of the Queue Job request */
+	hdr_ref = encode_DIS_ReqHdr(buf, PBS_BATCH_QueueJob, pbs_current_user);
+	quejob_ref = encode_wire_QueueJob(buf, jobid, destin, attrib);
+	ext_ref = encode_DIS_ReqExtend(buf, extend);
+
+	if (hdr_ef == 0 || quejob_ref == 0 || ext_ref == 0) {
 		if (!rpp) {
-			connection[connect].ch_errtxt = strdup(dis_emsg[rc]);
+			connection[connect].ch_errtxt = strdup("Encoding error");
 			if (connection[connect].ch_errtxt == NULL) {
 				pbs_errno = PBSE_SYSTEM;
 			} else {
@@ -598,7 +606,7 @@ PBSD_queuejob(int connect, char *jobid, char *destin, struct attropl *attrib, ch
 		return (""); /* return something NON-NULL for rpp */
 	}
 
-	if (DIS_tcp_wflush(sock)) {
+	if (DIS_tcp_wflush(sock)) { // get the encoded buffer and flush to transport
 		pbs_errno = PBSE_PROTOCOL;
 		return return_jobid;
 	}

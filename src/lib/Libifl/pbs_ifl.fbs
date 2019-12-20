@@ -1,0 +1,51 @@
+namespace PBS;
+
+enum ProtType:byte { Batch, TaskManager }
+enum batch_op:byte { SET, UNSET, INCR, DECR, EQ, NE, GE, GT, LE, LT, DFLT }
+
+table Header {
+    protType: ProtType = Batch;
+    user: string;
+}
+
+table Attribute {
+    name: string;
+    resc: string;
+    value: string;
+    op: batch_op;
+}
+
+table Extend {
+    extend: string;
+}
+
+table QueuejobReq {
+    jobId: string;
+    destin: string;
+    attrs: [Attribute]; // vector of attributes
+}
+union ReqBody {QueuejobReq}
+
+table QueuejobResp {
+    jobId: string;
+}
+union RespBody {QueuejobResp}
+
+table Req {
+    hdr: Header;
+    body: ReqBody;
+    extend: Extend;
+}
+
+table Resp {
+    code: short;
+    auxCode: short;
+    body: RespBody;
+}
+
+table IFL {
+    req: Req;
+    resp: Resp;
+}
+
+root_type IFL;

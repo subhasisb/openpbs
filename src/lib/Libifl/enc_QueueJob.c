@@ -55,7 +55,6 @@
 
 #include "libpbs.h"
 #include "pbs_error.h"
-#include "dis.h"
 
 /**
  * @brief
@@ -74,20 +73,21 @@
  * @retval      error code      error
  *
  */
-
-int
-encode_DIS_QueueJob(int sock, char *jobid, char *destin, struct attropl *aoplp)
+flatbuffers_ref_t
+encode_DIS_QueueJob(void *buf, char *jobid, char *destin, struct attropl *aoplp)
 {
-	int   rc;
+	flatcc_builder_t *B = (flattcc_builder_t *) buf;
+	ns(Attribute_vec_ref_t) attrs;
 
 	if (jobid == NULL)
 		jobid = "";
 	if (destin == NULL)
 		destin = "";
 
-	if ((rc = diswst(sock, jobid) != 0) ||
-		(rc = diswst(sock, destin) != 0))
-			return rc;
+	flatbuffers_string_ref_t jobid = flatbuffers_string_create_str(B, jobid);
+	flatbuffers_string_ref_t destin = flatbuffers_string_create_str(B, destin);
 
-	return (encode_DIS_attropl(sock, aoplp));
+	attrs =  encode_DIS_attropl(buf, aoplp);
+
+	return (ns(PBS_QueuejobReq_create(B, jobid, destin, attrs, extend)); 
 }

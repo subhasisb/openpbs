@@ -99,45 +99,25 @@
  *
  */
 
-int
-encode_DIS_attropl(int sock, struct attropl *pattropl)
+flatbuffers_ref_t
+encode_DIS_attropl(void *buf, struct attropl *pattropl)
 {
-	unsigned int ct = 0;
-	unsigned int name_len;
 	struct attropl *ps;
-	int rc;
+	flatcc_builder_t *B = (flattcc_builder_t *) buf;
+	flatbuffers_string_ref_t name, resc, value, op;
 
-	/* count how many */
-
-	for (ps = pattropl; ps; ps = ps->next) {
-		++ct;
-	}
-
-	if ((rc = diswui(sock, ct)) != 0)
-		return rc;
+	ns(Attribute_vec_start(B));
 
 	for (ps = pattropl; ps; ps = ps->next) {
-		/* length of three strings */
-		name_len = (int)strlen(ps->name) + (int)strlen(ps->value) + 2;
+		name = flatbuffers_string_create_str(B, ps->name);
 		if (ps->resource)
-			name_len += strlen(ps->resource) + 1;
-
-		if ((rc = diswui(sock, name_len)) != 0)
-			break;
-		if ((rc = diswst(sock, ps->name)) != 0)
-			break;
-		if (ps->resource) { /* has a resource name */
-			if ((rc = diswui(sock, 1)) != 0)
-				break;
-			if ((rc = diswst(sock, ps->resource)) != 0)
-				break;
-		} else {
-			if ((rc = diswui(sock, 0)) != 0) /* no resource name */
-				break;
-		}
-		if ((rc = diswst(sock, ps->value))	||
-			(rc = diswui(sock, (unsigned int)ps->op)))
-				break;
+			resc = flatbuffers_string_create_str(B, ps->resource);
+		value = flatbuffers_string_create_str(B, ps->value);
+		op = flatbuffers_string_create_str(B, ps->op);
+		
+		ns(Attribute_ref_t) attr = ns(Attribute_create(B, name, resc, value, op));
+		ns(Attribute_vec_push(B, attr));
 	}
-	return rc;
+	
+	return ((ns(Attribute_vec_end(B)));
 }
