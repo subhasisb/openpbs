@@ -2947,12 +2947,9 @@ preempt_job(status *policy, int pbs_sd, resource_resv *pjob, server_info *sinfo)
 	} else {
 		/* we're prematurely ending a job.  We need to correct our calendar */
 		if (sinfo->calendar != NULL) {
-			te = find_timed_event(sinfo->calendar->events, pjob->name, TIMED_END_EVENT, 0);
-			if (te != NULL) {
-				if (delete_event(sinfo, te, DE_NO_FLAGS) == 0)
-					schdlog(PBSEVENT_SCHED, PBS_EVENTCLASS_JOB, LOG_INFO, pjob->name, "Failed to delete end event for job.");
-			}
-
+			te = find_timed_event(sinfo->calendar->events, 0, pjob->name, TIMED_END_EVENT, 0);
+			if (te != NULL)
+				delete_event(sinfo, te);
 		}
 	}
 	if (job_preempted == 1) {
@@ -3365,7 +3362,7 @@ find_jobs_to_preempt(status *policy, resource_resv *hjob, server_info *sinfo, in
 		rjobs_count--;
 
 		if (pjob->end_event != NULL)
-			delete_event(nsinfo, pjob->end_event, DE_NO_FLAGS);
+			delete_event(nsinfo, pjob->end_event);
 
 		pjobs[j] = pjob;
 		j++;

@@ -114,6 +114,7 @@
 #include "check.h"
 #include "fifo.h"
 #include "range.h"
+#include "simulate.h"
 
 
 /**
@@ -1470,9 +1471,6 @@ update_resresv_on_end(resource_resv *resresv, char *job_state)
 	char logbuf[MAX_LOG_SIZE];
 	int ret;
 	int i;
-
-	/* used for calendar correction */
-	timed_event *te;
 
 	if (resresv == NULL)
 		return;
