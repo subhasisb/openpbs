@@ -24,9 +24,15 @@ __flatbuffers_build_scalar(flatbuffers_, PBS_ifl_ProtType, PBS_ifl_ProtType_enum
 #define __PBS_ifl_batch_op_call_args , v0
 __flatbuffers_build_scalar(flatbuffers_, PBS_ifl_batch_op, PBS_ifl_batch_op_enum_t)
 
+typedef flatbuffers_union_ref_t PBS_ifl_AuthInfo_union_ref_t;
+typedef flatbuffers_union_vec_ref_t PBS_ifl_AuthInfo_union_vec_ref_t;
+static PBS_ifl_AuthInfo_union_ref_t PBS_ifl_AuthInfo_clone(flatbuffers_builder_t *B, PBS_ifl_AuthInfo_union_t t);
 typedef flatbuffers_union_ref_t PBS_ifl_ReqBody_union_ref_t;
 typedef flatbuffers_union_vec_ref_t PBS_ifl_ReqBody_union_vec_ref_t;
 static PBS_ifl_ReqBody_union_ref_t PBS_ifl_ReqBody_clone(flatbuffers_builder_t *B, PBS_ifl_ReqBody_union_t t);
+typedef flatbuffers_union_ref_t PBS_ifl_RespBody_union_ref_t;
+typedef flatbuffers_union_vec_ref_t PBS_ifl_RespBody_union_vec_ref_t;
+static PBS_ifl_RespBody_union_ref_t PBS_ifl_RespBody_clone(flatbuffers_builder_t *B, PBS_ifl_RespBody_union_t t);
 
 static const flatbuffers_voffset_t __PBS_ifl_Header_required[] = { 0 };
 typedef flatbuffers_ref_t PBS_ifl_Header_ref_t;
@@ -48,10 +54,130 @@ typedef flatbuffers_ref_t PBS_ifl_Qjob_ref_t;
 static PBS_ifl_Qjob_ref_t PBS_ifl_Qjob_clone(flatbuffers_builder_t *B, PBS_ifl_Qjob_table_t t);
 __flatbuffers_build_table(flatbuffers_, PBS_ifl_Qjob, 3)
 
+static const flatbuffers_voffset_t __PBS_ifl_Jobfile_required[] = { 0 };
+typedef flatbuffers_ref_t PBS_ifl_Jobfile_ref_t;
+static PBS_ifl_Jobfile_ref_t PBS_ifl_Jobfile_clone(flatbuffers_builder_t *B, PBS_ifl_Jobfile_table_t t);
+__flatbuffers_build_table(flatbuffers_, PBS_ifl_Jobfile, 5)
+
+static const flatbuffers_voffset_t __PBS_ifl_Jobid_required[] = { 0 };
+typedef flatbuffers_ref_t PBS_ifl_Jobid_ref_t;
+static PBS_ifl_Jobid_ref_t PBS_ifl_Jobid_clone(flatbuffers_builder_t *B, PBS_ifl_Jobid_table_t t);
+__flatbuffers_build_table(flatbuffers_, PBS_ifl_Jobid, 1)
+
+static const flatbuffers_voffset_t __PBS_ifl_Manage_required[] = { 0 };
+typedef flatbuffers_ref_t PBS_ifl_Manage_ref_t;
+static PBS_ifl_Manage_ref_t PBS_ifl_Manage_clone(flatbuffers_builder_t *B, PBS_ifl_Manage_table_t t);
+__flatbuffers_build_table(flatbuffers_, PBS_ifl_Manage, 4)
+
+static const flatbuffers_voffset_t __PBS_ifl_Msg_required[] = { 0 };
+typedef flatbuffers_ref_t PBS_ifl_Msg_ref_t;
+static PBS_ifl_Msg_ref_t PBS_ifl_Msg_clone(flatbuffers_builder_t *B, PBS_ifl_Msg_table_t t);
+__flatbuffers_build_table(flatbuffers_, PBS_ifl_Msg, 3)
+
+static const flatbuffers_voffset_t __PBS_ifl_DmnCmd_required[] = { 0 };
+typedef flatbuffers_ref_t PBS_ifl_DmnCmd_ref_t;
+static PBS_ifl_DmnCmd_ref_t PBS_ifl_DmnCmd_clone(flatbuffers_builder_t *B, PBS_ifl_DmnCmd_table_t t);
+__flatbuffers_build_table(flatbuffers_, PBS_ifl_DmnCmd, 1)
+
+static const flatbuffers_voffset_t __PBS_ifl_Signal_required[] = { 0 };
+typedef flatbuffers_ref_t PBS_ifl_Signal_ref_t;
+static PBS_ifl_Signal_ref_t PBS_ifl_Signal_clone(flatbuffers_builder_t *B, PBS_ifl_Signal_table_t t);
+__flatbuffers_build_table(flatbuffers_, PBS_ifl_Signal, 2)
+
+static const flatbuffers_voffset_t __PBS_ifl_Stat_required[] = { 0 };
+typedef flatbuffers_ref_t PBS_ifl_Stat_ref_t;
+static PBS_ifl_Stat_ref_t PBS_ifl_Stat_clone(flatbuffers_builder_t *B, PBS_ifl_Stat_table_t t);
+__flatbuffers_build_table(flatbuffers_, PBS_ifl_Stat, 2)
+
+static const flatbuffers_voffset_t __PBS_ifl_Spawn_required[] = { 0 };
+typedef flatbuffers_ref_t PBS_ifl_Spawn_ref_t;
+static PBS_ifl_Spawn_ref_t PBS_ifl_Spawn_clone(flatbuffers_builder_t *B, PBS_ifl_Spawn_table_t t);
+__flatbuffers_build_table(flatbuffers_, PBS_ifl_Spawn, 3)
+
+static const flatbuffers_voffset_t __PBS_ifl_AuthMunge_required[] = { 0 };
+typedef flatbuffers_ref_t PBS_ifl_AuthMunge_ref_t;
+static PBS_ifl_AuthMunge_ref_t PBS_ifl_AuthMunge_clone(flatbuffers_builder_t *B, PBS_ifl_AuthMunge_table_t t);
+__flatbuffers_build_table(flatbuffers_, PBS_ifl_AuthMunge, 1)
+
+static const flatbuffers_voffset_t __PBS_ifl_AuthResvPort_required[] = { 0 };
+typedef flatbuffers_ref_t PBS_ifl_AuthResvPort_ref_t;
+static PBS_ifl_AuthResvPort_ref_t PBS_ifl_AuthResvPort_clone(flatbuffers_builder_t *B, PBS_ifl_AuthResvPort_table_t t);
+__flatbuffers_build_table(flatbuffers_, PBS_ifl_AuthResvPort, 1)
+
+static const flatbuffers_voffset_t __PBS_ifl_Auth_required[] = { 0 };
+typedef flatbuffers_ref_t PBS_ifl_Auth_ref_t;
+static PBS_ifl_Auth_ref_t PBS_ifl_Auth_clone(flatbuffers_builder_t *B, PBS_ifl_Auth_table_t t);
+__flatbuffers_build_table(flatbuffers_, PBS_ifl_Auth, 3)
+
+static const flatbuffers_voffset_t __PBS_ifl_Move_required[] = { 0 };
+typedef flatbuffers_ref_t PBS_ifl_Move_ref_t;
+static PBS_ifl_Move_ref_t PBS_ifl_Move_clone(flatbuffers_builder_t *B, PBS_ifl_Move_table_t t);
+__flatbuffers_build_table(flatbuffers_, PBS_ifl_Move, 2)
+
+static const flatbuffers_voffset_t __PBS_ifl_Run_required[] = { 0 };
+typedef flatbuffers_ref_t PBS_ifl_Run_ref_t;
+static PBS_ifl_Run_ref_t PBS_ifl_Run_clone(flatbuffers_builder_t *B, PBS_ifl_Run_table_t t);
+__flatbuffers_build_table(flatbuffers_, PBS_ifl_Run, 3)
+
+static const flatbuffers_voffset_t __PBS_ifl_SchedDefRep_required[] = { 0 };
+typedef flatbuffers_ref_t PBS_ifl_SchedDefRep_ref_t;
+static PBS_ifl_SchedDefRep_ref_t PBS_ifl_SchedDefRep_clone(flatbuffers_builder_t *B, PBS_ifl_SchedDefRep_table_t t);
+__flatbuffers_build_table(flatbuffers_, PBS_ifl_SchedDefRep, 4)
+
+static const flatbuffers_voffset_t __PBS_ifl_Select_required[] = { 0 };
+typedef flatbuffers_ref_t PBS_ifl_Select_ref_t;
+static PBS_ifl_Select_ref_t PBS_ifl_Select_clone(flatbuffers_builder_t *B, PBS_ifl_Select_table_t t);
+__flatbuffers_build_table(flatbuffers_, PBS_ifl_Select, 2)
+
+static const flatbuffers_voffset_t __PBS_ifl_Track_required[] = { 0 };
+typedef flatbuffers_ref_t PBS_ifl_Track_ref_t;
+static PBS_ifl_Track_ref_t PBS_ifl_Track_clone(flatbuffers_builder_t *B, PBS_ifl_Track_table_t t);
+__flatbuffers_build_table(flatbuffers_, PBS_ifl_Track, 4)
+
+static const flatbuffers_voffset_t __PBS_ifl_Register_required[] = { 0 };
+typedef flatbuffers_ref_t PBS_ifl_Register_ref_t;
+static PBS_ifl_Register_ref_t PBS_ifl_Register_clone(flatbuffers_builder_t *B, PBS_ifl_Register_table_t t);
+__flatbuffers_build_table(flatbuffers_, PBS_ifl_Register, 7)
+
+static const flatbuffers_voffset_t __PBS_ifl_CopyHook_required[] = { 0 };
+typedef flatbuffers_ref_t PBS_ifl_CopyHook_ref_t;
+static PBS_ifl_CopyHook_ref_t PBS_ifl_CopyHook_clone(flatbuffers_builder_t *B, PBS_ifl_CopyHook_table_t t);
+__flatbuffers_build_table(flatbuffers_, PBS_ifl_CopyHook, 4)
+
+static const flatbuffers_voffset_t __PBS_ifl_FilePair_required[] = { 0 };
+typedef flatbuffers_ref_t PBS_ifl_FilePair_ref_t;
+static PBS_ifl_FilePair_ref_t PBS_ifl_FilePair_clone(flatbuffers_builder_t *B, PBS_ifl_FilePair_table_t t);
+__flatbuffers_build_table(flatbuffers_, PBS_ifl_FilePair, 3)
+
+static const flatbuffers_voffset_t __PBS_ifl_CopyFile_required[] = { 0 };
+typedef flatbuffers_ref_t PBS_ifl_CopyFile_ref_t;
+static PBS_ifl_CopyFile_ref_t PBS_ifl_CopyFile_clone(flatbuffers_builder_t *B, PBS_ifl_CopyFile_table_t t);
+__flatbuffers_build_table(flatbuffers_, PBS_ifl_CopyFile, 6)
+
 static const flatbuffers_voffset_t __PBS_ifl_Req_required[] = { 0 };
 typedef flatbuffers_ref_t PBS_ifl_Req_ref_t;
 static PBS_ifl_Req_ref_t PBS_ifl_Req_clone(flatbuffers_builder_t *B, PBS_ifl_Req_table_t t);
 __flatbuffers_build_table(flatbuffers_, PBS_ifl_Req, 4)
+
+static const flatbuffers_voffset_t __PBS_ifl_StatResp_required[] = { 0 };
+typedef flatbuffers_ref_t PBS_ifl_StatResp_ref_t;
+static PBS_ifl_StatResp_ref_t PBS_ifl_StatResp_clone(flatbuffers_builder_t *B, PBS_ifl_StatResp_table_t t);
+__flatbuffers_build_table(flatbuffers_, PBS_ifl_StatResp, 3)
+
+static const flatbuffers_voffset_t __PBS_ifl_SelectRespBody_required[] = { 0 };
+typedef flatbuffers_ref_t PBS_ifl_SelectRespBody_ref_t;
+static PBS_ifl_SelectRespBody_ref_t PBS_ifl_SelectRespBody_clone(flatbuffers_builder_t *B, PBS_ifl_SelectRespBody_table_t t);
+__flatbuffers_build_table(flatbuffers_, PBS_ifl_SelectRespBody, 1)
+
+static const flatbuffers_voffset_t __PBS_ifl_StatRespBody_required[] = { 0 };
+typedef flatbuffers_ref_t PBS_ifl_StatRespBody_ref_t;
+static PBS_ifl_StatRespBody_ref_t PBS_ifl_StatRespBody_clone(flatbuffers_builder_t *B, PBS_ifl_StatRespBody_table_t t);
+__flatbuffers_build_table(flatbuffers_, PBS_ifl_StatRespBody, 1)
+
+static const flatbuffers_voffset_t __PBS_ifl_Resp_required[] = { 0 };
+typedef flatbuffers_ref_t PBS_ifl_Resp_ref_t;
+static PBS_ifl_Resp_ref_t PBS_ifl_Resp_clone(flatbuffers_builder_t *B, PBS_ifl_Resp_table_t t);
+__flatbuffers_build_table(flatbuffers_, PBS_ifl_Resp, 5)
 
 #define __PBS_ifl_Header_formal_args , PBS_ifl_ProtType_enum_t v0, int16_t v1, flatbuffers_string_ref_t v2
 #define __PBS_ifl_Header_call_args , v0, v1, v2
@@ -73,22 +199,235 @@ __flatbuffers_build_table_prolog(flatbuffers_, PBS_ifl_Extend, PBS_ifl_Extend_fi
 static inline PBS_ifl_Qjob_ref_t PBS_ifl_Qjob_create(flatbuffers_builder_t *B __PBS_ifl_Qjob_formal_args);
 __flatbuffers_build_table_prolog(flatbuffers_, PBS_ifl_Qjob, PBS_ifl_Qjob_file_identifier, PBS_ifl_Qjob_type_identifier)
 
+#define __PBS_ifl_Jobfile_formal_args ,\
+  int64_t v0, int16_t v1, int64_t v2, flatbuffers_string_ref_t v3, flatbuffers_string_ref_t v4
+#define __PBS_ifl_Jobfile_call_args ,\
+  v0, v1, v2, v3, v4
+static inline PBS_ifl_Jobfile_ref_t PBS_ifl_Jobfile_create(flatbuffers_builder_t *B __PBS_ifl_Jobfile_formal_args);
+__flatbuffers_build_table_prolog(flatbuffers_, PBS_ifl_Jobfile, PBS_ifl_Jobfile_file_identifier, PBS_ifl_Jobfile_type_identifier)
+
+#define __PBS_ifl_Jobid_formal_args , flatbuffers_string_ref_t v0
+#define __PBS_ifl_Jobid_call_args , v0
+static inline PBS_ifl_Jobid_ref_t PBS_ifl_Jobid_create(flatbuffers_builder_t *B __PBS_ifl_Jobid_formal_args);
+__flatbuffers_build_table_prolog(flatbuffers_, PBS_ifl_Jobid, PBS_ifl_Jobid_file_identifier, PBS_ifl_Jobid_type_identifier)
+
+#define __PBS_ifl_Manage_formal_args , int16_t v0, int16_t v1, flatbuffers_string_ref_t v2, PBS_ifl_Attribute_vec_ref_t v3
+#define __PBS_ifl_Manage_call_args , v0, v1, v2, v3
+static inline PBS_ifl_Manage_ref_t PBS_ifl_Manage_create(flatbuffers_builder_t *B __PBS_ifl_Manage_formal_args);
+__flatbuffers_build_table_prolog(flatbuffers_, PBS_ifl_Manage, PBS_ifl_Manage_file_identifier, PBS_ifl_Manage_type_identifier)
+
+#define __PBS_ifl_Msg_formal_args , int16_t v0, flatbuffers_string_ref_t v1, flatbuffers_string_ref_t v2
+#define __PBS_ifl_Msg_call_args , v0, v1, v2
+static inline PBS_ifl_Msg_ref_t PBS_ifl_Msg_create(flatbuffers_builder_t *B __PBS_ifl_Msg_formal_args);
+__flatbuffers_build_table_prolog(flatbuffers_, PBS_ifl_Msg, PBS_ifl_Msg_file_identifier, PBS_ifl_Msg_type_identifier)
+
+#define __PBS_ifl_DmnCmd_formal_args , int16_t v0
+#define __PBS_ifl_DmnCmd_call_args , v0
+static inline PBS_ifl_DmnCmd_ref_t PBS_ifl_DmnCmd_create(flatbuffers_builder_t *B __PBS_ifl_DmnCmd_formal_args);
+__flatbuffers_build_table_prolog(flatbuffers_, PBS_ifl_DmnCmd, PBS_ifl_DmnCmd_file_identifier, PBS_ifl_DmnCmd_type_identifier)
+
+#define __PBS_ifl_Signal_formal_args , flatbuffers_string_ref_t v0, flatbuffers_string_ref_t v1
+#define __PBS_ifl_Signal_call_args , v0, v1
+static inline PBS_ifl_Signal_ref_t PBS_ifl_Signal_create(flatbuffers_builder_t *B __PBS_ifl_Signal_formal_args);
+__flatbuffers_build_table_prolog(flatbuffers_, PBS_ifl_Signal, PBS_ifl_Signal_file_identifier, PBS_ifl_Signal_type_identifier)
+
+#define __PBS_ifl_Stat_formal_args , flatbuffers_string_ref_t v0, PBS_ifl_Attribute_vec_ref_t v1
+#define __PBS_ifl_Stat_call_args , v0, v1
+static inline PBS_ifl_Stat_ref_t PBS_ifl_Stat_create(flatbuffers_builder_t *B __PBS_ifl_Stat_formal_args);
+__flatbuffers_build_table_prolog(flatbuffers_, PBS_ifl_Stat, PBS_ifl_Stat_file_identifier, PBS_ifl_Stat_type_identifier)
+
+#define __PBS_ifl_Spawn_formal_args , flatbuffers_string_ref_t v0, flatbuffers_string_vec_ref_t v1, flatbuffers_string_vec_ref_t v2
+#define __PBS_ifl_Spawn_call_args , v0, v1, v2
+static inline PBS_ifl_Spawn_ref_t PBS_ifl_Spawn_create(flatbuffers_builder_t *B __PBS_ifl_Spawn_formal_args);
+__flatbuffers_build_table_prolog(flatbuffers_, PBS_ifl_Spawn, PBS_ifl_Spawn_file_identifier, PBS_ifl_Spawn_type_identifier)
+
+#define __PBS_ifl_AuthMunge_formal_args , flatbuffers_string_ref_t v0
+#define __PBS_ifl_AuthMunge_call_args , v0
+static inline PBS_ifl_AuthMunge_ref_t PBS_ifl_AuthMunge_create(flatbuffers_builder_t *B __PBS_ifl_AuthMunge_formal_args);
+__flatbuffers_build_table_prolog(flatbuffers_, PBS_ifl_AuthMunge, PBS_ifl_AuthMunge_file_identifier, PBS_ifl_AuthMunge_type_identifier)
+
+#define __PBS_ifl_AuthResvPort_formal_args , int16_t v0
+#define __PBS_ifl_AuthResvPort_call_args , v0
+static inline PBS_ifl_AuthResvPort_ref_t PBS_ifl_AuthResvPort_create(flatbuffers_builder_t *B __PBS_ifl_AuthResvPort_formal_args);
+__flatbuffers_build_table_prolog(flatbuffers_, PBS_ifl_AuthResvPort, PBS_ifl_AuthResvPort_file_identifier, PBS_ifl_AuthResvPort_type_identifier)
+
+#define __PBS_ifl_Auth_formal_args , int16_t v0, PBS_ifl_AuthInfo_union_ref_t v2
+#define __PBS_ifl_Auth_call_args , v0, v2
+static inline PBS_ifl_Auth_ref_t PBS_ifl_Auth_create(flatbuffers_builder_t *B __PBS_ifl_Auth_formal_args);
+__flatbuffers_build_table_prolog(flatbuffers_, PBS_ifl_Auth, PBS_ifl_Auth_file_identifier, PBS_ifl_Auth_type_identifier)
+
+#define __PBS_ifl_Move_formal_args , flatbuffers_string_ref_t v0, flatbuffers_string_ref_t v1
+#define __PBS_ifl_Move_call_args , v0, v1
+static inline PBS_ifl_Move_ref_t PBS_ifl_Move_create(flatbuffers_builder_t *B __PBS_ifl_Move_formal_args);
+__flatbuffers_build_table_prolog(flatbuffers_, PBS_ifl_Move, PBS_ifl_Move_file_identifier, PBS_ifl_Move_type_identifier)
+
+#define __PBS_ifl_Run_formal_args , flatbuffers_string_ref_t v0, flatbuffers_string_ref_t v1, int64_t v2
+#define __PBS_ifl_Run_call_args , v0, v1, v2
+static inline PBS_ifl_Run_ref_t PBS_ifl_Run_create(flatbuffers_builder_t *B __PBS_ifl_Run_formal_args);
+__flatbuffers_build_table_prolog(flatbuffers_, PBS_ifl_Run, PBS_ifl_Run_file_identifier, PBS_ifl_Run_type_identifier)
+
+#define __PBS_ifl_SchedDefRep_formal_args , int16_t v0, flatbuffers_string_ref_t v1, int16_t v2, flatbuffers_string_ref_t v3
+#define __PBS_ifl_SchedDefRep_call_args , v0, v1, v2, v3
+static inline PBS_ifl_SchedDefRep_ref_t PBS_ifl_SchedDefRep_create(flatbuffers_builder_t *B __PBS_ifl_SchedDefRep_formal_args);
+__flatbuffers_build_table_prolog(flatbuffers_, PBS_ifl_SchedDefRep, PBS_ifl_SchedDefRep_file_identifier, PBS_ifl_SchedDefRep_type_identifier)
+
+#define __PBS_ifl_Select_formal_args , PBS_ifl_Attribute_vec_ref_t v0, PBS_ifl_Attribute_vec_ref_t v1
+#define __PBS_ifl_Select_call_args , v0, v1
+static inline PBS_ifl_Select_ref_t PBS_ifl_Select_create(flatbuffers_builder_t *B __PBS_ifl_Select_formal_args);
+__flatbuffers_build_table_prolog(flatbuffers_, PBS_ifl_Select, PBS_ifl_Select_file_identifier, PBS_ifl_Select_type_identifier)
+
+#define __PBS_ifl_Track_formal_args , int16_t v0, flatbuffers_string_ref_t v1, flatbuffers_string_ref_t v2, int8_t v3
+#define __PBS_ifl_Track_call_args , v0, v1, v2, v3
+static inline PBS_ifl_Track_ref_t PBS_ifl_Track_create(flatbuffers_builder_t *B __PBS_ifl_Track_formal_args);
+__flatbuffers_build_table_prolog(flatbuffers_, PBS_ifl_Track, PBS_ifl_Track_file_identifier, PBS_ifl_Track_type_identifier)
+
+#define __PBS_ifl_Register_formal_args ,\
+  flatbuffers_string_ref_t v0, flatbuffers_string_ref_t v1, flatbuffers_string_ref_t v2, flatbuffers_string_ref_t v3,\
+  int16_t v4, int16_t v5, int64_t v6
+#define __PBS_ifl_Register_call_args ,\
+  v0, v1, v2, v3,\
+  v4, v5, v6
+static inline PBS_ifl_Register_ref_t PBS_ifl_Register_create(flatbuffers_builder_t *B __PBS_ifl_Register_formal_args);
+__flatbuffers_build_table_prolog(flatbuffers_, PBS_ifl_Register, PBS_ifl_Register_file_identifier, PBS_ifl_Register_type_identifier)
+
+#define __PBS_ifl_CopyHook_formal_args , int16_t v0, int64_t v1, flatbuffers_string_ref_t v2, flatbuffers_string_ref_t v3
+#define __PBS_ifl_CopyHook_call_args , v0, v1, v2, v3
+static inline PBS_ifl_CopyHook_ref_t PBS_ifl_CopyHook_create(flatbuffers_builder_t *B __PBS_ifl_CopyHook_formal_args);
+__flatbuffers_build_table_prolog(flatbuffers_, PBS_ifl_CopyHook, PBS_ifl_CopyHook_file_identifier, PBS_ifl_CopyHook_type_identifier)
+
+#define __PBS_ifl_FilePair_formal_args , flatbuffers_string_ref_t v0, flatbuffers_string_ref_t v1, int16_t v2
+#define __PBS_ifl_FilePair_call_args , v0, v1, v2
+static inline PBS_ifl_FilePair_ref_t PBS_ifl_FilePair_create(flatbuffers_builder_t *B __PBS_ifl_FilePair_formal_args);
+__flatbuffers_build_table_prolog(flatbuffers_, PBS_ifl_FilePair, PBS_ifl_FilePair_file_identifier, PBS_ifl_FilePair_type_identifier)
+
+#define __PBS_ifl_CopyFile_formal_args ,\
+  flatbuffers_string_ref_t v0, flatbuffers_string_ref_t v1, flatbuffers_string_ref_t v2, flatbuffers_string_ref_t v3, int16_t v4, PBS_ifl_FilePair_vec_ref_t v5
+#define __PBS_ifl_CopyFile_call_args ,\
+  v0, v1, v2, v3, v4, v5
+static inline PBS_ifl_CopyFile_ref_t PBS_ifl_CopyFile_create(flatbuffers_builder_t *B __PBS_ifl_CopyFile_formal_args);
+__flatbuffers_build_table_prolog(flatbuffers_, PBS_ifl_CopyFile, PBS_ifl_CopyFile_file_identifier, PBS_ifl_CopyFile_type_identifier)
+
 #define __PBS_ifl_Req_formal_args , PBS_ifl_Header_ref_t v0, PBS_ifl_ReqBody_union_ref_t v2, PBS_ifl_Extend_ref_t v3
 #define __PBS_ifl_Req_call_args , v0, v2, v3
 static inline PBS_ifl_Req_ref_t PBS_ifl_Req_create(flatbuffers_builder_t *B __PBS_ifl_Req_formal_args);
 __flatbuffers_build_table_prolog(flatbuffers_, PBS_ifl_Req, PBS_ifl_Req_file_identifier, PBS_ifl_Req_type_identifier)
 
+#define __PBS_ifl_StatResp_formal_args , int16_t v0, flatbuffers_string_ref_t v1, PBS_ifl_Attribute_vec_ref_t v2
+#define __PBS_ifl_StatResp_call_args , v0, v1, v2
+static inline PBS_ifl_StatResp_ref_t PBS_ifl_StatResp_create(flatbuffers_builder_t *B __PBS_ifl_StatResp_formal_args);
+__flatbuffers_build_table_prolog(flatbuffers_, PBS_ifl_StatResp, PBS_ifl_StatResp_file_identifier, PBS_ifl_StatResp_type_identifier)
+
+#define __PBS_ifl_SelectRespBody_formal_args , flatbuffers_string_vec_ref_t v0
+#define __PBS_ifl_SelectRespBody_call_args , v0
+static inline PBS_ifl_SelectRespBody_ref_t PBS_ifl_SelectRespBody_create(flatbuffers_builder_t *B __PBS_ifl_SelectRespBody_formal_args);
+__flatbuffers_build_table_prolog(flatbuffers_, PBS_ifl_SelectRespBody, PBS_ifl_SelectRespBody_file_identifier, PBS_ifl_SelectRespBody_type_identifier)
+
+#define __PBS_ifl_StatRespBody_formal_args , PBS_ifl_StatResp_vec_ref_t v0
+#define __PBS_ifl_StatRespBody_call_args , v0
+static inline PBS_ifl_StatRespBody_ref_t PBS_ifl_StatRespBody_create(flatbuffers_builder_t *B __PBS_ifl_StatRespBody_formal_args);
+__flatbuffers_build_table_prolog(flatbuffers_, PBS_ifl_StatRespBody, PBS_ifl_StatRespBody_file_identifier, PBS_ifl_StatRespBody_type_identifier)
+
+#define __PBS_ifl_Resp_formal_args , int16_t v0, int16_t v1, int16_t v2, PBS_ifl_RespBody_union_ref_t v4
+#define __PBS_ifl_Resp_call_args , v0, v1, v2, v4
+static inline PBS_ifl_Resp_ref_t PBS_ifl_Resp_create(flatbuffers_builder_t *B __PBS_ifl_Resp_formal_args);
+__flatbuffers_build_table_prolog(flatbuffers_, PBS_ifl_Resp, PBS_ifl_Resp_file_identifier, PBS_ifl_Resp_type_identifier)
+
+static inline PBS_ifl_AuthInfo_union_ref_t PBS_ifl_AuthInfo_as_NONE()
+{ PBS_ifl_AuthInfo_union_ref_t uref; uref.type = PBS_ifl_AuthInfo_NONE; uref.value = 0; return uref; }
+static inline PBS_ifl_AuthInfo_union_ref_t PBS_ifl_AuthInfo_as_AuthMunge(PBS_ifl_AuthMunge_ref_t ref)
+{ PBS_ifl_AuthInfo_union_ref_t uref; uref.type = PBS_ifl_AuthInfo_AuthMunge; uref.value = ref; return uref; }
+__flatbuffers_build_union_vector(flatbuffers_, PBS_ifl_AuthInfo)
+
+static PBS_ifl_AuthInfo_union_ref_t PBS_ifl_AuthInfo_clone(flatbuffers_builder_t *B, PBS_ifl_AuthInfo_union_t u)
+{
+    switch (u.type) {
+    case 1: return PBS_ifl_AuthInfo_as_AuthMunge(PBS_ifl_AuthMunge_clone(B, (PBS_ifl_AuthMunge_table_t)u.value));
+    default: return PBS_ifl_AuthInfo_as_NONE();
+    }
+}
+
 static inline PBS_ifl_ReqBody_union_ref_t PBS_ifl_ReqBody_as_NONE()
 { PBS_ifl_ReqBody_union_ref_t uref; uref.type = PBS_ifl_ReqBody_NONE; uref.value = 0; return uref; }
 static inline PBS_ifl_ReqBody_union_ref_t PBS_ifl_ReqBody_as_Qjob(PBS_ifl_Qjob_ref_t ref)
 { PBS_ifl_ReqBody_union_ref_t uref; uref.type = PBS_ifl_ReqBody_Qjob; uref.value = ref; return uref; }
+static inline PBS_ifl_ReqBody_union_ref_t PBS_ifl_ReqBody_as_Jobfile(PBS_ifl_Jobfile_ref_t ref)
+{ PBS_ifl_ReqBody_union_ref_t uref; uref.type = PBS_ifl_ReqBody_Jobfile; uref.value = ref; return uref; }
+static inline PBS_ifl_ReqBody_union_ref_t PBS_ifl_ReqBody_as_Jobid(PBS_ifl_Jobid_ref_t ref)
+{ PBS_ifl_ReqBody_union_ref_t uref; uref.type = PBS_ifl_ReqBody_Jobid; uref.value = ref; return uref; }
+static inline PBS_ifl_ReqBody_union_ref_t PBS_ifl_ReqBody_as_Manage(PBS_ifl_Manage_ref_t ref)
+{ PBS_ifl_ReqBody_union_ref_t uref; uref.type = PBS_ifl_ReqBody_Manage; uref.value = ref; return uref; }
+static inline PBS_ifl_ReqBody_union_ref_t PBS_ifl_ReqBody_as_Msg(PBS_ifl_Msg_ref_t ref)
+{ PBS_ifl_ReqBody_union_ref_t uref; uref.type = PBS_ifl_ReqBody_Msg; uref.value = ref; return uref; }
+static inline PBS_ifl_ReqBody_union_ref_t PBS_ifl_ReqBody_as_DmnCmd(PBS_ifl_DmnCmd_ref_t ref)
+{ PBS_ifl_ReqBody_union_ref_t uref; uref.type = PBS_ifl_ReqBody_DmnCmd; uref.value = ref; return uref; }
+static inline PBS_ifl_ReqBody_union_ref_t PBS_ifl_ReqBody_as_Signal(PBS_ifl_Signal_ref_t ref)
+{ PBS_ifl_ReqBody_union_ref_t uref; uref.type = PBS_ifl_ReqBody_Signal; uref.value = ref; return uref; }
+static inline PBS_ifl_ReqBody_union_ref_t PBS_ifl_ReqBody_as_Stat(PBS_ifl_Stat_ref_t ref)
+{ PBS_ifl_ReqBody_union_ref_t uref; uref.type = PBS_ifl_ReqBody_Stat; uref.value = ref; return uref; }
+static inline PBS_ifl_ReqBody_union_ref_t PBS_ifl_ReqBody_as_Spawn(PBS_ifl_Spawn_ref_t ref)
+{ PBS_ifl_ReqBody_union_ref_t uref; uref.type = PBS_ifl_ReqBody_Spawn; uref.value = ref; return uref; }
+static inline PBS_ifl_ReqBody_union_ref_t PBS_ifl_ReqBody_as_Auth(PBS_ifl_Auth_ref_t ref)
+{ PBS_ifl_ReqBody_union_ref_t uref; uref.type = PBS_ifl_ReqBody_Auth; uref.value = ref; return uref; }
+static inline PBS_ifl_ReqBody_union_ref_t PBS_ifl_ReqBody_as_Move(PBS_ifl_Move_ref_t ref)
+{ PBS_ifl_ReqBody_union_ref_t uref; uref.type = PBS_ifl_ReqBody_Move; uref.value = ref; return uref; }
+static inline PBS_ifl_ReqBody_union_ref_t PBS_ifl_ReqBody_as_Run(PBS_ifl_Run_ref_t ref)
+{ PBS_ifl_ReqBody_union_ref_t uref; uref.type = PBS_ifl_ReqBody_Run; uref.value = ref; return uref; }
+static inline PBS_ifl_ReqBody_union_ref_t PBS_ifl_ReqBody_as_SchedDefRep(PBS_ifl_SchedDefRep_ref_t ref)
+{ PBS_ifl_ReqBody_union_ref_t uref; uref.type = PBS_ifl_ReqBody_SchedDefRep; uref.value = ref; return uref; }
+static inline PBS_ifl_ReqBody_union_ref_t PBS_ifl_ReqBody_as_Select(PBS_ifl_Select_ref_t ref)
+{ PBS_ifl_ReqBody_union_ref_t uref; uref.type = PBS_ifl_ReqBody_Select; uref.value = ref; return uref; }
+static inline PBS_ifl_ReqBody_union_ref_t PBS_ifl_ReqBody_as_Track(PBS_ifl_Track_ref_t ref)
+{ PBS_ifl_ReqBody_union_ref_t uref; uref.type = PBS_ifl_ReqBody_Track; uref.value = ref; return uref; }
+static inline PBS_ifl_ReqBody_union_ref_t PBS_ifl_ReqBody_as_Register(PBS_ifl_Register_ref_t ref)
+{ PBS_ifl_ReqBody_union_ref_t uref; uref.type = PBS_ifl_ReqBody_Register; uref.value = ref; return uref; }
+static inline PBS_ifl_ReqBody_union_ref_t PBS_ifl_ReqBody_as_CopyHook(PBS_ifl_CopyHook_ref_t ref)
+{ PBS_ifl_ReqBody_union_ref_t uref; uref.type = PBS_ifl_ReqBody_CopyHook; uref.value = ref; return uref; }
+static inline PBS_ifl_ReqBody_union_ref_t PBS_ifl_ReqBody_as_CopyFile(PBS_ifl_CopyFile_ref_t ref)
+{ PBS_ifl_ReqBody_union_ref_t uref; uref.type = PBS_ifl_ReqBody_CopyFile; uref.value = ref; return uref; }
 __flatbuffers_build_union_vector(flatbuffers_, PBS_ifl_ReqBody)
 
 static PBS_ifl_ReqBody_union_ref_t PBS_ifl_ReqBody_clone(flatbuffers_builder_t *B, PBS_ifl_ReqBody_union_t u)
 {
     switch (u.type) {
     case 1: return PBS_ifl_ReqBody_as_Qjob(PBS_ifl_Qjob_clone(B, (PBS_ifl_Qjob_table_t)u.value));
+    case 2: return PBS_ifl_ReqBody_as_Jobfile(PBS_ifl_Jobfile_clone(B, (PBS_ifl_Jobfile_table_t)u.value));
+    case 3: return PBS_ifl_ReqBody_as_Jobid(PBS_ifl_Jobid_clone(B, (PBS_ifl_Jobid_table_t)u.value));
+    case 4: return PBS_ifl_ReqBody_as_Manage(PBS_ifl_Manage_clone(B, (PBS_ifl_Manage_table_t)u.value));
+    case 5: return PBS_ifl_ReqBody_as_Msg(PBS_ifl_Msg_clone(B, (PBS_ifl_Msg_table_t)u.value));
+    case 6: return PBS_ifl_ReqBody_as_DmnCmd(PBS_ifl_DmnCmd_clone(B, (PBS_ifl_DmnCmd_table_t)u.value));
+    case 7: return PBS_ifl_ReqBody_as_Signal(PBS_ifl_Signal_clone(B, (PBS_ifl_Signal_table_t)u.value));
+    case 8: return PBS_ifl_ReqBody_as_Stat(PBS_ifl_Stat_clone(B, (PBS_ifl_Stat_table_t)u.value));
+    case 9: return PBS_ifl_ReqBody_as_Spawn(PBS_ifl_Spawn_clone(B, (PBS_ifl_Spawn_table_t)u.value));
+    case 10: return PBS_ifl_ReqBody_as_Auth(PBS_ifl_Auth_clone(B, (PBS_ifl_Auth_table_t)u.value));
+    case 11: return PBS_ifl_ReqBody_as_Move(PBS_ifl_Move_clone(B, (PBS_ifl_Move_table_t)u.value));
+    case 12: return PBS_ifl_ReqBody_as_Run(PBS_ifl_Run_clone(B, (PBS_ifl_Run_table_t)u.value));
+    case 13: return PBS_ifl_ReqBody_as_SchedDefRep(PBS_ifl_SchedDefRep_clone(B, (PBS_ifl_SchedDefRep_table_t)u.value));
+    case 14: return PBS_ifl_ReqBody_as_Select(PBS_ifl_Select_clone(B, (PBS_ifl_Select_table_t)u.value));
+    case 15: return PBS_ifl_ReqBody_as_Track(PBS_ifl_Track_clone(B, (PBS_ifl_Track_table_t)u.value));
+    case 16: return PBS_ifl_ReqBody_as_Register(PBS_ifl_Register_clone(B, (PBS_ifl_Register_table_t)u.value));
+    case 17: return PBS_ifl_ReqBody_as_CopyHook(PBS_ifl_CopyHook_clone(B, (PBS_ifl_CopyHook_table_t)u.value));
+    case 18: return PBS_ifl_ReqBody_as_CopyFile(PBS_ifl_CopyFile_clone(B, (PBS_ifl_CopyFile_table_t)u.value));
     default: return PBS_ifl_ReqBody_as_NONE();
+    }
+}
+
+static inline PBS_ifl_RespBody_union_ref_t PBS_ifl_RespBody_as_NONE()
+{ PBS_ifl_RespBody_union_ref_t uref; uref.type = PBS_ifl_RespBody_NONE; uref.value = 0; return uref; }
+static inline PBS_ifl_RespBody_union_ref_t PBS_ifl_RespBody_as_text(flatbuffers_string_ref_t ref)
+{ PBS_ifl_RespBody_union_ref_t uref; uref.type = PBS_ifl_RespBody_text; uref.value = ref; return uref; }
+static inline PBS_ifl_RespBody_union_ref_t PBS_ifl_RespBody_as_selects(PBS_ifl_SelectRespBody_ref_t ref)
+{ PBS_ifl_RespBody_union_ref_t uref; uref.type = PBS_ifl_RespBody_selects; uref.value = ref; return uref; }
+static inline PBS_ifl_RespBody_union_ref_t PBS_ifl_RespBody_as_stats(PBS_ifl_StatRespBody_ref_t ref)
+{ PBS_ifl_RespBody_union_ref_t uref; uref.type = PBS_ifl_RespBody_stats; uref.value = ref; return uref; }
+__flatbuffers_build_union_vector(flatbuffers_, PBS_ifl_RespBody)
+
+static PBS_ifl_RespBody_union_ref_t PBS_ifl_RespBody_clone(flatbuffers_builder_t *B, PBS_ifl_RespBody_union_t u)
+{
+    switch (u.type) {
+    case 1: return PBS_ifl_RespBody_as_text(flatbuffers_string_clone(B, u.value));
+    case 2: return PBS_ifl_RespBody_as_selects(PBS_ifl_SelectRespBody_clone(B, (PBS_ifl_SelectRespBody_table_t)u.value));
+    case 3: return PBS_ifl_RespBody_as_stats(PBS_ifl_StatRespBody_clone(B, (PBS_ifl_StatRespBody_table_t)u.value));
+    default: return PBS_ifl_RespBody_as_NONE();
     }
 }
 
@@ -197,9 +536,568 @@ static PBS_ifl_Qjob_ref_t PBS_ifl_Qjob_clone(flatbuffers_builder_t *B, PBS_ifl_Q
     __flatbuffers_memoize_end(B, t, PBS_ifl_Qjob_end(B));
 }
 
+__flatbuffers_build_scalar_field(0, flatbuffers_, PBS_ifl_Jobfile_seq, flatbuffers_int64, int64_t, 8, 8, INT64_C(0), PBS_ifl_Jobfile)
+__flatbuffers_build_scalar_field(1, flatbuffers_, PBS_ifl_Jobfile_type, flatbuffers_int16, int16_t, 2, 2, INT16_C(0), PBS_ifl_Jobfile)
+__flatbuffers_build_scalar_field(2, flatbuffers_, PBS_ifl_Jobfile_size, flatbuffers_int64, int64_t, 8, 8, INT64_C(0), PBS_ifl_Jobfile)
+__flatbuffers_build_string_field(3, flatbuffers_, PBS_ifl_Jobfile_jobId, PBS_ifl_Jobfile)
+__flatbuffers_build_string_field(4, flatbuffers_, PBS_ifl_Jobfile_data, PBS_ifl_Jobfile)
+
+static inline PBS_ifl_Jobfile_ref_t PBS_ifl_Jobfile_create(flatbuffers_builder_t *B __PBS_ifl_Jobfile_formal_args)
+{
+    if (PBS_ifl_Jobfile_start(B)
+        || PBS_ifl_Jobfile_seq_add(B, v0)
+        || PBS_ifl_Jobfile_size_add(B, v2)
+        || PBS_ifl_Jobfile_jobId_add(B, v3)
+        || PBS_ifl_Jobfile_data_add(B, v4)
+        || PBS_ifl_Jobfile_type_add(B, v1)) {
+        return 0;
+    }
+    return PBS_ifl_Jobfile_end(B);
+}
+
+static PBS_ifl_Jobfile_ref_t PBS_ifl_Jobfile_clone(flatbuffers_builder_t *B, PBS_ifl_Jobfile_table_t t)
+{
+    __flatbuffers_memoize_begin(B, t);
+    if (PBS_ifl_Jobfile_start(B)
+        || PBS_ifl_Jobfile_seq_pick(B, t)
+        || PBS_ifl_Jobfile_size_pick(B, t)
+        || PBS_ifl_Jobfile_jobId_pick(B, t)
+        || PBS_ifl_Jobfile_data_pick(B, t)
+        || PBS_ifl_Jobfile_type_pick(B, t)) {
+        return 0;
+    }
+    __flatbuffers_memoize_end(B, t, PBS_ifl_Jobfile_end(B));
+}
+
+__flatbuffers_build_string_field(0, flatbuffers_, PBS_ifl_Jobid_jobId, PBS_ifl_Jobid)
+
+static inline PBS_ifl_Jobid_ref_t PBS_ifl_Jobid_create(flatbuffers_builder_t *B __PBS_ifl_Jobid_formal_args)
+{
+    if (PBS_ifl_Jobid_start(B)
+        || PBS_ifl_Jobid_jobId_add(B, v0)) {
+        return 0;
+    }
+    return PBS_ifl_Jobid_end(B);
+}
+
+static PBS_ifl_Jobid_ref_t PBS_ifl_Jobid_clone(flatbuffers_builder_t *B, PBS_ifl_Jobid_table_t t)
+{
+    __flatbuffers_memoize_begin(B, t);
+    if (PBS_ifl_Jobid_start(B)
+        || PBS_ifl_Jobid_jobId_pick(B, t)) {
+        return 0;
+    }
+    __flatbuffers_memoize_end(B, t, PBS_ifl_Jobid_end(B));
+}
+
+__flatbuffers_build_scalar_field(0, flatbuffers_, PBS_ifl_Manage_cmd, flatbuffers_int16, int16_t, 2, 2, INT16_C(0), PBS_ifl_Manage)
+__flatbuffers_build_scalar_field(1, flatbuffers_, PBS_ifl_Manage_objType, flatbuffers_int16, int16_t, 2, 2, INT16_C(0), PBS_ifl_Manage)
+__flatbuffers_build_string_field(2, flatbuffers_, PBS_ifl_Manage_objName, PBS_ifl_Manage)
+__flatbuffers_build_table_vector_field(3, flatbuffers_, PBS_ifl_Manage_attrs, PBS_ifl_Attribute, PBS_ifl_Manage)
+
+static inline PBS_ifl_Manage_ref_t PBS_ifl_Manage_create(flatbuffers_builder_t *B __PBS_ifl_Manage_formal_args)
+{
+    if (PBS_ifl_Manage_start(B)
+        || PBS_ifl_Manage_objName_add(B, v2)
+        || PBS_ifl_Manage_attrs_add(B, v3)
+        || PBS_ifl_Manage_cmd_add(B, v0)
+        || PBS_ifl_Manage_objType_add(B, v1)) {
+        return 0;
+    }
+    return PBS_ifl_Manage_end(B);
+}
+
+static PBS_ifl_Manage_ref_t PBS_ifl_Manage_clone(flatbuffers_builder_t *B, PBS_ifl_Manage_table_t t)
+{
+    __flatbuffers_memoize_begin(B, t);
+    if (PBS_ifl_Manage_start(B)
+        || PBS_ifl_Manage_objName_pick(B, t)
+        || PBS_ifl_Manage_attrs_pick(B, t)
+        || PBS_ifl_Manage_cmd_pick(B, t)
+        || PBS_ifl_Manage_objType_pick(B, t)) {
+        return 0;
+    }
+    __flatbuffers_memoize_end(B, t, PBS_ifl_Manage_end(B));
+}
+
+__flatbuffers_build_scalar_field(0, flatbuffers_, PBS_ifl_Msg_fileInd, flatbuffers_int16, int16_t, 2, 2, INT16_C(0), PBS_ifl_Msg)
+__flatbuffers_build_string_field(1, flatbuffers_, PBS_ifl_Msg_jobId, PBS_ifl_Msg)
+__flatbuffers_build_string_field(2, flatbuffers_, PBS_ifl_Msg_text, PBS_ifl_Msg)
+
+static inline PBS_ifl_Msg_ref_t PBS_ifl_Msg_create(flatbuffers_builder_t *B __PBS_ifl_Msg_formal_args)
+{
+    if (PBS_ifl_Msg_start(B)
+        || PBS_ifl_Msg_jobId_add(B, v1)
+        || PBS_ifl_Msg_text_add(B, v2)
+        || PBS_ifl_Msg_fileInd_add(B, v0)) {
+        return 0;
+    }
+    return PBS_ifl_Msg_end(B);
+}
+
+static PBS_ifl_Msg_ref_t PBS_ifl_Msg_clone(flatbuffers_builder_t *B, PBS_ifl_Msg_table_t t)
+{
+    __flatbuffers_memoize_begin(B, t);
+    if (PBS_ifl_Msg_start(B)
+        || PBS_ifl_Msg_jobId_pick(B, t)
+        || PBS_ifl_Msg_text_pick(B, t)
+        || PBS_ifl_Msg_fileInd_pick(B, t)) {
+        return 0;
+    }
+    __flatbuffers_memoize_end(B, t, PBS_ifl_Msg_end(B));
+}
+
+__flatbuffers_build_scalar_field(0, flatbuffers_, PBS_ifl_DmnCmd_cmd, flatbuffers_int16, int16_t, 2, 2, INT16_C(0), PBS_ifl_DmnCmd)
+
+static inline PBS_ifl_DmnCmd_ref_t PBS_ifl_DmnCmd_create(flatbuffers_builder_t *B __PBS_ifl_DmnCmd_formal_args)
+{
+    if (PBS_ifl_DmnCmd_start(B)
+        || PBS_ifl_DmnCmd_cmd_add(B, v0)) {
+        return 0;
+    }
+    return PBS_ifl_DmnCmd_end(B);
+}
+
+static PBS_ifl_DmnCmd_ref_t PBS_ifl_DmnCmd_clone(flatbuffers_builder_t *B, PBS_ifl_DmnCmd_table_t t)
+{
+    __flatbuffers_memoize_begin(B, t);
+    if (PBS_ifl_DmnCmd_start(B)
+        || PBS_ifl_DmnCmd_cmd_pick(B, t)) {
+        return 0;
+    }
+    __flatbuffers_memoize_end(B, t, PBS_ifl_DmnCmd_end(B));
+}
+
+__flatbuffers_build_string_field(0, flatbuffers_, PBS_ifl_Signal_jobId, PBS_ifl_Signal)
+__flatbuffers_build_string_field(1, flatbuffers_, PBS_ifl_Signal_sigName, PBS_ifl_Signal)
+
+static inline PBS_ifl_Signal_ref_t PBS_ifl_Signal_create(flatbuffers_builder_t *B __PBS_ifl_Signal_formal_args)
+{
+    if (PBS_ifl_Signal_start(B)
+        || PBS_ifl_Signal_jobId_add(B, v0)
+        || PBS_ifl_Signal_sigName_add(B, v1)) {
+        return 0;
+    }
+    return PBS_ifl_Signal_end(B);
+}
+
+static PBS_ifl_Signal_ref_t PBS_ifl_Signal_clone(flatbuffers_builder_t *B, PBS_ifl_Signal_table_t t)
+{
+    __flatbuffers_memoize_begin(B, t);
+    if (PBS_ifl_Signal_start(B)
+        || PBS_ifl_Signal_jobId_pick(B, t)
+        || PBS_ifl_Signal_sigName_pick(B, t)) {
+        return 0;
+    }
+    __flatbuffers_memoize_end(B, t, PBS_ifl_Signal_end(B));
+}
+
+__flatbuffers_build_string_field(0, flatbuffers_, PBS_ifl_Stat_jobIds, PBS_ifl_Stat)
+__flatbuffers_build_table_vector_field(1, flatbuffers_, PBS_ifl_Stat_attrs, PBS_ifl_Attribute, PBS_ifl_Stat)
+
+static inline PBS_ifl_Stat_ref_t PBS_ifl_Stat_create(flatbuffers_builder_t *B __PBS_ifl_Stat_formal_args)
+{
+    if (PBS_ifl_Stat_start(B)
+        || PBS_ifl_Stat_jobIds_add(B, v0)
+        || PBS_ifl_Stat_attrs_add(B, v1)) {
+        return 0;
+    }
+    return PBS_ifl_Stat_end(B);
+}
+
+static PBS_ifl_Stat_ref_t PBS_ifl_Stat_clone(flatbuffers_builder_t *B, PBS_ifl_Stat_table_t t)
+{
+    __flatbuffers_memoize_begin(B, t);
+    if (PBS_ifl_Stat_start(B)
+        || PBS_ifl_Stat_jobIds_pick(B, t)
+        || PBS_ifl_Stat_attrs_pick(B, t)) {
+        return 0;
+    }
+    __flatbuffers_memoize_end(B, t, PBS_ifl_Stat_end(B));
+}
+
+__flatbuffers_build_string_field(0, flatbuffers_, PBS_ifl_Spawn_jobId, PBS_ifl_Spawn)
+__flatbuffers_build_string_vector_field(1, flatbuffers_, PBS_ifl_Spawn_argv, PBS_ifl_Spawn)
+__flatbuffers_build_string_vector_field(2, flatbuffers_, PBS_ifl_Spawn_envp, PBS_ifl_Spawn)
+
+static inline PBS_ifl_Spawn_ref_t PBS_ifl_Spawn_create(flatbuffers_builder_t *B __PBS_ifl_Spawn_formal_args)
+{
+    if (PBS_ifl_Spawn_start(B)
+        || PBS_ifl_Spawn_jobId_add(B, v0)
+        || PBS_ifl_Spawn_argv_add(B, v1)
+        || PBS_ifl_Spawn_envp_add(B, v2)) {
+        return 0;
+    }
+    return PBS_ifl_Spawn_end(B);
+}
+
+static PBS_ifl_Spawn_ref_t PBS_ifl_Spawn_clone(flatbuffers_builder_t *B, PBS_ifl_Spawn_table_t t)
+{
+    __flatbuffers_memoize_begin(B, t);
+    if (PBS_ifl_Spawn_start(B)
+        || PBS_ifl_Spawn_jobId_pick(B, t)
+        || PBS_ifl_Spawn_argv_pick(B, t)
+        || PBS_ifl_Spawn_envp_pick(B, t)) {
+        return 0;
+    }
+    __flatbuffers_memoize_end(B, t, PBS_ifl_Spawn_end(B));
+}
+
+__flatbuffers_build_string_field(0, flatbuffers_, PBS_ifl_AuthMunge_key, PBS_ifl_AuthMunge)
+
+static inline PBS_ifl_AuthMunge_ref_t PBS_ifl_AuthMunge_create(flatbuffers_builder_t *B __PBS_ifl_AuthMunge_formal_args)
+{
+    if (PBS_ifl_AuthMunge_start(B)
+        || PBS_ifl_AuthMunge_key_add(B, v0)) {
+        return 0;
+    }
+    return PBS_ifl_AuthMunge_end(B);
+}
+
+static PBS_ifl_AuthMunge_ref_t PBS_ifl_AuthMunge_clone(flatbuffers_builder_t *B, PBS_ifl_AuthMunge_table_t t)
+{
+    __flatbuffers_memoize_begin(B, t);
+    if (PBS_ifl_AuthMunge_start(B)
+        || PBS_ifl_AuthMunge_key_pick(B, t)) {
+        return 0;
+    }
+    __flatbuffers_memoize_end(B, t, PBS_ifl_AuthMunge_end(B));
+}
+
+__flatbuffers_build_scalar_field(0, flatbuffers_, PBS_ifl_AuthResvPort_port, flatbuffers_int16, int16_t, 2, 2, INT16_C(0), PBS_ifl_AuthResvPort)
+
+static inline PBS_ifl_AuthResvPort_ref_t PBS_ifl_AuthResvPort_create(flatbuffers_builder_t *B __PBS_ifl_AuthResvPort_formal_args)
+{
+    if (PBS_ifl_AuthResvPort_start(B)
+        || PBS_ifl_AuthResvPort_port_add(B, v0)) {
+        return 0;
+    }
+    return PBS_ifl_AuthResvPort_end(B);
+}
+
+static PBS_ifl_AuthResvPort_ref_t PBS_ifl_AuthResvPort_clone(flatbuffers_builder_t *B, PBS_ifl_AuthResvPort_table_t t)
+{
+    __flatbuffers_memoize_begin(B, t);
+    if (PBS_ifl_AuthResvPort_start(B)
+        || PBS_ifl_AuthResvPort_port_pick(B, t)) {
+        return 0;
+    }
+    __flatbuffers_memoize_end(B, t, PBS_ifl_AuthResvPort_end(B));
+}
+
+__flatbuffers_build_scalar_field(0, flatbuffers_, PBS_ifl_Auth_type, flatbuffers_int16, int16_t, 2, 2, INT16_C(0), PBS_ifl_Auth)
+__flatbuffers_build_union_field(2, flatbuffers_, PBS_ifl_Auth_info, PBS_ifl_AuthInfo, PBS_ifl_Auth)
+__flatbuffers_build_union_table_value_field(flatbuffers_, PBS_ifl_Auth_info, PBS_ifl_AuthInfo, AuthMunge, PBS_ifl_AuthMunge)
+
+static inline PBS_ifl_Auth_ref_t PBS_ifl_Auth_create(flatbuffers_builder_t *B __PBS_ifl_Auth_formal_args)
+{
+    if (PBS_ifl_Auth_start(B)
+        || PBS_ifl_Auth_info_add_value(B, v2)
+        || PBS_ifl_Auth_type_add(B, v0)
+        || PBS_ifl_Auth_info_add_type(B, v2.type)) {
+        return 0;
+    }
+    return PBS_ifl_Auth_end(B);
+}
+
+static PBS_ifl_Auth_ref_t PBS_ifl_Auth_clone(flatbuffers_builder_t *B, PBS_ifl_Auth_table_t t)
+{
+    __flatbuffers_memoize_begin(B, t);
+    if (PBS_ifl_Auth_start(B)
+        || PBS_ifl_Auth_info_pick(B, t)
+        || PBS_ifl_Auth_type_pick(B, t)) {
+        return 0;
+    }
+    __flatbuffers_memoize_end(B, t, PBS_ifl_Auth_end(B));
+}
+
+__flatbuffers_build_string_field(0, flatbuffers_, PBS_ifl_Move_jobId, PBS_ifl_Move)
+__flatbuffers_build_string_field(1, flatbuffers_, PBS_ifl_Move_dest, PBS_ifl_Move)
+
+static inline PBS_ifl_Move_ref_t PBS_ifl_Move_create(flatbuffers_builder_t *B __PBS_ifl_Move_formal_args)
+{
+    if (PBS_ifl_Move_start(B)
+        || PBS_ifl_Move_jobId_add(B, v0)
+        || PBS_ifl_Move_dest_add(B, v1)) {
+        return 0;
+    }
+    return PBS_ifl_Move_end(B);
+}
+
+static PBS_ifl_Move_ref_t PBS_ifl_Move_clone(flatbuffers_builder_t *B, PBS_ifl_Move_table_t t)
+{
+    __flatbuffers_memoize_begin(B, t);
+    if (PBS_ifl_Move_start(B)
+        || PBS_ifl_Move_jobId_pick(B, t)
+        || PBS_ifl_Move_dest_pick(B, t)) {
+        return 0;
+    }
+    __flatbuffers_memoize_end(B, t, PBS_ifl_Move_end(B));
+}
+
+__flatbuffers_build_string_field(0, flatbuffers_, PBS_ifl_Run_jobId, PBS_ifl_Run)
+__flatbuffers_build_string_field(1, flatbuffers_, PBS_ifl_Run_dest, PBS_ifl_Run)
+__flatbuffers_build_scalar_field(2, flatbuffers_, PBS_ifl_Run_resch, flatbuffers_int64, int64_t, 8, 8, INT64_C(0), PBS_ifl_Run)
+
+static inline PBS_ifl_Run_ref_t PBS_ifl_Run_create(flatbuffers_builder_t *B __PBS_ifl_Run_formal_args)
+{
+    if (PBS_ifl_Run_start(B)
+        || PBS_ifl_Run_resch_add(B, v2)
+        || PBS_ifl_Run_jobId_add(B, v0)
+        || PBS_ifl_Run_dest_add(B, v1)) {
+        return 0;
+    }
+    return PBS_ifl_Run_end(B);
+}
+
+static PBS_ifl_Run_ref_t PBS_ifl_Run_clone(flatbuffers_builder_t *B, PBS_ifl_Run_table_t t)
+{
+    __flatbuffers_memoize_begin(B, t);
+    if (PBS_ifl_Run_start(B)
+        || PBS_ifl_Run_resch_pick(B, t)
+        || PBS_ifl_Run_jobId_pick(B, t)
+        || PBS_ifl_Run_dest_pick(B, t)) {
+        return 0;
+    }
+    __flatbuffers_memoize_end(B, t, PBS_ifl_Run_end(B));
+}
+
+__flatbuffers_build_scalar_field(0, flatbuffers_, PBS_ifl_SchedDefRep_cmd, flatbuffers_int16, int16_t, 2, 2, INT16_C(0), PBS_ifl_SchedDefRep)
+__flatbuffers_build_string_field(1, flatbuffers_, PBS_ifl_SchedDefRep_id, PBS_ifl_SchedDefRep)
+__flatbuffers_build_scalar_field(2, flatbuffers_, PBS_ifl_SchedDefRep_err, flatbuffers_int16, int16_t, 2, 2, INT16_C(0), PBS_ifl_SchedDefRep)
+__flatbuffers_build_string_field(3, flatbuffers_, PBS_ifl_SchedDefRep_text, PBS_ifl_SchedDefRep)
+
+static inline PBS_ifl_SchedDefRep_ref_t PBS_ifl_SchedDefRep_create(flatbuffers_builder_t *B __PBS_ifl_SchedDefRep_formal_args)
+{
+    if (PBS_ifl_SchedDefRep_start(B)
+        || PBS_ifl_SchedDefRep_id_add(B, v1)
+        || PBS_ifl_SchedDefRep_text_add(B, v3)
+        || PBS_ifl_SchedDefRep_cmd_add(B, v0)
+        || PBS_ifl_SchedDefRep_err_add(B, v2)) {
+        return 0;
+    }
+    return PBS_ifl_SchedDefRep_end(B);
+}
+
+static PBS_ifl_SchedDefRep_ref_t PBS_ifl_SchedDefRep_clone(flatbuffers_builder_t *B, PBS_ifl_SchedDefRep_table_t t)
+{
+    __flatbuffers_memoize_begin(B, t);
+    if (PBS_ifl_SchedDefRep_start(B)
+        || PBS_ifl_SchedDefRep_id_pick(B, t)
+        || PBS_ifl_SchedDefRep_text_pick(B, t)
+        || PBS_ifl_SchedDefRep_cmd_pick(B, t)
+        || PBS_ifl_SchedDefRep_err_pick(B, t)) {
+        return 0;
+    }
+    __flatbuffers_memoize_end(B, t, PBS_ifl_SchedDefRep_end(B));
+}
+
+__flatbuffers_build_table_vector_field(0, flatbuffers_, PBS_ifl_Select_selAttrs, PBS_ifl_Attribute, PBS_ifl_Select)
+__flatbuffers_build_table_vector_field(1, flatbuffers_, PBS_ifl_Select_rtnAttrs, PBS_ifl_Attribute, PBS_ifl_Select)
+
+static inline PBS_ifl_Select_ref_t PBS_ifl_Select_create(flatbuffers_builder_t *B __PBS_ifl_Select_formal_args)
+{
+    if (PBS_ifl_Select_start(B)
+        || PBS_ifl_Select_selAttrs_add(B, v0)
+        || PBS_ifl_Select_rtnAttrs_add(B, v1)) {
+        return 0;
+    }
+    return PBS_ifl_Select_end(B);
+}
+
+static PBS_ifl_Select_ref_t PBS_ifl_Select_clone(flatbuffers_builder_t *B, PBS_ifl_Select_table_t t)
+{
+    __flatbuffers_memoize_begin(B, t);
+    if (PBS_ifl_Select_start(B)
+        || PBS_ifl_Select_selAttrs_pick(B, t)
+        || PBS_ifl_Select_rtnAttrs_pick(B, t)) {
+        return 0;
+    }
+    __flatbuffers_memoize_end(B, t, PBS_ifl_Select_end(B));
+}
+
+__flatbuffers_build_scalar_field(0, flatbuffers_, PBS_ifl_Track_hops, flatbuffers_int16, int16_t, 2, 2, INT16_C(0), PBS_ifl_Track)
+__flatbuffers_build_string_field(1, flatbuffers_, PBS_ifl_Track_jobId, PBS_ifl_Track)
+__flatbuffers_build_string_field(2, flatbuffers_, PBS_ifl_Track_location, PBS_ifl_Track)
+__flatbuffers_build_scalar_field(3, flatbuffers_, PBS_ifl_Track_state, flatbuffers_int8, int8_t, 1, 1, INT8_C(0), PBS_ifl_Track)
+
+static inline PBS_ifl_Track_ref_t PBS_ifl_Track_create(flatbuffers_builder_t *B __PBS_ifl_Track_formal_args)
+{
+    if (PBS_ifl_Track_start(B)
+        || PBS_ifl_Track_jobId_add(B, v1)
+        || PBS_ifl_Track_location_add(B, v2)
+        || PBS_ifl_Track_hops_add(B, v0)
+        || PBS_ifl_Track_state_add(B, v3)) {
+        return 0;
+    }
+    return PBS_ifl_Track_end(B);
+}
+
+static PBS_ifl_Track_ref_t PBS_ifl_Track_clone(flatbuffers_builder_t *B, PBS_ifl_Track_table_t t)
+{
+    __flatbuffers_memoize_begin(B, t);
+    if (PBS_ifl_Track_start(B)
+        || PBS_ifl_Track_jobId_pick(B, t)
+        || PBS_ifl_Track_location_pick(B, t)
+        || PBS_ifl_Track_hops_pick(B, t)
+        || PBS_ifl_Track_state_pick(B, t)) {
+        return 0;
+    }
+    __flatbuffers_memoize_end(B, t, PBS_ifl_Track_end(B));
+}
+
+__flatbuffers_build_string_field(0, flatbuffers_, PBS_ifl_Register_owner, PBS_ifl_Register)
+__flatbuffers_build_string_field(1, flatbuffers_, PBS_ifl_Register_server, PBS_ifl_Register)
+__flatbuffers_build_string_field(2, flatbuffers_, PBS_ifl_Register_parent, PBS_ifl_Register)
+__flatbuffers_build_string_field(3, flatbuffers_, PBS_ifl_Register_child, PBS_ifl_Register)
+__flatbuffers_build_scalar_field(4, flatbuffers_, PBS_ifl_Register_type, flatbuffers_int16, int16_t, 2, 2, INT16_C(0), PBS_ifl_Register)
+__flatbuffers_build_scalar_field(5, flatbuffers_, PBS_ifl_Register_op, flatbuffers_int16, int16_t, 2, 2, INT16_C(0), PBS_ifl_Register)
+__flatbuffers_build_scalar_field(6, flatbuffers_, PBS_ifl_Register_cost, flatbuffers_int64, int64_t, 8, 8, INT64_C(0), PBS_ifl_Register)
+
+static inline PBS_ifl_Register_ref_t PBS_ifl_Register_create(flatbuffers_builder_t *B __PBS_ifl_Register_formal_args)
+{
+    if (PBS_ifl_Register_start(B)
+        || PBS_ifl_Register_cost_add(B, v6)
+        || PBS_ifl_Register_owner_add(B, v0)
+        || PBS_ifl_Register_server_add(B, v1)
+        || PBS_ifl_Register_parent_add(B, v2)
+        || PBS_ifl_Register_child_add(B, v3)
+        || PBS_ifl_Register_type_add(B, v4)
+        || PBS_ifl_Register_op_add(B, v5)) {
+        return 0;
+    }
+    return PBS_ifl_Register_end(B);
+}
+
+static PBS_ifl_Register_ref_t PBS_ifl_Register_clone(flatbuffers_builder_t *B, PBS_ifl_Register_table_t t)
+{
+    __flatbuffers_memoize_begin(B, t);
+    if (PBS_ifl_Register_start(B)
+        || PBS_ifl_Register_cost_pick(B, t)
+        || PBS_ifl_Register_owner_pick(B, t)
+        || PBS_ifl_Register_server_pick(B, t)
+        || PBS_ifl_Register_parent_pick(B, t)
+        || PBS_ifl_Register_child_pick(B, t)
+        || PBS_ifl_Register_type_pick(B, t)
+        || PBS_ifl_Register_op_pick(B, t)) {
+        return 0;
+    }
+    __flatbuffers_memoize_end(B, t, PBS_ifl_Register_end(B));
+}
+
+__flatbuffers_build_scalar_field(0, flatbuffers_, PBS_ifl_CopyHook_seq, flatbuffers_int16, int16_t, 2, 2, INT16_C(0), PBS_ifl_CopyHook)
+__flatbuffers_build_scalar_field(1, flatbuffers_, PBS_ifl_CopyHook_size, flatbuffers_int64, int64_t, 8, 8, INT64_C(0), PBS_ifl_CopyHook)
+__flatbuffers_build_string_field(2, flatbuffers_, PBS_ifl_CopyHook_filename, PBS_ifl_CopyHook)
+__flatbuffers_build_string_field(3, flatbuffers_, PBS_ifl_CopyHook_data, PBS_ifl_CopyHook)
+
+static inline PBS_ifl_CopyHook_ref_t PBS_ifl_CopyHook_create(flatbuffers_builder_t *B __PBS_ifl_CopyHook_formal_args)
+{
+    if (PBS_ifl_CopyHook_start(B)
+        || PBS_ifl_CopyHook_size_add(B, v1)
+        || PBS_ifl_CopyHook_filename_add(B, v2)
+        || PBS_ifl_CopyHook_data_add(B, v3)
+        || PBS_ifl_CopyHook_seq_add(B, v0)) {
+        return 0;
+    }
+    return PBS_ifl_CopyHook_end(B);
+}
+
+static PBS_ifl_CopyHook_ref_t PBS_ifl_CopyHook_clone(flatbuffers_builder_t *B, PBS_ifl_CopyHook_table_t t)
+{
+    __flatbuffers_memoize_begin(B, t);
+    if (PBS_ifl_CopyHook_start(B)
+        || PBS_ifl_CopyHook_size_pick(B, t)
+        || PBS_ifl_CopyHook_filename_pick(B, t)
+        || PBS_ifl_CopyHook_data_pick(B, t)
+        || PBS_ifl_CopyHook_seq_pick(B, t)) {
+        return 0;
+    }
+    __flatbuffers_memoize_end(B, t, PBS_ifl_CopyHook_end(B));
+}
+
+__flatbuffers_build_string_field(0, flatbuffers_, PBS_ifl_FilePair_local, PBS_ifl_FilePair)
+__flatbuffers_build_string_field(1, flatbuffers_, PBS_ifl_FilePair_remote, PBS_ifl_FilePair)
+__flatbuffers_build_scalar_field(2, flatbuffers_, PBS_ifl_FilePair_flag, flatbuffers_int16, int16_t, 2, 2, INT16_C(0), PBS_ifl_FilePair)
+
+static inline PBS_ifl_FilePair_ref_t PBS_ifl_FilePair_create(flatbuffers_builder_t *B __PBS_ifl_FilePair_formal_args)
+{
+    if (PBS_ifl_FilePair_start(B)
+        || PBS_ifl_FilePair_local_add(B, v0)
+        || PBS_ifl_FilePair_remote_add(B, v1)
+        || PBS_ifl_FilePair_flag_add(B, v2)) {
+        return 0;
+    }
+    return PBS_ifl_FilePair_end(B);
+}
+
+static PBS_ifl_FilePair_ref_t PBS_ifl_FilePair_clone(flatbuffers_builder_t *B, PBS_ifl_FilePair_table_t t)
+{
+    __flatbuffers_memoize_begin(B, t);
+    if (PBS_ifl_FilePair_start(B)
+        || PBS_ifl_FilePair_local_pick(B, t)
+        || PBS_ifl_FilePair_remote_pick(B, t)
+        || PBS_ifl_FilePair_flag_pick(B, t)) {
+        return 0;
+    }
+    __flatbuffers_memoize_end(B, t, PBS_ifl_FilePair_end(B));
+}
+
+__flatbuffers_build_string_field(0, flatbuffers_, PBS_ifl_CopyFile_jobId, PBS_ifl_CopyFile)
+__flatbuffers_build_string_field(1, flatbuffers_, PBS_ifl_CopyFile_owener, PBS_ifl_CopyFile)
+__flatbuffers_build_string_field(2, flatbuffers_, PBS_ifl_CopyFile_user, PBS_ifl_CopyFile)
+__flatbuffers_build_string_field(3, flatbuffers_, PBS_ifl_CopyFile_group, PBS_ifl_CopyFile)
+__flatbuffers_build_scalar_field(4, flatbuffers_, PBS_ifl_CopyFile_flags, flatbuffers_int16, int16_t, 2, 2, INT16_C(0), PBS_ifl_CopyFile)
+__flatbuffers_build_table_vector_field(5, flatbuffers_, PBS_ifl_CopyFile_pairs, PBS_ifl_FilePair, PBS_ifl_CopyFile)
+
+static inline PBS_ifl_CopyFile_ref_t PBS_ifl_CopyFile_create(flatbuffers_builder_t *B __PBS_ifl_CopyFile_formal_args)
+{
+    if (PBS_ifl_CopyFile_start(B)
+        || PBS_ifl_CopyFile_jobId_add(B, v0)
+        || PBS_ifl_CopyFile_owener_add(B, v1)
+        || PBS_ifl_CopyFile_user_add(B, v2)
+        || PBS_ifl_CopyFile_group_add(B, v3)
+        || PBS_ifl_CopyFile_pairs_add(B, v5)
+        || PBS_ifl_CopyFile_flags_add(B, v4)) {
+        return 0;
+    }
+    return PBS_ifl_CopyFile_end(B);
+}
+
+static PBS_ifl_CopyFile_ref_t PBS_ifl_CopyFile_clone(flatbuffers_builder_t *B, PBS_ifl_CopyFile_table_t t)
+{
+    __flatbuffers_memoize_begin(B, t);
+    if (PBS_ifl_CopyFile_start(B)
+        || PBS_ifl_CopyFile_jobId_pick(B, t)
+        || PBS_ifl_CopyFile_owener_pick(B, t)
+        || PBS_ifl_CopyFile_user_pick(B, t)
+        || PBS_ifl_CopyFile_group_pick(B, t)
+        || PBS_ifl_CopyFile_pairs_pick(B, t)
+        || PBS_ifl_CopyFile_flags_pick(B, t)) {
+        return 0;
+    }
+    __flatbuffers_memoize_end(B, t, PBS_ifl_CopyFile_end(B));
+}
+
 __flatbuffers_build_table_field(0, flatbuffers_, PBS_ifl_Req_hdr, PBS_ifl_Header, PBS_ifl_Req)
 __flatbuffers_build_union_field(2, flatbuffers_, PBS_ifl_Req_body, PBS_ifl_ReqBody, PBS_ifl_Req)
 __flatbuffers_build_union_table_value_field(flatbuffers_, PBS_ifl_Req_body, PBS_ifl_ReqBody, Qjob, PBS_ifl_Qjob)
+__flatbuffers_build_union_table_value_field(flatbuffers_, PBS_ifl_Req_body, PBS_ifl_ReqBody, Jobfile, PBS_ifl_Jobfile)
+__flatbuffers_build_union_table_value_field(flatbuffers_, PBS_ifl_Req_body, PBS_ifl_ReqBody, Jobid, PBS_ifl_Jobid)
+__flatbuffers_build_union_table_value_field(flatbuffers_, PBS_ifl_Req_body, PBS_ifl_ReqBody, Manage, PBS_ifl_Manage)
+__flatbuffers_build_union_table_value_field(flatbuffers_, PBS_ifl_Req_body, PBS_ifl_ReqBody, Msg, PBS_ifl_Msg)
+__flatbuffers_build_union_table_value_field(flatbuffers_, PBS_ifl_Req_body, PBS_ifl_ReqBody, DmnCmd, PBS_ifl_DmnCmd)
+__flatbuffers_build_union_table_value_field(flatbuffers_, PBS_ifl_Req_body, PBS_ifl_ReqBody, Signal, PBS_ifl_Signal)
+__flatbuffers_build_union_table_value_field(flatbuffers_, PBS_ifl_Req_body, PBS_ifl_ReqBody, Stat, PBS_ifl_Stat)
+__flatbuffers_build_union_table_value_field(flatbuffers_, PBS_ifl_Req_body, PBS_ifl_ReqBody, Spawn, PBS_ifl_Spawn)
+__flatbuffers_build_union_table_value_field(flatbuffers_, PBS_ifl_Req_body, PBS_ifl_ReqBody, Auth, PBS_ifl_Auth)
+__flatbuffers_build_union_table_value_field(flatbuffers_, PBS_ifl_Req_body, PBS_ifl_ReqBody, Move, PBS_ifl_Move)
+__flatbuffers_build_union_table_value_field(flatbuffers_, PBS_ifl_Req_body, PBS_ifl_ReqBody, Run, PBS_ifl_Run)
+__flatbuffers_build_union_table_value_field(flatbuffers_, PBS_ifl_Req_body, PBS_ifl_ReqBody, SchedDefRep, PBS_ifl_SchedDefRep)
+__flatbuffers_build_union_table_value_field(flatbuffers_, PBS_ifl_Req_body, PBS_ifl_ReqBody, Select, PBS_ifl_Select)
+__flatbuffers_build_union_table_value_field(flatbuffers_, PBS_ifl_Req_body, PBS_ifl_ReqBody, Track, PBS_ifl_Track)
+__flatbuffers_build_union_table_value_field(flatbuffers_, PBS_ifl_Req_body, PBS_ifl_ReqBody, Register, PBS_ifl_Register)
+__flatbuffers_build_union_table_value_field(flatbuffers_, PBS_ifl_Req_body, PBS_ifl_ReqBody, CopyHook, PBS_ifl_CopyHook)
+__flatbuffers_build_union_table_value_field(flatbuffers_, PBS_ifl_Req_body, PBS_ifl_ReqBody, CopyFile, PBS_ifl_CopyFile)
 __flatbuffers_build_table_field(3, flatbuffers_, PBS_ifl_Req_extend, PBS_ifl_Extend, PBS_ifl_Req)
 
 static inline PBS_ifl_Req_ref_t PBS_ifl_Req_create(flatbuffers_builder_t *B __PBS_ifl_Req_formal_args)
@@ -224,6 +1122,109 @@ static PBS_ifl_Req_ref_t PBS_ifl_Req_clone(flatbuffers_builder_t *B, PBS_ifl_Req
         return 0;
     }
     __flatbuffers_memoize_end(B, t, PBS_ifl_Req_end(B));
+}
+
+__flatbuffers_build_scalar_field(0, flatbuffers_, PBS_ifl_StatResp_type, flatbuffers_int16, int16_t, 2, 2, INT16_C(0), PBS_ifl_StatResp)
+__flatbuffers_build_string_field(1, flatbuffers_, PBS_ifl_StatResp_name, PBS_ifl_StatResp)
+__flatbuffers_build_table_vector_field(2, flatbuffers_, PBS_ifl_StatResp_attrs, PBS_ifl_Attribute, PBS_ifl_StatResp)
+
+static inline PBS_ifl_StatResp_ref_t PBS_ifl_StatResp_create(flatbuffers_builder_t *B __PBS_ifl_StatResp_formal_args)
+{
+    if (PBS_ifl_StatResp_start(B)
+        || PBS_ifl_StatResp_name_add(B, v1)
+        || PBS_ifl_StatResp_attrs_add(B, v2)
+        || PBS_ifl_StatResp_type_add(B, v0)) {
+        return 0;
+    }
+    return PBS_ifl_StatResp_end(B);
+}
+
+static PBS_ifl_StatResp_ref_t PBS_ifl_StatResp_clone(flatbuffers_builder_t *B, PBS_ifl_StatResp_table_t t)
+{
+    __flatbuffers_memoize_begin(B, t);
+    if (PBS_ifl_StatResp_start(B)
+        || PBS_ifl_StatResp_name_pick(B, t)
+        || PBS_ifl_StatResp_attrs_pick(B, t)
+        || PBS_ifl_StatResp_type_pick(B, t)) {
+        return 0;
+    }
+    __flatbuffers_memoize_end(B, t, PBS_ifl_StatResp_end(B));
+}
+
+__flatbuffers_build_string_vector_field(0, flatbuffers_, PBS_ifl_SelectRespBody_ids, PBS_ifl_SelectRespBody)
+
+static inline PBS_ifl_SelectRespBody_ref_t PBS_ifl_SelectRespBody_create(flatbuffers_builder_t *B __PBS_ifl_SelectRespBody_formal_args)
+{
+    if (PBS_ifl_SelectRespBody_start(B)
+        || PBS_ifl_SelectRespBody_ids_add(B, v0)) {
+        return 0;
+    }
+    return PBS_ifl_SelectRespBody_end(B);
+}
+
+static PBS_ifl_SelectRespBody_ref_t PBS_ifl_SelectRespBody_clone(flatbuffers_builder_t *B, PBS_ifl_SelectRespBody_table_t t)
+{
+    __flatbuffers_memoize_begin(B, t);
+    if (PBS_ifl_SelectRespBody_start(B)
+        || PBS_ifl_SelectRespBody_ids_pick(B, t)) {
+        return 0;
+    }
+    __flatbuffers_memoize_end(B, t, PBS_ifl_SelectRespBody_end(B));
+}
+
+__flatbuffers_build_table_vector_field(0, flatbuffers_, PBS_ifl_StatRespBody_jobs, PBS_ifl_StatResp, PBS_ifl_StatRespBody)
+
+static inline PBS_ifl_StatRespBody_ref_t PBS_ifl_StatRespBody_create(flatbuffers_builder_t *B __PBS_ifl_StatRespBody_formal_args)
+{
+    if (PBS_ifl_StatRespBody_start(B)
+        || PBS_ifl_StatRespBody_jobs_add(B, v0)) {
+        return 0;
+    }
+    return PBS_ifl_StatRespBody_end(B);
+}
+
+static PBS_ifl_StatRespBody_ref_t PBS_ifl_StatRespBody_clone(flatbuffers_builder_t *B, PBS_ifl_StatRespBody_table_t t)
+{
+    __flatbuffers_memoize_begin(B, t);
+    if (PBS_ifl_StatRespBody_start(B)
+        || PBS_ifl_StatRespBody_jobs_pick(B, t)) {
+        return 0;
+    }
+    __flatbuffers_memoize_end(B, t, PBS_ifl_StatRespBody_end(B));
+}
+
+__flatbuffers_build_scalar_field(0, flatbuffers_, PBS_ifl_Resp_code, flatbuffers_int16, int16_t, 2, 2, INT16_C(0), PBS_ifl_Resp)
+__flatbuffers_build_scalar_field(1, flatbuffers_, PBS_ifl_Resp_auxCode, flatbuffers_int16, int16_t, 2, 2, INT16_C(0), PBS_ifl_Resp)
+__flatbuffers_build_scalar_field(2, flatbuffers_, PBS_ifl_Resp_choice, flatbuffers_int16, int16_t, 2, 2, INT16_C(0), PBS_ifl_Resp)
+__flatbuffers_build_union_field(4, flatbuffers_, PBS_ifl_Resp_body, PBS_ifl_RespBody, PBS_ifl_Resp)
+__flatbuffers_build_union_string_value_field(flatbuffers_, PBS_ifl_Resp_body, PBS_ifl_RespBody, text)
+__flatbuffers_build_union_table_value_field(flatbuffers_, PBS_ifl_Resp_body, PBS_ifl_RespBody, selects, PBS_ifl_SelectRespBody)
+__flatbuffers_build_union_table_value_field(flatbuffers_, PBS_ifl_Resp_body, PBS_ifl_RespBody, stats, PBS_ifl_StatRespBody)
+
+static inline PBS_ifl_Resp_ref_t PBS_ifl_Resp_create(flatbuffers_builder_t *B __PBS_ifl_Resp_formal_args)
+{
+    if (PBS_ifl_Resp_start(B)
+        || PBS_ifl_Resp_body_add_value(B, v4)
+        || PBS_ifl_Resp_code_add(B, v0)
+        || PBS_ifl_Resp_auxCode_add(B, v1)
+        || PBS_ifl_Resp_choice_add(B, v2)
+        || PBS_ifl_Resp_body_add_type(B, v4.type)) {
+        return 0;
+    }
+    return PBS_ifl_Resp_end(B);
+}
+
+static PBS_ifl_Resp_ref_t PBS_ifl_Resp_clone(flatbuffers_builder_t *B, PBS_ifl_Resp_table_t t)
+{
+    __flatbuffers_memoize_begin(B, t);
+    if (PBS_ifl_Resp_start(B)
+        || PBS_ifl_Resp_body_pick(B, t)
+        || PBS_ifl_Resp_code_pick(B, t)
+        || PBS_ifl_Resp_auxCode_pick(B, t)
+        || PBS_ifl_Resp_choice_pick(B, t)) {
+        return 0;
+    }
+    __flatbuffers_memoize_end(B, t, PBS_ifl_Resp_end(B));
 }
 
 #include "flatcc/flatcc_epilogue.h"

@@ -23,12 +23,162 @@ table Extend {
 table Qjob {
     jobId: string;
     destin: string;
-    attrs: [Attribute]; // vector of attributes
+    attrs: [Attribute];
 }
-union ReqBody {Qjob}
+
+table Jobfile {
+    seq: long;
+	type: short;
+	size: long;
+	jobId: string;
+	data: string;
+}
+
+table Jobid {
+    jobId: string;
+}
+
+table Manage {
+    cmd: short;
+    objType: short;
+    objName: string; // jobid, quename etc
+    attrs: [Attribute];
+}
+
+table Msg {
+    fileInd: short;
+    jobId: string;
+    text: string;
+}
+
+table DmnCmd {
+    cmd: short;
+}
+
+table Signal {
+    jobId: string;
+    sigName: string;
+}
+
+table Stat {
+    jobIds: string;
+    attrs: [Attribute];
+}
+
+table Spawn {
+    jobId: string;
+    argv: [string];
+    envp: [string];
+}
+
+table AuthMunge {
+    key: string;
+}
+
+table AuthResvPort {
+    port: short;
+}
+
+union AuthInfo {AuthMunge}
+
+table Auth {
+    type: short;
+    info: AuthInfo;
+}
+
+table Move {
+    jobId: string;
+    dest: string;
+}
+
+table Run {
+    jobId: string;
+    dest: string;
+    resch: long;
+}
+
+table SchedDefRep {
+    cmd: short;
+    id: string;
+    err: short;
+    text: string;
+}
+
+table Select {
+    selAttrs: [Attribute];
+    rtnAttrs: [Attribute];
+}
+
+table Track {
+    hops: short;
+    jobId: string;
+    location: string;
+    state: byte;
+}
+
+table Register {
+    owner: string;
+    server: string;
+    parent: string;
+    child: string;
+    type: short;
+    op: short;
+    cost: long;
+}
+
+table CopyHook {
+    seq: short;
+    size: long;
+    filename: string;
+    data: string;
+}
+
+table FilePair {
+    local: string;
+    remote: string;
+    flag: short; // 1 for std[out|err] 2 for stageout
+}
+
+table CopyFile {
+    jobId: string;
+    owener: string;
+    user: string;
+    group: string;
+    flags: short;
+    pairs: [FilePair];
+}
+
+union ReqBody {Qjob, Jobfile, Jobid, Manage, Msg, DmnCmd, Signal, Stat, Spawn, Auth, Move, Run, SchedDefRep, Select, Track, Register, CopyHook, CopyFile}
 
 table Req {
     hdr: Header;
     body: ReqBody;
     extend: Extend;
+}
+
+table StatResp {
+    type: short;
+    name: string;
+    attrs: [Attribute];
+}
+
+table SelectRespBody {
+    ids: [string];
+}
+
+table StatRespBody {
+    jobs: [StatResp];
+}
+
+union RespBody {
+    text: string, // jobid, text, location etc
+    selects: SelectRespBody,
+    stats: StatRespBody // stat, cmdstat reponses
+}
+
+table Resp {
+    code: short;
+    auxCode: short;
+    choice: short;
+    body: RespBody;
 }

@@ -35,10 +35,106 @@ typedef const struct PBS_ifl_Qjob_table *PBS_ifl_Qjob_table_t;
 typedef struct PBS_ifl_Qjob_table *PBS_ifl_Qjob_mutable_table_t;
 typedef const flatbuffers_uoffset_t *PBS_ifl_Qjob_vec_t;
 typedef flatbuffers_uoffset_t *PBS_ifl_Qjob_mutable_vec_t;
+typedef const struct PBS_ifl_Jobfile_table *PBS_ifl_Jobfile_table_t;
+typedef struct PBS_ifl_Jobfile_table *PBS_ifl_Jobfile_mutable_table_t;
+typedef const flatbuffers_uoffset_t *PBS_ifl_Jobfile_vec_t;
+typedef flatbuffers_uoffset_t *PBS_ifl_Jobfile_mutable_vec_t;
+typedef const struct PBS_ifl_Jobid_table *PBS_ifl_Jobid_table_t;
+typedef struct PBS_ifl_Jobid_table *PBS_ifl_Jobid_mutable_table_t;
+typedef const flatbuffers_uoffset_t *PBS_ifl_Jobid_vec_t;
+typedef flatbuffers_uoffset_t *PBS_ifl_Jobid_mutable_vec_t;
+typedef const struct PBS_ifl_Manage_table *PBS_ifl_Manage_table_t;
+typedef struct PBS_ifl_Manage_table *PBS_ifl_Manage_mutable_table_t;
+typedef const flatbuffers_uoffset_t *PBS_ifl_Manage_vec_t;
+typedef flatbuffers_uoffset_t *PBS_ifl_Manage_mutable_vec_t;
+typedef const struct PBS_ifl_Msg_table *PBS_ifl_Msg_table_t;
+typedef struct PBS_ifl_Msg_table *PBS_ifl_Msg_mutable_table_t;
+typedef const flatbuffers_uoffset_t *PBS_ifl_Msg_vec_t;
+typedef flatbuffers_uoffset_t *PBS_ifl_Msg_mutable_vec_t;
+typedef const struct PBS_ifl_DmnCmd_table *PBS_ifl_DmnCmd_table_t;
+typedef struct PBS_ifl_DmnCmd_table *PBS_ifl_DmnCmd_mutable_table_t;
+typedef const flatbuffers_uoffset_t *PBS_ifl_DmnCmd_vec_t;
+typedef flatbuffers_uoffset_t *PBS_ifl_DmnCmd_mutable_vec_t;
+typedef const struct PBS_ifl_Signal_table *PBS_ifl_Signal_table_t;
+typedef struct PBS_ifl_Signal_table *PBS_ifl_Signal_mutable_table_t;
+typedef const flatbuffers_uoffset_t *PBS_ifl_Signal_vec_t;
+typedef flatbuffers_uoffset_t *PBS_ifl_Signal_mutable_vec_t;
+typedef const struct PBS_ifl_Stat_table *PBS_ifl_Stat_table_t;
+typedef struct PBS_ifl_Stat_table *PBS_ifl_Stat_mutable_table_t;
+typedef const flatbuffers_uoffset_t *PBS_ifl_Stat_vec_t;
+typedef flatbuffers_uoffset_t *PBS_ifl_Stat_mutable_vec_t;
+typedef const struct PBS_ifl_Spawn_table *PBS_ifl_Spawn_table_t;
+typedef struct PBS_ifl_Spawn_table *PBS_ifl_Spawn_mutable_table_t;
+typedef const flatbuffers_uoffset_t *PBS_ifl_Spawn_vec_t;
+typedef flatbuffers_uoffset_t *PBS_ifl_Spawn_mutable_vec_t;
+typedef const struct PBS_ifl_AuthMunge_table *PBS_ifl_AuthMunge_table_t;
+typedef struct PBS_ifl_AuthMunge_table *PBS_ifl_AuthMunge_mutable_table_t;
+typedef const flatbuffers_uoffset_t *PBS_ifl_AuthMunge_vec_t;
+typedef flatbuffers_uoffset_t *PBS_ifl_AuthMunge_mutable_vec_t;
+typedef const struct PBS_ifl_AuthResvPort_table *PBS_ifl_AuthResvPort_table_t;
+typedef struct PBS_ifl_AuthResvPort_table *PBS_ifl_AuthResvPort_mutable_table_t;
+typedef const flatbuffers_uoffset_t *PBS_ifl_AuthResvPort_vec_t;
+typedef flatbuffers_uoffset_t *PBS_ifl_AuthResvPort_mutable_vec_t;
+typedef const struct PBS_ifl_Auth_table *PBS_ifl_Auth_table_t;
+typedef struct PBS_ifl_Auth_table *PBS_ifl_Auth_mutable_table_t;
+typedef const flatbuffers_uoffset_t *PBS_ifl_Auth_vec_t;
+typedef flatbuffers_uoffset_t *PBS_ifl_Auth_mutable_vec_t;
+typedef const struct PBS_ifl_Move_table *PBS_ifl_Move_table_t;
+typedef struct PBS_ifl_Move_table *PBS_ifl_Move_mutable_table_t;
+typedef const flatbuffers_uoffset_t *PBS_ifl_Move_vec_t;
+typedef flatbuffers_uoffset_t *PBS_ifl_Move_mutable_vec_t;
+typedef const struct PBS_ifl_Run_table *PBS_ifl_Run_table_t;
+typedef struct PBS_ifl_Run_table *PBS_ifl_Run_mutable_table_t;
+typedef const flatbuffers_uoffset_t *PBS_ifl_Run_vec_t;
+typedef flatbuffers_uoffset_t *PBS_ifl_Run_mutable_vec_t;
+typedef const struct PBS_ifl_SchedDefRep_table *PBS_ifl_SchedDefRep_table_t;
+typedef struct PBS_ifl_SchedDefRep_table *PBS_ifl_SchedDefRep_mutable_table_t;
+typedef const flatbuffers_uoffset_t *PBS_ifl_SchedDefRep_vec_t;
+typedef flatbuffers_uoffset_t *PBS_ifl_SchedDefRep_mutable_vec_t;
+typedef const struct PBS_ifl_Select_table *PBS_ifl_Select_table_t;
+typedef struct PBS_ifl_Select_table *PBS_ifl_Select_mutable_table_t;
+typedef const flatbuffers_uoffset_t *PBS_ifl_Select_vec_t;
+typedef flatbuffers_uoffset_t *PBS_ifl_Select_mutable_vec_t;
+typedef const struct PBS_ifl_Track_table *PBS_ifl_Track_table_t;
+typedef struct PBS_ifl_Track_table *PBS_ifl_Track_mutable_table_t;
+typedef const flatbuffers_uoffset_t *PBS_ifl_Track_vec_t;
+typedef flatbuffers_uoffset_t *PBS_ifl_Track_mutable_vec_t;
+typedef const struct PBS_ifl_Register_table *PBS_ifl_Register_table_t;
+typedef struct PBS_ifl_Register_table *PBS_ifl_Register_mutable_table_t;
+typedef const flatbuffers_uoffset_t *PBS_ifl_Register_vec_t;
+typedef flatbuffers_uoffset_t *PBS_ifl_Register_mutable_vec_t;
+typedef const struct PBS_ifl_CopyHook_table *PBS_ifl_CopyHook_table_t;
+typedef struct PBS_ifl_CopyHook_table *PBS_ifl_CopyHook_mutable_table_t;
+typedef const flatbuffers_uoffset_t *PBS_ifl_CopyHook_vec_t;
+typedef flatbuffers_uoffset_t *PBS_ifl_CopyHook_mutable_vec_t;
+typedef const struct PBS_ifl_FilePair_table *PBS_ifl_FilePair_table_t;
+typedef struct PBS_ifl_FilePair_table *PBS_ifl_FilePair_mutable_table_t;
+typedef const flatbuffers_uoffset_t *PBS_ifl_FilePair_vec_t;
+typedef flatbuffers_uoffset_t *PBS_ifl_FilePair_mutable_vec_t;
+typedef const struct PBS_ifl_CopyFile_table *PBS_ifl_CopyFile_table_t;
+typedef struct PBS_ifl_CopyFile_table *PBS_ifl_CopyFile_mutable_table_t;
+typedef const flatbuffers_uoffset_t *PBS_ifl_CopyFile_vec_t;
+typedef flatbuffers_uoffset_t *PBS_ifl_CopyFile_mutable_vec_t;
 typedef const struct PBS_ifl_Req_table *PBS_ifl_Req_table_t;
 typedef struct PBS_ifl_Req_table *PBS_ifl_Req_mutable_table_t;
 typedef const flatbuffers_uoffset_t *PBS_ifl_Req_vec_t;
 typedef flatbuffers_uoffset_t *PBS_ifl_Req_mutable_vec_t;
+typedef const struct PBS_ifl_StatResp_table *PBS_ifl_StatResp_table_t;
+typedef struct PBS_ifl_StatResp_table *PBS_ifl_StatResp_mutable_table_t;
+typedef const flatbuffers_uoffset_t *PBS_ifl_StatResp_vec_t;
+typedef flatbuffers_uoffset_t *PBS_ifl_StatResp_mutable_vec_t;
+typedef const struct PBS_ifl_SelectRespBody_table *PBS_ifl_SelectRespBody_table_t;
+typedef struct PBS_ifl_SelectRespBody_table *PBS_ifl_SelectRespBody_mutable_table_t;
+typedef const flatbuffers_uoffset_t *PBS_ifl_SelectRespBody_vec_t;
+typedef flatbuffers_uoffset_t *PBS_ifl_SelectRespBody_mutable_vec_t;
+typedef const struct PBS_ifl_StatRespBody_table *PBS_ifl_StatRespBody_table_t;
+typedef struct PBS_ifl_StatRespBody_table *PBS_ifl_StatRespBody_mutable_table_t;
+typedef const flatbuffers_uoffset_t *PBS_ifl_StatRespBody_vec_t;
+typedef flatbuffers_uoffset_t *PBS_ifl_StatRespBody_mutable_vec_t;
+typedef const struct PBS_ifl_Resp_table *PBS_ifl_Resp_table_t;
+typedef struct PBS_ifl_Resp_table *PBS_ifl_Resp_mutable_table_t;
+typedef const flatbuffers_uoffset_t *PBS_ifl_Resp_vec_t;
+typedef flatbuffers_uoffset_t *PBS_ifl_Resp_mutable_vec_t;
 #ifndef PBS_ifl_Header_file_identifier
 #define PBS_ifl_Header_file_identifier flatbuffers_identifier
 #endif
@@ -75,6 +171,186 @@ typedef flatbuffers_uoffset_t *PBS_ifl_Req_mutable_vec_t;
 #endif
 #define PBS_ifl_Qjob_type_hash ((flatbuffers_thash_t)0x59286611)
 #define PBS_ifl_Qjob_type_identifier "\x11\x66\x28\x59"
+#ifndef PBS_ifl_Jobfile_file_identifier
+#define PBS_ifl_Jobfile_file_identifier flatbuffers_identifier
+#endif
+/* deprecated, use PBS_ifl_Jobfile_file_identifier */
+#ifndef PBS_ifl_Jobfile_identifier
+#define PBS_ifl_Jobfile_identifier flatbuffers_identifier
+#endif
+#define PBS_ifl_Jobfile_type_hash ((flatbuffers_thash_t)0x1bd060d4)
+#define PBS_ifl_Jobfile_type_identifier "\xd4\x60\xd0\x1b"
+#ifndef PBS_ifl_Jobid_file_identifier
+#define PBS_ifl_Jobid_file_identifier flatbuffers_identifier
+#endif
+/* deprecated, use PBS_ifl_Jobid_file_identifier */
+#ifndef PBS_ifl_Jobid_identifier
+#define PBS_ifl_Jobid_identifier flatbuffers_identifier
+#endif
+#define PBS_ifl_Jobid_type_hash ((flatbuffers_thash_t)0x6a139c5f)
+#define PBS_ifl_Jobid_type_identifier "\x5f\x9c\x13\x6a"
+#ifndef PBS_ifl_Manage_file_identifier
+#define PBS_ifl_Manage_file_identifier flatbuffers_identifier
+#endif
+/* deprecated, use PBS_ifl_Manage_file_identifier */
+#ifndef PBS_ifl_Manage_identifier
+#define PBS_ifl_Manage_identifier flatbuffers_identifier
+#endif
+#define PBS_ifl_Manage_type_hash ((flatbuffers_thash_t)0xdd3e682c)
+#define PBS_ifl_Manage_type_identifier "\x2c\x68\x3e\xdd"
+#ifndef PBS_ifl_Msg_file_identifier
+#define PBS_ifl_Msg_file_identifier flatbuffers_identifier
+#endif
+/* deprecated, use PBS_ifl_Msg_file_identifier */
+#ifndef PBS_ifl_Msg_identifier
+#define PBS_ifl_Msg_identifier flatbuffers_identifier
+#endif
+#define PBS_ifl_Msg_type_hash ((flatbuffers_thash_t)0x60fd206c)
+#define PBS_ifl_Msg_type_identifier "\x6c\x20\xfd\x60"
+#ifndef PBS_ifl_DmnCmd_file_identifier
+#define PBS_ifl_DmnCmd_file_identifier flatbuffers_identifier
+#endif
+/* deprecated, use PBS_ifl_DmnCmd_file_identifier */
+#ifndef PBS_ifl_DmnCmd_identifier
+#define PBS_ifl_DmnCmd_identifier flatbuffers_identifier
+#endif
+#define PBS_ifl_DmnCmd_type_hash ((flatbuffers_thash_t)0x3c9f1ba2)
+#define PBS_ifl_DmnCmd_type_identifier "\xa2\x1b\x9f\x3c"
+#ifndef PBS_ifl_Signal_file_identifier
+#define PBS_ifl_Signal_file_identifier flatbuffers_identifier
+#endif
+/* deprecated, use PBS_ifl_Signal_file_identifier */
+#ifndef PBS_ifl_Signal_identifier
+#define PBS_ifl_Signal_identifier flatbuffers_identifier
+#endif
+#define PBS_ifl_Signal_type_hash ((flatbuffers_thash_t)0x93821d6b)
+#define PBS_ifl_Signal_type_identifier "\x6b\x1d\x82\x93"
+#ifndef PBS_ifl_Stat_file_identifier
+#define PBS_ifl_Stat_file_identifier flatbuffers_identifier
+#endif
+/* deprecated, use PBS_ifl_Stat_file_identifier */
+#ifndef PBS_ifl_Stat_identifier
+#define PBS_ifl_Stat_identifier flatbuffers_identifier
+#endif
+#define PBS_ifl_Stat_type_hash ((flatbuffers_thash_t)0x5b65ca51)
+#define PBS_ifl_Stat_type_identifier "\x51\xca\x65\x5b"
+#ifndef PBS_ifl_Spawn_file_identifier
+#define PBS_ifl_Spawn_file_identifier flatbuffers_identifier
+#endif
+/* deprecated, use PBS_ifl_Spawn_file_identifier */
+#ifndef PBS_ifl_Spawn_identifier
+#define PBS_ifl_Spawn_identifier flatbuffers_identifier
+#endif
+#define PBS_ifl_Spawn_type_hash ((flatbuffers_thash_t)0xddc881de)
+#define PBS_ifl_Spawn_type_identifier "\xde\x81\xc8\xdd"
+#ifndef PBS_ifl_AuthMunge_file_identifier
+#define PBS_ifl_AuthMunge_file_identifier flatbuffers_identifier
+#endif
+/* deprecated, use PBS_ifl_AuthMunge_file_identifier */
+#ifndef PBS_ifl_AuthMunge_identifier
+#define PBS_ifl_AuthMunge_identifier flatbuffers_identifier
+#endif
+#define PBS_ifl_AuthMunge_type_hash ((flatbuffers_thash_t)0x67a93763)
+#define PBS_ifl_AuthMunge_type_identifier "\x63\x37\xa9\x67"
+#ifndef PBS_ifl_AuthResvPort_file_identifier
+#define PBS_ifl_AuthResvPort_file_identifier flatbuffers_identifier
+#endif
+/* deprecated, use PBS_ifl_AuthResvPort_file_identifier */
+#ifndef PBS_ifl_AuthResvPort_identifier
+#define PBS_ifl_AuthResvPort_identifier flatbuffers_identifier
+#endif
+#define PBS_ifl_AuthResvPort_type_hash ((flatbuffers_thash_t)0x9de7464e)
+#define PBS_ifl_AuthResvPort_type_identifier "\x4e\x46\xe7\x9d"
+#ifndef PBS_ifl_Auth_file_identifier
+#define PBS_ifl_Auth_file_identifier flatbuffers_identifier
+#endif
+/* deprecated, use PBS_ifl_Auth_file_identifier */
+#ifndef PBS_ifl_Auth_identifier
+#define PBS_ifl_Auth_identifier flatbuffers_identifier
+#endif
+#define PBS_ifl_Auth_type_hash ((flatbuffers_thash_t)0x543335c5)
+#define PBS_ifl_Auth_type_identifier "\xc5\x35\x33\x54"
+#ifndef PBS_ifl_Move_file_identifier
+#define PBS_ifl_Move_file_identifier flatbuffers_identifier
+#endif
+/* deprecated, use PBS_ifl_Move_file_identifier */
+#ifndef PBS_ifl_Move_identifier
+#define PBS_ifl_Move_identifier flatbuffers_identifier
+#endif
+#define PBS_ifl_Move_type_hash ((flatbuffers_thash_t)0x17077582)
+#define PBS_ifl_Move_type_identifier "\x82\x75\x07\x17"
+#ifndef PBS_ifl_Run_file_identifier
+#define PBS_ifl_Run_file_identifier flatbuffers_identifier
+#endif
+/* deprecated, use PBS_ifl_Run_file_identifier */
+#ifndef PBS_ifl_Run_identifier
+#define PBS_ifl_Run_identifier flatbuffers_identifier
+#endif
+#define PBS_ifl_Run_type_hash ((flatbuffers_thash_t)0x4eb5fc)
+#define PBS_ifl_Run_type_identifier "\xfc\xb5\x4e\x00"
+#ifndef PBS_ifl_SchedDefRep_file_identifier
+#define PBS_ifl_SchedDefRep_file_identifier flatbuffers_identifier
+#endif
+/* deprecated, use PBS_ifl_SchedDefRep_file_identifier */
+#ifndef PBS_ifl_SchedDefRep_identifier
+#define PBS_ifl_SchedDefRep_identifier flatbuffers_identifier
+#endif
+#define PBS_ifl_SchedDefRep_type_hash ((flatbuffers_thash_t)0x59a739dc)
+#define PBS_ifl_SchedDefRep_type_identifier "\xdc\x39\xa7\x59"
+#ifndef PBS_ifl_Select_file_identifier
+#define PBS_ifl_Select_file_identifier flatbuffers_identifier
+#endif
+/* deprecated, use PBS_ifl_Select_file_identifier */
+#ifndef PBS_ifl_Select_identifier
+#define PBS_ifl_Select_identifier flatbuffers_identifier
+#endif
+#define PBS_ifl_Select_type_hash ((flatbuffers_thash_t)0xddb8b57b)
+#define PBS_ifl_Select_type_identifier "\x7b\xb5\xb8\xdd"
+#ifndef PBS_ifl_Track_file_identifier
+#define PBS_ifl_Track_file_identifier flatbuffers_identifier
+#endif
+/* deprecated, use PBS_ifl_Track_file_identifier */
+#ifndef PBS_ifl_Track_identifier
+#define PBS_ifl_Track_identifier flatbuffers_identifier
+#endif
+#define PBS_ifl_Track_type_hash ((flatbuffers_thash_t)0x9cd5fb5a)
+#define PBS_ifl_Track_type_identifier "\x5a\xfb\xd5\x9c"
+#ifndef PBS_ifl_Register_file_identifier
+#define PBS_ifl_Register_file_identifier flatbuffers_identifier
+#endif
+/* deprecated, use PBS_ifl_Register_file_identifier */
+#ifndef PBS_ifl_Register_identifier
+#define PBS_ifl_Register_identifier flatbuffers_identifier
+#endif
+#define PBS_ifl_Register_type_hash ((flatbuffers_thash_t)0x17c3169e)
+#define PBS_ifl_Register_type_identifier "\x9e\x16\xc3\x17"
+#ifndef PBS_ifl_CopyHook_file_identifier
+#define PBS_ifl_CopyHook_file_identifier flatbuffers_identifier
+#endif
+/* deprecated, use PBS_ifl_CopyHook_file_identifier */
+#ifndef PBS_ifl_CopyHook_identifier
+#define PBS_ifl_CopyHook_identifier flatbuffers_identifier
+#endif
+#define PBS_ifl_CopyHook_type_hash ((flatbuffers_thash_t)0x3cab22bd)
+#define PBS_ifl_CopyHook_type_identifier "\xbd\x22\xab\x3c"
+#ifndef PBS_ifl_FilePair_file_identifier
+#define PBS_ifl_FilePair_file_identifier flatbuffers_identifier
+#endif
+/* deprecated, use PBS_ifl_FilePair_file_identifier */
+#ifndef PBS_ifl_FilePair_identifier
+#define PBS_ifl_FilePair_identifier flatbuffers_identifier
+#endif
+#define PBS_ifl_FilePair_type_hash ((flatbuffers_thash_t)0xa9799261)
+#define PBS_ifl_FilePair_type_identifier "\x61\x92\x79\xa9"
+#ifndef PBS_ifl_CopyFile_file_identifier
+#define PBS_ifl_CopyFile_file_identifier flatbuffers_identifier
+#endif
+/* deprecated, use PBS_ifl_CopyFile_file_identifier */
+#ifndef PBS_ifl_CopyFile_identifier
+#define PBS_ifl_CopyFile_identifier flatbuffers_identifier
+#endif
+#define PBS_ifl_CopyFile_type_hash ((flatbuffers_thash_t)0x3489f324)
+#define PBS_ifl_CopyFile_type_identifier "\x24\xf3\x89\x34"
 #ifndef PBS_ifl_Req_file_identifier
 #define PBS_ifl_Req_file_identifier flatbuffers_identifier
 #endif
@@ -84,6 +360,42 @@ typedef flatbuffers_uoffset_t *PBS_ifl_Req_mutable_vec_t;
 #endif
 #define PBS_ifl_Req_type_hash ((flatbuffers_thash_t)0xf7279861)
 #define PBS_ifl_Req_type_identifier "\x61\x98\x27\xf7"
+#ifndef PBS_ifl_StatResp_file_identifier
+#define PBS_ifl_StatResp_file_identifier flatbuffers_identifier
+#endif
+/* deprecated, use PBS_ifl_StatResp_file_identifier */
+#ifndef PBS_ifl_StatResp_identifier
+#define PBS_ifl_StatResp_identifier flatbuffers_identifier
+#endif
+#define PBS_ifl_StatResp_type_hash ((flatbuffers_thash_t)0x6217a80f)
+#define PBS_ifl_StatResp_type_identifier "\x0f\xa8\x17\x62"
+#ifndef PBS_ifl_SelectRespBody_file_identifier
+#define PBS_ifl_SelectRespBody_file_identifier flatbuffers_identifier
+#endif
+/* deprecated, use PBS_ifl_SelectRespBody_file_identifier */
+#ifndef PBS_ifl_SelectRespBody_identifier
+#define PBS_ifl_SelectRespBody_identifier flatbuffers_identifier
+#endif
+#define PBS_ifl_SelectRespBody_type_hash ((flatbuffers_thash_t)0x9b1e0ba1)
+#define PBS_ifl_SelectRespBody_type_identifier "\xa1\x0b\x1e\x9b"
+#ifndef PBS_ifl_StatRespBody_file_identifier
+#define PBS_ifl_StatRespBody_file_identifier flatbuffers_identifier
+#endif
+/* deprecated, use PBS_ifl_StatRespBody_file_identifier */
+#ifndef PBS_ifl_StatRespBody_identifier
+#define PBS_ifl_StatRespBody_identifier flatbuffers_identifier
+#endif
+#define PBS_ifl_StatRespBody_type_hash ((flatbuffers_thash_t)0xc0eecc47)
+#define PBS_ifl_StatRespBody_type_identifier "\x47\xcc\xee\xc0"
+#ifndef PBS_ifl_Resp_file_identifier
+#define PBS_ifl_Resp_file_identifier flatbuffers_identifier
+#endif
+/* deprecated, use PBS_ifl_Resp_file_identifier */
+#ifndef PBS_ifl_Resp_identifier
+#define PBS_ifl_Resp_identifier flatbuffers_identifier
+#endif
+#define PBS_ifl_Resp_type_hash ((flatbuffers_thash_t)0x38500511)
+#define PBS_ifl_Resp_type_identifier "\x11\x05\x50\x38"
 
 typedef int8_t PBS_ifl_ProtType_enum_t;
 __flatbuffers_define_integer_type(PBS_ifl_ProtType, PBS_ifl_ProtType_enum_t, 8)
@@ -206,17 +518,315 @@ __flatbuffers_table_as_root(PBS_ifl_Qjob)
 __flatbuffers_define_string_field(0, PBS_ifl_Qjob, jobId, 0)
 __flatbuffers_define_string_field(1, PBS_ifl_Qjob, destin, 0)
 __flatbuffers_define_vector_field(2, PBS_ifl_Qjob, attrs, PBS_ifl_Attribute_vec_t, 0)
+
+struct PBS_ifl_Jobfile_table { uint8_t unused__; };
+
+static inline size_t PBS_ifl_Jobfile_vec_len(PBS_ifl_Jobfile_vec_t vec)
+__flatbuffers_vec_len(vec)
+static inline PBS_ifl_Jobfile_table_t PBS_ifl_Jobfile_vec_at(PBS_ifl_Jobfile_vec_t vec, size_t i)
+__flatbuffers_offset_vec_at(PBS_ifl_Jobfile_table_t, vec, i, 0)
+__flatbuffers_table_as_root(PBS_ifl_Jobfile)
+
+__flatbuffers_define_scalar_field(0, PBS_ifl_Jobfile, seq, flatbuffers_int64, int64_t, INT64_C(0))
+__flatbuffers_define_scalar_field(1, PBS_ifl_Jobfile, type, flatbuffers_int16, int16_t, INT16_C(0))
+__flatbuffers_define_scalar_field(2, PBS_ifl_Jobfile, size, flatbuffers_int64, int64_t, INT64_C(0))
+__flatbuffers_define_string_field(3, PBS_ifl_Jobfile, jobId, 0)
+__flatbuffers_define_string_field(4, PBS_ifl_Jobfile, data, 0)
+
+struct PBS_ifl_Jobid_table { uint8_t unused__; };
+
+static inline size_t PBS_ifl_Jobid_vec_len(PBS_ifl_Jobid_vec_t vec)
+__flatbuffers_vec_len(vec)
+static inline PBS_ifl_Jobid_table_t PBS_ifl_Jobid_vec_at(PBS_ifl_Jobid_vec_t vec, size_t i)
+__flatbuffers_offset_vec_at(PBS_ifl_Jobid_table_t, vec, i, 0)
+__flatbuffers_table_as_root(PBS_ifl_Jobid)
+
+__flatbuffers_define_string_field(0, PBS_ifl_Jobid, jobId, 0)
+
+struct PBS_ifl_Manage_table { uint8_t unused__; };
+
+static inline size_t PBS_ifl_Manage_vec_len(PBS_ifl_Manage_vec_t vec)
+__flatbuffers_vec_len(vec)
+static inline PBS_ifl_Manage_table_t PBS_ifl_Manage_vec_at(PBS_ifl_Manage_vec_t vec, size_t i)
+__flatbuffers_offset_vec_at(PBS_ifl_Manage_table_t, vec, i, 0)
+__flatbuffers_table_as_root(PBS_ifl_Manage)
+
+__flatbuffers_define_scalar_field(0, PBS_ifl_Manage, cmd, flatbuffers_int16, int16_t, INT16_C(0))
+__flatbuffers_define_scalar_field(1, PBS_ifl_Manage, objType, flatbuffers_int16, int16_t, INT16_C(0))
+__flatbuffers_define_string_field(2, PBS_ifl_Manage, objName, 0)
+__flatbuffers_define_vector_field(3, PBS_ifl_Manage, attrs, PBS_ifl_Attribute_vec_t, 0)
+
+struct PBS_ifl_Msg_table { uint8_t unused__; };
+
+static inline size_t PBS_ifl_Msg_vec_len(PBS_ifl_Msg_vec_t vec)
+__flatbuffers_vec_len(vec)
+static inline PBS_ifl_Msg_table_t PBS_ifl_Msg_vec_at(PBS_ifl_Msg_vec_t vec, size_t i)
+__flatbuffers_offset_vec_at(PBS_ifl_Msg_table_t, vec, i, 0)
+__flatbuffers_table_as_root(PBS_ifl_Msg)
+
+__flatbuffers_define_scalar_field(0, PBS_ifl_Msg, fileInd, flatbuffers_int16, int16_t, INT16_C(0))
+__flatbuffers_define_string_field(1, PBS_ifl_Msg, jobId, 0)
+__flatbuffers_define_string_field(2, PBS_ifl_Msg, text, 0)
+
+struct PBS_ifl_DmnCmd_table { uint8_t unused__; };
+
+static inline size_t PBS_ifl_DmnCmd_vec_len(PBS_ifl_DmnCmd_vec_t vec)
+__flatbuffers_vec_len(vec)
+static inline PBS_ifl_DmnCmd_table_t PBS_ifl_DmnCmd_vec_at(PBS_ifl_DmnCmd_vec_t vec, size_t i)
+__flatbuffers_offset_vec_at(PBS_ifl_DmnCmd_table_t, vec, i, 0)
+__flatbuffers_table_as_root(PBS_ifl_DmnCmd)
+
+__flatbuffers_define_scalar_field(0, PBS_ifl_DmnCmd, cmd, flatbuffers_int16, int16_t, INT16_C(0))
+
+struct PBS_ifl_Signal_table { uint8_t unused__; };
+
+static inline size_t PBS_ifl_Signal_vec_len(PBS_ifl_Signal_vec_t vec)
+__flatbuffers_vec_len(vec)
+static inline PBS_ifl_Signal_table_t PBS_ifl_Signal_vec_at(PBS_ifl_Signal_vec_t vec, size_t i)
+__flatbuffers_offset_vec_at(PBS_ifl_Signal_table_t, vec, i, 0)
+__flatbuffers_table_as_root(PBS_ifl_Signal)
+
+__flatbuffers_define_string_field(0, PBS_ifl_Signal, jobId, 0)
+__flatbuffers_define_string_field(1, PBS_ifl_Signal, sigName, 0)
+
+struct PBS_ifl_Stat_table { uint8_t unused__; };
+
+static inline size_t PBS_ifl_Stat_vec_len(PBS_ifl_Stat_vec_t vec)
+__flatbuffers_vec_len(vec)
+static inline PBS_ifl_Stat_table_t PBS_ifl_Stat_vec_at(PBS_ifl_Stat_vec_t vec, size_t i)
+__flatbuffers_offset_vec_at(PBS_ifl_Stat_table_t, vec, i, 0)
+__flatbuffers_table_as_root(PBS_ifl_Stat)
+
+__flatbuffers_define_string_field(0, PBS_ifl_Stat, jobIds, 0)
+__flatbuffers_define_vector_field(1, PBS_ifl_Stat, attrs, PBS_ifl_Attribute_vec_t, 0)
+
+struct PBS_ifl_Spawn_table { uint8_t unused__; };
+
+static inline size_t PBS_ifl_Spawn_vec_len(PBS_ifl_Spawn_vec_t vec)
+__flatbuffers_vec_len(vec)
+static inline PBS_ifl_Spawn_table_t PBS_ifl_Spawn_vec_at(PBS_ifl_Spawn_vec_t vec, size_t i)
+__flatbuffers_offset_vec_at(PBS_ifl_Spawn_table_t, vec, i, 0)
+__flatbuffers_table_as_root(PBS_ifl_Spawn)
+
+__flatbuffers_define_string_field(0, PBS_ifl_Spawn, jobId, 0)
+__flatbuffers_define_vector_field(1, PBS_ifl_Spawn, argv, flatbuffers_string_vec_t, 0)
+__flatbuffers_define_vector_field(2, PBS_ifl_Spawn, envp, flatbuffers_string_vec_t, 0)
+
+struct PBS_ifl_AuthMunge_table { uint8_t unused__; };
+
+static inline size_t PBS_ifl_AuthMunge_vec_len(PBS_ifl_AuthMunge_vec_t vec)
+__flatbuffers_vec_len(vec)
+static inline PBS_ifl_AuthMunge_table_t PBS_ifl_AuthMunge_vec_at(PBS_ifl_AuthMunge_vec_t vec, size_t i)
+__flatbuffers_offset_vec_at(PBS_ifl_AuthMunge_table_t, vec, i, 0)
+__flatbuffers_table_as_root(PBS_ifl_AuthMunge)
+
+__flatbuffers_define_string_field(0, PBS_ifl_AuthMunge, key, 0)
+
+struct PBS_ifl_AuthResvPort_table { uint8_t unused__; };
+
+static inline size_t PBS_ifl_AuthResvPort_vec_len(PBS_ifl_AuthResvPort_vec_t vec)
+__flatbuffers_vec_len(vec)
+static inline PBS_ifl_AuthResvPort_table_t PBS_ifl_AuthResvPort_vec_at(PBS_ifl_AuthResvPort_vec_t vec, size_t i)
+__flatbuffers_offset_vec_at(PBS_ifl_AuthResvPort_table_t, vec, i, 0)
+__flatbuffers_table_as_root(PBS_ifl_AuthResvPort)
+
+__flatbuffers_define_scalar_field(0, PBS_ifl_AuthResvPort, port, flatbuffers_int16, int16_t, INT16_C(0))
+typedef uint8_t PBS_ifl_AuthInfo_union_type_t;
+__flatbuffers_define_integer_type(PBS_ifl_AuthInfo, PBS_ifl_AuthInfo_union_type_t, 8)
+__flatbuffers_define_union(flatbuffers_, PBS_ifl_AuthInfo)
+#define PBS_ifl_AuthInfo_NONE ((PBS_ifl_AuthInfo_union_type_t)UINT8_C(0))
+#define PBS_ifl_AuthInfo_AuthMunge ((PBS_ifl_AuthInfo_union_type_t)UINT8_C(1))
+
+static inline const char *PBS_ifl_AuthInfo_type_name(PBS_ifl_AuthInfo_union_type_t type)
+{
+    switch (type) {
+    case PBS_ifl_AuthInfo_NONE: return "NONE";
+    case PBS_ifl_AuthInfo_AuthMunge: return "AuthMunge";
+    default: return "";
+    }
+}
+
+static inline int PBS_ifl_AuthInfo_is_known_type(PBS_ifl_AuthInfo_union_type_t type)
+{
+    switch (type) {
+    case PBS_ifl_AuthInfo_NONE: return 1;
+    case PBS_ifl_AuthInfo_AuthMunge: return 1;
+    default: return 0;
+    }
+}
+
+
+struct PBS_ifl_Auth_table { uint8_t unused__; };
+
+static inline size_t PBS_ifl_Auth_vec_len(PBS_ifl_Auth_vec_t vec)
+__flatbuffers_vec_len(vec)
+static inline PBS_ifl_Auth_table_t PBS_ifl_Auth_vec_at(PBS_ifl_Auth_vec_t vec, size_t i)
+__flatbuffers_offset_vec_at(PBS_ifl_Auth_table_t, vec, i, 0)
+__flatbuffers_table_as_root(PBS_ifl_Auth)
+
+__flatbuffers_define_scalar_field(0, PBS_ifl_Auth, type, flatbuffers_int16, int16_t, INT16_C(0))
+__flatbuffers_define_union_field(flatbuffers_, 2, PBS_ifl_Auth, info, PBS_ifl_AuthInfo, 0)
+
+struct PBS_ifl_Move_table { uint8_t unused__; };
+
+static inline size_t PBS_ifl_Move_vec_len(PBS_ifl_Move_vec_t vec)
+__flatbuffers_vec_len(vec)
+static inline PBS_ifl_Move_table_t PBS_ifl_Move_vec_at(PBS_ifl_Move_vec_t vec, size_t i)
+__flatbuffers_offset_vec_at(PBS_ifl_Move_table_t, vec, i, 0)
+__flatbuffers_table_as_root(PBS_ifl_Move)
+
+__flatbuffers_define_string_field(0, PBS_ifl_Move, jobId, 0)
+__flatbuffers_define_string_field(1, PBS_ifl_Move, dest, 0)
+
+struct PBS_ifl_Run_table { uint8_t unused__; };
+
+static inline size_t PBS_ifl_Run_vec_len(PBS_ifl_Run_vec_t vec)
+__flatbuffers_vec_len(vec)
+static inline PBS_ifl_Run_table_t PBS_ifl_Run_vec_at(PBS_ifl_Run_vec_t vec, size_t i)
+__flatbuffers_offset_vec_at(PBS_ifl_Run_table_t, vec, i, 0)
+__flatbuffers_table_as_root(PBS_ifl_Run)
+
+__flatbuffers_define_string_field(0, PBS_ifl_Run, jobId, 0)
+__flatbuffers_define_string_field(1, PBS_ifl_Run, dest, 0)
+__flatbuffers_define_scalar_field(2, PBS_ifl_Run, resch, flatbuffers_int64, int64_t, INT64_C(0))
+
+struct PBS_ifl_SchedDefRep_table { uint8_t unused__; };
+
+static inline size_t PBS_ifl_SchedDefRep_vec_len(PBS_ifl_SchedDefRep_vec_t vec)
+__flatbuffers_vec_len(vec)
+static inline PBS_ifl_SchedDefRep_table_t PBS_ifl_SchedDefRep_vec_at(PBS_ifl_SchedDefRep_vec_t vec, size_t i)
+__flatbuffers_offset_vec_at(PBS_ifl_SchedDefRep_table_t, vec, i, 0)
+__flatbuffers_table_as_root(PBS_ifl_SchedDefRep)
+
+__flatbuffers_define_scalar_field(0, PBS_ifl_SchedDefRep, cmd, flatbuffers_int16, int16_t, INT16_C(0))
+__flatbuffers_define_string_field(1, PBS_ifl_SchedDefRep, id, 0)
+__flatbuffers_define_scalar_field(2, PBS_ifl_SchedDefRep, err, flatbuffers_int16, int16_t, INT16_C(0))
+__flatbuffers_define_string_field(3, PBS_ifl_SchedDefRep, text, 0)
+
+struct PBS_ifl_Select_table { uint8_t unused__; };
+
+static inline size_t PBS_ifl_Select_vec_len(PBS_ifl_Select_vec_t vec)
+__flatbuffers_vec_len(vec)
+static inline PBS_ifl_Select_table_t PBS_ifl_Select_vec_at(PBS_ifl_Select_vec_t vec, size_t i)
+__flatbuffers_offset_vec_at(PBS_ifl_Select_table_t, vec, i, 0)
+__flatbuffers_table_as_root(PBS_ifl_Select)
+
+__flatbuffers_define_vector_field(0, PBS_ifl_Select, selAttrs, PBS_ifl_Attribute_vec_t, 0)
+__flatbuffers_define_vector_field(1, PBS_ifl_Select, rtnAttrs, PBS_ifl_Attribute_vec_t, 0)
+
+struct PBS_ifl_Track_table { uint8_t unused__; };
+
+static inline size_t PBS_ifl_Track_vec_len(PBS_ifl_Track_vec_t vec)
+__flatbuffers_vec_len(vec)
+static inline PBS_ifl_Track_table_t PBS_ifl_Track_vec_at(PBS_ifl_Track_vec_t vec, size_t i)
+__flatbuffers_offset_vec_at(PBS_ifl_Track_table_t, vec, i, 0)
+__flatbuffers_table_as_root(PBS_ifl_Track)
+
+__flatbuffers_define_scalar_field(0, PBS_ifl_Track, hops, flatbuffers_int16, int16_t, INT16_C(0))
+__flatbuffers_define_string_field(1, PBS_ifl_Track, jobId, 0)
+__flatbuffers_define_string_field(2, PBS_ifl_Track, location, 0)
+__flatbuffers_define_scalar_field(3, PBS_ifl_Track, state, flatbuffers_int8, int8_t, INT8_C(0))
+
+struct PBS_ifl_Register_table { uint8_t unused__; };
+
+static inline size_t PBS_ifl_Register_vec_len(PBS_ifl_Register_vec_t vec)
+__flatbuffers_vec_len(vec)
+static inline PBS_ifl_Register_table_t PBS_ifl_Register_vec_at(PBS_ifl_Register_vec_t vec, size_t i)
+__flatbuffers_offset_vec_at(PBS_ifl_Register_table_t, vec, i, 0)
+__flatbuffers_table_as_root(PBS_ifl_Register)
+
+__flatbuffers_define_string_field(0, PBS_ifl_Register, owner, 0)
+__flatbuffers_define_string_field(1, PBS_ifl_Register, server, 0)
+__flatbuffers_define_string_field(2, PBS_ifl_Register, parent, 0)
+__flatbuffers_define_string_field(3, PBS_ifl_Register, child, 0)
+__flatbuffers_define_scalar_field(4, PBS_ifl_Register, type, flatbuffers_int16, int16_t, INT16_C(0))
+__flatbuffers_define_scalar_field(5, PBS_ifl_Register, op, flatbuffers_int16, int16_t, INT16_C(0))
+__flatbuffers_define_scalar_field(6, PBS_ifl_Register, cost, flatbuffers_int64, int64_t, INT64_C(0))
+
+struct PBS_ifl_CopyHook_table { uint8_t unused__; };
+
+static inline size_t PBS_ifl_CopyHook_vec_len(PBS_ifl_CopyHook_vec_t vec)
+__flatbuffers_vec_len(vec)
+static inline PBS_ifl_CopyHook_table_t PBS_ifl_CopyHook_vec_at(PBS_ifl_CopyHook_vec_t vec, size_t i)
+__flatbuffers_offset_vec_at(PBS_ifl_CopyHook_table_t, vec, i, 0)
+__flatbuffers_table_as_root(PBS_ifl_CopyHook)
+
+__flatbuffers_define_scalar_field(0, PBS_ifl_CopyHook, seq, flatbuffers_int16, int16_t, INT16_C(0))
+__flatbuffers_define_scalar_field(1, PBS_ifl_CopyHook, size, flatbuffers_int64, int64_t, INT64_C(0))
+__flatbuffers_define_string_field(2, PBS_ifl_CopyHook, filename, 0)
+__flatbuffers_define_string_field(3, PBS_ifl_CopyHook, data, 0)
+
+struct PBS_ifl_FilePair_table { uint8_t unused__; };
+
+static inline size_t PBS_ifl_FilePair_vec_len(PBS_ifl_FilePair_vec_t vec)
+__flatbuffers_vec_len(vec)
+static inline PBS_ifl_FilePair_table_t PBS_ifl_FilePair_vec_at(PBS_ifl_FilePair_vec_t vec, size_t i)
+__flatbuffers_offset_vec_at(PBS_ifl_FilePair_table_t, vec, i, 0)
+__flatbuffers_table_as_root(PBS_ifl_FilePair)
+
+__flatbuffers_define_string_field(0, PBS_ifl_FilePair, local, 0)
+__flatbuffers_define_string_field(1, PBS_ifl_FilePair, remote, 0)
+__flatbuffers_define_scalar_field(2, PBS_ifl_FilePair, flag, flatbuffers_int16, int16_t, INT16_C(0))
+
+struct PBS_ifl_CopyFile_table { uint8_t unused__; };
+
+static inline size_t PBS_ifl_CopyFile_vec_len(PBS_ifl_CopyFile_vec_t vec)
+__flatbuffers_vec_len(vec)
+static inline PBS_ifl_CopyFile_table_t PBS_ifl_CopyFile_vec_at(PBS_ifl_CopyFile_vec_t vec, size_t i)
+__flatbuffers_offset_vec_at(PBS_ifl_CopyFile_table_t, vec, i, 0)
+__flatbuffers_table_as_root(PBS_ifl_CopyFile)
+
+__flatbuffers_define_string_field(0, PBS_ifl_CopyFile, jobId, 0)
+__flatbuffers_define_string_field(1, PBS_ifl_CopyFile, owener, 0)
+__flatbuffers_define_string_field(2, PBS_ifl_CopyFile, user, 0)
+__flatbuffers_define_string_field(3, PBS_ifl_CopyFile, group, 0)
+__flatbuffers_define_scalar_field(4, PBS_ifl_CopyFile, flags, flatbuffers_int16, int16_t, INT16_C(0))
+__flatbuffers_define_vector_field(5, PBS_ifl_CopyFile, pairs, PBS_ifl_FilePair_vec_t, 0)
 typedef uint8_t PBS_ifl_ReqBody_union_type_t;
 __flatbuffers_define_integer_type(PBS_ifl_ReqBody, PBS_ifl_ReqBody_union_type_t, 8)
 __flatbuffers_define_union(flatbuffers_, PBS_ifl_ReqBody)
 #define PBS_ifl_ReqBody_NONE ((PBS_ifl_ReqBody_union_type_t)UINT8_C(0))
 #define PBS_ifl_ReqBody_Qjob ((PBS_ifl_ReqBody_union_type_t)UINT8_C(1))
+#define PBS_ifl_ReqBody_Jobfile ((PBS_ifl_ReqBody_union_type_t)UINT8_C(2))
+#define PBS_ifl_ReqBody_Jobid ((PBS_ifl_ReqBody_union_type_t)UINT8_C(3))
+#define PBS_ifl_ReqBody_Manage ((PBS_ifl_ReqBody_union_type_t)UINT8_C(4))
+#define PBS_ifl_ReqBody_Msg ((PBS_ifl_ReqBody_union_type_t)UINT8_C(5))
+#define PBS_ifl_ReqBody_DmnCmd ((PBS_ifl_ReqBody_union_type_t)UINT8_C(6))
+#define PBS_ifl_ReqBody_Signal ((PBS_ifl_ReqBody_union_type_t)UINT8_C(7))
+#define PBS_ifl_ReqBody_Stat ((PBS_ifl_ReqBody_union_type_t)UINT8_C(8))
+#define PBS_ifl_ReqBody_Spawn ((PBS_ifl_ReqBody_union_type_t)UINT8_C(9))
+#define PBS_ifl_ReqBody_Auth ((PBS_ifl_ReqBody_union_type_t)UINT8_C(10))
+#define PBS_ifl_ReqBody_Move ((PBS_ifl_ReqBody_union_type_t)UINT8_C(11))
+#define PBS_ifl_ReqBody_Run ((PBS_ifl_ReqBody_union_type_t)UINT8_C(12))
+#define PBS_ifl_ReqBody_SchedDefRep ((PBS_ifl_ReqBody_union_type_t)UINT8_C(13))
+#define PBS_ifl_ReqBody_Select ((PBS_ifl_ReqBody_union_type_t)UINT8_C(14))
+#define PBS_ifl_ReqBody_Track ((PBS_ifl_ReqBody_union_type_t)UINT8_C(15))
+#define PBS_ifl_ReqBody_Register ((PBS_ifl_ReqBody_union_type_t)UINT8_C(16))
+#define PBS_ifl_ReqBody_CopyHook ((PBS_ifl_ReqBody_union_type_t)UINT8_C(17))
+#define PBS_ifl_ReqBody_CopyFile ((PBS_ifl_ReqBody_union_type_t)UINT8_C(18))
 
 static inline const char *PBS_ifl_ReqBody_type_name(PBS_ifl_ReqBody_union_type_t type)
 {
     switch (type) {
     case PBS_ifl_ReqBody_NONE: return "NONE";
     case PBS_ifl_ReqBody_Qjob: return "Qjob";
+    case PBS_ifl_ReqBody_Jobfile: return "Jobfile";
+    case PBS_ifl_ReqBody_Jobid: return "Jobid";
+    case PBS_ifl_ReqBody_Manage: return "Manage";
+    case PBS_ifl_ReqBody_Msg: return "Msg";
+    case PBS_ifl_ReqBody_DmnCmd: return "DmnCmd";
+    case PBS_ifl_ReqBody_Signal: return "Signal";
+    case PBS_ifl_ReqBody_Stat: return "Stat";
+    case PBS_ifl_ReqBody_Spawn: return "Spawn";
+    case PBS_ifl_ReqBody_Auth: return "Auth";
+    case PBS_ifl_ReqBody_Move: return "Move";
+    case PBS_ifl_ReqBody_Run: return "Run";
+    case PBS_ifl_ReqBody_SchedDefRep: return "SchedDefRep";
+    case PBS_ifl_ReqBody_Select: return "Select";
+    case PBS_ifl_ReqBody_Track: return "Track";
+    case PBS_ifl_ReqBody_Register: return "Register";
+    case PBS_ifl_ReqBody_CopyHook: return "CopyHook";
+    case PBS_ifl_ReqBody_CopyFile: return "CopyFile";
     default: return "";
     }
 }
@@ -226,6 +836,23 @@ static inline int PBS_ifl_ReqBody_is_known_type(PBS_ifl_ReqBody_union_type_t typ
     switch (type) {
     case PBS_ifl_ReqBody_NONE: return 1;
     case PBS_ifl_ReqBody_Qjob: return 1;
+    case PBS_ifl_ReqBody_Jobfile: return 1;
+    case PBS_ifl_ReqBody_Jobid: return 1;
+    case PBS_ifl_ReqBody_Manage: return 1;
+    case PBS_ifl_ReqBody_Msg: return 1;
+    case PBS_ifl_ReqBody_DmnCmd: return 1;
+    case PBS_ifl_ReqBody_Signal: return 1;
+    case PBS_ifl_ReqBody_Stat: return 1;
+    case PBS_ifl_ReqBody_Spawn: return 1;
+    case PBS_ifl_ReqBody_Auth: return 1;
+    case PBS_ifl_ReqBody_Move: return 1;
+    case PBS_ifl_ReqBody_Run: return 1;
+    case PBS_ifl_ReqBody_SchedDefRep: return 1;
+    case PBS_ifl_ReqBody_Select: return 1;
+    case PBS_ifl_ReqBody_Track: return 1;
+    case PBS_ifl_ReqBody_Register: return 1;
+    case PBS_ifl_ReqBody_CopyHook: return 1;
+    case PBS_ifl_ReqBody_CopyFile: return 1;
     default: return 0;
     }
 }
@@ -242,6 +869,81 @@ __flatbuffers_table_as_root(PBS_ifl_Req)
 __flatbuffers_define_table_field(0, PBS_ifl_Req, hdr, PBS_ifl_Header_table_t, 0)
 __flatbuffers_define_union_field(flatbuffers_, 2, PBS_ifl_Req, body, PBS_ifl_ReqBody, 0)
 __flatbuffers_define_table_field(3, PBS_ifl_Req, extend, PBS_ifl_Extend_table_t, 0)
+
+struct PBS_ifl_StatResp_table { uint8_t unused__; };
+
+static inline size_t PBS_ifl_StatResp_vec_len(PBS_ifl_StatResp_vec_t vec)
+__flatbuffers_vec_len(vec)
+static inline PBS_ifl_StatResp_table_t PBS_ifl_StatResp_vec_at(PBS_ifl_StatResp_vec_t vec, size_t i)
+__flatbuffers_offset_vec_at(PBS_ifl_StatResp_table_t, vec, i, 0)
+__flatbuffers_table_as_root(PBS_ifl_StatResp)
+
+__flatbuffers_define_scalar_field(0, PBS_ifl_StatResp, type, flatbuffers_int16, int16_t, INT16_C(0))
+__flatbuffers_define_string_field(1, PBS_ifl_StatResp, name, 0)
+__flatbuffers_define_vector_field(2, PBS_ifl_StatResp, attrs, PBS_ifl_Attribute_vec_t, 0)
+
+struct PBS_ifl_SelectRespBody_table { uint8_t unused__; };
+
+static inline size_t PBS_ifl_SelectRespBody_vec_len(PBS_ifl_SelectRespBody_vec_t vec)
+__flatbuffers_vec_len(vec)
+static inline PBS_ifl_SelectRespBody_table_t PBS_ifl_SelectRespBody_vec_at(PBS_ifl_SelectRespBody_vec_t vec, size_t i)
+__flatbuffers_offset_vec_at(PBS_ifl_SelectRespBody_table_t, vec, i, 0)
+__flatbuffers_table_as_root(PBS_ifl_SelectRespBody)
+
+__flatbuffers_define_vector_field(0, PBS_ifl_SelectRespBody, ids, flatbuffers_string_vec_t, 0)
+
+struct PBS_ifl_StatRespBody_table { uint8_t unused__; };
+
+static inline size_t PBS_ifl_StatRespBody_vec_len(PBS_ifl_StatRespBody_vec_t vec)
+__flatbuffers_vec_len(vec)
+static inline PBS_ifl_StatRespBody_table_t PBS_ifl_StatRespBody_vec_at(PBS_ifl_StatRespBody_vec_t vec, size_t i)
+__flatbuffers_offset_vec_at(PBS_ifl_StatRespBody_table_t, vec, i, 0)
+__flatbuffers_table_as_root(PBS_ifl_StatRespBody)
+
+__flatbuffers_define_vector_field(0, PBS_ifl_StatRespBody, jobs, PBS_ifl_StatResp_vec_t, 0)
+typedef uint8_t PBS_ifl_RespBody_union_type_t;
+__flatbuffers_define_integer_type(PBS_ifl_RespBody, PBS_ifl_RespBody_union_type_t, 8)
+__flatbuffers_define_union(flatbuffers_, PBS_ifl_RespBody)
+#define PBS_ifl_RespBody_NONE ((PBS_ifl_RespBody_union_type_t)UINT8_C(0))
+#define PBS_ifl_RespBody_text ((PBS_ifl_RespBody_union_type_t)UINT8_C(1))
+#define PBS_ifl_RespBody_selects ((PBS_ifl_RespBody_union_type_t)UINT8_C(2))
+#define PBS_ifl_RespBody_stats ((PBS_ifl_RespBody_union_type_t)UINT8_C(3))
+
+static inline const char *PBS_ifl_RespBody_type_name(PBS_ifl_RespBody_union_type_t type)
+{
+    switch (type) {
+    case PBS_ifl_RespBody_NONE: return "NONE";
+    case PBS_ifl_RespBody_text: return "text";
+    case PBS_ifl_RespBody_selects: return "selects";
+    case PBS_ifl_RespBody_stats: return "stats";
+    default: return "";
+    }
+}
+
+static inline int PBS_ifl_RespBody_is_known_type(PBS_ifl_RespBody_union_type_t type)
+{
+    switch (type) {
+    case PBS_ifl_RespBody_NONE: return 1;
+    case PBS_ifl_RespBody_text: return 1;
+    case PBS_ifl_RespBody_selects: return 1;
+    case PBS_ifl_RespBody_stats: return 1;
+    default: return 0;
+    }
+}
+
+
+struct PBS_ifl_Resp_table { uint8_t unused__; };
+
+static inline size_t PBS_ifl_Resp_vec_len(PBS_ifl_Resp_vec_t vec)
+__flatbuffers_vec_len(vec)
+static inline PBS_ifl_Resp_table_t PBS_ifl_Resp_vec_at(PBS_ifl_Resp_vec_t vec, size_t i)
+__flatbuffers_offset_vec_at(PBS_ifl_Resp_table_t, vec, i, 0)
+__flatbuffers_table_as_root(PBS_ifl_Resp)
+
+__flatbuffers_define_scalar_field(0, PBS_ifl_Resp, code, flatbuffers_int16, int16_t, INT16_C(0))
+__flatbuffers_define_scalar_field(1, PBS_ifl_Resp, auxCode, flatbuffers_int16, int16_t, INT16_C(0))
+__flatbuffers_define_scalar_field(2, PBS_ifl_Resp, choice, flatbuffers_int16, int16_t, INT16_C(0))
+__flatbuffers_define_union_field(flatbuffers_, 4, PBS_ifl_Resp, body, PBS_ifl_RespBody, 0)
 
 
 #include "flatcc/flatcc_epilogue.h"
