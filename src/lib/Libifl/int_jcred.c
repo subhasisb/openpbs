@@ -88,9 +88,9 @@ PBSD_jcred(int c, int type, char *buf, int len, int rpp, char **msgid)
 			return rc;
 	}
 
-	if ((rc =encode_DIS_ReqHdr(sock, PBS_BATCH_JobCred, pbs_current_user)) ||
-		(rc = encode_DIS_JobCred(sock, type, buf, len)) ||
-		(rc = encode_DIS_ReqExtend(sock, NULL))) {
+	if ((rc =encode_wire_ReqHdr(sock, PBS_BATCH_JobCred, pbs_current_user)) ||
+		(rc = encode_wire_JobCred(sock, type, buf, len)) ||
+		(rc = encode_wire_ReqExtend(sock, NULL))) {
 		if (!rpp) {
 			connection[c].ch_errtxt = strdup(dis_emsg[rc]);
 			if (connection[c].ch_errtxt == NULL)

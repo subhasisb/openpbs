@@ -93,9 +93,9 @@ PBSD_mgr_put(int c, int function, int command, int objtype, char *objname,
 			return rc;
 	}
 
-	if ((rc = encode_DIS_ReqHdr(sock, function, pbs_current_user)) ||
-		(rc = encode_DIS_Manage(sock, command, objtype, objname, aoplp)) ||
-		(rc = encode_DIS_ReqExtend(sock, extend))) {
+	if ((rc = encode_wire_ReqHdr(sock, function, pbs_current_user)) ||
+		(rc = encode_wire_Manage(sock, command, objtype, objname, aoplp)) ||
+		(rc = encode_wire_ReqExtend(sock, extend))) {
 		if (!rpp) {
 			connection[c].ch_errtxt = strdup(dis_emsg[rc]);
 			if (connection[c].ch_errtxt == NULL)

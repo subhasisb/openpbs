@@ -62,7 +62,7 @@
  */
 
 int
-encode_DIS_UserCred(int sock, char *user, int type, char *cred, int len)
+encode_wire_UserCred(int sock, char *user, int type, char *cred, int len)
 {
 	int   rc;
 
@@ -90,7 +90,7 @@ encode_DIS_UserCred(int sock, char *user, int type, char *cred, int len)
  */
 
 int
-encode_DIS_UserMigrate(int sock, char *tohost)
+encode_wire_UserMigrate(int sock, char *tohost)
 {
 	int   rc;
 

@@ -57,9 +57,9 @@ send_terminate(int sock, int manner, char *extend)
 	/* setup DIS support routines for following DIS calls */
 	DIS_tcp_setup(sock);
 
-	if ((rc=encode_DIS_ReqHdr(sock, PBS_BATCH_Shutdown, pbs_current_user)) ||
-		(rc = encode_DIS_ShutDown(sock, manner)) ||
-		(rc = encode_DIS_ReqExtend(sock, extend))) {
+	if ((rc=encode_wire_ReqHdr(sock, PBS_BATCH_Shutdown, pbs_current_user)) ||
+		(rc = encode_wire_ShutDown(sock, manner)) ||
+		(rc = encode_wire_ReqExtend(sock, extend))) {
 		return PBSE_PROTOCOL;
 	}
 	if (DIS_tcp_wflush(sock)) {

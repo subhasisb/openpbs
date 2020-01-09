@@ -200,9 +200,9 @@ PBSD_rdytocmt(int connect, char *jobid, int rpp, char **msgid)
 			return rc;
 	}
 
-	if ((rc=encode_DIS_ReqHdr(sock, PBS_BATCH_RdytoCommit, pbs_current_user)) ||
-		(rc = encode_DIS_JobId(sock, jobid))  ||
-		(rc = encode_DIS_ReqExtend(sock, NULL))) {
+	if ((rc=encode_wire_ReqHdr(sock, PBS_BATCH_RdytoCommit, pbs_current_user)) ||
+		(rc = encode_wire_JobId(sock, jobid))  ||
+		(rc = encode_wire_ReqExtend(sock, NULL))) {
 		if (!rpp) {
 			connection[connect].ch_errtxt = strdup(dis_emsg[rc]);
 			if (connection[connect].ch_errtxt == NULL)
@@ -263,9 +263,9 @@ PBSD_commit(int connect, char *jobid, int rpp, char **msgid)
 			return NULL;
 	}
 
-	if ((rc = encode_DIS_ReqHdr(sock, PBS_BATCH_Commit, pbs_current_user)) ||
-		(rc = encode_DIS_JobId(sock, jobid)) ||
-		(rc = encode_DIS_ReqExtend(sock, NULL))) {
+	if ((rc = encode_wire_ReqHdr(sock, PBS_BATCH_Commit, pbs_current_user)) ||
+		(rc = encode_wire_JobId(sock, jobid)) ||
+		(rc = encode_wire_ReqExtend(sock, NULL))) {
 		if (!rpp) {
 			connection[connect].ch_errtxt = strdup(dis_emsg[rc]);
 			if (connection[connect].ch_errtxt == NULL) {
@@ -353,9 +353,9 @@ PBSD_scbuf(int c, int reqtype, int seq, char *buf, int len, char *jobid,
 	if (jobid == NULL)
 		jobid = "";	/* use null string for null pointer */
 
-	if ((rc = encode_DIS_ReqHdr(sock, reqtype, pbs_current_user)) ||
-		(rc = encode_DIS_JobFile(sock, seq, buf, len, jobid, which)) ||
-		(rc = encode_DIS_ReqExtend(sock, NULL))) {
+	if ((rc = encode_wire_ReqHdr(sock, reqtype, pbs_current_user)) ||
+		(rc = encode_wire_JobFile(sock, seq, buf, len, jobid, which)) ||
+		(rc = encode_wire_ReqExtend(sock, NULL))) {
 		if (!rpp) {
 			connection[c].ch_errtxt = strdup(dis_emsg[rc]);
 			if (connection[c].ch_errtxt == NULL)
@@ -582,9 +582,9 @@ PBSD_queuejob(int connect, char *jobid, char *destin, struct attropl *attrib, ch
 	buf = get_encode_buffer(connect);
 
 	/* first, set up the body of the Queue Job request */
-	hdr_ref = encode_DIS_ReqHdr(buf, PBS_BATCH_QueueJob, pbs_current_user);
+	hdr_ref = encode_wire_ReqHdr(buf, PBS_BATCH_QueueJob, pbs_current_user);
 	quejob_ref = encode_wire_QueueJob(buf, jobid, destin, attrib);
-	ext_ref = encode_DIS_ReqExtend(buf, extend);
+	ext_ref = encode_wire_ReqExtend(buf, extend);
 
 	if (hdr_ef == 0 || quejob_ref == 0 || ext_ref == 0) {
 		if (!rpp) {

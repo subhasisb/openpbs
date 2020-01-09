@@ -1170,7 +1170,7 @@ send_sisters_job_update(job *pjob)
 				free_attrlist(&phead);
 				continue;
 			}
-			(void)encode_DIS_svrattrl(np->hn_stream,
+			(void)encode_wire_svrattrl(np->hn_stream,
 							psatl);
 			(void)rpp_flush(np->hn_stream);
 		}
@@ -1190,7 +1190,7 @@ send_sisters_job_update(job *pjob)
 				free_attrlist(&phead);
 				return (-1);
 			}
-			(void)encode_DIS_svrattrl(mtfd, psatl);
+			(void)encode_wire_svrattrl(mtfd, psatl);
 
 			ret = rpp_flush(mtfd);
 			if (ret != DIS_SUCCESS) {
@@ -1233,8 +1233,8 @@ receive_job_update(int stream, job *pjob)
 	attribute_def		*pdef;
 
 	CLEAR_HEAD(lhead);
-	if (decode_DIS_svrattrl(stream, &lhead) != DIS_SUCCESS) {
-		log_err(-1, __func__, "decode_DIS_svrattrl failed");
+	if (decode_wire_svrattrl(stream, &lhead) != DIS_SUCCESS) {
+		log_err(-1, __func__, "decode_wire_svrattrl failed");
 		return (-1);
 	}
 	for (psatl = (svrattrl *)GET_NEXT(lhead);
@@ -2831,7 +2831,7 @@ send_resc_used_to_ms(int stream, char *jobid)
 		return (-1);
 	}
 
-	ret = encode_DIS_svrattrl(stream, psatl);
+	ret = encode_wire_svrattrl(stream, psatl);
 	free_attrlist(&send_head);
 	if (ret != DIS_SUCCESS)
 		return (-1);
@@ -2882,8 +2882,8 @@ recv_resc_used_from_sister(int stream, char *jobid, int nodeidx)
 	pdef = &job_attr_def[(int)JOB_ATR_resc_used];
 
 	CLEAR_HEAD(lhead);
-	if (decode_DIS_svrattrl(stream, &lhead) != DIS_SUCCESS) {
-		sprintf(log_buffer, "decode_DIS_svrattrl failed");
+	if (decode_wire_svrattrl(stream, &lhead) != DIS_SUCCESS) {
+		sprintf(log_buffer, "decode_wire_svrattrl failed");
 		return (-1);
 	}
 	if  ((pjob->ji_resources[nodeidx].nr_used.at_flags & ATR_VFLAG_SET) != 0) {
@@ -3148,8 +3148,8 @@ im_request(int stream, int version)
 
 			pjob->ji_numnodes = hnodenum;
 			CLEAR_HEAD(lhead);
-			if (decode_DIS_svrattrl(stream, &lhead) != DIS_SUCCESS) {
-				sprintf(log_buffer, "decode_DIS_svrattrl failed");
+			if (decode_wire_svrattrl(stream, &lhead) != DIS_SUCCESS) {
+				sprintf(log_buffer, "decode_wire_svrattrl failed");
 				goto err;
 			}
 			/*
@@ -6626,7 +6626,7 @@ send_join_job_restart(int com, eventent *ep, int nth, job *pjob, pbs_list_head *
 		}
 
 		psatl = (svrattrl *)GET_NEXT(*phead);
-		(void)encode_DIS_svrattrl(stream, psatl);
+		(void)encode_wire_svrattrl(stream, psatl);
 	}
 	rpp_flush(stream);
 }
@@ -6693,7 +6693,7 @@ send_join_job_restart_mcast(int mtfd, int com, eventent *ep, int nth, job *pjob,
 		}
 
 		psatl = (svrattrl *)GET_NEXT(*phead);
-		(void)encode_DIS_svrattrl(stream, psatl);
+		(void)encode_wire_svrattrl(stream, psatl);
 	}
 	rpp_flush(stream);
 }

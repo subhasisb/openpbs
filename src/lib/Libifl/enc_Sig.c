@@ -40,7 +40,7 @@
 /**
  * @file	enc_Sig.c
  * @brief
- * encode_DIS_SignalJob() - encode a Signal Job Batch Request
+ * encode_wire_SignalJob() - encode a Signal Job Batch Request
  *
  * @par Data items are:
  * 			string		job id
@@ -68,7 +68,7 @@
  */
 
 int
-encode_DIS_SignalJob(int sock, char *jobid, char *signal)
+encode_wire_SignalJob(int sock, char *jobid, char *signal)
 {
 	int   rc;
 

@@ -40,7 +40,7 @@
 /**
  * @file	enc_Manage.c
  * @brief
- * encode_DIS_Manage() - encode a Manager Batch Request
+ * encode_wire_Manage() - encode a Manager Batch Request
  *
  *	This request is used for most operations where an object is being
  *	created, deleted, or altered.
@@ -73,7 +73,7 @@
  */
 
 int
-encode_DIS_Manage(int sock, int command, int objtype, char *objname, struct attropl *aoplp)
+encode_wire_Manage(int sock, int command, int objtype, char *objname, struct attropl *aoplp)
 {
 	int   rc;
 
@@ -82,5 +82,5 @@ encode_DIS_Manage(int sock, int command, int objtype, char *objname, struct attr
 		(rc = diswst(sock, objname) != 0))
 			return rc;
 
-	return (encode_DIS_attropl(sock, aoplp));
+	return (encode_wire_attropl(sock, aoplp));
 }

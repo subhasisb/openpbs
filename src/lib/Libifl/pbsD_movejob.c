@@ -95,9 +95,9 @@ __pbs_movejob(int c, char *jobid, char *destin, char *extend)
 
 	DIS_tcp_setup(sock);
 
-	if ((rc=encode_DIS_ReqHdr(sock, PBS_BATCH_MoveJob, pbs_current_user)) ||
-		(rc = encode_DIS_MoveJob(sock, jobid, destin))   ||
-		(rc = encode_DIS_ReqExtend(sock, extend))) {
+	if ((rc=encode_wire_ReqHdr(sock, PBS_BATCH_MoveJob, pbs_current_user)) ||
+		(rc = encode_wire_MoveJob(sock, jobid, destin))   ||
+		(rc = encode_wire_ReqExtend(sock, extend))) {
 		connection[c].ch_errtxt = strdup(dis_emsg[rc]);
 		if (connection[c].ch_errtxt == NULL) {
 			pbs_errno = PBSE_SYSTEM;

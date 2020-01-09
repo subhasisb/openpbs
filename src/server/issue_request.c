@@ -530,13 +530,13 @@ issue_Drequest(int conn,
 				if (rc != 0)
 					break;
 			}
-			rc=encode_DIS_ReqHdr(sock, PBS_BATCH_Rerun, pbs_current_user);
+			rc=encode_wire_ReqHdr(sock, PBS_BATCH_Rerun, pbs_current_user);
 			if (rc != 0)
 				break;
-			rc=encode_DIS_JobId(sock, request->rq_ind.rq_rerun);
+			rc=encode_wire_JobId(sock, request->rq_ind.rq_rerun);
 			if (rc != 0)
 				break;
-			rc=encode_DIS_ReqExtend(sock, 0);
+			rc=encode_wire_ReqExtend(sock, 0);
 			if (rc != 0)
 				break;
 			rc = DIS_wflush(sock, rpp);
@@ -549,14 +549,14 @@ issue_Drequest(int conn,
 				if (rc != 0)
 					break;
 			}
-			rc=encode_DIS_ReqHdr(sock,
+			rc=encode_wire_ReqHdr(sock,
 				PBS_BATCH_RegistDep, pbs_current_user);
 			if (rc != 0)
 				break;
-			rc=encode_DIS_Register(sock, request);
+			rc=encode_wire_Register(sock, request);
 			if (rc != 0)
 				break;
-			rc=encode_DIS_ReqExtend(sock, 0);
+			rc=encode_wire_ReqExtend(sock, 0);
 			if (rc != 0)
 				break;
 			rc = DIS_wflush(sock, rpp);
@@ -586,13 +586,13 @@ issue_Drequest(int conn,
 				if (rc != 0)
 					break;
 			}
-			rc=encode_DIS_ReqHdr(sock, PBS_BATCH_TrackJob, pbs_current_user);
+			rc=encode_wire_ReqHdr(sock, PBS_BATCH_TrackJob, pbs_current_user);
 			if (rc != 0)
 				break;
-			rc=encode_DIS_TrackJob(sock, request);
+			rc=encode_wire_TrackJob(sock, request);
 			if (rc != 0)
 				break;
-			rc=encode_DIS_ReqExtend(sock, request->rq_extend);
+			rc=encode_wire_ReqExtend(sock, request->rq_extend);
 			if (rc != 0)
 				break;
 			rc = DIS_wflush(sock, rpp);
@@ -604,14 +604,14 @@ issue_Drequest(int conn,
 				if (rc != 0)
 					break;
 			}
-			rc=encode_DIS_ReqHdr(sock,
+			rc=encode_wire_ReqHdr(sock,
 				PBS_BATCH_CopyFiles, pbs_current_user);
 			if (rc != 0)
 				break;
-			rc=encode_DIS_CopyFiles(sock, request);
+			rc=encode_wire_CopyFiles(sock, request);
 			if (rc != 0)
 				break;
-			rc=encode_DIS_ReqExtend(sock, 0);
+			rc=encode_wire_ReqExtend(sock, 0);
 			if (rc != 0)
 				break;
 			rc = DIS_wflush(sock, rpp);
@@ -623,14 +623,14 @@ issue_Drequest(int conn,
 				if (rc != 0)
 					break;
 			}
-			rc=encode_DIS_ReqHdr(sock,
+			rc=encode_wire_ReqHdr(sock,
 				PBS_BATCH_CopyFiles_Cred, pbs_current_user);
 			if (rc != 0)
 				break;
-			rc=encode_DIS_CopyFiles_Cred(sock, request);
+			rc=encode_wire_CopyFiles_Cred(sock, request);
 			if (rc != 0)
 				break;
-			rc=encode_DIS_ReqExtend(sock, 0);
+			rc=encode_wire_ReqExtend(sock, 0);
 			if (rc != 0)
 				break;
 			rc = DIS_wflush(sock, rpp);
@@ -642,14 +642,14 @@ issue_Drequest(int conn,
 				if (rc != 0)
 					break;
 			}
-			rc=encode_DIS_ReqHdr(sock,
+			rc=encode_wire_ReqHdr(sock,
 				PBS_BATCH_DelFiles, pbs_current_user);
 			if (rc != 0)
 				break;
-			rc=encode_DIS_CopyFiles(sock, request);
+			rc=encode_wire_CopyFiles(sock, request);
 			if (rc != 0)
 				break;
-			rc=encode_DIS_ReqExtend(sock, 0);
+			rc=encode_wire_ReqExtend(sock, 0);
 			if (rc != 0)
 				break;
 			rc = DIS_wflush(sock, rpp);
@@ -661,14 +661,14 @@ issue_Drequest(int conn,
 				if (rc != 0)
 					break;
 			}
-			rc=encode_DIS_ReqHdr(sock,
+			rc=encode_wire_ReqHdr(sock,
 				PBS_BATCH_DelFiles_Cred, pbs_current_user);
 			if (rc != 0)
 				break;
-			rc=encode_DIS_CopyFiles_Cred(sock, request);
+			rc=encode_wire_CopyFiles_Cred(sock, request);
 			if (rc != 0)
 				break;
-			rc=encode_DIS_ReqExtend(sock, 0);
+			rc=encode_wire_ReqExtend(sock, 0);
 			if (rc != 0)
 				break;
 			rc = DIS_wflush(sock, rpp);
@@ -681,13 +681,13 @@ issue_Drequest(int conn,
 #else	/* PBS_MOM */
 
 		case PBS_BATCH_JobObit:
-			rc=encode_DIS_ReqHdr(sock, PBS_BATCH_JobObit, pbs_current_user);
+			rc=encode_wire_ReqHdr(sock, PBS_BATCH_JobObit, pbs_current_user);
 			if (rc != 0)
 				break;
-			rc=encode_DIS_JobObit(sock, request);
+			rc=encode_wire_JobObit(sock, request);
 			if (rc != 0)
 				break;
-			rc=encode_DIS_ReqExtend(sock, 0);
+			rc=encode_wire_ReqExtend(sock, 0);
 			if (rc != 0)
 				break;
 			rc = DIS_wflush(sock, rpp);

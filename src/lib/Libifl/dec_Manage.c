@@ -40,7 +40,7 @@
 /**
  * @file	dec_Manage.c
  * @brief
- * decode_DIS_Manage() - decode a Manager Batch Request
+ * decode_wire_Manage() - decode a Manager Batch Request
  *
  *	This request is used for most operations where an object is being
  *	created, deleted, or altered.
@@ -94,7 +94,7 @@
  */
 
 int
-decode_DIS_Manage(int sock, struct batch_request *preq)
+decode_wire_Manage(int sock, struct batch_request *preq)
 {
 	int rc;
 
@@ -105,5 +105,5 @@ decode_DIS_Manage(int sock, struct batch_request *preq)
 	if (rc) return rc;
 	rc = disrfst(sock, PBS_MAXSVRJOBID+1, preq->rq_ind.rq_manager.rq_objname);
 	if (rc) return rc;
-	return (decode_DIS_svrattrl(sock, &preq->rq_ind.rq_manager.rq_attr));
+	return (decode_wire_svrattrl(sock, &preq->rq_ind.rq_manager.rq_attr));
 }

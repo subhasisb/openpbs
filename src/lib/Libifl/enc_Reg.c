@@ -40,7 +40,7 @@
 /**
  * @file	enc_Reg.c
  * @brief
- * encode_DIS_Register() - encode a Register Dependency Batch Request
+ * encode_wire_Register() - encode a Register Dependency Batch Request
  *
  *	This request is used by the server ONLY; its input is a server
  *	batch request structure.
@@ -91,7 +91,7 @@
  */
 
 int
-encode_DIS_Register(int sock, struct batch_request *preq)
+encode_wire_Register(int sock, struct batch_request *preq)
 {
 	int   rc;
 

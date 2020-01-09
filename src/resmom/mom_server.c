@@ -1491,7 +1491,7 @@ send_resc_used(int cmd, int count, struct resc_used_update *rud)
 		if (ret != DIS_SUCCESS)
 			goto err;
 
-		ret = encode_DIS_svrattrl(shard_server_stream,
+		ret = encode_wire_svrattrl(shard_server_stream,
 			(svrattrl *)GET_NEXT(rud->ru_attr));
 		if (ret != DIS_SUCCESS)
 			goto err;

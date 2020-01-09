@@ -40,7 +40,7 @@
 /**
  * @file	dec_ReqHdr.c
  * @brief
- * decode_DIS_ReqHdr() - Decode the Request Header Fields
+ * decode_wire_ReqHdr() - Decode the Request Header Fields
  *	common to all requests
  *
  * @par	Fields are:
@@ -82,7 +82,7 @@
  */
 
 int
-decode_DIS_ReqHdr(int sock, struct batch_request *preq, int *proto_type, int *proto_ver)
+decode_wire_ReqHdr(int sock, struct batch_request *preq, int *proto_type, int *proto_ver)
 {
 	int rc;
 

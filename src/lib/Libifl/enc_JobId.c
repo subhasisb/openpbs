@@ -40,7 +40,7 @@
 /**
  * @file	enc_JobId.c
  * @brief
- * encode_DIS_JobId() - encode a Job ID string
+ * encode_wire_JobId() - encode a Job ID string
  *
  * @par This is used for the following batch requests:
  *		Ready_to_Commit
@@ -76,7 +76,7 @@
  */
 
 int
-encode_DIS_JobId(int sock, char *jobid)
+encode_wire_JobId(int sock, char *jobid)
 {
 	return (diswst(sock, jobid));
 }

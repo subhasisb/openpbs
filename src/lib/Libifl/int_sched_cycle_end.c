@@ -73,9 +73,9 @@ PBSD_sched_cycle_end_put(int sock, char *scname, int start_or_end, char *extend,
 	struct batch_reply *reply;
 
 	DIS_tcp_setup(sock);
-	if ((rc = encode_DIS_ReqHdr(sock, PBS_BATCH_SchedCycleEnd, pbs_current_user)) ||
-		(rc = encode_DIS_SchedCycleEnd(sock, scname, start_or_end)) ||
-		(rc = encode_DIS_ReqExtend(sock, extend))) {
+	if ((rc = encode_wire_ReqHdr(sock, PBS_BATCH_SchedCycleEnd, pbs_current_user)) ||
+		(rc = encode_wire_SchedCycleEnd(sock, scname, start_or_end)) ||
+		(rc = encode_wire_ReqExtend(sock, extend))) {
 		return (pbs_errno = PBSE_PROTOCOL);
 	}
 	if (DIS_wflush(sock, rpp)) {

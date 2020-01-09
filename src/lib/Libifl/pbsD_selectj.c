@@ -187,10 +187,10 @@ PBSD_select_put(int c, int type, struct attropl *attrib,
 
 	DIS_tcp_setup(sock);
 
-	if ((rc = encode_DIS_ReqHdr(sock, type, pbs_current_user)) ||
-		(rc = encode_DIS_attropl(sock, attrib)) ||
-		(rc = encode_DIS_attrl(sock, rattrib))  ||
-		(rc = encode_DIS_ReqExtend(sock, extend))) {
+	if ((rc = encode_wire_ReqHdr(sock, type, pbs_current_user)) ||
+		(rc = encode_wire_attropl(sock, attrib)) ||
+		(rc = encode_wire_attrl(sock, rattrib))  ||
+		(rc = encode_wire_ReqExtend(sock, extend))) {
 		connection[c].ch_errtxt = strdup(dis_emsg[rc]);
 		if (connection[c].ch_errtxt == NULL) {
 			pbs_errno = PBSE_SYSTEM;

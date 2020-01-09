@@ -512,11 +512,11 @@ return_file(job *pjob, enum job_file which, int sock)
 
 
 		DIS_tcp_setup(sock);
-		if ((rc = encode_DIS_ReqHdr(sock, PBS_BATCH_MvJobFile,
+		if ((rc = encode_wire_ReqHdr(sock, PBS_BATCH_MvJobFile,
 			pbs_current_user)) ||
-			(rc = encode_DIS_JobFile(sock, seq++, buf, amt,
+			(rc = encode_wire_JobFile(sock, seq++, buf, amt,
 			pjob->ji_qs.ji_jobid, which)) ||
-			(rc = encode_DIS_ReqExtend(sock, NULL))) {
+			(rc = encode_wire_ReqExtend(sock, NULL))) {
 			break;
 		}
 

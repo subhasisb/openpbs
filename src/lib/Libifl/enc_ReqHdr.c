@@ -40,7 +40,7 @@
 /**
  * @file	enc_ReqHdr.c
  * @brief
- * encode_DIS_ReqHdr() - DIS encode a Request Header
+ * encode_wire_ReqHdr() - DIS encode a Request Header
  * @par	Fields are:
  * 			Protocol ID (unsigned integer)
  *			Protocol Version (unsigned integer)
@@ -68,7 +68,7 @@
  */
 
 int
-encode_DIS_ReqHdr(int sock, int reqt, char *user)
+encode_wire_ReqHdr(int sock, int reqt, char *user)
 {
 	int rc;
 

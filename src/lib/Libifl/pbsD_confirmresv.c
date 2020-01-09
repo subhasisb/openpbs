@@ -93,9 +93,9 @@ pbs_confirmresv(int c, char *rid, char *location, unsigned long start,
 
 	/* send run request */
 
-	if ((rc = encode_DIS_ReqHdr(sock, PBS_BATCH_ConfirmResv, pbs_current_user)) ||
-		(rc = encode_DIS_Run(sock, rid, location, start)) ||
-		(rc = encode_DIS_ReqExtend(sock, extend))) {
+	if ((rc = encode_wire_ReqHdr(sock, PBS_BATCH_ConfirmResv, pbs_current_user)) ||
+		(rc = encode_wire_Run(sock, rid, location, start)) ||
+		(rc = encode_wire_ReqExtend(sock, extend))) {
 		connection[c].ch_errtxt = strdup(dis_emsg[rc]);
 		if (connection[c].ch_errtxt == NULL) {
 			pbs_errno = PBSE_SYSTEM;

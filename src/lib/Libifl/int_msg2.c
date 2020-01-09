@@ -83,10 +83,10 @@ PBSD_msg_put(int c, char *jobid, int fileopt, char *msg, char *extend, int rpp, 
 			return rc;
 	}
 
-	if ((rc = encode_DIS_ReqHdr(sock, PBS_BATCH_MessJob,
+	if ((rc = encode_wire_ReqHdr(sock, PBS_BATCH_MessJob,
 		pbs_current_user)) ||
-		(rc = encode_DIS_MessageJob(sock, jobid, fileopt, msg)) ||
-		(rc = encode_DIS_ReqExtend(sock, extend))) {
+		(rc = encode_wire_MessageJob(sock, jobid, fileopt, msg)) ||
+		(rc = encode_wire_ReqExtend(sock, extend))) {
 		return (pbs_errno = PBSE_PROTOCOL);
 	}
 	if (DIS_wflush(sock, rpp)) {
@@ -128,10 +128,10 @@ PBSD_py_spawn_put(int c, char *jobid, char **argv, char **envp, int rpp, char **
 			return rc;
 	}
 
-	if ((rc = encode_DIS_ReqHdr(sock, PBS_BATCH_PySpawn,
+	if ((rc = encode_wire_ReqHdr(sock, PBS_BATCH_PySpawn,
 		pbs_current_user)) ||
-		(rc = encode_DIS_PySpawn(sock, jobid, argv, envp)) ||
-		(rc = encode_DIS_ReqExtend(sock, NULL))) {
+		(rc = encode_wire_PySpawn(sock, jobid, argv, envp)) ||
+		(rc = encode_wire_ReqExtend(sock, NULL))) {
 			return (pbs_errno = PBSE_PROTOCOL);
 	}
 
@@ -170,10 +170,10 @@ char   **msgid;
 			return rc;
 	}
 
-	if ((rc = encode_DIS_ReqHdr(sock, PBS_BATCH_RelnodesJob,
+	if ((rc = encode_wire_ReqHdr(sock, PBS_BATCH_RelnodesJob,
 		pbs_current_user)) ||
-		(rc = encode_DIS_RelnodesJob(sock, jobid, node_list)) ||
-		(rc = encode_DIS_ReqExtend(sock, extend))) {
+		(rc = encode_wire_RelnodesJob(sock, jobid, node_list)) ||
+		(rc = encode_wire_ReqExtend(sock, extend))) {
 		return (pbs_errno = PBSE_PROTOCOL);
 	}
 	if (DIS_wflush(sock, rpp)) {

@@ -52,7 +52,7 @@
  * @return - error code while writing data to the socket.
  */
 int
-encode_DIS_ModifyResv(int sock, char *resv_id, struct attropl *aoplp)
+encode_wire_ModifyResv(int sock, char *resv_id, struct attropl *aoplp)
 {
 	int   rc = 0;
 
@@ -63,6 +63,6 @@ encode_DIS_ModifyResv(int sock, char *resv_id, struct attropl *aoplp)
 		((rc = diswst(sock, resv_id)) != 0))
 			return rc;
 
-	return (encode_DIS_attropl(sock, aoplp));
+	return (encode_wire_attropl(sock, aoplp));
 }
 

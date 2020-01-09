@@ -79,7 +79,7 @@
  */
 
 int
-decode_DIS_Rescl(int sock, struct batch_request *preq)
+decode_wire_Rescl(int sock, struct batch_request *preq)
 {
 	int    ct;
 	int    i;

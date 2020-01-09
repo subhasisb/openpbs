@@ -104,7 +104,7 @@ pbs_defschreply(int c, int cmd, char *id, int err, char *txt, char *extend)
 
 	/* encode request */
 
-	if ((rc = encode_DIS_ReqHdr(sock, PBS_BATCH_DefSchReply,
+	if ((rc = encode_wire_ReqHdr(sock, PBS_BATCH_DefSchReply,
 		pbs_current_user)) ||
 		(rc = diswui(sock, cmd)  != 0)                        ||
 		(rc = diswst(sock, id)  != 0)                        ||
@@ -123,7 +123,7 @@ pbs_defschreply(int c, int cmd, char *id, int err, char *txt, char *extend)
 		rc = diswst(sock, txt);
 	}
 	if (rc == 0)
-		rc = encode_DIS_ReqExtend(sock, extend);
+		rc = encode_wire_ReqExtend(sock, extend);
 	if (rc) {
 		connection[c].ch_errtxt = strdup(dis_emsg[rc]);
 		if (connection[c].ch_errtxt == NULL) {

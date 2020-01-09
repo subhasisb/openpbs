@@ -40,7 +40,7 @@
 /**
  * @file	dec_ReqExt.c
  * @brief
- * decode_DIS_ReqExtend() - decode a batch_request Extend string
+ * decode_wire_ReqExtend() - decode a batch_request Extend string
  *
  *	The batch_request structure must already exist (be allocated by the
  *	caller.   It is assumed that the header fields (protocol type,
@@ -85,7 +85,7 @@
  */
 
 int
-decode_DIS_ReqExtend(int sock, struct batch_request *preq)
+decode_wire_ReqExtend(int sock, struct batch_request *preq)
 {
 	int i;
 	int rc;

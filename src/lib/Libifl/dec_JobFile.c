@@ -40,7 +40,7 @@
 /**
  * @file	dec_JobFile.c
  * @brief
- * decode_DIS_JobFile() - decode a Job Related Job File Move request
+ * decode_wire_JobFile() - decode a Job Related Job File Move request
  *
  *	Data items are:
  *		      :	u int	block sequence number\n
@@ -84,7 +84,7 @@
  */
 
 int
-decode_DIS_JobFile(int sock, struct batch_request *preq)
+decode_wire_JobFile(int sock, struct batch_request *preq)
 {
 	int   rc;
 	size_t amt;

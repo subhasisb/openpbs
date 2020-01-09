@@ -40,7 +40,7 @@
 /**
  * @file	dec_JobId.c
  * @brief
- * 	decode_DIS_JobId() - decode a Job ID string into a batch_request
+ * 	decode_wire_JobId() - decode a Job ID string into a batch_request
  *
  *	This is used for the following batch requests:
  *		Ready_to_Commit
@@ -64,7 +64,7 @@
 
 /**
  * @brief
- *	decode_DIS_JobId() - decode a Job ID string into a batch_request
+ *	decode_wire_JobId() - decode a Job ID string into a batch_request
  *
  * @par Functionality:
  *		This is used for the following batch requests:\n
@@ -83,7 +83,7 @@
  */
 
 int
-decode_DIS_JobId(int sock, char *jobid)
+decode_wire_JobId(int sock, char *jobid)
 {
 	return (disrfst(sock, PBS_MAXSVRJOBID+1, jobid));
 }

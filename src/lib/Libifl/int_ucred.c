@@ -95,9 +95,9 @@ PBSD_ucred(int c, char *user, int type, char *buf, int len)
 
 	DIS_tcp_setup(sock);
 
-	if ((rc =encode_DIS_ReqHdr(sock, PBS_BATCH_UserCred, pbs_current_user)) ||
-		(rc = encode_DIS_UserCred(sock, user, type, buf, len)) ||
-		(rc = encode_DIS_ReqExtend(sock, NULL))) {
+	if ((rc =encode_wire_ReqHdr(sock, PBS_BATCH_UserCred, pbs_current_user)) ||
+		(rc = encode_wire_UserCred(sock, user, type, buf, len)) ||
+		(rc = encode_wire_ReqExtend(sock, NULL))) {
 		connection[c].ch_errtxt = strdup(dis_emsg[rc]);
 		if (connection[c].ch_errtxt == NULL) {
 			pbs_errno = PBSE_SYSTEM;
@@ -157,10 +157,10 @@ PBSD_user_migrate(int c, char *tohost)
 	sock = connection[c].ch_socket;
 	DIS_tcp_setup(sock);
 
-	if ((rc =encode_DIS_ReqHdr(sock, PBS_BATCH_UserMigrate,
+	if ((rc =encode_wire_ReqHdr(sock, PBS_BATCH_UserMigrate,
 		pbs_current_user)) ||
-		(rc = encode_DIS_UserMigrate(sock, tohost)) ||
-		(rc = encode_DIS_ReqExtend(sock, NULL))) {
+		(rc = encode_wire_UserMigrate(sock, tohost)) ||
+		(rc = encode_wire_ReqExtend(sock, NULL))) {
 		connection[c].ch_errtxt = strdup(dis_emsg[rc]);
 		if (connection[c].ch_errtxt == NULL) {
 			pbs_errno = PBSE_SYSTEM;

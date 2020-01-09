@@ -40,7 +40,7 @@
 /**
  * @file	enc_Status.c
  * @brief
- * encode_DIS_Status() - encode a Status Job Batch Request
+ * encode_wire_Status() - encode a Status Job Batch Request
  *
  * @par Data items are:
  * 			string		object id
@@ -68,12 +68,12 @@
  */
 
 int
-encode_DIS_Status(int sock, char *objid, struct attrl *pattrl)
+encode_wire_Status(int sock, char *objid, struct attrl *pattrl)
 {
 	int   rc;
 
 	if ((rc = diswst(sock, objid) != 0) ||
-		(rc = encode_DIS_attrl(sock, pattrl) != 0))
+		(rc = encode_wire_attrl(sock, pattrl) != 0))
 			return rc;
 
 	return 0;

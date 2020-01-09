@@ -80,7 +80,7 @@
  */
 
 int
-decode_DIS_attropl(int sock, struct attropl **ppatt)
+decode_wire_attropl(int sock, struct attropl **ppatt)
 {
 	int		 hasresc;
 	int		 i;

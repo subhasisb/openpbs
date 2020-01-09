@@ -40,7 +40,7 @@
 /**
  * @file	enc_JobCred.c
  * @brief
- * encode_DIS_JobCred() - encode a Job Credential Batch Request
+ * encode_wire_JobCred() - encode a Job Credential Batch Request
  *
  * @par Data items are:
  * 			unsigned int	Credential type
@@ -72,7 +72,7 @@
  */
 	
 int
-encode_DIS_JobCred(int sock, int type, char *cred, int len)
+encode_wire_JobCred(int sock, int type, char *cred, int len)
 {
 	int   rc;
 

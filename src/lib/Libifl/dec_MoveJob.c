@@ -40,7 +40,7 @@
 /**
  * @file	dec_MoveJob.c
  * @brief
- * 	decode_DIS_MoveJob() - decode a Move Job batch request
+ * 	decode_wire_MoveJob() - decode a Move Job batch request
  *			  also used for an Order Job batch request
  *
  *	The batch_request structure must already exist (be allocated by the
@@ -87,7 +87,7 @@
  */
 
 int
-decode_DIS_MoveJob(int sock, struct batch_request *preq)
+decode_wire_MoveJob(int sock, struct batch_request *preq)
 {
 	int rc;
 

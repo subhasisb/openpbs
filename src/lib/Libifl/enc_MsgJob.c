@@ -40,7 +40,7 @@
 /**
  * @file	enc_MsgJob.c
  * @brief
- * encode_DIS_MessageJob() - encode a Message Job Batch Request
+ * encode_wire_MessageJob() - encode a Message Job Batch Request
  *
  * @par	Data items are:
  * 			string		job id
@@ -70,7 +70,7 @@
  */
 
 int
-encode_DIS_MessageJob(int sock, char *jobid, int fileopt, char *msg)
+encode_wire_MessageJob(int sock, char *jobid, int fileopt, char *msg)
 {
 	int   rc;
 
@@ -100,7 +100,7 @@ encode_DIS_MessageJob(int sock, char *jobid, int fileopt, char *msg)
  *
  */
 int
-encode_DIS_PySpawn(int sock, char *jobid, char **argv, char **envp)
+encode_wire_PySpawn(int sock, char *jobid, char **argv, char **envp)
 {
 	int	rc, i;
 	char	*cp;
@@ -129,7 +129,7 @@ encode_DIS_PySpawn(int sock, char *jobid, char **argv, char **envp)
 }
 
 int
-encode_DIS_RelnodesJob(int sock, char *jobid, char *node_list)
+encode_wire_RelnodesJob(int sock, char *jobid, char *node_list)
 {
 	int   rc;
 

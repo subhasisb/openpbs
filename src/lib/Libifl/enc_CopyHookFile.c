@@ -68,7 +68,7 @@
  */
 
 int
-encode_DIS_CopyHookFile(int sock, int seq, char *buf, int len, char *filename)
+encode_wire_CopyHookFile(int sock, int seq, char *buf, int len, char *filename)
 {
 	int   rc;
 

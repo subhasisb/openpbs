@@ -40,7 +40,7 @@
 /**
  * @file	dec_Sig.c
  * @brief
- * 	decode_DIS_SignalJob() - decode a Signal Job batch request
+ * 	decode_wire_SignalJob() - decode a Signal Job batch request
  *
  *	The batch_request structure must already exist (be allocated by the
  *	caller.   It is assumed that the header fields (protocol type,
@@ -83,7 +83,7 @@
  */
 
 int
-decode_DIS_SchedCycleEnd(int sock, struct batch_request *preq)
+decode_wire_SchedCycleEnd(int sock, struct batch_request *preq)
 {
 	int rc;
 

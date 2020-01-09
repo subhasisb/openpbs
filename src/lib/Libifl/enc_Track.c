@@ -40,7 +40,7 @@
 /**
  * @file	enc_Track.c
  * @brief
- * encode_DIS_TrackJob() - encode a Track Job Batch Request
+ * encode_wire_TrackJob() - encode a Track Job Batch Request
  *
  *	This request is used by the server ONLY; its input is a server
  *	batch request structure.
@@ -87,7 +87,7 @@
  */
 
 int
-encode_DIS_TrackJob(int sock, struct batch_request *preq)
+encode_wire_TrackJob(int sock, struct batch_request *preq)
 {
 	int   rc;
 

@@ -40,8 +40,8 @@
 /**
  * @file	dec_Authen.c
  * @brief
- * 	decode_DIS_AuthenResvPort() - decode a priv port based authentication request
- * 	decode_DIS_AuthExternal() - decode a External authentication request
+ * 	decode_wire_AuthenResvPort() - decode a priv port based authentication request
+ * 	decode_wire_AuthExternal() - decode a External authentication request
  *
  *	The batch_request structure must already exist (be allocated by the
  *	caller.   It is assumed that the header fields (protocol type,
@@ -71,7 +71,7 @@
  * @retval > 0 on failure
  */
 int
-decode_DIS_AuthenResvPort(int sock, struct batch_request *preq)
+decode_wire_AuthenResvPort(int sock, struct batch_request *preq)
 {
 	int rc;
 
@@ -91,7 +91,7 @@ decode_DIS_AuthenResvPort(int sock, struct batch_request *preq)
  * @retval > 0 on failure
  */
 int
-decode_DIS_AuthExternal(int sock, struct batch_request *preq)
+decode_wire_AuthExternal(int sock, struct batch_request *preq)
 {
 	int rc;
 	int cred_len = 0;

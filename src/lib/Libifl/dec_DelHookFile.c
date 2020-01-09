@@ -67,7 +67,7 @@
  */
 
 int
-decode_DIS_DelHookFile(int sock, struct batch_request *preq)
+decode_wire_DelHookFile(int sock, struct batch_request *preq)
 {
 	int   rc;
 

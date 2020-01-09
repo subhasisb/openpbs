@@ -448,11 +448,11 @@ engage_external_authentication(int sock, int auth_type, int fromsvr, char *ebuf,
 		ret = -1;
 		cred_len = strlen(cred);
 		DIS_tcp_setup(sock);
-		if (encode_DIS_ReqHdr(sock, PBS_BATCH_AuthExternal, pbs_current_user) ||
+		if (encode_wire_ReqHdr(sock, PBS_BATCH_AuthExternal, pbs_current_user) ||
 				diswuc(sock, auth_type) || /* authentication_type */
 				diswsi(sock, cred_len) ||       /* credential length */
 				diswcs(sock, cred, cred_len) || /* credential data */
-				encode_DIS_ReqExtend(sock, NULL)) {
+				encode_wire_ReqExtend(sock, NULL)) {
 			pbs_errno = PBSE_SYSTEM;
 			goto err;
 		}
@@ -578,8 +578,8 @@ internal_tcp_connect(int channel, char *server, int port, char *extend_data)
 
 #if !defined(PBS_SECURITY ) || (PBS_SECURITY == STD )
 	DIS_tcp_setup(sd);
-	if ((i = encode_DIS_ReqHdr(sd, PBS_BATCH_Connect, pbs_current_user)) ||
-		(i = encode_DIS_ReqExtend(sd, extend_data))) {
+	if ((i = encode_wire_ReqHdr(sd, PBS_BATCH_Connect, pbs_current_user)) ||
+		(i = encode_wire_ReqExtend(sd, extend_data))) {
 		pbs_errno = PBSE_SYSTEM;
 		return -1;
 	}
@@ -966,7 +966,7 @@ close_tcp_connection(int sock)
 	char x;
 
 	DIS_tcp_setup(sock);
-	if ((encode_DIS_ReqHdr(sock, PBS_BATCH_Disconnect,
+	if ((encode_wire_ReqHdr(sock, PBS_BATCH_Disconnect,
 		pbs_current_user) == 0) &&
 		(DIS_tcp_wflush(sock) == 0)) {
 		for (;;) {	/* wait for server to close connection */
@@ -1326,9 +1326,9 @@ err:
 
 	/* send "dummy" connect message */
 	DIS_tcp_setup(connection[out].ch_socket);
-	if ((i = encode_DIS_ReqHdr(connection[out].ch_socket,
+	if ((i = encode_wire_ReqHdr(connection[out].ch_socket,
 		PBS_BATCH_Connect, pbs_current_user)) ||
-		(i = encode_DIS_ReqExtend(connection[out].ch_socket,
+		(i = encode_wire_ReqExtend(connection[out].ch_socket,
 		NULL))) {
 		pbs_errno = PBSE_SYSTEM;
 		return -1;

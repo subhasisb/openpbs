@@ -81,7 +81,7 @@
  */
 
 int
-decode_DIS_attrl(int sock, struct attrl **ppatt)
+decode_wire_attrl(int sock, struct attrl **ppatt)
 {
 	int		 hasresc;
 	int		 i;

@@ -74,7 +74,7 @@
  */
 
 int
-decode_DIS_UserCred(int sock, struct batch_request *preq)
+decode_wire_UserCred(int sock, struct batch_request *preq)
 {
 	int rc;
 
@@ -114,7 +114,7 @@ decode_DIS_UserCred(int sock, struct batch_request *preq)
  */
 
 int
-decode_DIS_UserMigrate(int sock, struct batch_request *preq)
+decode_wire_UserMigrate(int sock, struct batch_request *preq)
 {
 	int rc;
 

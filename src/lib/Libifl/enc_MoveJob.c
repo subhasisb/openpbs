@@ -40,7 +40,7 @@
 /**
  * @file	enc_MoveJob.c
  * @brief
- * encode_DIS_MoveJob() - encode a Move Job Batch Request
+ * encode_wire_MoveJob() - encode a Move Job Batch Request
  *			  also used for an Order Job Batch Request
  *
  * @par Data items are:
@@ -70,7 +70,7 @@
  */
 
 int
-encode_DIS_MoveJob(int sock, char *jobid, char *destin)
+encode_wire_MoveJob(int sock, char *jobid, char *destin)
 {
 	int   rc;
 

@@ -40,7 +40,7 @@
 /**
  * @file	enc_Sig.c
  * @brief
- * encode_DIS_SignalJob() - encode a Signal Job Batch Request
+ * encode_wire_SignalJob() - encode a Signal Job Batch Request
  *
  * @par Data items are:
  * 			string		scheduler name
@@ -66,7 +66,7 @@
  */
 
 int
-encode_DIS_SchedCycleEnd(int sock, char *scname, int start_or_end)
+encode_wire_SchedCycleEnd(int sock, char *scname, int start_or_end)
 {
 	int   rc;
 

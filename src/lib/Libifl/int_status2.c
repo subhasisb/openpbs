@@ -86,9 +86,9 @@ PBSD_status_put(int c, int function, char *id, struct attrl *attrib,
 		if ((rc = is_compose_cmd(sock, IS_CMD, msgid)) != DIS_SUCCESS)
 			return rc;
 	}
-	if ((rc = encode_DIS_ReqHdr(sock, function, pbs_current_user))   ||
-		(rc = encode_DIS_Status(sock, id, attrib)) ||
-		(rc = encode_DIS_ReqExtend(sock, extend))) {
+	if ((rc = encode_wire_ReqHdr(sock, function, pbs_current_user))   ||
+		(rc = encode_wire_Status(sock, id, attrib)) ||
+		(rc = encode_wire_ReqExtend(sock, extend))) {
 		if (!rpp) {
 			connection[c].ch_errtxt = strdup(dis_emsg[rc]);
 			if (connection[c].ch_errtxt == NULL)

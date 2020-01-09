@@ -69,7 +69,7 @@
  */
 
 int
-decode_DIS_CopyHookFile(int sock, struct batch_request *preq)
+decode_wire_CopyHookFile(int sock, struct batch_request *preq)
 {
 	int   rc=0;
 	size_t amt;

@@ -245,9 +245,9 @@ main(int argc, char *argv[], char *envp[])
 	for (i=0; i<4; i++) {
 		/* send authentication information */
 
-		if (encode_DIS_ReqHdr(sock, PBS_BATCH_AuthenResvPort, pwent->pw_name) ||
+		if (encode_wire_ReqHdr(sock, PBS_BATCH_AuthenResvPort, pwent->pw_name) ||
 			diswui(sock, parentport) ||
-			encode_DIS_ReqExtend(sock, NULL)) {
+			encode_wire_ReqExtend(sock, NULL)) {
 			return (2);
 		}
 		if (DIS_tcp_wflush(sock)) {

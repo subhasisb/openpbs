@@ -40,7 +40,7 @@
 /**
  * @file	dec_JobCred.c
  * @brief
- * decode_DIS_JobCred() - decode a Job Credential batch request
+ * decode_wire_JobCred() - decode a Job Credential batch request
  *
  *	The batch_request structure must already exist (be allocated by the
  *	caller.   It is assumed that the header fields (protocol type,
@@ -80,7 +80,7 @@
  */
 
 int
-decode_DIS_JobCred(int sock, struct batch_request *preq)
+decode_wire_JobCred(int sock, struct batch_request *preq)
 {
 	int rc;
 

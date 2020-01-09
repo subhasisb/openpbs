@@ -40,7 +40,7 @@
 /**
  * @file	dec_Shut.c
  * @brief
- * decode_DIS_ShutDown() - decode a Server Shut Down batch request
+ * decode_wire_ShutDown() - decode a Server Shut Down batch request
  *
  *	The batch_request structure must already exist (be allocated by the
  *	caller.   It is assumed that the header fields (protocol type,
@@ -83,7 +83,7 @@
  */
 
 int
-decode_DIS_ShutDown(int sock, struct batch_request *preq)
+decode_wire_ShutDown(int sock, struct batch_request *preq)
 {
 	int rc;
 

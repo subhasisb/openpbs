@@ -37,7 +37,7 @@
  */
 
 /*
- * decode_DIS_ModifyResv() - decode a Reservation Modify Request
+ * decode_wire_ModifyResv() - decode a Reservation Modify Request
  *
  *	This request is used for modifying a reservation.
  *
@@ -72,7 +72,7 @@
  * @return DIS error
  */
 int
-decode_DIS_ModifyResv(int sock, struct batch_request *preq)
+decode_wire_ModifyResv(int sock, struct batch_request *preq)
 {
 	int rc = 0;
 
@@ -83,5 +83,5 @@ decode_DIS_ModifyResv(int sock, struct batch_request *preq)
 	rc = disrfst(sock, PBS_MAXSVRJOBID+1, preq->rq_ind.rq_modify.rq_objname);
 	if (rc)
 		return rc;
-	return (decode_DIS_svrattrl(sock, &preq->rq_ind.rq_modify.rq_attr));
+	return (decode_wire_svrattrl(sock, &preq->rq_ind.rq_modify.rq_attr));
 }

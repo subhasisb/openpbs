@@ -40,7 +40,7 @@
 /**
  * @file	dec_rpys.c
  * @brief
- * decode_DIS_replySvr() - decode a Batch Protocol Reply Structure for Server
+ * decode_wire_replySvr() - decode a Batch Protocol Reply Structure for Server
  *
  *	This routine decodes a batch reply into the form used by server.
  *	The only difference between this and the command version is on status
@@ -82,7 +82,7 @@
  *
  */
 int
-decode_DIS_replySvr(int sock, struct batch_reply *reply)
+decode_wire_replySvr(int sock, struct batch_reply *reply)
 {
 	int		      ct;
 	int		      i;
@@ -175,7 +175,7 @@ decode_DIS_replySvr(int sock, struct batch_reply *reply)
 				}
 				append_link(&reply->brp_un.brp_status,
 					&pstsvr->brp_stlink, pstsvr);
-				rc = decode_DIS_svrattrl(sock, &pstsvr->brp_attr);
+				rc = decode_wire_svrattrl(sock, &pstsvr->brp_attr);
 			}
 			break;
 

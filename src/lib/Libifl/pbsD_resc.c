@@ -79,7 +79,7 @@ free_node_pool(struct node_pool *np)
 
 /**
  * @brief
- * 	-encode_DIS_resc() - encode a resource related request,
+ * 	-encode_wire_resc() - encode a resource related request,
  *	Used by pbs_rescquery(), pbs_rescreserve() and pbs_rescfree()
  *
  * @param[in] sock - socket fd
@@ -94,7 +94,7 @@ free_node_pool(struct node_pool *np)
  */
 
 static int
-encode_DIS_Resc(int sock, char **rlist, int ct, pbs_resource_t rh)
+encode_wire_Resc(int sock, char **rlist, int ct, pbs_resource_t rh)
 {
 	int    i;
 	int    rc;
@@ -148,9 +148,9 @@ PBS_resc(int c, int reqtype, char **rescl, int ct, pbs_resource_t rh)
 
 	DIS_tcp_setup(sock);
 
-	if ((rc = encode_DIS_ReqHdr(sock, reqtype, pbs_current_user)) ||
-		(rc = encode_DIS_Resc(sock, rescl, ct, rh)) ||
-		(rc = encode_DIS_ReqExtend(sock, NULL))) {
+	if ((rc = encode_wire_ReqHdr(sock, reqtype, pbs_current_user)) ||
+		(rc = encode_wire_Resc(sock, rescl, ct, rh)) ||
+		(rc = encode_wire_ReqExtend(sock, NULL))) {
 		connection[c].ch_errtxt = strdup(dis_emsg[rc]);
 		if (connection[c].ch_errtxt == NULL) {
 			pbs_errno = PBSE_SYSTEM;

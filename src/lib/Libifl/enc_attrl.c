@@ -40,7 +40,7 @@
 /**
  * @file	enc_attrl.c
  * @brief
- * 	encode_DIS_attrl() - encode a list of PBS API "attrl" structures
+ * 	encode_wire_attrl() - encode a list of PBS API "attrl" structures
  *
  *	The first item encoded is a unsigned integer, a count of the
  *	number of attrl entries in the linked list.  This is encoded
@@ -95,7 +95,7 @@
  */
 
 int
-encode_DIS_attrl(int sock, struct attrl *pattrl)
+encode_wire_attrl(int sock, struct attrl *pattrl)
 {
 	unsigned int ct = 0;
 	unsigned int name_len;

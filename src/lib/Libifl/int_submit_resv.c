@@ -81,9 +81,9 @@ PBSD_submit_resv(int connect, char *resv_id, struct attropl *attrib, char *exten
 
 	/* first, set up the body of the Submit Reservation request */
 
-	if ((rc = encode_DIS_ReqHdr(sock, PBS_BATCH_SubmitResv, pbs_current_user)) ||
-		(rc = encode_DIS_SubmitResv(sock, resv_id, attrib)) ||
-		(rc = encode_DIS_ReqExtend(sock, extend))) {
+	if ((rc = encode_wire_ReqHdr(sock, PBS_BATCH_SubmitResv, pbs_current_user)) ||
+		(rc = encode_wire_SubmitResv(sock, resv_id, attrib)) ||
+		(rc = encode_wire_ReqExtend(sock, extend))) {
 		connection[connect].ch_errtxt = strdup(dis_emsg[rc]);
 		if (connection[connect].ch_errtxt == NULL) {
 			pbs_errno = PBSE_SYSTEM;

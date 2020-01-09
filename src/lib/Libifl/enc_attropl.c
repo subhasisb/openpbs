@@ -40,7 +40,7 @@
 /**
  * @file	enc_attropl.c
  * @brief
- * encode_DIS_attropl() - encode a list of PBS API "attropl" structures
+ * encode_wire_attropl() - encode a list of PBS API "attropl" structures
  *
  *	The first item encoded is a unsigned integer, a count of the
  *	number of attropl entries in the linked list.  This is encoded
@@ -100,7 +100,7 @@
  */
 
 flatbuffers_ref_t
-encode_DIS_attropl(void *buf, struct attropl *pattropl)
+encode_wire_attropl(void *buf, struct attropl *pattropl)
 {
 	struct attropl *ps;
 	flatcc_builder_t *B = (flattcc_builder_t *) buf;

@@ -40,7 +40,7 @@
 /**
  * @file	dec_Reg.c
  * @brief
- * 	decode_DIS_Register() - decode a Register Dependency Batch Request
+ * 	decode_wire_Register() - decode a Register Dependency Batch Request
  *
  *	The batch_request structure must already exist (be allocated by the
  *	caller.   It is assumed that the header fields (protocol type,
@@ -93,7 +93,7 @@
  */
 
 int
-decode_DIS_Register(int sock, struct batch_request *preq)
+decode_wire_Register(int sock, struct batch_request *preq)
 {
 	int   rc;
 

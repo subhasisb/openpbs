@@ -61,7 +61,7 @@
  */
 
 int
-encode_DIS_DelHookFile(int sock, char *filename)
+encode_wire_DelHookFile(int sock, char *filename)
 {
 	int   rc;
 

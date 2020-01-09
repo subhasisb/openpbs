@@ -301,7 +301,7 @@ svr_disconnect_with_wait_option(int handle, int wait)
 
 		sock = connection[handle].ch_socket;
 		DIS_tcp_setup(sock);
-		if ((encode_DIS_ReqHdr(sock, PBS_BATCH_Disconnect, pbs_current_user) == 0) && (DIS_tcp_wflush(sock) == 0)) {
+		if ((encode_wire_ReqHdr(sock, PBS_BATCH_Disconnect, pbs_current_user) == 0) && (DIS_tcp_wflush(sock) == 0)) {
 			conn_t *conn = get_conn(sock);
 
 			/* if no error, will be closed when process_request */

@@ -40,7 +40,7 @@
 /**
  * @file	enc_JobObit.c
  * @brief
- * encode_DIS_JobObit() - encode a Job Obituary Batch Request (Notice)
+ * encode_wire_JobObit() - encode a Job Obituary Batch Request (Notice)
  *
  *	This request is used by the server ONLY; its input is a server
  *	batch request structure.
@@ -84,7 +84,7 @@
  *
  */
 int
-encode_DIS_JobObit(int sock, struct batch_request *preq)
+encode_wire_JobObit(int sock, struct batch_request *preq)
 {
 	int   rc;
 	struct svrattrl *psvrl;
@@ -93,7 +93,7 @@ encode_DIS_JobObit(int sock, struct batch_request *preq)
 
 	if ((rc = diswst(sock, preq->rq_ind.rq_jobobit.rq_jid) != 0) ||
 		(rc = diswsi(sock, preq->rq_ind.rq_jobobit.rq_status) != 0) ||
-		(rc = encode_DIS_svrattrl(sock, psvrl) != 0))
+		(rc = encode_wire_svrattrl(sock, psvrl) != 0))
 			return rc;
 
 	return 0;

@@ -86,9 +86,9 @@ PBSD_sig_put(int c, char *jobid, char *signal, char *extend, int rpp, char **msg
 			return rc;
 	}
 
-	if ((rc = encode_DIS_ReqHdr(sock, PBS_BATCH_SignalJob, pbs_current_user)) ||
-		(rc = encode_DIS_SignalJob(sock, jobid, signal)) ||
-		(rc = encode_DIS_ReqExtend(sock, extend))) {
+	if ((rc = encode_wire_ReqHdr(sock, PBS_BATCH_SignalJob, pbs_current_user)) ||
+		(rc = encode_wire_SignalJob(sock, jobid, signal)) ||
+		(rc = encode_wire_ReqExtend(sock, extend))) {
 		if (!rpp) {
 			connection[c].ch_errtxt = strdup(dis_emsg[rc]);
 			if (connection[c].ch_errtxt == NULL)

@@ -99,10 +99,10 @@ __pbs_asyrunjob(int c, char *jobid, char *location, char *extend)
 
 	/* send run request */
 
-	if ((rc = encode_DIS_ReqHdr(sock, PBS_BATCH_AsyrunJob,
+	if ((rc = encode_wire_ReqHdr(sock, PBS_BATCH_AsyrunJob,
 		pbs_current_user)) ||
-		(rc = encode_DIS_Run(sock, jobid, location, resch)) ||
-		(rc = encode_DIS_ReqExtend(sock, extend))) {
+		(rc = encode_wire_Run(sock, jobid, location, resch)) ||
+		(rc = encode_wire_ReqExtend(sock, extend))) {
 		connection[c].ch_errtxt = strdup(dis_emsg[rc]);
 		if (connection[c].ch_errtxt == NULL) {
 			pbs_errno = PBSE_SYSTEM;

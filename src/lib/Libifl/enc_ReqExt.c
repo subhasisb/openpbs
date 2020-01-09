@@ -40,7 +40,7 @@
 /**
  * @file	enc_ReqExt.c
  * @brief
- * encode_DIS_ReqExtend() - write an extension to a Batch Request
+ * encode_wire_ReqExtend() - write an extension to a Batch Request
  *	The extension is in two parts:
  *		unsigned integer - 1 if an extension string follows, 0 if not
  *		character string - if 1 above
@@ -68,7 +68,7 @@
  */
 
 int
-encode_DIS_ReqExtend(int sock, char *extend)
+encode_wire_ReqExtend(int sock, char *extend)
 {
 	int rc;
 

@@ -96,9 +96,9 @@ __pbs_orderjob(int c, char *job1, char *job2, char *extend)
 
 	DIS_tcp_setup(sock);
 
-	if ((rc = encode_DIS_ReqHdr(sock, PBS_BATCH_OrderJob, pbs_current_user)) ||
-		(rc = encode_DIS_MoveJob(sock, job1, job2)) ||
-		(rc = encode_DIS_ReqExtend(sock, extend))) {
+	if ((rc = encode_wire_ReqHdr(sock, PBS_BATCH_OrderJob, pbs_current_user)) ||
+		(rc = encode_wire_MoveJob(sock, job1, job2)) ||
+		(rc = encode_wire_ReqExtend(sock, extend))) {
 		connection[c].ch_errtxt = strdup(dis_emsg[rc]);
 		if (connection[c].ch_errtxt == NULL) {
 			pbs_errno = PBSE_SYSTEM;

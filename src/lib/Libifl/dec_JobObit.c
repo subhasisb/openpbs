@@ -40,7 +40,7 @@
 /**
  * @file	dec_JobObit.c
  * @brief
- * 	decode_DIS_JobObit() - decode a Job Obituary Batch Request (Notice)
+ * 	decode_wire_JobObit() - decode a Job Obituary Batch Request (Notice)
  *
  *	This request is used by the server ONLY.
  *	The batch request structure must already exist.
@@ -85,7 +85,7 @@
  */
  
 int
-decode_DIS_JobObit(int sock, struct batch_request *preq)
+decode_wire_JobObit(int sock, struct batch_request *preq)
 {
 	int   rc;
 
@@ -97,6 +97,6 @@ decode_DIS_JobObit(int sock, struct batch_request *preq)
 
 	/* decode list of svrattrl (if any) */
 
-	rc = decode_DIS_svrattrl(sock, &preq->rq_ind.rq_jobobit.rq_attr);
+	rc = decode_wire_svrattrl(sock, &preq->rq_ind.rq_jobobit.rq_attr);
 	return rc;
 }

@@ -40,7 +40,7 @@
 /**
  * @file	enc_CpyFil.c
  * @brief
- * encode_DIS_CopyFiles() - encode a Copy Files Dependency Batch Request
+ * encode_wire_CopyFiles() - encode a Copy Files Dependency Batch Request
  *
  *	This request is used by the server ONLY; its input is a server
  *	batch request structure.
@@ -82,7 +82,7 @@
  *
  */
 int
-encode_DIS_CopyFiles(int sock, struct batch_request *preq)
+encode_wire_CopyFiles(int sock, struct batch_request *preq)
 {
 	int   pair_ct = 0;
 	char *nullstr = "";
@@ -120,7 +120,7 @@ encode_DIS_CopyFiles(int sock, struct batch_request *preq)
 
 /**
  * @brief
- * 	-encode_DIS_CopyFiles_Cred() - encode a Copy Files with Credential Dependency
+ * 	-encode_wire_CopyFiles_Cred() - encode a Copy Files with Credential Dependency
  *	Batch Request
  *
  * @par Note:
@@ -151,7 +151,7 @@ encode_DIS_CopyFiles(int sock, struct batch_request *preq)
  *
  */
 int
-encode_DIS_CopyFiles_Cred(int sock, struct batch_request *preq)
+encode_wire_CopyFiles_Cred(int sock, struct batch_request *preq)
 {
 	int			pair_ct = 0;
 	char			*nullstr = "";

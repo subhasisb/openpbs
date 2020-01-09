@@ -40,7 +40,7 @@
 /**
  * @file	enc_svrattrl.c
  * @brief
- * encode_DIS_svrattrl() - encode a list of server "svrattrl" structures
+ * encode_wire_svrattrl() - encode a list of server "svrattrl" structures
  *
  *	The first item encoded is a unsigned integer, a count of the
  *	number of svrattrl entries in the linked list.  This is encoded
@@ -97,7 +97,7 @@
  */
 
 int
-encode_DIS_svrattrl(int sock, svrattrl *psattl)
+encode_wire_svrattrl(int sock, svrattrl *psattl)
 {
 	unsigned int ct = 0;
 	unsigned int name_len;

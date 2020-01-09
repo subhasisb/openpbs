@@ -63,7 +63,7 @@
  *	free_rescrq()
  *	arrayfree()
  *	read_carray()
- *	decode_DIS_PySpawn()
+ *	decode_wire_PySpawn()
  *	free_br()
  *	freebr_manage()
  *	freebr_cpyfile()
@@ -1253,7 +1253,7 @@ read_carray(int stream, char ***arrloc)
  * @param[in]	preq	- the batch_request structure to free up.
  */
 int
-decode_DIS_PySpawn(int sock, struct batch_request *preq)
+decode_wire_PySpawn(int sock, struct batch_request *preq)
 {
 	int	rc;
 
@@ -1286,7 +1286,7 @@ decode_DIS_PySpawn(int sock, struct batch_request *preq)
  * @retval	!= 0	- if not successful (an error encountered along the way)
  */
 int
-decode_DIS_RelnodesJob(int sock, struct batch_request *preq)
+decode_wire_RelnodesJob(int sock, struct batch_request *preq)
 {
 	int rc;
 

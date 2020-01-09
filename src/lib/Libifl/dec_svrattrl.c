@@ -40,7 +40,7 @@
 /**
  * @file	dec_svrattrl.c
  * @brief
- * decode_DIS_svrattrl() - decode into a list of server "svrattrl" structures
+ * decode_wire_svrattrl() - decode into a list of server "svrattrl" structures
  *
  *	The space for the svrattrl structures is allocated as needed.
  *
@@ -110,7 +110,7 @@
  */
 
 int
-decode_DIS_svrattrl(int sock, pbs_list_head *phead)
+decode_wire_svrattrl(int sock, pbs_list_head *phead)
 {
 	int		i;
 	unsigned int	hasresc;

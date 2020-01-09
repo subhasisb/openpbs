@@ -71,7 +71,7 @@
  */
 
 int
-decode_DIS_Status(int sock, struct batch_request *preq)
+decode_wire_Status(int sock, struct batch_request *preq)
 {
 	int    rc;
 	size_t nchars = 0;
@@ -87,6 +87,6 @@ decode_DIS_Status(int sock, struct batch_request *preq)
 	preq->rq_ind.rq_status.rq_id = disrcs(sock, &nchars, &rc);
 	if (rc) return rc;
 
-	rc = decode_DIS_svrattrl(sock, &preq->rq_ind.rq_status.rq_attr);
+	rc = decode_wire_svrattrl(sock, &preq->rq_ind.rq_status.rq_attr);
 	return rc;
 }

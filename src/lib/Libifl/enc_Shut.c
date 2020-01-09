@@ -40,7 +40,7 @@
 /**
  * @file	enc_Shut.c
  * @brief
- * encode_DIS_ShutDown() - encode a Server Shut Down Batch Request
+ * encode_wire_ShutDown() - encode a Server Shut Down Batch Request
  *
  * @par	Data items are:
  * 			unsigned int	manner
@@ -66,7 +66,7 @@
  */
 
 int
-encode_DIS_ShutDown(int sock, int manner)
+encode_wire_ShutDown(int sock, int manner)
 {
 	return (diswui(sock, manner));
 }

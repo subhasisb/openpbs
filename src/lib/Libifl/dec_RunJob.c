@@ -40,7 +40,7 @@
 /**
  * @file	dec_RunJob.c
  * @brief
- * decode_DIS_RunJob() - decode a Run Job batch request
+ * decode_wire_RunJob() - decode a Run Job batch request
  *
  *	The batch_request structure must already exist (be allocated by the
  *	caller.   It is assumed that the header fields (protocol type,
@@ -87,7 +87,7 @@
  */
 
 int
-decode_DIS_Run(int sock, struct batch_request *preq)
+decode_wire_Run(int sock, struct batch_request *preq)
 {
 	int rc;
 
