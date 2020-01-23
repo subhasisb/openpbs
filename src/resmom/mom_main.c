@@ -157,7 +157,7 @@ volatile pbs_mutex      *pbs_commit_ptr = &pbs_commit_mtx;
 #endif
 
 /* Global Data Items */
-
+int mock_run = 0;
 enum hup_action	call_hup = HUP_CLEAR;
 static int      update_state_flag = 0;
 double		cputfactor = 1.00;
@@ -8422,11 +8422,14 @@ main(int argc, char *argv[])
 	}
 
 	errflg = 0;
-	getopt_str = "d:c:M:NS:R:lL:a:xC:prs:n:Q:-:";
+	getopt_str = "d:c:M:mNS:R:lL:a:xC:prs:n:Q:-:";
 	while ((c = getopt(argc, argv, getopt_str)) != -1) {
 		switch (c) {
 			case 'N':	/* stand alone (win), no fork (others) */
 				stalone = 1;
+				break;
+			case 'm':
+				mock_run = 1;
 				break;
 			case 'd':	/* directory */
 				if (pbs_conf.pbs_home_path != NULL)
@@ -9474,7 +9477,8 @@ main(int argc, char *argv[])
 	}
 
 #ifndef	WIN32
-	mom_nice();
+	if (!mock_run)
+		mom_nice();
 #endif
 	/*
 	 * Recover the hooks.

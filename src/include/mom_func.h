@@ -143,6 +143,8 @@ enum hup_action {
  */
 extern enum hup_action	call_hup;
 
+extern int mock_run;
+
 /* public funtions within MOM */
 
 #ifdef	_PBS_JOB_H

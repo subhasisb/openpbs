@@ -2852,6 +2852,27 @@ receive_job_update_request(int sd)
 }
 
 /**
+ * @brief	work task handler for end of a job in mock run mode
+ *
+ * @param[in]	ptask - pointer to the work task
+ *
+ * @return void
+ */
+static void
+mock_run_end_job_task(struct work_task *ptask)
+{
+	job *pjob;
+
+	pjob = ptask->wt_parm1;
+
+	pjob->ji_qs.ji_substate = JOB_SUBSTATE_EXITING;
+	pjob->ji_qs.ji_state = JOB_STATE_EXITING;
+	pjob->ji_qs.ji_un.ji_momt.ji_exitstat = JOB_EXEC_OK;
+
+	scan_for_exiting();
+}
+
+/**
  *
  * @brief
  * 	Used by MOM superior to start the shell process for 'pjob'
@@ -2930,6 +2951,34 @@ finish_exec(job *pjob)
 	FILE			*temp_stderr = stderr;
 	vnl_t			*vnl_fails = NULL;
 	vnl_t			*vnl_good = NULL;
+
+	if (mock_run) {
+		resource_def *rd;
+		attribute *wallt;
+		resource *wall_req;
+		int walltime = 0;
+
+		rd = find_resc_def(svr_resc_def, "walltime", svr_resc_size);
+		wallt = &pjob->ji_wattr[(int)JOB_ATR_resource];
+		wall_req = find_resc_entry(wallt, rd);
+		if (wall_req != NULL) {
+			walltime = wall_req->rs_value.at_val.at_long;
+			start_walltime(pjob);
+		}
+
+		time_now = time(NULL);
+
+		/* Add a work task that runs when the job is supposed to end */
+		set_task(WORK_Timed, time_now + walltime, mock_run_end_job_task, pjob);
+
+		sprintf(log_buffer, "Started mock run of job");
+		log_event(PBSEVENT_JOB, PBS_EVENTCLASS_JOB,
+			LOG_INFO, pjob->ji_qs.ji_jobid, log_buffer);
+
+		mom_set_use(pjob);
+
+		return;
+	}
 
 	ptc = -1; /* No current master pty */
 
@@ -6132,6 +6181,16 @@ start_exec(job *pjob)
 
 	if (do_tolerate_node_failures(pjob))
 		reliable_job_node_add(&pjob->ji_node_list, mom_host);
+
+	if (mock_run) {
+		   pjob->ji_ports[0] = -1;
+		   pjob->ji_ports[1] = -1;
+		   pjob->ji_stdout = -1;
+		   pjob->ji_stderr = -1;
+
+		   finish_exec(pjob);
+		   return;
+	}
 
 	if (nodenum > 1) {
 		attribute *pattr;
