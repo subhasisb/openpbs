@@ -131,7 +131,6 @@ extern struct server   server;
 extern char *msg_abt_err;
 extern char *path_jobs;
 extern char *path_spool;
-extern char *path_resvs;
 extern char  server_name[];
 extern char *pbs_server_name;
 extern pbs_list_head svr_newjobs;
@@ -811,7 +810,7 @@ job_purge(job *pjob)
 	extern	char	*msg_err_purgejob_db;
 	pbs_db_obj_info_t obj;
 	pbs_db_job_info_t dbjob;
-	pbs_db_conn_t *conn = (pbs_db_conn_t *) svr_db_conn;
+	void *conn = (void *) svr_db_conn;
 #endif	/* PBS_MOM */
 
 	if (pjob->ji_rerun_preq != NULL) {

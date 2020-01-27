@@ -72,7 +72,8 @@
 
 
 #ifndef PBS_MOM
-extern pbs_db_conn_t	*svr_db_conn;
+extern void	*svr_db_conn;
+extern char	*msg_init_recovque;
 #endif
 
 /**
@@ -154,7 +155,8 @@ que_save_db(pbs_queue *pque)
 {
 	pbs_db_que_info_t	dbque = {{0}};
 	pbs_db_obj_info_t	obj;
-	pbs_db_conn_t *conn = (pbs_db_conn_t *) svr_db_conn;
+	void *conn = (void *) svr_db_conn;
+	char *conn_db_err = NULL;
 	int savetype;
 	int rc = -1;
 
@@ -175,8 +177,12 @@ done:
 	
 	if (rc != 0) {
 		strcpy(log_buffer, "que_save failed ");
-		if (conn->conn_db_err != NULL)
-			strncat(log_buffer, conn->conn_db_err, LOG_BUF_SIZE - strlen(log_buffer) - 1);
+		pbs_db_get_errmsg(PBS_DB_ERR, &conn_db_err);
+		if (conn_db_err != NULL) {
+			strcat(log_buffer, ", DB_ERR: ");
+			strncat(log_buffer, conn_db_err, LOG_BUF_SIZE - strlen(log_buffer) - 1);
+			free(conn_db_err);
+		}
 		log_err(-1, __func__, log_buffer);
 
 		panic_stop_db(log_buffer);
@@ -239,7 +245,7 @@ que_recov_db(char *qname, pbs_queue	*pq)
 {
 	pbs_db_que_info_t	dbque = {{0}};
 	pbs_db_obj_info_t	obj;
-	pbs_db_conn_t		*conn = (pbs_db_conn_t *) svr_db_conn;
+	void *conn = (void *) svr_db_conn;
 	int rc = -1;
 
 	if (pq) {
@@ -270,8 +276,8 @@ que_recov_db(char *qname, pbs_queue	*pq)
  * @brief
  *	Refresh/retrieve queue from database and add it into AVL tree if not present
  *
- *	@param[in]	dbque - The pointer to the wrapper queue object of type pbs_db_que_info_t
- *  @param[in]  refreshed - To count the no. of queues refreshed
+ *	@param[in]	dbobj - The pointer to the wrapper queue object of type pbs_db_que_info_t
+ *	@param[out]	refreshed - To check if queues refreshed
  *
  * @return	The recovered queue
  * @retval	NULL - Failure
@@ -279,15 +285,14 @@ que_recov_db(char *qname, pbs_queue	*pq)
  *
  */
 pbs_queue *
-refresh_queue(pbs_db_que_info_t *dbque, int *refreshed) 
+refresh_queue(pbs_db_obj_info_t *dbobj, int *refreshed) 
 {
 	char  *pc;
 	pbs_queue *pque = NULL;
 	char   qname[PBS_MAXDEST + 1];
-	extern pbs_list_head	svr_queues; 
+	extern pbs_list_head	svr_queues;
+	pbs_db_que_info_t *dbque = dbobj->pbs_db_un.pbs_db_que;
 
-	*refreshed = 0;
-	
 	(void)strncpy(qname, dbque->qu_name, PBS_MAXDEST);
 	qname[PBS_MAXDEST] ='\0';
 	pc = strchr(qname, (int)'@');	/* strip off server (fragment) */
@@ -323,4 +328,38 @@ err:
 	snprintf(log_buffer, LOG_BUF_SIZE, "Failed to refresh queue %s", dbque->qu_name);
 	log_err(-1, __func__, log_buffer);
 	return NULL;
+}
+
+/**
+ * @brief
+ * 		recov_queue_cb - callback function to process and load
+ * 					  queue database result to pbs structure.
+ *
+ * @param[in]	dbobj	- database queue structure to C.
+ * @param[out]	refreshed - if rows processed.
+ *
+ * @return	resv structure - on success
+ * @return 	NULL - on failure
+ */
+pbs_queue *
+recov_queue_cb(pbs_db_obj_info_t *dbobj, int *refreshed)
+{
+	pbs_db_que_info_t *dbque = dbobj->pbs_db_un.pbs_db_que;
+	pbs_queue *pque = NULL;
+
+	*refreshed = 0;
+	/* recover queue */
+	if ((pque = que_recov_db(dbque->qu_name, NULL)) != NULL) {
+		/* que_recov increments sv_numque */
+		sprintf(log_buffer, msg_init_recovque, pque->qu_qs.qu_name);
+		log_event(PBSEVENT_SYSTEM | PBSEVENT_ADMIN | PBSEVENT_DEBUG, PBS_EVENTCLASS_SERVER, LOG_INFO, msg_daemonname, log_buffer);
+		if (pque->qu_attr[(int) QE_ATR_ResourceAssn].at_flags & ATR_VFLAG_SET)
+			que_attr_def[(int) QE_ATR_ResourceAssn].at_free(&pque->qu_attr[(int) QE_ATR_ResourceAssn]);
+		*refreshed = 1;
+	}
+
+	free_db_attr_list(&dbque->db_attr_list);
+	free_db_attr_list(&dbque->cache_attr_list);
+
+	return pque;
 }

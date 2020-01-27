@@ -101,10 +101,10 @@ extern int svr_chk_histjob(job *);
 
 static int bad;
 
-job *refresh_job(pbs_db_job_info_t *dbjob, int *refreshed);
-pbs_queue *refresh_queue(pbs_db_que_info_t *dbque, int *refreshed);
-resc_resv *refresh_resv(pbs_db_resv_info_t *dbresv, int *refreshed);
-struct pbsnode *refresh_node(pbs_db_node_info_t	*dbnode, int *refreshed);
+job *refresh_job(pbs_db_obj_info_t *dbobj, int *refreshed);
+pbs_queue *refresh_queue(pbs_db_obj_info_t *dbobj, int *refreshed);
+resc_resv *refresh_resv(pbs_db_obj_info_t *dbobj, int *refreshed);
+struct pbsnode *refresh_node(pbs_db_obj_info_t *dbobj, int *refreshed);
 
 /* The following private support functions are included */
 
@@ -128,53 +128,42 @@ get_all_db_nodes(char *hostname)
 {
 	pbs_db_node_info_t	dbnode;
 	pbs_db_obj_info_t	dbobj;
-	pbs_db_conn_t		*conn = (pbs_db_conn_t *) svr_db_conn;
+	void *conn = svr_db_conn;
 	pbs_db_query_options_t opts;
 	static char nodes_from_time[DB_TIMESTAMP_LEN + 1] = {0};
-	struct pbsnode *pnode = NULL;
-	void *cur_state = NULL;
-	int refreshed;
 	int count = 0;
+	char *conn_db_err = NULL;
 
 	/* fill in options */
 	if (hostname) {
 		opts.flags = 1;
 		opts.hostname = hostname;
+		opts.timestamp = NULL;
 	} else {
 		opts.flags = 0;
-		opts.timestamp = nodes_from_time;
+		opts.timestamp = strdup(nodes_from_time);
 	}
 	dbobj.pbs_db_obj_type = PBS_DB_NODE;
 	dbobj.pbs_db_un.pbs_db_node = &dbnode;
 
-	cur_state = pbs_db_cursor_init(conn, &dbobj, &opts);
-	if (cur_state == NULL) {
-		sprintf(log_buffer, "%s", (char *) conn->conn_db_err);
-		log_err(-1, __func__, log_buffer);
-		pbs_db_cursor_close(conn, cur_state);
+	count = pbs_db_search(conn, &dbobj, &opts, (query_cb_t)&refresh_node);
+	if (count == -1) {
+		pbs_db_get_errmsg(PBS_DB_ERR, &conn_db_err);
+		if (conn_db_err != NULL) {
+			sprintf(log_buffer, "%s", conn_db_err);
+			free(conn_db_err);
+		}
+		if (opts.timestamp)
+			free(opts.timestamp);
 		return (1);
 	}
 
-	while (pbs_db_cursor_next(conn, cur_state, &dbobj) == 0) {
-		if ((pnode = refresh_node(&dbnode, &refreshed)) == NULL) {
-			sprintf(log_buffer, "Failed to refresh node %s", dbnode.nd_name);
-			log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_NOTICE, msg_daemonname, log_buffer);
-		} else if (strncmp(pnode->nd_savetm, nodes_from_time, DB_TIMESTAMP_LEN) > 0) {
-			strcpy(nodes_from_time, pnode->nd_savetm);
-		}
-
-		if (refreshed)
-			count++;
-	
-		free_db_attr_list(&dbnode.db_attr_list);
-		free_db_attr_list(&dbnode.cache_attr_list);
-	}
-
 	/* to save the last job's time save_tm, since we are loading in order */
-	if (pnode)
-		strcpy(nodes_from_time, pnode->nd_savetm);
-
-	pbs_db_cursor_close(conn, cur_state);
+	if (opts.timestamp) {
+		if (strncmp(opts.timestamp, nodes_from_time, DB_TIMESTAMP_LEN) > 0)
+			strcpy(nodes_from_time, opts.timestamp);
+		free(opts.timestamp);
+	}
 
 	return 0;
 }
@@ -192,43 +181,29 @@ get_all_db_resvs()
 {
 	pbs_db_resv_info_t dbresv= {{0}};
 	pbs_db_obj_info_t dbobj;
-	pbs_db_conn_t		*conn = (pbs_db_conn_t *) svr_db_conn;
+	void *conn = svr_db_conn;
 	pbs_db_query_options_t opts;
 	static char resvs_from_time[DB_TIMESTAMP_LEN + 1] = {0};
-	resc_resv *presv = NULL;
-	void *cur_state = NULL;
-	int rc_cur = 0;
-	int refreshed;
 	int count = 0;
+	char *conn_db_err = NULL;
 
 	/* fill in options */
 	opts.flags = 0;
-	opts.timestamp = resvs_from_time;
+	opts.timestamp = strdup(resvs_from_time);
 	dbobj.pbs_db_obj_type = PBS_DB_RESV;
 	dbobj.pbs_db_un.pbs_db_resv = &dbresv;
 	
-	cur_state = pbs_db_cursor_init(conn, &dbobj, &opts);
-	if (cur_state == NULL) {
-		sprintf(log_buffer, "%s", (char *) conn->conn_db_err);
-		log_err(-1, __func__, log_buffer);
-		pbs_db_cursor_close(conn, cur_state);
+	count = pbs_db_search(conn, &dbobj, &opts, (query_cb_t)&refresh_resv);
+	if (count == -1) {
+		pbs_db_get_errmsg(PBS_DB_ERR, &conn_db_err);
+		if (conn_db_err != NULL) {
+			sprintf(log_buffer, "%s", conn_db_err);
+			free(conn_db_err);
+		}
+		if (opts.timestamp)
+			free(opts.timestamp);
 		return (1);
 	}
-
-	while ((rc_cur = pbs_db_cursor_next(conn, cur_state, &dbobj)) == 0) {
-		if ((presv = refresh_resv(&dbresv, &refreshed)) == NULL) {
-			sprintf(log_buffer, "Failed to refresh reservation %s", dbresv.ri_resvid);
-			log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_NOTICE, msg_daemonname, log_buffer);
-		}
-
-		if (refreshed)
-			count++;
-
-		free_db_attr_list(&dbresv.db_attr_list);
-		free_db_attr_list(&dbresv.cache_attr_list);
-	}
-
-	pbs_db_cursor_close(conn, cur_state);
 
 	if (count > 0) {
 		sprintf(log_buffer, "Refreshed %d reservations", count);
@@ -236,8 +211,10 @@ get_all_db_resvs()
 	}
 
 	/* to save the last job's time save_tm, since we are loading in order */
-	if (presv)
-		strcpy(resvs_from_time, presv->ri_savetm);
+	if (opts.timestamp) {
+		strcpy(resvs_from_time, opts.timestamp);
+		free(opts.timestamp);
+	}
 
 	return 0;
 }
@@ -248,51 +225,41 @@ get_all_db_resvs()
  * 		Get all the jobs from database which are changed after given time.
  *
  * @return	0 - success
- * 			1 - fail/error
+ * 		1 - fail/error
  */
 
 int
 get_all_db_jobs() 
 {
-	job	*pj = NULL;
 	pbs_db_job_info_t dbjob = {{0}};
 	pbs_db_obj_info_t obj = {0};
-	pbs_db_conn_t *conn = svr_db_conn;
-	void *state = NULL;
-	int rc_cur = 0;
+	void *conn = svr_db_conn;
 	pbs_db_query_options_t opts;
-	int refreshed;
 	int count = 0;
 	static char jobs_from_time[DB_TIMESTAMP_LEN + 1] = {0};
+	char *conn_db_err = NULL;
 
 	/* fill in options */
 	opts.flags = 0;
-	opts.timestamp = jobs_from_time;
+	opts.timestamp = strdup(jobs_from_time);
 
 	obj.pbs_db_obj_type = PBS_DB_JOB;
 	obj.pbs_db_un.pbs_db_job = &dbjob;
-
-	state = pbs_db_cursor_init(conn, &obj, &opts);
-	if (state == NULL) {
-		sprintf(log_buffer, "%s", (char *) conn->conn_db_err);
-		log_err(-1, __func__, log_buffer);
-		pbs_db_cursor_close(conn, state);
+	
+	/* get jobs from DB */
+	obj.pbs_db_obj_type = PBS_DB_JOB;
+	obj.pbs_db_un.pbs_db_job = &dbjob;
+	count = pbs_db_search(conn, &obj, &opts, (query_cb_t)&refresh_job);
+	if (count == -1) {
+		pbs_db_get_errmsg(PBS_DB_ERR, &conn_db_err);
+		if (conn_db_err != NULL) {
+			sprintf(log_buffer, "%s", conn_db_err);
+			log_err(-1, __func__, log_buffer);
+			free(conn_db_err);
+		}
+		free(opts.timestamp);
 		return (1);
 	}
-	
-	while ((rc_cur = pbs_db_cursor_next(conn, state, &obj)) == 0) {
-		if ((pj = refresh_job(&dbjob, &refreshed)) == NULL) {
-			sprintf(log_buffer, "Failed to refresh job %s", dbjob.ji_jobid);
-			log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_NOTICE, msg_daemonname, log_buffer);
-		}
-		if (refreshed)
-			count++;
-
-		free_db_attr_list(&dbjob.db_attr_list);
-		free_db_attr_list(&dbjob.cache_attr_list);
-	}
-
-	pbs_db_cursor_close(conn, state);
 
 	if (count > 0) {
 		sprintf(log_buffer, "Refreshed %d jobs", count);
@@ -300,8 +267,8 @@ get_all_db_jobs()
 	}
 
 	/* to save the last job's time save_tm, since we are loading in order */
-	if (pj)
-		strcpy(jobs_from_time, pj->ji_savetm);
+	strcpy(jobs_from_time, opts.timestamp);
+	free(opts.timestamp);
 
 	return 0;
 }
@@ -319,43 +286,29 @@ get_all_db_queues()
 {
 	pbs_db_que_info_t	dbque = {{0}};
 	pbs_db_obj_info_t	dbobj;
-	pbs_db_conn_t		*conn = (pbs_db_conn_t *) svr_db_conn;
+	void *conn = svr_db_conn;
 	pbs_db_query_options_t opts;
 	static char ques_from_time[DB_TIMESTAMP_LEN + 1] = {0};
-	pbs_queue *pque = NULL;
-	void *cur_state = NULL;
-	int rc_cur = 0;
-	int refreshed = 0;
 	int count = 0;
+	char *conn_db_err = NULL;
 
 	/* fill in options */
 	opts.flags = 0;
-	opts.timestamp = ques_from_time;
+	opts.timestamp = strdup(ques_from_time);
 	dbobj.pbs_db_obj_type = PBS_DB_QUEUE;
 	dbobj.pbs_db_un.pbs_db_que = &dbque;
 
-	cur_state = pbs_db_cursor_init(conn, &dbobj, &opts);
-	if (cur_state == NULL) {
-		sprintf(log_buffer, "%s", (char *) conn->conn_db_err);
-		log_err(-1, __func__, log_buffer);
-		pbs_db_cursor_close(conn, cur_state);
+	count = pbs_db_search(conn, &dbobj, &opts, (query_cb_t)&refresh_queue);
+	if (count == -1) {
+		pbs_db_get_errmsg(PBS_DB_ERR, &conn_db_err);
+		if (conn_db_err != NULL) {
+			sprintf(log_buffer, "%s", conn_db_err);
+			log_err(-1, __func__, log_buffer);
+			free(conn_db_err);
+		}
+		free(opts.timestamp);
 		return (1);
 	}
-
-	while ((rc_cur = pbs_db_cursor_next(conn, cur_state, &dbobj)) == 0) {
-		if ((pque = refresh_queue(&dbque, &refreshed)) == NULL) {
-			sprintf(log_buffer, "Failed to refresh queue %s", dbque.qu_name);
-			log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_NOTICE, msg_daemonname, log_buffer);
-		}
-
-		if (refreshed)
-			count++;
-
-		free_db_attr_list(&dbque.db_attr_list);
-		free_db_attr_list(&dbque.cache_attr_list);
-	}
-
-	pbs_db_cursor_close(conn, cur_state);
 
 	if (count > 0) {
 		sprintf(log_buffer, "Refreshed %d queues", count);
@@ -363,8 +316,10 @@ get_all_db_queues()
 	}
 
 	/* to save the last queue's time save_tm, since we are loading in order */
-	if (pque)
-		strcpy(ques_from_time, pque->qu_savetm);
+	if (opts.timestamp) {
+		strcpy(ques_from_time, opts.timestamp);
+		free(opts.timestamp);
+	}
 
 	return 0;
 }

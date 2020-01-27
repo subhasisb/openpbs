@@ -95,7 +95,6 @@
 /* global data items */
 
 extern char  *path_jobs;
-extern char  *path_resvs;
 extern time_t time_now;
 extern char   pbs_recov_filename[];
 
@@ -511,4 +510,3 @@ job_recov_fs(char *filename)
 
 	return (pj);
 }
-

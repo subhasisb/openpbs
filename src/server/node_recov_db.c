@@ -181,7 +181,7 @@ struct pbsnode *
 node_recov_db(char *nd_name, struct pbsnode *pnode)
 {
 	pbs_db_obj_info_t obj;
-	pbs_db_conn_t *conn = (pbs_db_conn_t *) svr_db_conn;
+	void *conn = (void *) svr_db_conn;
 	pbs_db_node_info_t dbnode = {{0}};
 	int rc = 0;
 
@@ -346,7 +346,8 @@ node_save_db(struct pbsnode *pnode)
 {
 	pbs_db_node_info_t dbnode = {{0}};
 	pbs_db_obj_info_t obj;
-	pbs_db_conn_t *conn = (pbs_db_conn_t *) svr_db_conn;
+	void *conn = (void *) svr_db_conn;
+	char *conn_db_err = NULL;
 	int savetype;
 	int rc = -1;
 
@@ -369,8 +370,12 @@ done:
 	
 	if (rc != 0) {
 		strcpy(log_buffer, "node_save failed ");
-		if (conn->conn_db_err != NULL)
-			strncat(log_buffer, conn->conn_db_err, LOG_BUF_SIZE - strlen(log_buffer) - 1);
+		pbs_db_get_errmsg(PBS_DB_ERR, &conn_db_err);
+		if (conn_db_err != NULL) {
+			strcat(log_buffer, ", DB_ERR: ");
+			strncat(log_buffer, conn_db_err, LOG_BUF_SIZE - strlen(log_buffer) - 1);
+			free(conn_db_err);
+		}
 		log_err(-1, __func__, log_buffer);
 		panic_stop_db(log_buffer);
 	}
@@ -395,7 +400,7 @@ node_delete_db(struct pbsnode *pnode)
 {
 	pbs_db_node_info_t dbnode;
 	pbs_db_obj_info_t obj;
-	pbs_db_conn_t *conn = (pbs_db_conn_t *) svr_db_conn;
+	void *conn = (void *) svr_db_conn;
 
 	strcpy(dbnode.nd_name, pnode->nd_name);
 	obj.pbs_db_obj_type = PBS_DB_NODE;
@@ -420,12 +425,13 @@ node_delete_db(struct pbsnode *pnode)
  *
  */
 struct pbsnode *
-refresh_node(pbs_db_node_info_t *dbnode, int *refreshed)
+refresh_node(pbs_db_obj_info_t *dbobj, int *refreshed)
 {
-	char		*pslash;
-	char 		*nodename = NULL;
+	char *pslash;
+	char *nodename = NULL;
 	struct pbsnode *pnode = NULL;
 	extern AVL_IX_DESC *node_tree;
+	pbs_db_node_info_t *dbnode = dbobj->pbs_db_un.pbs_db_node;
 
 	if (dbnode == NULL || dbnode->nd_name == NULL)
 		return NULL;
@@ -442,7 +448,7 @@ refresh_node(pbs_db_node_info_t *dbnode, int *refreshed)
 	if (!node_tree || (pnode = find_tree(node_tree, nodename)) == NULL) {
 		if ((pnode = node_recov_db(nodename, pnode)) == NULL)
 			goto err;
-		
+
 		*refreshed = 1;
 
 	} else if (strcmp(dbnode->nd_savetm, pnode->nd_savetm) != 0) {
@@ -452,13 +458,82 @@ refresh_node(pbs_db_node_info_t *dbnode, int *refreshed)
 
 		*refreshed = 1;
 	}
-
+	free_db_attr_list(&dbnode->db_attr_list);
+	free_db_attr_list(&dbnode->cache_attr_list);
 	free(nodename);
 	return pnode;
 
 err:
+	free_db_attr_list(&dbnode->db_attr_list);
+	free_db_attr_list(&dbnode->cache_attr_list);
 	free(nodename);
 	sprintf(log_buffer, "Failed to load node %s", dbnode->nd_name);
+	log_err(-1, __func__, log_buffer);
+	return NULL;
+}
+
+
+/**
+ * @brief
+ *	Refresh/retrieve node from database and add it into AVL tree if not present
+ *
+ *	@param[in]	dbobj - The pointer to the wrapper job object of type pbs_db_node_info_t
+ *	@param[out]  refreshed - if nodes is refreshed
+ *
+ * @return	The recovered node
+ * @retval	NULL - Failure
+ * @retval	!NULL - Success, pointer to node structure recovered
+ *
+ */
+pbsnode *
+recov_node_cb(pbs_db_obj_info_t *dbobj, int *refreshed)
+{
+	pbs_db_node_info_t *dbnode = dbobj->pbs_db_un.pbs_db_node;
+	time_t mom_modtime = 0;
+	struct pbsnode *np;
+	svrattrl *pal;
+	int bad;
+	int err = 0;
+	int perm = ATR_DFLAG_ACCESS | ATR_PERM_ALLOW_INDIRECT;
+
+	mom_modtime = dbnode->mom_modtime;
+
+	/* now create node and subnodes */
+	pal = GET_NEXT(dbnode->db_attr_list.attrs);
+
+	/* MSTODO: Add attributes from dist cache to the pal list */
+
+	err = create_pbs_node2(dbnode->nd_name, pal, perm, &bad, &np, FALSE, TRUE);	/* allow unknown resources */
+	if (err)
+		goto refresh_err;
+
+	if (mom_modtime) {
+		/* a vnode pointer will be returned */
+		if (np)
+			np->nd_moms[0]->mi_modtime = mom_modtime;
+	}
+	if (np) {
+		if ((np->nd_attr[(int)ND_ATR_vnode_pool].at_flags & ATR_VFLAG_SET) &&
+			(np->nd_attr[(int)ND_ATR_vnode_pool].at_val.at_long > 0)) {
+			mominfo_t *pmom = np->nd_moms[0];
+			if (pmom && (np == ((mom_svrinfo_t *)(pmom->mi_data))->msr_children[0])) {
+				/* natural vnode being recovered, add to pool */
+				(void)add_mom_to_pool(np->nd_moms[0]);
+			}
+		}
+	}
+	free_db_attr_list(&dbnode->db_attr_list);
+	free_db_attr_list(&dbnode->cache_attr_list);
+	*refreshed = 1;
+	return np;
+
+refresh_err:
+	if (err == PBSE_NODEEXIST)
+		sprintf(log_buffer, "duplicate node \"%s\"", dbnode->nd_name);
+	else
+		sprintf(log_buffer, "could not create node \"%s\", error = %d", dbnode->nd_name, err);
+	log_err(-1, __func__, log_buffer);
+	snprintf(log_buffer, LOG_BUF_SIZE, "Failed to refresh node attribute %s", dbnode->nd_name);
 	log_err(-1, __func__, log_buffer);
 	return NULL;
 }

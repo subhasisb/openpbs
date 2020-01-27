@@ -141,7 +141,6 @@ extern pbs_list_head svr_alljobs;
 extern pbs_list_head svr_newjobs;
 extern attribute_def job_attr_def[];
 extern char *path_jobs;
-extern char *path_resvs;
 extern char *pbs_o_host;
 extern char *msg_script_open;
 extern char *msg_script_write;
@@ -154,7 +153,7 @@ extern time_t time_now;
 
 #ifndef PBS_MOM
 extern char *pbs_server_name;
-extern pbs_db_conn_t	*svr_db_conn;
+extern void	*svr_db_conn;
 extern char *msg_max_no_minwt;
 extern char *msg_min_gt_maxwt;
 extern char *msg_nostf_resv;
@@ -1737,7 +1736,7 @@ req_commit_now(struct batch_request *preq, job *pj)
 #else
 	struct timeval		tval;
 #endif
-	pbs_db_conn_t		*conn = (pbs_db_conn_t *) svr_db_conn;
+	void		*conn = (void *) svr_db_conn;
 #endif
 
 	if (pj->ji_qs.ji_substate != JOB_SUBSTATE_TRANSIN) {
