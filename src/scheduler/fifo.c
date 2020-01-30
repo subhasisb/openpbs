@@ -570,8 +570,8 @@ schedule(int cmd, int sd, char *runjobid)
 			 * This is required since there is a probability that scheduler's configuration has been changed at
 			 * server through qmgr.
 			 */
-			if (!update_svr_schedobj(connector, 0, 0)) {
-				sprintf(log_buffer, "update_svr_schedobj failed");
+			if (!validate_sched_attrs(connector)) {
+				sprintf(log_buffer, "validate_sched_attrs failed");
 				log_err(-1, __func__, log_buffer);
 				return 0;
 			}
@@ -2649,7 +2649,6 @@ update_svr_schedobj(int connector, int cmd, int alarm_time)
 	static	int svr_knows_me = 0;
 	int	err;
 	struct	attropl	*attribs, *patt;
-	struct batch_status *all_ss = NULL; /* all scheduler objects */
 	struct batch_status *ss = NULL;
 	char sched_host[PBS_MAXHOSTNAME + 1];
 
@@ -2666,13 +2665,13 @@ update_svr_schedobj(int connector, int cmd, int alarm_time)
 	if (ss == NULL) {
 		sprintf(log_buffer, "Unable to retrieve the scheduler attributes from server");
 		log_err(-1, __func__, log_buffer);
-		pbs_statfree(all_ss);
+		pbs_statfree(ss);
 		return 0;
 	}
 	if (!sched_settings_frm_svr(ss))
 		return 0;
 
-	pbs_statfree(all_ss);
+	pbs_statfree(ss);
 
 	/* update the sched with new values */
 	attribs = calloc(4, sizeof(struct attropl));
@@ -2719,5 +2718,28 @@ update_svr_schedobj(int connector, int cmd, int alarm_time)
 
 	return 1;
 }
+
+int
+validate_sched_attrs(int connector)
+{
+	struct batch_status *ss = NULL;
+
+	/* Stat the scheduler to get details of sched */
+	ss = pbs_statsched(connector, sc_name, NULL, NULL);
+
+	if (ss == NULL) {
+		sprintf(log_buffer, "Unable to retrieve the scheduler attributes from server");
+		log_err(-1, __func__, log_buffer);
+		pbs_statfree(ss);
+		return 0;
+	}
+	if (!sched_settings_frm_svr(ss))
+		return 0;
+
+	pbs_statfree(ss);
+
+	return 1;
+}
+
 
 

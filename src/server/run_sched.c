@@ -279,7 +279,7 @@ find_assoc_sched_pque(pbs_queue *pq, pbs_sched **target_sched)
 		dflt_scheduler = *target_sched = recov_sched_from_db(NULL, "default", 0);
 		if (!dflt_scheduler) {
 			dflt_scheduler = sched_alloc(PBS_DFLT_SCHED_NAME, 1);
-			set_sched_default(dflt_scheduler, 0);
+			set_sched_default(dflt_scheduler);
 			(void)sched_save_db(dflt_scheduler, SVR_SAVE_NEW);
 			*target_sched = dflt_scheduler;
 		}
@@ -714,7 +714,8 @@ recov_sched_from_db(char *partition, char *sched_name, int lock)
 		snprintf(dbsched.partition_name, sizeof(dbsched.partition_name), "%%%s%%", partition);
 		ps = find_scheduler_by_partition(partition);
 	} else if (sched_name != NULL) {
-		snprintf(dbsched.sched_name, sizeof(dbsched.sched_name), "%s", sched_name);
+		strncpy(dbsched.sched_name, sched_name, sizeof(dbsched.sched_name));
+		dbsched.sched_name[sizeof(dbsched.sched_name) - 1] = '\0';
 		ps = find_scheduler(dbsched.sched_name);
 	}
 

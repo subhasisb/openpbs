@@ -273,7 +273,7 @@ extern int			sched_save_db(pbs_sched *, int mode);
 extern enum failover_state	are_we_primary(void);
 extern int			have_socket_licensed_nodes(void);
 extern void			unlicense_socket_licensed_nodes(void);
-extern void			set_sched_default(pbs_sched *, int unset_flag);
+extern void			set_sched_default(pbs_sched *);
 extern pbs_sched *		find_scheduler(char *sched_name);
 extern pbs_sched *		find_scheduler_by_partition(char *partition);
 void				copy_sched_misc_not_in_db(pbs_sched *target, pbs_sched *src);

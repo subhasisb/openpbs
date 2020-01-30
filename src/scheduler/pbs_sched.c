@@ -118,6 +118,7 @@ struct		connect_handle connection[NCONNECTS];
 int		connector = -1;
 int		server_sock;
 int		second_sd = -1;
+int		update_svr = 1;
 fd_set		master_fdset;
 
 #define		START_CLIENTS	2	/* minimum number of clients */
@@ -1456,10 +1457,13 @@ main(int argc, char *argv[])
 						log_buffer);
 				} else {
 					if (connector >= 0) {
-						/* update sched object attributes on server */
-						if (update_svr_schedobj(connector, cmd, alarm_time) == 0) {
-							close_server_conns();
-							break;
+						if (update_svr) {
+							/* update sched object attributes on server */
+							if (update_svr_schedobj(connector, cmd, alarm_time) == 0) {
+								close_server_conns();
+								break;
+							}
+							update_svr = 0;
 						}
 
 						if (sigprocmask(SIG_BLOCK, &allsigs, &oldsigs) == -1)

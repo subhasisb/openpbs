@@ -427,7 +427,7 @@ poke_scheduler(attribute *pattr, void *pobj, int actmode)
  *
   */
 void
-set_sched_default(pbs_sched *psched, int unset_flag)
+set_sched_default(pbs_sched *psched)
 {
 	char *temp;
 	char dir_path[MAXPATHLEN +1] = {0};
@@ -439,7 +439,7 @@ set_sched_default(pbs_sched *psched, int unset_flag)
 		set_attr_svr(&(psched->sch_attr[(int) SCHED_ATR_sched_cycle_len]), &sched_attr_def[(int) SCHED_ATR_sched_cycle_len],
 			TOSTR(PBS_SCHED_CYCLE_LEN_DEFAULT));
 	}
-	if (!unset_flag && (psched->sch_attr[(int) SCHED_ATR_schediteration].at_flags & ATR_VFLAG_SET) == 0) {
+	if ((psched->sch_attr[(int) SCHED_ATR_schediteration].at_flags & ATR_VFLAG_SET) == 0) {
 		set_attr_svr(&(psched->sch_attr[(int) SCHED_ATR_schediteration]), &sched_attr_def[(int) SCHED_ATR_schediteration],
 			TOSTR(PBS_SCHEDULE_CYCLE));
 	}

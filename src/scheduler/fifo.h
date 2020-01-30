@@ -225,6 +225,8 @@ int scheduler_simulation_task(int pbs_sd, int debug);
 
 int update_svr_schedobj(int connector, int cmd, int alarm_time);
 
+int validate_sched_attrs(int connector);
+
 
 #ifdef	__cplusplus
 }
