@@ -181,10 +181,10 @@ svr_to_db_svr(struct server *ps, pbs_db_svr_info_t *pdbsvr, int updatetype)
 int
 db_to_svr_svr(struct server *ps, pbs_db_svr_info_t *pdbsvr)
 {
-	strcpy(ps->sv_savetm, pdbsvr->sv_savetm);
-
-	if ((decode_attr_db(ps, &pdbsvr->attr_list, svr_attr_def, ps->sv_attr, (int) SRV_ATR_LAST, 0)) != 0)
+	if ((decode_attr_db(ps, &pdbsvr->attr_list, svr_attr_def, ps->sv_attr, (int) SRV_ATR_LAST, 0, ps->sv_savetm)) != 0)
 		return -1;
+
+	strcpy(ps->sv_savetm, pdbsvr->sv_savetm);
 
 	return 0;
 }

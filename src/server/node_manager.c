@@ -7250,7 +7250,7 @@ adj_resc_on_node(void *obj, int is_resv, char *noden, enum batch_op op, resource
 
 	/* if the request is from sched_spec, job might have requed and database may not have cleaned up.
 	   so, start afresh! */
-	if (pjob && (pjob->ji_qs.ji_state & JOB_STATE_RUNNING) && (pjob->ji_qs.ji_substate & JOB_SUBSTATE_PRERUN))
+	if (pjob && (pjob->ji_qs.ji_state == JOB_STATE_RUNNING) && (pjob->ji_qs.ji_substate == JOB_SUBSTATE_PRERUN))
 		cur_val = NULL;
 	else
 		cur_val = cur_attr ? cur_attr->attr_value : NULL;
@@ -7926,14 +7926,17 @@ set_last_used_time_node(void *pobj, int type)
 		*pc = '\0';
 
 		if (last_pn == NULL || (cmp_ret = strcmp(pn, last_pn)) != 0 ) {
-			pnode = find_nodebyname(pn, LOCK);
+			/* ND_ATR_last_used_time has to be derived from node-job table or
+			   from an in-memory cache as we cannot lock the node here
+			*/
+			pnode = find_nodebyname(pn, NO_LOCK);
 			/* had better be the "natural" vnode with only the one parent */
 			if (pnode != NULL) {
 				snprintf(str_val, sizeof(str_val), "%d", time_int_val);
 				set_attr_svr(&(pnode->nd_attr[(int)ND_ATR_last_used_time]),
 						&node_attr_def[(int) ND_ATR_last_used_time], str_val);
 			}
-			node_save_db(pnode);
+			//node_save_db(pnode);
 		}
 		last_pn = pn;
 		pn = parse_plus_spec(NULL, &rc);

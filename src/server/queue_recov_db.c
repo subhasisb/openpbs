@@ -138,11 +138,12 @@ db_to_svr_que(pbs_queue *pque, pbs_db_que_info_t *pdbque)
 	pque->qu_qs.qu_type = pdbque->qu_type;
 	pque->qu_qs.qu_deleted = pdbque->qu_deleted;
 	strcpy(pque->qu_creattm, pdbque->qu_creattm);
-	strcpy(pque->qu_savetm, pdbque->qu_savetm);
 
 	if ((decode_attr_db(pque, &pdbque->attr_list, que_attr_def,
-		pque->qu_attr, (int) QA_ATR_LAST, 0)) != 0)
+		pque->qu_attr, (int) QA_ATR_LAST, 0, pque->qu_savetm)) != 0)
 		return -1;
+
+	strcpy(pque->qu_savetm, pdbque->qu_savetm);
 
 	return 0;
 }

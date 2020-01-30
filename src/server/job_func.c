@@ -381,6 +381,7 @@ job_alloc(void)
 	pj->ji_deletehistory = 0;
 	pj->ji_newjob = 0;
 	pj->ji_script = NULL;
+	*pj->ji_savetm = '\0';
 #endif
 	pj->ji_qs.ji_jsversion = JSVERSION;
 	pj->ji_momhandle = -1;		/* mark mom connection invalid */
@@ -1571,6 +1572,7 @@ resc_resv_alloc(void)
 	CLEAR_LINK(resvp->ri_allresvs);
 	CLEAR_HEAD(resvp->ri_svrtask);
 	CLEAR_HEAD(resvp->ri_rejectdest);
+	resvp->ri_savetm[0] = '\0';
 
 	/* set the reservation structure's version number and
 	 * the working attributes to "unspecified"

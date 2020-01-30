@@ -130,7 +130,6 @@ extern int make_pbs_list_attr_db(void *parent, pbs_db_attr_list_t *attr_list, st
 static int
 db_to_svr_node(struct pbsnode *pnode, pbs_db_node_info_t *pdbnd)
 {
-	DBPRT(("Entering %s", __func__))
 	if (pdbnd->nd_name && pdbnd->nd_name[0] != 0) {
 		pnode->nd_name = strdup(pdbnd->nd_name);
 		if (pnode->nd_name == NULL)
@@ -153,12 +152,11 @@ db_to_svr_node(struct pbsnode *pnode, pbs_db_node_info_t *pdbnd)
 	if (pnode->nd_pque)
 		strcpy(pnode->nd_pque->qu_qs.qu_name, pdbnd->nd_pque);
 
-	strcpy(pnode->nd_savetm, pdbnd->nd_savetm);
-
 	if ((decode_attr_db(pnode, &pdbnd->attr_list, node_attr_def,
-		pnode->nd_attr, (int) ND_ATR_LAST, 0)) != 0)
+		pnode->nd_attr, (int) ND_ATR_LAST, 0, pnode->nd_savetm)) != 0)
 		return -1;
-
+	
+	strcpy(pnode->nd_savetm, pdbnd->nd_savetm);
 	mod_node_ncpus(pnode, get_ncpu_ct(pnode), ATR_ACTION_ALTER);
 
 	return 0;
@@ -226,7 +224,6 @@ node_recov_db(char *nd_name, struct pbsnode *pnode, int lock)
 	if (!pnode) {
 		pnode = malloc(sizeof(struct pbsnode));
 		initialize_pbsnode(pnode, strdup(nd_name), NTYPE_PBS);
-		DBPRT(("Initializing pbsnode..."))
 	}
 
 	if (db_to_svr_node(pnode, &dbnode) != 0)

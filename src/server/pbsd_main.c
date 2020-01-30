@@ -1256,6 +1256,7 @@ main(int argc, char **argv)
 		READS_MASK|WRITES_MASK|STANDARD_RIGHTS_REQUIRED);
 #endif
 	server.sv_started = time(&time_now);	/* time server started */
+	server.sv_savetm[0] = '\0';
 
 	CLEAR_HEAD(svr_requests);
 	CLEAR_HEAD(task_list_immed);

@@ -207,7 +207,6 @@ db_to_svr_job(job *pjob,  pbs_db_job_info_t *dbjob)
 {
 	/* Variables assigned constant values are not stored in the DB */
 	pjob->ji_qs.ji_jsversion = JSVERSION;
-	strcpy(pjob->ji_savetm, dbjob->ji_savetm);
 	strcpy(pjob->ji_qs.ji_jobid, dbjob->ji_jobid);
 	pjob->ji_qs.ji_state = dbjob->ji_state;
 	pjob->ji_qs.ji_substate = dbjob->ji_substate;
@@ -249,8 +248,10 @@ db_to_svr_job(job *pjob,  pbs_db_job_info_t *dbjob)
 #endif
 	pjob->ji_extended.ji_ext.ji_credtype = dbjob->ji_credtype;
 
-	if ((decode_attr_db(pjob, &dbjob->attr_list, job_attr_def, pjob->ji_wattr, (int)JOB_ATR_LAST, (int) JOB_ATR_UNKN)) != 0)
+	if ((decode_attr_db(pjob, &dbjob->attr_list, job_attr_def, pjob->ji_wattr, (int)JOB_ATR_LAST, (int) JOB_ATR_UNKN, pjob->ji_savetm)) != 0)
 		return -1;
+
+	strcpy(pjob->ji_savetm, dbjob->ji_savetm);
 
 	return 0;
 }
@@ -332,12 +333,13 @@ db_to_svr_resv(resc_resv *presv, pbs_db_resv_info_t *pdresv)
 	presv->ri_qs.ri_svrflags = pdresv->ri_svrflags;
 	presv->ri_qs.ri_tactive = pdresv->ri_tactive;
 	presv->ri_qs.ri_type = pdresv->ri_type;
-	strcpy(presv->ri_savetm, pdresv->ri_savetm);
 
 	if ((decode_attr_db(presv, &pdresv->attr_list, resv_attr_def,
 		presv->ri_wattr,
-		(int) RESV_ATR_LAST, (int) RESV_ATR_UNKN)) != 0)
+		(int) RESV_ATR_LAST, (int) RESV_ATR_UNKN, presv->ri_savetm)) != 0)
 		return -1;
+
+	strcpy(presv->ri_savetm, pdresv->ri_savetm);
 
 	return 0;
 
