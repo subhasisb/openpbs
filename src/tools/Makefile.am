@@ -60,7 +60,8 @@ common_libs = \
 	$(top_builddir)/src/lib/Libpbs/.libs/libpbs.a \
 	-lpthread \
 	@socket_lib@ \
-	-lm
+	-lm \
+	-lshard -L$(top_builddir)/src/lib/Libshard/.libs
 
 pbs_sleep_LDFLAGS = -all-static
 pbs_sleep_SOURCES = pbs_sleep.c
@@ -75,6 +76,7 @@ pbs_ds_monitor_LDADD = \
 	$(top_builddir)/src/lib/Libutil/libutil.a \
 	$(top_builddir)/src/lib/Libpbs/.libs/libpbs.a \
 	$(top_builddir)/src/lib/Libnet/libnet.a \
+	-lshard -L$(top_builddir)/src/lib/Libshard/.libs \
 	-lpthread \
 	@socket_lib@ \
 	@database_ldflags@ \
@@ -112,6 +114,7 @@ pbs_python_LDADD = \
 	$(top_builddir)/src/lib/Libpbs/.libs/libpbs.a \
 	$(top_builddir)/src/lib/Libnet/libnet.a \
 	$(top_builddir)/src/lib/Libutil/libutil.a \
+	-lshard -L$(top_builddir)/src/lib/Libshard/.libs \
 	-lpthread \
 	@socket_lib@ \
 	@PYTHON_LDFLAGS@ \
@@ -140,6 +143,7 @@ pbs_tclsh_LDADD = \
 	$(top_builddir)/src/lib/Libnet/libnet.a \
 	$(top_builddir)/src/lib/Libtpp/libtpp.a \
 	$(top_builddir)/src/lib/Libutil/libutil.a \
+	-lshard -L$(top_builddir)/src/lib/Libshard/.libs \
 	-lpthread \
 	@socket_lib@ \
 	@libz_lib@ \
@@ -160,6 +164,7 @@ pbs_wish_LDADD = \
 	$(top_builddir)/src/lib/Liblog/liblog.a \
 	$(top_builddir)/src/lib/Libpbs/.libs/libpbs.a \
 	$(top_builddir)/src/lib/Libnet/libnet.a \
+	-lshard -L$(top_builddir)/src/lib/Libshard/.libs \
 	-lpthread \
 	@socket_lib@ \
 	@tk_lib@
@@ -181,6 +186,7 @@ printjob_svr_bin_LDADD = \
 	$(top_builddir)/src/lib/Libdb/libdb.a \
 	$(top_builddir)/src/lib/Libpbs/.libs/libpbs.a \
 	$(top_builddir)/src/lib/Libnet/libnet.a \
+	-lshard -L$(top_builddir)/src/lib/Libshard/.libs \
 	-lpthread \
 	@socket_lib@ \
 	@database_ldflags@ \

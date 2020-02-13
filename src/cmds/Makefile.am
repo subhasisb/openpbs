@@ -90,6 +90,7 @@ common_libs = \
 	$(top_builddir)/src/lib/Libpbs/.libs/libpbs.a \
 	$(top_builddir)/src/lib/Libnet/libnet.a \
 	$(top_builddir)/src/lib/Libsec/libsec.a \
+	-lshard -L$(top_builddir)/src/lib/Libshard/.libs \
 	-lpthread \
 	@socket_lib@ \
 	-lm

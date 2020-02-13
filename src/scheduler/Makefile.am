@@ -113,6 +113,7 @@ common_libs = \
 	$(top_builddir)/src/lib/Libpbs/.libs/libpbs.a \
 	$(top_builddir)/src/lib/Libnet/libnet.a \
 	$(top_builddir)/src/lib/Libsec/libsec.a \
+	-lshard -L$(top_builddir)/src/lib/Libshard/.libs \
 	@PYTHON_LDFLAGS@ \
 	@PYTHON_LIBS@ \
 	@libz_lib@ \

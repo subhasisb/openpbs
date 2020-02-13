@@ -70,6 +70,7 @@
 #include "libsec.h"
 #include "pbs_ecl.h"
 #include "pbs_internal.h"
+#include "libshard.h"
 
 
 extern struct connect_handle connection[NCONNECTS];
@@ -648,32 +649,46 @@ get_svr_shard_connection(int channel, int req_type, void *shard_hint)
 {
 	int srv_index;
 	int sd;
-	int first_index = -1;
+	int i = 0;
+	int inact_srv_index = 0;
 	if (internal_connect == NULL)
 		internal_connect = internal_connect_cli;
+	int num_of_indexes = get_current_servers();
+	int svr_indexes[num_of_indexes+1];
+	int inactive_servers[num_of_indexes+1];
+	
+	for (; i < num_of_indexes; i++)
+		inactive_servers[i] = -1;
+
+	i = 0;
+
+	for(; i < num_of_indexes; i++)
+		svr_indexes[i] = i;
+	svr_indexes[i] = -1;
+
 
 	if (pbs_conf.pbs_max_servers > 1) {
+
 		if (shard_hint || connection[channel].shard_context == -1) {
-			srv_index = get_server_shard(shard_hint);
+			srv_index = shard_get_server_instance(pbs_conf.pbs_max_servers, shard_hint, svr_indexes, inactive_servers);
 			connection[channel].shard_context = srv_index; /* reuse the same server in case of a dialogue */
 		} else {
 			srv_index = connection[channel].shard_context;
 		}
 
 tryagain:
-		if (first_index > -1) {
-			srv_index++;
-			if (srv_index >= get_current_servers()) {
-				srv_index = 0;
-			}
-			if (srv_index == first_index) {
+		
+		if (inact_srv_index) {	
+			if (inact_srv_index == pbs_conf.pbs_max_servers)
+				return -1;
+			srv_index = shard_get_server_instance(pbs_conf.pbs_max_servers, shard_hint, svr_indexes, inactive_servers);
+			if (srv_index == -1) {
 				DBG_TRACE_SHARD((stderr, "No nonfailed server, bailing out\n"))
 				connection[channel].ch_socket = -1;
 				return -1;
 			}
-		} else {
-			first_index = srv_index;
 		}
+
 
 		DBG_TRACE_SHARD((stderr, "Selected server index %d, srv=%s:%d, state=%d, ", srv_index, pbs_conf.psi[srv_index]->name, pbs_conf.psi[srv_index]->port, connection[channel].ch_shards[srv_index]->state))
 
@@ -689,7 +704,7 @@ tryagain:
 
 				connection[channel].shard_context = -1;
 				DBG_TRACE_SHARD((stderr, "Failed!\n"))
-				
+				inactive_servers[inact_srv_index++] = srv_index;
 				goto tryagain;
 
 			} else if (connection[channel].ch_shards[srv_index]->state == SHARD_CONN_STATE_DOWN) {
@@ -708,7 +723,7 @@ tryagain:
 					connection[channel].ch_shards[srv_index]->state_change_time = time(0);
 
 					connection[channel].shard_context = -1;
-
+					inactive_servers[inact_srv_index++] = srv_index;
 					goto tryagain;
 				}
 
@@ -726,6 +741,7 @@ tryagain:
 			if ( connection[channel].ch_shards[srv_index]->state == SHARD_CONN_STATE_CONNECTED)
 				return  connection[channel].ch_shards[srv_index]->sd;
 			else {
+				inactive_servers[inact_srv_index++] = srv_index;
 				goto tryagain;
 			}
 		}

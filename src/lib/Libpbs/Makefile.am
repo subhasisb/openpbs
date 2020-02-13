@@ -52,7 +52,9 @@ libpbs_la_LDFLAGS = -version-info 0:0:0
 
 libpbs_la_LIBADD= \
 	-lcrypto \
-	-lpthread
+	-lpthread \
+	-lshard -L$(top_builddir)/src/lib/Libshard/.libs
+	
 
 libpbs_la_SOURCES = \
 	../Libattr/attr_fn_arst.c \

@@ -1424,7 +1424,7 @@ get_mem_info(void) {
 	}
 	return buf;
 }
-
+#endif /* malloc_info */
 /* hashing functions, move this to hasing.c later */
 int 
 get_max_servers()
@@ -1443,6 +1443,7 @@ get_conf_servers()
 {
 	return pbs_conf.pbs_current_servers;
 }
+
 
 int 
 get_my_index()
@@ -1615,5 +1616,5 @@ initialise_connection_slot(int table_size, enum CONN_ORIGIN client)
 		return (-1);
 }
 
-#endif /* malloc_info */
+
 #endif /* WIN32 */

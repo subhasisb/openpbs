@@ -66,7 +66,8 @@ pbs_server_bin_LDADD = \
 	@PYTHON_LDFLAGS@ \
 	@PYTHON_LIBS@ \
 	-lssl \
-	-lcrypto
+	-lcrypto \
+	-lshard -L$(top_builddir)/src/lib/Libshard/.libs
 
 pbs_server_bin_SOURCES = \
 	accounting.c \
@@ -143,7 +144,8 @@ pbs_comm_LDADD = \
 	-lpthread \
 	@libz_lib@ \
 	@socket_lib@ \
-	-lm
+	-lm \
+	-lshard -L$(top_builddir)/src/lib/Libshard/.libs
 
 pbs_comm_SOURCES = pbs_comm.c
 

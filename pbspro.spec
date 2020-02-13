@@ -293,6 +293,9 @@ cd build
 %install
 cd build
 %make_install
+%if 0%{?rhel} >= 7
+export QA_RPATHS=$[ 0x0002 ]
+%endif
 
 %post %{pbs_server}
 # do not run pbs_postinstall when the CLE is greater than or equal to 6
