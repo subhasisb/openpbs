@@ -74,6 +74,7 @@ pbs_rmget_LDADD = \
 	$(top_builddir)/src/lib/Libutil/libutil.a \
 	-lpthread \
 	@libz_lib@ \
-	-lm
+	-lm \
+	-lshard -L$(top_builddir)/src/lib/Libshard/.libs
 
 pbs_rmget_SOURCES = pbs_rmget.c

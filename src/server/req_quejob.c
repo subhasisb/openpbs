@@ -69,6 +69,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <libutil.h>
+#include <libshard.h>
 
 #ifdef WIN32
 #include  <io.h>
@@ -431,7 +432,7 @@ req_quejob(struct batch_request *preq)
 			psatl = (svrattrl *)GET_NEXT(psatl->al_link);
 		}
 
-		svr_jobidnumber = get_next_hash(svr_jobidnumber, svr_max_job_sequence_id);
+		svr_jobidnumber = pbs_shard_get_next_seqid(svr_jobidnumber, svr_max_job_sequence_id);
 		if (svr_jobidnumber == -1) {
 			log_err(-1, __func__, "Failed to compute next hash for jobid");
 			exit(0);
@@ -2175,8 +2176,8 @@ req_resvSub(struct batch_request *preq)
 	resc_access_perm = preq->rq_perm | ATR_DFLAG_Creat;
 
 	/* get reseravtion id/queue name locally */
-	if (((next_svr_sequence_id = get_next_hash(svr_jobidnumber, svr_max_job_sequence_id)) == -1)) {
-		sprintf(log_buffer,"1.Failed to compute hash(resvid) for reservation, svr_jobidnumber=%lld and returned from get_next_hash=%lld",
+	if (((next_svr_sequence_id = pbs_shard_get_next_seqid(svr_jobidnumber, svr_max_job_sequence_id)) == -1)) {
+		sprintf(log_buffer,"1.Failed to compute hash(resvid) for reservation, svr_jobidnumber=%lld and returned from pbs_shard_get_next_seqid=%lld",
 				svr_jobidnumber, next_svr_sequence_id);
 		log_err(-1, __func__,log_buffer);
 		req_reject(PBSE_SYSTEM, 0, preq);

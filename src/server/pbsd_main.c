@@ -140,6 +140,7 @@
 #include "pbs_sched.h"
 #include "pbs_share.h"
 #include <pbs_python.h>  /* for python interpreter */
+#include "libshard.h"
 
 /* External functions called */
 
@@ -221,6 +222,7 @@ unsigned int	pbs_mom_port;
 unsigned int	pbs_rm_port;
 pbs_net_t	pbs_server_addr;
 unsigned int	pbs_server_port_dis;
+struct server_instance self;
 /*
  * the names of the Server:
  *    pbs_server_name - from PBS_SERVER_HOST_NAME
@@ -879,6 +881,7 @@ main(int argc, char **argv)
 	int 			db_stop_counts = 0;
 	int 			db_stop_email_sent = 0;
 
+
 	extern int		optind;
 	extern char		*optarg;
 	extern char		*msg_svrdown;	/* log message */
@@ -979,6 +982,8 @@ main(int argc, char **argv)
 
 	if (pbs_loadconf(0) == 0)
 		return (1);
+	/* initialize the shard lib */
+	pbs_shard_init(pbs_conf.pbs_max_servers, (struct server_instance **)pbs_conf.psi, get_current_servers());
 
 #endif
 #ifdef WIN32
@@ -1026,9 +1031,12 @@ main(int argc, char **argv)
 	if ((pc = strchr(daemonname, (int)'.')) != NULL)
 		*pc = '\0';
 
+	self.hostname = strdup(daemonname);
+	self.port = pbs_conf.batch_service_port;
+
 	if (get_max_servers() > 1) {
 		char buf[PBS_MAXHOSTNAME+8];
-		if (get_my_index() == -1) {
+		if (get_my_index(self) == -1) {
 			fprintf(stderr, "Wrong Multi Server configuration. Please start server after correcting /etc/pbs.conf\n");
 			return 1;
 		}

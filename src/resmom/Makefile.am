@@ -62,7 +62,8 @@ pbs_mom_LDADD = \
 	@mom_mach_libs@ \
 	@libz_lib@ \
 	-lssl \
-	-lcrypto
+	-lcrypto \
+	-lshard -L$(top_builddir)/src/lib/Libshard/.libs
 
 pbs_mom_SOURCES = \
 	$(top_builddir)/src/lib/Libattr/job_attr_def.c \

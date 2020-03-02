@@ -82,6 +82,7 @@
 #include "mom_hook_func.h"
 #include "placementsets.h"
 #include "hook.h"
+#include "libshard.h"
 /**
  * @file	catch_child.c
  */
@@ -1955,10 +1956,13 @@ get_server_stream(char *svr, unsigned int port, char *jobid)
 
 
 void
-set_server_stream(unsigned int port, int stream)
+set_server_stream(char * hostname, unsigned int port, int stream)
 {
 	if (pbs_conf.pbs_max_servers > 1) {
-		int srv_index = get_svr_index(port);
+		struct server_instance si;
+		si.hostname = strdup(hostname);
+		si.port = port;
+		int srv_index = get_svr_index(si);
 		if (connection[conn_slot].ch_shards[srv_index]->state == SHARD_CONN_STATE_DOWN) {
 			connection[conn_slot].ch_shards[srv_index]->state = SHARD_CONN_STATE_CONNECTED;
 			connection[conn_slot].ch_shards[srv_index]->sd = stream;

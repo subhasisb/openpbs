@@ -72,6 +72,7 @@
 #include <time.h>
 #include <sys/stat.h>
 #include <libutil.h>
+#include <libshard.h>
 
 #ifdef WIN32
 
@@ -686,7 +687,7 @@ pbsd_init(int type)
 		if (njobid == -1)
 			svr_jobidnumber = -1;
 		else {
-			svr_jobidnumber = get_last_hash(njobid);
+			svr_jobidnumber = pbs_shard_get_last_seqid(njobid);
 			if (svr_jobidnumber == -1) {
 				log_err(-1, __func__, "Failed to compute svr_jobidnumber");
 				return (-1);

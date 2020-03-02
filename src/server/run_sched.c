@@ -69,6 +69,7 @@
 #include "queue.h"
 #include "pbs_share.h"
 #include "pbs_sched.h"
+#include "libshard.h"
 
 
 /* Global Data */
@@ -86,6 +87,7 @@ extern pbs_list_head svr_deferred_req;
 extern void  est_start_timed_task(struct work_task *);
 extern char	*msg_noloopbackif;
 extern char	*msg_daemonname;
+extern struct server_instance self;
 
 int scheduler_sock = -1;	/* socket open to scheduler during a cycle */
 int scheduler_sock2 = -1;
@@ -364,7 +366,7 @@ contact_sched(int cmd, char *jobid, pbs_sched *psched, enum towhich_conn which_c
 			return (-1);
 		}
 
-		snprintf(my_index, MAX_SVR_INDEX, "%d", get_my_index());
+		snprintf(my_index, MAX_SVR_INDEX, "%d", get_my_index(self));
 		if (put_sched_cmd(sock, SCH_SVR_IDENTIFIER, my_index) < 0) {
 			close_conn(sock);
 			return (-1);

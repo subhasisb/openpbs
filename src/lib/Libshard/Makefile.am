@@ -36,16 +36,11 @@
 # trademark licensing policies.
 #
 
-SUBDIRS = \
-	Libattr \
-	Libdb \
-	Liblog \
-	Libnet \
-	Libshard \
-	Libpbs \
-	Libpython \
-	Libsite \
-	Libsec \
-	Libtpp \
-	Libutil 
+lib_LTLIBRARIES = libshard.la
 
+libshard_la_CPPFLAGS = -I$(top_srcdir)/src/include
+
+libshard_la_LDFLAGS = -version-info 0:0:0
+
+libshard_la_SOURCES = \
+	shard_functions.c 

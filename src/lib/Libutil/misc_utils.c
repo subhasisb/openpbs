@@ -1424,7 +1424,7 @@ get_mem_info(void) {
 	}
 	return buf;
 }
-
+#endif /* malloc_info */
 /* hashing functions, move this to hasing.c later */
 int 
 get_max_servers()
@@ -1444,74 +1444,6 @@ get_conf_servers()
 	return pbs_conf.pbs_current_servers;
 }
 
-int 
-get_my_index()
-{
-	static int my_index = -1;
-	int i;
-
-	if (my_index == -1) {
-		if (pbs_conf.pbs_current_servers > 1) {
-			/* find my index */
-			for(i = 0; i < pbs_conf.pbs_current_servers; i++) {
-				if (pbs_conf.batch_service_port == pbs_conf.psi[i]->port)
-					my_index = i;
-			}
-		} else 
-			return 0;
-	}
-
-	return my_index;
-}
-
-int 
-get_svr_index(int port)
-{
-	int i;
-
-	if (pbs_conf.pbs_current_servers > 1) {
-		/* find my index */
-		for(i = 0; i < pbs_conf.pbs_current_servers; i++) {
-			if (port == pbs_conf.psi[i]->port)
-				return i;
-		}
-	} else 
-		return 0;
-
-	return -1;
-}
-
-long long 
-get_next_hash(long long curr, long long max_id)
-{
-	int my_index = get_my_index();
-	if (my_index == -1) 
-		return -1;
-
-	if (curr == -1) {
-		return my_index;
-	}
-
-	curr += get_max_servers();
-	/* If server job limit is over, reset back to zero */
-	if (curr > max_id) {
-		curr -= max_id + 1;
-	}
-	return curr;
-}
-
-long long 
-get_last_hash(long long njobid)
-{
-	int my_index = get_my_index();
-	if (my_index == -1) 
-		return -1;
-
-	if (njobid == -1)
-		return 0;
-
-	return (ceil(njobid / get_max_servers())*get_max_servers() + my_index);
-}
 
 int
 get_server_shard(char *shard_hint)
@@ -1615,5 +1547,5 @@ initialise_connection_slot(int table_size, enum CONN_ORIGIN client)
 		return (-1);
 }
 
-#endif /* malloc_info */
+
 #endif /* WIN32 */

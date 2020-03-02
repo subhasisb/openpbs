@@ -46,7 +46,8 @@ pbs_iff_LDADD = \
 	$(top_builddir)/src/lib/Libsec/libsec.a \
 	-lpthread \
 	@socket_lib@ \
-	-lm
+	-lm \
+	-lshard -L$(top_builddir)/src/lib/Libshard/.libs
 
 pbs_iff_SOURCES = iff2.c
 

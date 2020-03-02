@@ -132,7 +132,7 @@ extern void	mom_vnlp_report(vnl_t *vnl, char *header);
 extern	char	*path_hooks;
 extern	unsigned long	hooks_rescdef_checksum;
 extern	int	report_hook_checksums;
-extern void set_server_stream(unsigned int port, int stream);
+extern void set_server_stream(char * hostname, unsigned int port, int stream);
 
 /*
  * Tree search generalized from Knuth (6.2.2) Algorithm T just like
@@ -726,6 +726,9 @@ is_request(int stream, int version)
 	struct hook_job_action *phjba;
 	struct hook_vnl_action *phvna;
 	mom_hook_input_t	hook_input;
+	char	remote_server_name[NI_MAXHOST+1] = {'\0'};
+	struct	sockaddr_in	server_addr;
+	int errcode;
 
 	DBPRT(("%s: stream %d version %d\n", __func__, stream, version))
 	if (version != IS_PROTOCOL_VER) {
@@ -745,6 +748,15 @@ is_request(int stream, int version)
 	}
 	port = ntohs((unsigned short)addr->sin_port);
 	ipaddr = ntohl(addr->sin_addr.s_addr);
+	memcpy((char *) &server_addr.sin_addr, &(addr->sin_addr), sizeof(server_addr.sin_addr));
+	server_addr.sin_port = addr->sin_port;
+	server_addr.sin_family = AF_INET;
+	if ((errcode = getnameinfo((struct sockaddr *) &server_addr, sizeof(struct sockaddr_in), remote_server_name,
+			sizeof(remote_server_name), NULL, 0, NI_NAMEREQD)) != 0) {
+				sprintf(log_buffer, "could not resolve hostname, errcode: %d", errcode);
+				log_err(-1, __func__, log_buffer);
+				rpp_close(stream);				
+			}
 
 	if ((pbs_conf.pbs_use_tcp == 0 && port >= IPPORT_RESERVED) || (!addrfind(ipaddr))) {
 		sprintf(log_buffer, "bad connect from %s", netaddr(addr));
@@ -757,7 +769,7 @@ is_request(int stream, int version)
 	if (ret != DIS_SUCCESS)
 		goto err;
 
-	set_server_stream(port, stream);	
+	set_server_stream(remote_server_name, port, stream);	
 
 	switch (command) {
 
