@@ -99,6 +99,8 @@
 
 #include "renew_creds.h"
 
+#include "mock_run.h"
+
 #define	PIPE_READ_TIMEOUT	5
 #define EXTRA_ENV_PTRS	       32
 
@@ -2852,27 +2854,6 @@ receive_job_update_request(int sd)
 }
 
 /**
- * @brief	work task handler for end of a job in mock run mode
- *
- * @param[in]	ptask - pointer to the work task
- *
- * @return void
- */
-static void
-mock_run_end_job_task(struct work_task *ptask)
-{
-	job *pjob;
-
-	pjob = ptask->wt_parm1;
-
-	pjob->ji_qs.ji_substate = JOB_SUBSTATE_EXITING;
-	pjob->ji_qs.ji_state = JOB_STATE_EXITING;
-	pjob->ji_qs.ji_un.ji_momt.ji_exitstat = JOB_EXEC_OK;
-
-	scan_for_exiting();
-}
-
-/**
  *
  * @brief
  * 	Used by MOM superior to start the shell process for 'pjob'
@@ -2975,7 +2956,7 @@ finish_exec(job *pjob)
 		log_event(PBSEVENT_JOB, PBS_EVENTCLASS_JOB,
 			LOG_INFO, pjob->ji_qs.ji_jobid, log_buffer);
 
-		mom_set_use(pjob);
+		mock_run_mom_set_use(pjob);
 
 		return;
 	}
