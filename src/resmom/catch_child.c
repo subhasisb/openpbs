@@ -82,7 +82,7 @@
 #include "mom_hook_func.h"
 #include "placementsets.h"
 #include "hook.h"
-#include "libshard.h"
+#include "shard_internal.h"
 /**
  * @file	catch_child.c
  */
@@ -1962,7 +1962,7 @@ set_server_stream(char * hostname, unsigned int port, int stream)
 		struct server_instance si;
 		si.hostname = strdup(hostname);
 		si.port = port;
-		int srv_index = get_svr_index(si);
+		int srv_index = pbs_shard_get_svr_index(&si);
 		if (connection[conn_slot].ch_shards[srv_index]->state == SHARD_CONN_STATE_DOWN) {
 			connection[conn_slot].ch_shards[srv_index]->state = SHARD_CONN_STATE_CONNECTED;
 			connection[conn_slot].ch_shards[srv_index]->sd = stream;

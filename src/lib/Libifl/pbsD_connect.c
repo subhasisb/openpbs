@@ -70,7 +70,7 @@
 #include "libsec.h"
 #include "pbs_ecl.h"
 #include "pbs_internal.h"
-#include "libshard.h"
+#include "shard_internal.h"
 
 
 extern struct connect_handle connection[NCONNECTS];
@@ -649,18 +649,26 @@ get_svr_shard_connection(int channel, int req_type, void *shard_hint)
 {
 	int srv_index;
 	int sd;
+	int i = 0;
 	int inact_srv_index = 0;
-	if (internal_connect == NULL)
-		internal_connect = internal_connect_cli;
 	int num_of_conf_servers = get_current_servers();
 	int inactive_servers[num_of_conf_servers];
-	inactive_servers[0] = -1;
 	static int shard_init_flag = -1;
-	if (shard_init_flag == -1) {
-		pbs_shard_init(pbs_conf.pbs_max_servers, (struct server_instance **)pbs_conf.psi, num_of_conf_servers);
-		shard_init_flag = 1;
+	if (pbs_conf.pbs_max_servers > 1) {
+			if (shard_init_flag == -1) {
+				if (pbs_shard_init(pbs_conf.pbs_max_servers, (struct server_instance **)pbs_conf.psi, num_of_conf_servers) == -1)
+				return -1;
+			shard_init_flag = 1;
+			}
 	}
-	
+
+
+	if (internal_connect == NULL)
+		internal_connect = internal_connect_cli;
+
+	for (; i < num_of_conf_servers; i++)
+		inactive_servers[i] = -1;
+
 	if (pbs_conf.pbs_max_servers > 1) {
 
 		if (shard_hint || connection[channel].shard_context == -1) {

@@ -69,7 +69,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <libutil.h>
-#include <libshard.h>
+#include <shard_internal.h>
 
 #ifdef WIN32
 #include  <io.h>

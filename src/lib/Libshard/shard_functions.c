@@ -47,19 +47,12 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <errno.h>
-#include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
-#include <netdb.h>
-#include <unistd.h>
-#include <sys/stat.h>
 #include <sys/types.h>
-#include <sys/socket.h>
 #include <sys/time.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
 #include <math.h>
-#include "libshard.h"
+#include "shard_internal.h"
 
 int pbs_shard_init(int max_allowed_servers, struct server_instance **server_instances, int num_instances);
 
@@ -69,40 +62,51 @@ long long pbs_shard_get_next_seqid(long long curr_seq_id_seq_id, long long max_s
 
 long long pbs_shard_get_last_seqid(long long njobid);
 
-int get_my_index(struct server_instance myinstance);
+int pbs_shard_get_caller_index(struct server_instance *myinstance);
 
-int get_svr_index(struct server_instance remote_instance);
+int pbs_shard_get_svr_index(struct server_instance *remote_instance);
 
-int max_allowed_servers_lib = 0;
-struct server_instance **server_instances_lib = NULL;
-int num_instances_lib = 0;
+int compute_srv_ind(char *obj_id);
+
+int max_num_of_servers = 0;
+struct server_instance **configured_servers = NULL;
+int configured_num_servers = 0;
 static int my_index = -1;
 
 int 
 pbs_shard_init(int max_allowed_servers, struct server_instance **server_instances, int num_instances) {
-        max_allowed_servers_lib = max_allowed_servers;
-        server_instances_lib = server_instances;
-        num_instances_lib = num_instances;
+        
+        if (server_instances == NULL)
+                return -1;
+        max_num_of_servers = max_allowed_servers;
+        configured_servers = server_instances;
+        configured_num_servers = num_instances;
         return 0;
 }
+
+
+int compute_srv_ind(char *id) {
+        int nshardid = 0;
+        nshardid = strtoull(id, NULL, 10);
+        return (nshardid % max_num_of_servers);
+}
+
 
 int
 pbs_shard_get_server_byindex(char *obj_id, enum obj_type_t obj_type, int *inactive_servers)
 {
         int srv_ind = 0;
-        int nshardid = 0;
         int loop_i = 0;
         static int seeded = 0;
         struct timeval tv;
         unsigned long time_in_micros;
         int counter = 0;
 
-        if (!max_allowed_servers_lib || !server_instances_lib)
+        if (!max_num_of_servers || !configured_servers)
                 return -1;
 
         if (obj_id) {
-                nshardid = strtoull(obj_id, NULL, 10);
-                srv_ind = nshardid % max_allowed_servers_lib;
+                srv_ind = compute_srv_ind(obj_id);
         } else {
                 if (!seeded) {
                         gettimeofday(&tv,NULL);
@@ -110,36 +114,36 @@ pbs_shard_get_server_byindex(char *obj_id, enum obj_type_t obj_type, int *inacti
                         srand(time_in_micros); /* seed the random generator */
                         seeded = 1;
                 }
-                srv_ind = rand() % num_instances_lib;
+                srv_ind = rand() % configured_num_servers;
         }
 
  check_again:
-        if (counter >= num_instances_lib)
+        if (counter >= configured_num_servers)
                 return -1;
-        loop_i = 0;
-        if (inactive_servers[0] != -1) {     
-                for(; loop_i < num_instances_lib; loop_i++) {
-                        if (srv_ind == inactive_servers[loop_i]) {
-                                srv_ind = (srv_ind + 1) % num_instances_lib;
-                                counter++;                                 
-                                goto check_again;
-                        }
+        loop_i = 0;    
+        for(; loop_i < configured_num_servers && inactive_servers[loop_i] != -1; loop_i++) {
+                if (srv_ind == inactive_servers[loop_i]) {
+                        srv_ind = (srv_ind + 1) % configured_num_servers;
+                        counter++;                                 
+                        goto check_again;
                 }
-        }        
+        }     
         return srv_ind;
 }
 
 int 
-get_my_index(struct server_instance myinstance)
+pbs_shard_get_caller_index(struct server_instance *myinstance)
 {
 	int i;
 
 	if (my_index == -1) {
-		if (num_instances_lib > 1) {
+		if (configured_num_servers > 1) {
 			/* find my index */
-			for(i = 0; i < num_instances_lib; i++) {
-				if (myinstance.port == server_instances_lib[i]->port)
+			for(i = 0; i < configured_num_servers; i++) {
+				if (myinstance->port == configured_servers[i]->port) {
 					my_index = i;
+                                        break;
+                                }
 			}
 		} else 
 			my_index = 0;
@@ -153,7 +157,7 @@ pbs_shard_get_next_seqid(long long curr_seq_id, long long max_seq_id)
 {
 
         if (my_index == -1) {
-                if (num_instances_lib > 1)  
+                if (configured_num_servers > 1)  
                         return -1;
                 else
                         my_index = 0;
@@ -163,7 +167,7 @@ pbs_shard_get_next_seqid(long long curr_seq_id, long long max_seq_id)
                 return my_index;
         }
 
-        curr_seq_id += max_allowed_servers_lib;
+        curr_seq_id += max_num_of_servers;
         /* If server job limit is over, reset back to zero */
         if (curr_seq_id > max_seq_id) {
                 curr_seq_id -= max_seq_id + 1;
@@ -178,7 +182,7 @@ pbs_shard_get_last_seqid(long long njobid)
 {
 
         if (my_index == -1) {
-                if (num_instances_lib > 1)  
+                if (configured_num_servers > 1)  
                         return -1;
                 else
                         my_index = 0;
@@ -187,19 +191,19 @@ pbs_shard_get_last_seqid(long long njobid)
         if (njobid == -1)
                 return 0;
 
-        return (ceil(njobid / max_allowed_servers_lib)*max_allowed_servers_lib + my_index);
+        return (ceil(njobid / max_num_of_servers)*max_num_of_servers + my_index);
 
 }
 
 int 
-get_svr_index(struct server_instance remote_instance)
+pbs_shard_get_svr_index(struct server_instance *remote_instance)
 {
 	int i;
 
-	if (num_instances_lib > 1) {
+	if (configured_num_servers > 1) {
 		/* find my index */
-		for(i = 0; i < num_instances_lib; i++) {
-			if (remote_instance.port == server_instances_lib[i]->port)
+		for(i = 0; i < configured_num_servers; i++) {
+			if (remote_instance->port == configured_servers[i]->port)
 				return i;
 		}
 	} else 

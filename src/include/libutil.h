@@ -291,7 +291,6 @@ char * get_mem_info(void);
  */
 void convert_duration_to_str(time_t duration, char* buf, int bufsize);
 
-
 int get_max_servers();
 int get_current_servers();
 int get_server_shard(char * shard_hint);

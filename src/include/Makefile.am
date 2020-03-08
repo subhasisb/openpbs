@@ -114,6 +114,7 @@ noinst_HEADERS = \
 	pbs_sched.h \
 	server.h \
 	server_limits.h \
+	shard_internal.h \
 	site_queue.h \
 	site_job_attr_def.h \
 	site_job_attr_enum.h \
