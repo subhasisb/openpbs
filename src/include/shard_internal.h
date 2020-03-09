@@ -36,8 +36,8 @@
  *
  */
 
-#ifndef __LIBSHARD_H
-#define __LIBSHARD_H
+#ifndef __SHARD_INTERNAL_H
+#define __SHARD_INTERNAL_H
 #ifdef  __cplusplus
 extern "C" {
 #endif
@@ -53,7 +53,7 @@ extern int pbs_shard_init(int max_allowed_servers, struct server_instance **serv
 
 extern int pbs_shard_get_server_byindex(char *obj_id, enum obj_type_t obj_type, int *inactive_servers);
 
-extern int pbs_shard_get_caller_index(struct server_instance *myinstance);
+extern int pbs_shard_get_index(struct server_instance *myinstance);
 
 extern long long pbs_shard_get_next_seqid(long long curr_seq_id, long long max_seq_id);
 
@@ -66,4 +66,4 @@ extern int pbs_shard_get_svr_index(struct server_instance *remote_instance);
 #ifdef  __cplusplus
 }
 #endif
-#endif /* __LIBSHARD_H */
+#endif /* __SHARD_INTERNAL_H */

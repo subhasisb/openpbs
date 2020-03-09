@@ -62,7 +62,7 @@ long long pbs_shard_get_next_seqid(long long curr_seq_id_seq_id, long long max_s
 
 long long pbs_shard_get_last_seqid(long long njobid);
 
-int pbs_shard_get_caller_index(struct server_instance *myinstance);
+int pbs_shard_get_index(struct server_instance *myinstance);
 
 int pbs_shard_get_svr_index(struct server_instance *remote_instance);
 
@@ -71,8 +71,22 @@ int compute_srv_ind(char *obj_id);
 int max_num_of_servers = 0;
 struct server_instance **configured_servers = NULL;
 int configured_num_servers = 0;
-static int my_index = -1;
+static int svr_index = -1;
 
+/**
+ * @brief
+ * This API  initializes the information needed in the shard library. 
+ * It should be called once at the startup of the client so that 
+ * the shard library would work on these parameters. 
+ *
+ * @param[in]	max_allowed_servers - Max number of PBS servers as specified in pbs.conf file by the admin.
+ * @param[in]	server_instances - Array of server_instance object, each object contains the server name, port
+ * @param[in]	num_instances - Numbers of server instances currently configured in the complex.
+ *
+ * @return	int
+ * @retval  0	- success
+ * @retval -1	- error
+ */
 int 
 pbs_shard_init(int max_allowed_servers, struct server_instance **server_instances, int num_instances) {
         
@@ -84,14 +98,36 @@ pbs_shard_init(int max_allowed_servers, struct server_instance **server_instance
         return 0;
 }
 
-
+/**
+ * @brief
+ * This API computes the server index based on internal hasing. 
+ *
+ * @param[in]	id - object identifier.
+ *
+ */
 int compute_srv_ind(char *id) {
         int nshardid = 0;
         nshardid = strtoull(id, NULL, 10);
         return (nshardid % max_num_of_servers);
 }
 
-
+/**
+ * @brief
+ * This API uses the internal sharding logic to identify the right server instance.
+ * If the chosen server is not active, the logic will return the next active server instance
+ * by referring to the array of configured server instances and an array of inactive server instances.
+ * However, the caller should maintain the same series of server instances received from the last call.
+ * This interface is used in a client-side application. 
+ *
+ * @param[in]	obj_id - The identifier used to find the respective server.
+ * @param[in]	obj_type - This would specify the object type. 
+ * @param[in]	inactive_servers - The array of failed servers list, 
+ *                                 the caller would update the failed server before the next call. 
+ *
+ * @return      int
+ * @retval !=-1 - success, returns one of the index value of server_instance array
+ * @retval -1	- error
+ */
 int
 pbs_shard_get_server_byindex(char *obj_id, enum obj_type_t obj_type, int *inactive_servers)
 {
@@ -131,40 +167,71 @@ pbs_shard_get_server_byindex(char *obj_id, enum obj_type_t obj_type, int *inacti
         return srv_ind;
 }
 
+/**
+ * @brief
+ * a) This API initializes the sharding library’s internal variable(svr_index),
+ * which is used in pbs_shard_get_next_seqid() and pbs_shard_get_last_seqid() 
+ * b) This API is used to check the multiserver configuration while starting the server 
+ * and c) this API also returns the server index based on the given server_instance object. 
+ * PBS server uses this API.    
+ *
+ * @param[in]	myinstance - object of server_instance, having hostname and port number.
+ *
+ * @return      int
+ * @retval !=-1 - success, caller's server index. 
+ * @retval -1	- error
+ */
 int 
-pbs_shard_get_caller_index(struct server_instance *myinstance)
+pbs_shard_get_index(struct server_instance *myinstance)
 {
 	int i;
 
-	if (my_index == -1) {
+	if (svr_index == -1) {
 		if (configured_num_servers > 1) {
 			/* find my index */
 			for(i = 0; i < configured_num_servers; i++) {
 				if (myinstance->port == configured_servers[i]->port) {
-					my_index = i;
-                                        break;
+                                        if (strcmp(myinstance->hostname, configured_servers[i]->hostname) == 0) {
+                                                svr_index = i;
+                                                break;
+                                        }
                                 }
 			}
 		} else 
-			my_index = 0;
+			svr_index = 0;
 	}
 
-	return my_index;
+	return svr_index;
 }
 
+/**
+ * @brief
+ * This API generates the next sequence ID.  
+ * It accepts the current seq id and maximum seq id to compute the next one in series. 
+ * This function would apply the "max_seq_id" limitations and make sure 
+ * the generated ID is less than the maximum allowed sequence ID. 
+ *
+ * @param[in]	curr_seq_id - The current seq ID in the PBS server.
+ * @param[in]	max_seq_id - The limitation in the PBS SERVER on an object ID, 
+ *                           which needs to be considered while generating the new object ID. 
+ *
+ * @return long long
+ * @retval !=-1 - success, the next obj_id to use is returned.
+ * @retval -1 -  error
+ */
 long long 
 pbs_shard_get_next_seqid(long long curr_seq_id, long long max_seq_id)
 {
 
-        if (my_index == -1) {
+        if (svr_index == -1) {
                 if (configured_num_servers > 1)  
                         return -1;
                 else
-                        my_index = 0;
+                        svr_index = 0;
         }
 
         if (curr_seq_id == -1) {
-                return my_index;
+                return svr_index;
         }
 
         curr_seq_id += max_num_of_servers;
@@ -177,24 +244,47 @@ pbs_shard_get_next_seqid(long long curr_seq_id, long long max_seq_id)
 }
 
 
+/**
+ * @brief
+ * If the server gets restarted, it will be needed to know the last generated seq id. 
+ * This last seq id is used by sharding logic to compute the next seq id. 
+ * This API accepts the maximum generated seq ID.
+ *
+ * @param[in]	njobid - The maximum generated seq ID. 
+ *
+ * @return long long
+ * @retval !=-1 - success, the next obj_id to use is returned.
+ * @retval -1 -  error
+ */
 long long 
 pbs_shard_get_last_seqid(long long njobid)
 {
 
-        if (my_index == -1) {
+        if (svr_index == -1) {
                 if (configured_num_servers > 1)  
                         return -1;
                 else
-                        my_index = 0;
+                        svr_index = 0;
         }
 
         if (njobid == -1)
                 return 0;
 
-        return (ceil(njobid / max_num_of_servers)*max_num_of_servers + my_index);
+        return (ceil(njobid / max_num_of_servers)*max_num_of_servers + svr_index);
 
 }
 
+/**
+ * @brief
+ * This API returns the server index based on the given server_instance object. 
+ * This is used in the client-side application to maintain the connection table.   
+ *
+ * @param[in]	remote_instance - object of server_instance, having hostname and port number.
+ *
+ * @return      int
+ * @retval !=-1 - success, server index
+ * @retval -1	- error
+ */
 int 
 pbs_shard_get_svr_index(struct server_instance *remote_instance)
 {
@@ -203,8 +293,10 @@ pbs_shard_get_svr_index(struct server_instance *remote_instance)
 	if (configured_num_servers > 1) {
 		/* find my index */
 		for(i = 0; i < configured_num_servers; i++) {
-			if (remote_instance->port == configured_servers[i]->port)
-				return i;
+			if (remote_instance->port == configured_servers[i]->port) {
+                                if (strcmp(remote_instance->hostname, configured_servers[i]->hostname) == 0) 
+                                        return i;
+                        }
 		}
 	} else 
 		return 0;

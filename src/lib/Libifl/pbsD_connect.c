@@ -654,12 +654,12 @@ get_svr_shard_connection(int channel, int req_type, void *shard_hint)
 	int num_of_conf_servers = get_current_servers();
 	int inactive_servers[num_of_conf_servers];
 	static int shard_init_flag = -1;
-	if (pbs_conf.pbs_max_servers > 1) {
-			if (shard_init_flag == -1) {
-				if (pbs_shard_init(pbs_conf.pbs_max_servers, (struct server_instance **)pbs_conf.psi, num_of_conf_servers) == -1)
+	if (get_max_servers() > 1) {
+		if (shard_init_flag == -1) {
+			if (pbs_shard_init(get_max_servers(), (struct server_instance **)pbs_conf.psi, num_of_conf_servers) == -1)
 				return -1;
-			shard_init_flag = 1;
-			}
+		shard_init_flag = 1;
+		}
 	}
 
 
@@ -669,7 +669,7 @@ get_svr_shard_connection(int channel, int req_type, void *shard_hint)
 	for (; i < num_of_conf_servers; i++)
 		inactive_servers[i] = -1;
 
-	if (pbs_conf.pbs_max_servers > 1) {
+	if (get_max_servers() > 1) {
 
 		if (shard_hint || connection[channel].shard_context == -1) {
 			srv_index = pbs_shard_get_server_byindex(shard_hint, JOB, inactive_servers);

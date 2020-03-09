@@ -983,7 +983,8 @@ main(int argc, char **argv)
 	if (pbs_loadconf(0) == 0)
 		return (1);
 	/* initialize the shard lib */
-	pbs_shard_init(pbs_conf.pbs_max_servers, (struct server_instance **)pbs_conf.psi, get_current_servers());
+	if (pbs_shard_init(get_max_servers(), (struct server_instance **)pbs_conf.psi, get_current_servers()) == -1)
+		return (1);
 
 #endif
 #ifdef WIN32
@@ -1031,12 +1032,12 @@ main(int argc, char **argv)
 	if ((pc = strchr(daemonname, (int)'.')) != NULL)
 		*pc = '\0';
 
-	self.hostname = strdup(daemonname);
+	self.hostname = strdup(server_host);
 	self.port = pbs_conf.batch_service_port;
 
 	if (get_max_servers() > 1) {
 		char buf[PBS_MAXHOSTNAME+8];
-		if (pbs_shard_get_caller_index(&self) == -1) {
+		if (pbs_shard_get_index(&self) == -1) {
 			fprintf(stderr, "Wrong Multi Server configuration. Please start server after correcting /etc/pbs.conf\n");
 			return 1;
 		}
