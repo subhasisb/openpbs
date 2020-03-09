@@ -94,7 +94,7 @@ mock_run_mom_set_use(job *pjob)
 	attribute *at;
 	attribute *at_req;
 	resource_def *rdefp;
-	long val_req;
+	long val_req = 0;
 	static resource_def	**rd = NULL;
 	static resource_def *vmemd = NULL;
 	int memval = 0;
