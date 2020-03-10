@@ -71,6 +71,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <libutil.h>
+#include "libshard.h"
 
 #ifdef WIN32
 #include  <io.h>
@@ -185,6 +186,7 @@ extern char *msg_nostf_resv;
 extern char *msg_nostf_jobarray;
 #endif
 
+extern int myindex;
 
 /* Private Functions in this file */
 
@@ -197,11 +199,11 @@ static	int	ignore_attr(char *);
 static	int	validate_place_req_of_job_in_reservation(job *pj);
 
 /* To generate the job/resv id's locally */
-static long long get_next_svr_sequence_id(void);
+
 static long long svr_sequence_window_count = 0;
 void reset_svr_sequence_window(void);
-long long next_svr_sequence_id = 0;
-long long svr_jobidnumber = 0;
+long long next_svr_sequence_id = -1;
+long long svr_jobidnumber = -1;
 
 static char *pbs_o_que = "PBS_O_QUEUE=";
 /**
@@ -430,17 +432,17 @@ req_quejob(struct batch_request *preq)
 			psatl = (svrattrl *)GET_NEXT(psatl->al_link);
 		}
 		/* fetch job id locally*/
-		if ((next_svr_sequence_id = get_next_svr_sequence_id()) == -1) {
+		if ((svr_jobidnumber = pbs_shard_get_next_seqid(svr_jobidnumber, svr_max_job_sequence_id, myindex)) == -1) {
 			req_reject(PBSE_SYSTEM, 0, preq);
 			return;
 		}
 		created_here = JOB_SVFLG_HERE;
 		if (i == 0) {	/* Normal job */
 			(void)sprintf(jidbuf, "%lld.%s",
-				next_svr_sequence_id, server_name);
+				svr_jobidnumber, server_name);
 		} else {	/* Array Job */
 			(void)sprintf(jidbuf, "%lld[].%s",
-					next_svr_sequence_id, server_name);
+					svr_jobidnumber, server_name);
 		}
 		jid = jidbuf;
 	}
@@ -2242,7 +2244,7 @@ req_resvSub(struct batch_request *preq)
 	}
 
 	/* get reservation id/queue name locally */
-	if ((next_svr_sequence_id = get_next_svr_sequence_id()) == -1) {
+	if ((svr_jobidnumber = pbs_shard_get_next_seqid(svr_jobidnumber, svr_max_job_sequence_id, myindex)) == -1) {
 		req_reject(PBSE_SYSTEM, 0, preq);
 		return;
 	}
@@ -2268,7 +2270,7 @@ req_resvSub(struct batch_request *preq)
 
 		created_here = RESV_SVFLG_HERE;
 		(void)snprintf(ridbuf, sizeof(ridbuf), "%c%lld.", PBS_RESV_ID_CHAR,
-				next_svr_sequence_id);
+				svr_jobidnumber);
 		(void)strcat(ridbuf, server_name);
 		rid = ridbuf;
 	}
@@ -2283,7 +2285,7 @@ req_resvSub(struct batch_request *preq)
 	 */
 
 	(void)snprintf(qbuf, sizeof(qbuf), "%c%lld", PBS_RESV_ID_CHAR,
-			next_svr_sequence_id);
+			svr_jobidnumber);
 
 	/* does reservation already exist, check both old
 	 * and new reservations?
@@ -3363,55 +3365,6 @@ validate_place_req_of_job_in_reservation(job *pj)
 	return 1;
 }
 
-/**
- * @brief
- * 		Provides the next job id
- *
- * @param[in] void
- *
- * @return	long long
- * @retval (>=0 to <= max_job_sequence_id): Success
- * @retval	-1	: database error
- *
- */
-
-static
-long long get_next_svr_sequence_id(void)
-{
-	long long ret_svr_sequence_id = 0;
-
-	/* JobId's save to the database after every 1000 jobs */
-	if (svr_sequence_window_count == 0) {
-		/* Save the job-id numbers in the database by a SEQ_WIN_INCR(1000) in advance.
-		 * So this way, we have to save it once only after every SEQ_WIN_INCR(1000) submissions.
-		 */
-		long long update_svr_sv_jobidnumber = 0;
-		svr_jobidnumber = server.sv_qs.sv_jobidnumber;
-		update_svr_sv_jobidnumber = server.sv_qs.sv_jobidnumber + SEQ_WIN_INCR;
-		if (update_svr_sv_jobidnumber > svr_max_job_sequence_id) {
-			update_svr_sv_jobidnumber = SEQ_WIN_INCR;
-		}
-		/* sv_jobidnumber has been increased by 1000 and then update it to the database */
-		server.sv_qs.sv_jobidnumber = update_svr_sv_jobidnumber;
-		if (svr_save_db(&server, SVR_SAVE_QUICK) != 0) {
-			/* reset back stuff to the current count, which gets written at server exit anyway */
-			server.sv_qs.sv_jobidnumber = svr_jobidnumber;
-			return -1;
-		}
-	}
-	++svr_sequence_window_count;
-	ret_svr_sequence_id = svr_jobidnumber;
-	/* sequence window count is more than 1000, reset back to zero*/
-	if (svr_sequence_window_count >= SEQ_WIN_INCR) {
-		svr_sequence_window_count = 0;
-	}
-	/* If server job limit is over, reset back to zero */
-	if (++svr_jobidnumber > svr_max_job_sequence_id) {
-		svr_sequence_window_count = 0;
-		server.sv_qs.sv_jobidnumber = 0;
-	}
-	return ret_svr_sequence_id;
-}
 
 /**
  * @brief

@@ -70,14 +70,21 @@ PBSD_submit_resv(int connect, char *resv_id, struct attropl *attrib, char *exten
 	struct batch_reply *reply;
 	char  *return_resv_id = NULL;
 	int    rc;
+	int    sock;
+
+	sock = get_svr_shard_connection(connect, PBS_BATCH_SubmitResv, NULL);
+	if (sock == -1) {
+		pbs_errno = PBSE_NOSERVER;
+		return NULL;
+	}
 
 	DIS_tcp_funcs();
 
 	/* first, set up the body of the Submit Reservation request */
 
-	if ((rc = encode_DIS_ReqHdr(connect, PBS_BATCH_SubmitResv, pbs_current_user)) ||
-		(rc = encode_DIS_SubmitResv(connect, resv_id, attrib)) ||
-		(rc = encode_DIS_ReqExtend(connect, extend))) {
+	if ((rc = encode_DIS_ReqHdr(sock, PBS_BATCH_SubmitResv, pbs_current_user)) ||
+		(rc = encode_DIS_SubmitResv(sock, resv_id, attrib)) ||
+		(rc = encode_DIS_ReqExtend(sock, extend))) {
 		if (set_conn_errtxt(connect, dis_emsg[rc]) != 0) {
 			pbs_errno = PBSE_SYSTEM;
 			return NULL;
@@ -85,7 +92,7 @@ PBSD_submit_resv(int connect, char *resv_id, struct attropl *attrib, char *exten
 		pbs_errno = PBSE_PROTOCOL;
 		return return_resv_id;
 	}
-	if (dis_flush(connect)) {
+	if (dis_flush(sock)) {
 		pbs_errno = PBSE_PROTOCOL;
 		return return_resv_id;
 	}

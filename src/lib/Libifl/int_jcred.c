@@ -77,17 +77,20 @@ PBSD_jcred(int c, int type, char *buf, int len, int prot, char **msgid)
 {
 	int			rc;
 	struct batch_reply	*reply = NULL;
+	int	sock;
 
 	if (prot == PROT_TCP) {
+		sock = get_svr_shard_connection(c, -1, NULL);
 		DIS_tcp_funcs();
 	} else {
-		if ((rc = is_compose_cmd(c, IS_CMD, msgid)) != DIS_SUCCESS)
+		sock = c;
+		if ((rc = is_compose_cmd(sock, IS_CMD, msgid)) != DIS_SUCCESS)
 			return rc;
 	}
 
-	if ((rc =encode_DIS_ReqHdr(c, PBS_BATCH_JobCred, pbs_current_user)) ||
-		(rc = encode_DIS_JobCred(c, type, buf, len)) ||
-		(rc = encode_DIS_ReqExtend(c, NULL))) {
+	if ((rc =encode_DIS_ReqHdr(sock, PBS_BATCH_JobCred, pbs_current_user)) ||
+		(rc = encode_DIS_JobCred(sock, type, buf, len)) ||
+		(rc = encode_DIS_ReqExtend(sock, NULL))) {
 		if (prot == PROT_TCP) {
 			if (set_conn_errtxt(c, dis_emsg[rc]) != 0)
 				return (pbs_errno = PBSE_SYSTEM);
@@ -97,13 +100,13 @@ PBSD_jcred(int c, int type, char *buf, int len, int prot, char **msgid)
 
 	if (prot == PROT_TPP) {
 		pbs_errno = PBSE_NONE;
-		if (dis_flush(c))
+		if (dis_flush(sock))
 			pbs_errno = PBSE_PROTOCOL;
 
 		return (pbs_errno);
 	}
 
-	if (dis_flush(c)) {
+	if (dis_flush(sock)) {
 		return (pbs_errno = PBSE_PROTOCOL);
 	}
 

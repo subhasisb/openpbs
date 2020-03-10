@@ -73,6 +73,7 @@ pbs_defschreply(int c, int cmd, char *id, int err, char *txt, char *extend)
 	int	rc;
 	struct batch_reply   *reply;
 	int	has_txt = 0;
+	int	sock;
 
 	if ((id == NULL) || (*id == '\0'))
 		return (pbs_errno = PBSE_IVALREQ);
@@ -87,6 +88,13 @@ pbs_defschreply(int c, int cmd, char *id, int err, char *txt, char *extend)
 	/* blocking call, waits for mutex release */
 	if (pbs_client_thread_lock_connection(c) != 0)
 		return pbs_errno;
+		
+	set_new_shard_context(c);
+	sock = get_svr_shard_connection(c, PBS_BATCH_DefSchReply, id);
+	if (sock == -1) {
+		return (pbs_errno = PBSE_NOSERVER);
+	}
+
 
 	/* setup DIS support routines for following DIS calls */
 
@@ -94,11 +102,11 @@ pbs_defschreply(int c, int cmd, char *id, int err, char *txt, char *extend)
 
 	/* encode request */
 
-	if ((rc = encode_DIS_ReqHdr(c, PBS_BATCH_DefSchReply,
+	if ((rc = encode_DIS_ReqHdr(sock, PBS_BATCH_DefSchReply,
 		pbs_current_user)) ||
-		(rc = diswui(c, cmd)  != 0)                        ||
-		(rc = diswst(c, id)  != 0)                        ||
-		(rc = diswui(c, err)  != 0)) {
+		(rc = diswui(sock, cmd)  != 0)                        ||
+		(rc = diswst(sock, id)  != 0)                        ||
+		(rc = diswui(sock, err)  != 0)) {
 		if (set_conn_errtxt(c, dis_emsg[rc]) != 0) {
 			pbs_errno = PBSE_SYSTEM;
 		} else {
@@ -107,12 +115,12 @@ pbs_defschreply(int c, int cmd, char *id, int err, char *txt, char *extend)
 		(void)pbs_client_thread_unlock_connection(c);
 		return pbs_errno;
 	}
-	rc = diswsi(c, has_txt);
+	rc = diswsi(sock, has_txt);
 	if ((has_txt == 1) && (rc == 0)) {
-		rc = diswst(c, txt);
+		rc = diswst(sock, txt);
 	}
 	if (rc == 0)
-		rc = encode_DIS_ReqExtend(c, extend);
+		rc = encode_DIS_ReqExtend(sock, extend);
 	if (rc) {
 		if (set_conn_errtxt(c, dis_emsg[rc]) != 0) {
 			pbs_errno = PBSE_SYSTEM;
@@ -123,7 +131,7 @@ pbs_defschreply(int c, int cmd, char *id, int err, char *txt, char *extend)
 		return pbs_errno;
 	}
 
-	if (dis_flush(c)) {
+	if (dis_flush(sock)) {
 		pbs_errno = PBSE_PROTOCOL;
 		(void)pbs_client_thread_unlock_connection(c);
 		return pbs_errno;

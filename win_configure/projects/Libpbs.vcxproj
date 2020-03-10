@@ -1120,6 +1120,9 @@
       <Project>{4f776873-f1fb-4299-b3d5-394af05baa73}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
+    <ProjectReference Include="Libshard.vcxproj">
+      <Project>{b1e71e4a-38ac-47c8-a7c6-e82b5b7cdf5e}</Project>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -91,6 +91,7 @@ extern "C" {
 #define STMT_INSERT_JOBSCR  "insert_jobscr"
 #define STMT_SELECT_JOBSCR  "select_jobscr"
 #define STMT_DELETE_JOBSCR  "delete_jobscr"
+#define STMT_GET_MAXJOBID  "get_maxjobid"
 
 
 

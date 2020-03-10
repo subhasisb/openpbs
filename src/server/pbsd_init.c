@@ -114,7 +114,7 @@
 #include "hook_func.h"
 #include "pbs_share.h"
 #include "pbs_undolr.h"
-
+#include "libshard.h"
 #ifndef SIGKILL
 /* there is some weid stuff in gcc include files signal.h & sys/params.h */
 #include <signal.h>
@@ -193,6 +193,7 @@ extern int		brought_up_db;
 extern pbs_db_conn_t	*svr_db_conn;
 
 extern	pbs_list_head	svr_allhooks;
+extern long long svr_jobidnumber;
 
 
 /* External Functions Called */
@@ -394,6 +395,7 @@ pbsd_init(int type)
 	char *buf = NULL;
 	int buf_len = 0;
 	pbs_sched *psched;
+	long long njobid = -1;
 
 #ifdef  RLIMIT_CORE
 	int      char_in_cname = 0;
@@ -567,7 +569,20 @@ pbsd_init(int type)
 		 * Retrieve the jobidnumber from the database and use it to generate jobid's locally
 		 * see: get_next_svr_sequence_id(void)
 		 */
-		svr_jobidnumber = server.sv_qs.sv_jobidnumber;
+		if (pbs_db_get_maxjobid(conn, &njobid) == -1) {
+			log_err(-1, __func__, "Failed to query last used jobid from datastore");
+			return (-1);
+		}
+
+		if (njobid == -1)
+			svr_jobidnumber = -1;
+		else {
+			svr_jobidnumber = njobid;
+			if (svr_jobidnumber == -1) {
+				log_err(-1, __func__, "Failed to compute svr_jobidnumber");
+				return (-1);
+			}
+		}
 		if (server.sv_attr[(int)SRV_ATR_resource_assn].at_flags &
 			ATR_VFLAG_SET) {
 			svr_attr_def[(int)SRV_ATR_resource_assn].at_free(

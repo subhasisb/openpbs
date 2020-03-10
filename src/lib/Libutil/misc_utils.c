@@ -2158,3 +2158,43 @@ crc_file(char *filepath)
 	return (crc(buf, sb.st_size));
 #endif
 }
+
+/**
+ * @brief
+ *	get_max_servers - Getter function to get the PBS_MAX_SERVERS from pbs.conf file.
+ *
+ */
+
+int 
+get_max_servers()
+{
+	return pbs_conf.pbs_max_servers;
+}
+
+/**
+ * @brief
+ *	get_current_servers - Getter function to get number of servers configured in PBS complex.
+ *
+ */
+int
+get_current_servers()
+{
+	return pbs_conf.pbs_current_servers;
+}
+
+int
+get_svr_index(struct pbs_server_instance *instance)
+{
+        int i;
+        if (get_current_servers() > 1) {
+		for(i = 0; i < get_current_servers(); i++) {
+			if (instance->port == pbs_conf.psi[i]->port) {
+				if (strcmp(instance->name, pbs_conf.psi[i]->name) == 0) 
+					return i;
+			}
+		}
+        } else
+                return 0;
+
+        return -1;
+}

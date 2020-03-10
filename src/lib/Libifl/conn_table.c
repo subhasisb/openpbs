@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 1994-2019 Altair Engineering, Inc.
+ * Copyright (C) 1994-2020 Altair Engineering, Inc.
  * For more information, contact Altair at www.altair.com.
  *
  * This file is part of the PBS Professional ("PBS Pro") software.
@@ -519,4 +519,146 @@ get_conn_mutex(int fd)
 	mutex = &(p->ch_mutex);
 	UNLOCK_TABLE(NULL);
 	return mutex;
+}
+
+/**
+ * @brief
+ * 	set_conn_shard_context - set connection shard context synchronously
+ *
+ * @param[in] vfd - Virtual socket number
+ * @param[in] sock - socket on connection
+ *
+ * @return int
+ * @retval 0 - success
+ * @retval -1 - error
+ *
+ * @par Side Effects:
+ *	None
+ *
+ * @par MT-safe: Yes
+ */
+int
+set_conn_shard_context(int vfd, int sock)
+{
+	pbs_conn_t *p = NULL;
+
+	if (INVALID_SOCK(vfd))
+		return -1;
+
+	LOCK_TABLE(-1);
+	p = get_connection(vfd);
+	if (p == NULL) {
+		UNLOCK_TABLE(-1);
+		return -1;
+	}
+	p->shard_context = sock;
+	UNLOCK_TABLE(-1);
+	return 0;
+}
+
+/**
+ * @brief
+ * 	get_conn_shard_context - get connection shard context synchronously
+ *
+ * @param[in] fd - socket number
+ *
+ * @return int
+ * @retval >= 0 - success
+ * @retval -1 - error
+ *
+ * @par Side Effects:
+ *	None
+ *
+ * @par MT-safe: Yes
+ */
+int
+get_conn_shard_context(int fd)
+{
+	pbs_conn_t *p = NULL;
+	int sock = -1;
+
+	if (INVALID_SOCK(fd))
+		return -1;
+
+	LOCK_TABLE(-1);
+	p = get_connection(fd);
+	if (p == NULL) {
+		UNLOCK_TABLE(-1);
+		return -1;
+	}
+	sock = p->shard_context;
+	UNLOCK_TABLE(-1);
+	return sock;
+}
+
+/**
+ * @brief
+ * 	set_conn_shards - set connection shards structure synchronously
+ *
+ * @param[in] fd - socket number
+ * @param[in] shards - tcp chan to set on connection
+ *
+ * @return int
+ * @retval 0 - success
+ * @retval -1 - error
+ *
+ * @par Side Effects:
+ *	None
+ *
+ * @par MT-safe: Yes
+ */
+int
+set_conn_shards(int fd, struct shard_conn ** shards)
+{
+	pbs_conn_t *p = NULL;
+
+	if (INVALID_SOCK(fd))
+		return -1;
+
+	LOCK_TABLE(-1);
+	p = get_connection(fd);
+	if (p == NULL) {
+		errno = ENOTCONN;
+		UNLOCK_TABLE(-1);
+		return -1;
+	}
+	p->ch_shards = shards;
+	UNLOCK_TABLE(-1);
+	return 0;
+}
+
+/**
+ * @brief
+ * 	get_conn_shards - get connection shards synchronously
+ *
+ * @param[in] fd - socket number
+ *
+ * @return struct shard_conn **
+ * @retval !NULL - success
+ * @retval NULL - error
+ *
+ * @par Side Effects:
+ *	None
+ *
+ * @par MT-safe: Yes
+ */
+struct shard_conn **
+get_conn_shards(int fd)
+{
+	pbs_conn_t *p = NULL;
+	struct shard_conn **shards = NULL;
+
+	if (INVALID_SOCK(fd))
+		return NULL;
+
+	LOCK_TABLE(NULL);
+	p = get_connection(fd);
+	if (p == NULL) {
+		errno = ENOTCONN;
+		UNLOCK_TABLE(NULL);
+		return NULL;
+	}
+	shards = p->ch_shards;
+	UNLOCK_TABLE(NULL);
+	return shards;
 }

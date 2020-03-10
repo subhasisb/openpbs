@@ -54,7 +54,8 @@ libpbs_la_LDFLAGS = -version-info 0:0:0 @KRB5_LIBS@
 
 libpbs_la_LIBADD= \
 	-lcrypto \
-	-lpthread
+	-lpthread \
+	$(top_builddir)/src/lib/Libshard/libshard.la
 
 libpbs_la_SOURCES = \
 	../Libattr/attr_fn_arst.c \

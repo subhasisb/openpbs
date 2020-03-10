@@ -326,6 +326,9 @@ cd build
 mandir=$(find %{buildroot} -type d -name man)
 [ -d "$mandir" ] && find $mandir -type f -exec gzip -9 -n {} \;
 install -D %{buildroot}/%{pbs_prefix}/libexec/pbs_init.d %{buildroot}/etc/init.d/pbs
+%if 0%{?rhel} >= 7
+export QA_RPATHS=$[ 0x0002 ]
+%endif
 
 %post %{pbs_server}
 ldconfig %{_libdir}
