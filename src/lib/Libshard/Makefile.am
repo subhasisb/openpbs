@@ -36,97 +36,13 @@
 # trademark licensing policies.
 #
 
-include_HEADERS = \
-	pbs_error.h \
-	pbs_ifl.h \
-	rm.h \
-	tm_.h \
-	tm.h \
-	libshard.h
+lib_LTLIBRARIES = libshard.la
 
-noinst_HEADERS = \
-	acct.h \
-	auth.h \
-	attribute.h \
-	avltree.h \
-	basil.h \
-	batch_request.h \
-	bitfield.h \
-	cmds.h \
-	credential.h \
-	dis.h \
-	grunt.h \
-	hook_func.h \
-	hook.h \
-	ifl_internal.h \
-	job.h \
-	libpbs.h \
-	libsec.h \
-	libutil.h \
-	limits_if.h \
-	list_link.h \
-	log.h \
-	Long_.h \
-	Long.h \
-	Makefile.in \
-	mom_func.h \
-	mom_hook_func.h \
-	mom_server.h \
-	mom_vnode.h \
-	net_connect.h \
-	pbs_array_list.h \
-	pbs_assert.h \
-	pbs_client_thread.h \
-	pbs_db.h \
-	pbs_ecl.h \
-	pbs_entlim.h \
-	pbs_internal.h \
-	pbs_reliable.h \
-	pbs_json.h \
-	pbs_license.h \
-	pbs_mpp.h \
-	pbs_mutex.h \
-	pbs_nodes.h \
-	pbs_python.h \
-	pbs_python_private.h \
-	pbs_share.h \
-	pbs_undolr.h \
-	pbs_version.h \
-	placementsets.h \
-	portability.h \
-	port_forwarding.h \
-	provision.h \
-	qmgr.h \
-	queue.h \
-	reservation.h \
-	resmon.h \
-	resource.h \
-	resv_node.h \
-	tpp.h \
-	sched_cmds.h \
-	pbs_sched.h \
-	server.h \
-	server_limits.h \
-	site_queue.h \
-	site_job_attr_def.h \
-	site_job_attr_enum.h \
-	site_qmgr_node_print.h \
-	site_qmgr_que_print.h \
-	site_qmgr_sched_print.h \
-	site_qmgr_svr_print.h \
-	site_que_attr_def.h \
-	site_que_attr_enum.h \
-	site_resc_attr_def.h \
-	site_resv_attr_def.h \
-	site_resv_attr_enum.h \
-	site_sched_attr_def.h \
-	site_sched_attr_enum.h \
-	site_svr_attr_def.h \
-	site_svr_attr_enum.h \
-	svrfunc.h \
-	ticket.h \
-	tracking.h \
-	user.h \
-	win.h \
-	win_remote_shell.h \
-	work_task.h
+libshard_la_CPPFLAGS = -I$(top_srcdir)/src/include
+
+libshard_la_LDFLAGS = -version-info 1:0:0
+
+libshard_la_LIBADD = -lm
+
+libshard_la_SOURCES = \
+	shard_functions.c 

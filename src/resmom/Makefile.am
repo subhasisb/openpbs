@@ -58,6 +58,7 @@ pbs_mom_LDADD = \
 	$(top_builddir)/src/lib/Libsite/libsite.a \
 	$(top_builddir)/src/lib/Libtpp/libtpp.a \
 	$(top_builddir)/src/lib/Libutil/libutil.a \
+	$(top_builddir)/src/lib/Libshard/libshard.la \
 	@hwloc_lib@ \
 	@pmix_lib@ \
 	@PYTHON_LDFLAGS@ \
@@ -67,7 +68,7 @@ pbs_mom_LDADD = \
 	-lssl \
 	-lcrypto \
 	@KRB5_LIBS@ \
-	@libundolr_lib@
+	@libundolr_lib@ 
 
 pbs_mom_SOURCES = \
 	$(top_builddir)/src/lib/Libattr/job_attr_def.c \

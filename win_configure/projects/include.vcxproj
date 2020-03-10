@@ -115,6 +115,7 @@
     <ClInclude Include="..\..\src\include\sched_cmds.h" />
     <ClInclude Include="..\..\src\include\server.h" />
     <ClInclude Include="..\..\src\include\server_limits.h" />
+    <ClInclude Include="..\..\src\include\libshard.h" />
     <ClInclude Include="..\..\src\include\site_job_attr_def.h" />
     <ClInclude Include="..\..\src\include\site_que_attr_def.h" />
     <ClInclude Include="..\..\src\include\site_resc_attr_def.h" />

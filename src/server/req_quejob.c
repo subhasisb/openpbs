@@ -71,6 +71,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <libutil.h>
+#include "libshard.h"
 
 #ifdef WIN32
 #include  <io.h>
@@ -185,6 +186,7 @@ extern char *msg_nostf_resv;
 extern char *msg_nostf_jobarray;
 #endif
 
+extern int myindex;
 
 /* Private Functions in this file */
 
@@ -200,8 +202,8 @@ static	int	validate_place_req_of_job_in_reservation(job *pj);
 static long long get_next_svr_sequence_id(void);
 static long long svr_sequence_window_count = 0;
 void reset_svr_sequence_window(void);
-long long next_svr_sequence_id = 0;
-long long svr_jobidnumber = 0;
+long long next_svr_sequence_id = -1;
+long long svr_jobidnumber = -1;
 
 static char *pbs_o_que = "PBS_O_QUEUE=";
 /**
@@ -3367,6 +3369,7 @@ validate_place_req_of_job_in_reservation(job *pj)
 	return 1;
 }
 
+
 /**
  * @brief
  * 		Provides the next job id
@@ -3390,7 +3393,7 @@ long long get_next_svr_sequence_id(void)
 		 * So this way, we have to save it once only after every SEQ_WIN_INCR(1000) submissions.
 		 */
 		long long update_svr_sv_jobidnumber = 0;
-		svr_jobidnumber = server.sv_qs.sv_jobidnumber;
+		svr_jobidnumber = pbs_shard_get_next_seqid(server.sv_qs.sv_jobidnumber, svr_max_job_sequence_id, myindex);
 		update_svr_sv_jobidnumber = server.sv_qs.sv_jobidnumber + SEQ_WIN_INCR;
 		if (update_svr_sv_jobidnumber > svr_max_job_sequence_id) {
 			update_svr_sv_jobidnumber = SEQ_WIN_INCR;
@@ -3410,12 +3413,14 @@ long long get_next_svr_sequence_id(void)
 		svr_sequence_window_count = 0;
 	}
 	/* If server job limit is over, reset back to zero */
-	if (++svr_jobidnumber > svr_max_job_sequence_id) {
+	svr_jobidnumber = pbs_shard_get_next_seqid(svr_jobidnumber, svr_max_job_sequence_id, myindex);
+	if (svr_jobidnumber > svr_max_job_sequence_id) {
 		svr_sequence_window_count = 0;
-		server.sv_qs.sv_jobidnumber = 0;
+		server.sv_qs.sv_jobidnumber = -1;
 	}
 	return ret_svr_sequence_id;
 }
+
 
 /**
  * @brief
@@ -3427,7 +3432,7 @@ long long get_next_svr_sequence_id(void)
 void reset_svr_sequence_window(void)
 {
 	svr_sequence_window_count = 0;
-	server.sv_qs.sv_jobidnumber = 0;
+	server.sv_qs.sv_jobidnumber = -1;
 	(void)svr_save_db(&server, SVR_SAVE_QUICK);
 }
 

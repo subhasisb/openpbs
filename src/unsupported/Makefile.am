@@ -76,6 +76,7 @@ pbs_rmget_LDADD = \
 	$(top_builddir)/src/lib/Libnet/libnet.a \
 	$(top_builddir)/src/lib/Libpbs/.libs/libpbs.a \
 	$(top_builddir)/src/lib/Libutil/libutil.a \
+	$(top_builddir)/src/lib/Libshard/libshard.la \
 	-lpthread \
 	@libz_lib@ \
 	@KRB5_LIBS@

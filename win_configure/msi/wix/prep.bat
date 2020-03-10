@@ -65,6 +65,7 @@ echo Copying necessory files for PBS_EXEC\bin
 for %%a in (
     "%WINBUILDDIR%\src\cmds\%BUILD_TYPE%\*.exe"
     "%WINBUILDDIR%\src\lib\Libpbspthread\%BUILD_TYPE%\Libpbspthread.dll"
+    "%WINBUILDDIR%\src\lib\Libshard\%BUILD_TYPE%\Libshard.dll"
     "%WINBUILDDIR%\src\tools\%BUILD_TYPE%\*.exe"
     "%PBS_SRCDIR%\src\cmds\scripts\*.bat"
 ) do (

@@ -58,6 +58,7 @@ pbs_server_bin_LDADD = \
 	$(top_builddir)/src/lib/Libpython/libpbspython_svr.a \
 	$(top_builddir)/src/lib/Libdb/libdb.a \
 	$(top_builddir)/src/lib/Libpbs/.libs/libpbs.a \
+	$(top_builddir)/src/lib/Libshard/libshard.la \
 	@database_ldflags@ \
 	@database_lib@ \
 	@expat_lib@ \
@@ -68,7 +69,7 @@ pbs_server_bin_LDADD = \
 	-lssl \
 	-lcrypto \
 	@KRB5_LIBS@ \
-	@libundolr_lib@
+	@libundolr_lib@ 
 
 pbs_server_bin_SOURCES = \
 	accounting.c \
@@ -147,10 +148,11 @@ pbs_comm_LDADD = \
 	$(top_builddir)/src/lib/Liblog/liblog.a \
 	$(top_builddir)/src/lib/Libutil/libutil.a \
 	$(top_builddir)/src/lib/Libpbs/.libs/libpbs.a \
+	$(top_builddir)/src/lib/Libshard/libshard.la \
 	-lpthread \
 	@libz_lib@ \
 	@socket_lib@ \
 	@KRB5_LIBS@ \
-	@libundolr_lib@
+	@libundolr_lib@ 
 
 pbs_comm_SOURCES = pbs_comm.c
