@@ -366,7 +366,7 @@ contact_sched(int cmd, char *jobid, pbs_sched *psched, enum towhich_conn which_c
 			return (-1);
 		}
 
-		snprintf(my_index, MAX_SVR_INDEX, "%d", pbs_shard_get_index(&self));
+		snprintf(my_index, MAX_SVR_INDEX, "%d", pbs_shard_get_index(&self, 1));
 		if (put_sched_cmd(sock, SCH_SVR_IDENTIFIER, my_index) < 0) {
 			close_conn(sock);
 			return (-1);

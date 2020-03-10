@@ -59,9 +59,6 @@ extern long long pbs_shard_get_next_seqid(long long curr_seq_id, long long max_s
 
 extern long long pbs_shard_get_last_seqid(long long njobid);
 
-extern int pbs_shard_get_svr_index(struct server_instance *remote_instance);
-
-
 
 #ifdef  __cplusplus
 }

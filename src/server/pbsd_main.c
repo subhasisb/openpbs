@@ -1037,7 +1037,7 @@ main(int argc, char **argv)
 
 	if (get_max_servers() > 1) {
 		char buf[PBS_MAXHOSTNAME+8];
-		if (pbs_shard_get_index(&self) == -1) {
+		if (pbs_shard_get_index(&self, 1) == -1) {
 			fprintf(stderr, "Wrong Multi Server configuration. Please start server after correcting /etc/pbs.conf\n");
 			return 1;
 		}
