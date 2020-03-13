@@ -1959,10 +1959,10 @@ void
 set_server_stream(char * hostname, unsigned int port, int stream)
 {
 	if (pbs_conf.pbs_max_servers > 1) {
-		struct server_instance si;
-		si.hostname = strdup(hostname);
+		struct pbs_server_instance si;
+		si.name = strdup(hostname);
 		si.port = port;
-		int srv_index = pbs_shard_get_index(&si, 0);
+		int srv_index = get_svr_index(&si);
 		if (connection[conn_slot].ch_shards[srv_index]->state == SHARD_CONN_STATE_DOWN) {
 			connection[conn_slot].ch_shards[srv_index]->state = SHARD_CONN_STATE_CONNECTED;
 			connection[conn_slot].ch_shards[srv_index]->sd = stream;

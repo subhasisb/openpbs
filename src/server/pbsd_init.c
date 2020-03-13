@@ -687,7 +687,7 @@ pbsd_init(int type)
 		if (njobid == -1)
 			svr_jobidnumber = -1;
 		else {
-			svr_jobidnumber = pbs_shard_get_last_seqid(njobid);
+			svr_jobidnumber = njobid;
 			if (svr_jobidnumber == -1) {
 				log_err(-1, __func__, "Failed to compute svr_jobidnumber");
 				return (-1);

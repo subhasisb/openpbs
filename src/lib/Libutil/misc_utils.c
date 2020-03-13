@@ -72,7 +72,7 @@
 #include <unistd.h>
 #include <limits.h>
 #include <pbs_ifl.h>
-#include <pbs_internal.h>
+#include "pbs_internal.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -114,6 +114,7 @@ struct {
 	{ND_Force_Exclhost,   VNS_FORCE_EXCLHOST}
 };
 
+int get_svr_index(struct pbs_server_instance *instance);
 int initialise_connection_slot(int table_size, enum CONN_ORIGIN client);
 /**
  * @brief
@@ -1442,6 +1443,23 @@ int
 get_conf_servers()
 {
 	return pbs_conf.pbs_current_servers;
+}
+
+int
+get_svr_index(struct pbs_server_instance *instance)
+{
+        int i;
+        if (get_conf_servers() > 1) {
+			for(i = 0; i < get_conf_servers(); i++) {
+					if (instance->port == pbs_conf.psi[i]->port) {
+							if (strcmp(instance->name, pbs_conf.psi[i]->name) == 0) 
+									return i;
+					}
+			}
+        } else
+                return 0;
+
+        return -1;
 }
 
 

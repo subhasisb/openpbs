@@ -658,7 +658,7 @@ get_svr_shard_connection(int channel, int req_type, void *shard_hint)
 		if (shard_init_flag == -1) {
 			if (pbs_shard_init(get_max_servers(), (struct server_instance **)pbs_conf.psi, num_of_conf_servers) == -1)
 				return -1;
-		shard_init_flag = 1;
+			shard_init_flag = 1;
 		}
 	}
 

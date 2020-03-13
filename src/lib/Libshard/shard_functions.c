@@ -58,18 +58,13 @@ int pbs_shard_init(int max_allowed_servers, struct server_instance **server_inst
 
 int pbs_shard_get_server_byindex(char *obj_id, enum obj_type_t obj_type, int *inactive_servers);
 
-long long pbs_shard_get_next_seqid(long long curr_seq_id_seq_id, long long max_seq_id);
-
-long long pbs_shard_get_last_seqid(long long highest_seqid);
-
-int pbs_shard_get_index(struct server_instance *instance, int from_server);
+long long pbs_shard_get_next_seqid(long long curr_seq_id_seq_id, long long max_seq_id, int svr_index);
 
 int compute_srv_ind(char *obj_id);
 
 int max_num_of_servers = 0;
 struct server_instance **configured_servers = NULL;
 int configured_num_servers = 0;
-static int svr_index = -1;
 
 /**
  * @brief
@@ -165,53 +160,6 @@ pbs_shard_get_server_byindex(char *obj_id, enum obj_type_t obj_type, int *inacti
         return srv_ind;
 }
 
-/**
- * @brief
- * a) This API initializes the sharding library’s internal variable(svr_index),
- * which is used in pbs_shard_get_next_seqid() and pbs_shard_get_last_seqid() 
- * b) This API is used to check the multiserver configuration while starting the server 
- * and c) this API also returns the server index based on the given server_instance object.     
- *
- * @param[in]	instance - object of server_instance, having hostname and port number.
- * @param[in]	from_server - Flag to refer the caller.
- *
- * @return      int
- * @retval !=-1 - success, caller's server index. 
- * @retval -1	- error
- */
-int 
-pbs_shard_get_index(struct server_instance *instance, int from_server)
-{
-	int i;
-        if (from_server) {
-                if (svr_index == -1) {
-                        if (configured_num_servers > 1) {
-                                for(i = 0; i < configured_num_servers; i++) {
-                                        if (instance->port == configured_servers[i]->port) {
-                                                if (strcmp(instance->hostname, configured_servers[i]->hostname) == 0) {
-                                                        svr_index = i;
-                                                        break;
-                                                }
-                                        }
-                                }
-                        } else 
-                                svr_index = 0;
-                }
-                return svr_index;
-        } else {
-                if (configured_num_servers > 1) {
-                        for(i = 0; i < configured_num_servers; i++) {
-                                if (instance->port == configured_servers[i]->port) {
-                                        if (strcmp(instance->hostname, configured_servers[i]->hostname) == 0) 
-                                                return i;
-                                }
-                        }
-                } else 
-                        return 0;
-
-                return -1;
-        }
-}
 
 /**
  * @brief
@@ -223,63 +171,26 @@ pbs_shard_get_index(struct server_instance *instance, int from_server)
  * @param[in]	curr_seq_id - The current seq ID in the PBS server.
  * @param[in]	max_seq_id - The limitation in the PBS SERVER on an object ID, 
  *                           which needs to be considered while generating the new object ID. 
+ * @param[in]	svr_index - The caller server index.
  *
  * @return long long
  * @retval !=-1 - success, the next obj_id to use is returned.
  * @retval -1 -  error
  */
 long long 
-pbs_shard_get_next_seqid(long long curr_seq_id, long long max_seq_id)
+pbs_shard_get_next_seqid(long long curr_seq_id, long long max_seq_id, int svr_index)
 {
-
-        if (svr_index == -1) {
-                if (configured_num_servers > 1)  
-                        return -1;
-                else
-                        svr_index = 0;
-        }
+        long long normalized_id = ceil(curr_seq_id / max_num_of_servers)*max_num_of_servers + svr_index;
 
         if (curr_seq_id == -1) {
                 return svr_index;
         }
-
-        curr_seq_id += max_num_of_servers;
+        normalized_id += max_num_of_servers;
         /* If server job limit is over, reset back to zero */
-        if (curr_seq_id > max_seq_id) {
-                curr_seq_id -= max_seq_id + 1;
+        if (normalized_id > max_seq_id) {
+                normalized_id -= max_seq_id + 1;
         }
-        return curr_seq_id;
-
+        return normalized_id;
 }
 
-
-/**
- * @brief
- * If the server gets restarted, it will be needed to know the last generated seq id. 
- * This last seq id is used by sharding logic to compute the next seq id. 
- * This API accepts the maximum generated seq ID.
- *
- * @param[in]	highest_seqid - The maximum generated seq ID. 
- *
- * @return long long
- * @retval !=-1 - success, the next obj_id to use is returned.
- * @retval -1 -  error
- */
-long long 
-pbs_shard_get_last_seqid(long long highest_seqid)
-{
-
-        if (svr_index == -1) {
-                if (configured_num_servers > 1)  
-                        return -1;
-                else
-                        svr_index = 0;
-        }
-
-        if (highest_seqid == -1)
-                return 0;
-
-        return (ceil(highest_seqid / max_num_of_servers)*max_num_of_servers + svr_index);
-
-}
 

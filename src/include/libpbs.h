@@ -414,6 +414,7 @@ extern int engage_external_authentication(int out, int auth_type, int fromsvr, c
 extern char *PBSD_modify_resv(int connect, char *resv_id,
 	struct attropl *attrib, char *extend);
 extern int initialise_connection_slot(int table_size, enum CONN_ORIGIN client);
+extern int get_svr_index(struct pbs_server_instance *instance);
 #ifdef	__cplusplus
 }
 #endif

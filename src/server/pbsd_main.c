@@ -222,7 +222,8 @@ unsigned int	pbs_mom_port;
 unsigned int	pbs_rm_port;
 pbs_net_t	pbs_server_addr;
 unsigned int	pbs_server_port_dis;
-struct server_instance self;
+struct pbs_server_instance self;
+int myindex;
 /*
  * the names of the Server:
  *    pbs_server_name - from PBS_SERVER_HOST_NAME
@@ -1032,12 +1033,11 @@ main(int argc, char **argv)
 	if ((pc = strchr(daemonname, (int)'.')) != NULL)
 		*pc = '\0';
 
-	self.hostname = strdup(server_host);
+	self.name = strdup(server_host);
 	self.port = pbs_conf.batch_service_port;
-
 	if (get_max_servers() > 1) {
 		char buf[PBS_MAXHOSTNAME+8];
-		if (pbs_shard_get_index(&self, 1) == -1) {
+		if ((myindex = get_svr_index(&self)) == -1) {
 			fprintf(stderr, "Wrong Multi Server configuration. Please start server after correcting /etc/pbs.conf\n");
 			return 1;
 		}

@@ -53,12 +53,7 @@ extern int pbs_shard_init(int max_allowed_servers, struct server_instance **serv
 
 extern int pbs_shard_get_server_byindex(char *obj_id, enum obj_type_t obj_type, int *inactive_servers);
 
-extern int pbs_shard_get_caller_index(struct server_instance *myinstance);
-
 extern long long pbs_shard_get_next_seqid(long long curr_seq_id, long long max_seq_id);
-
-extern long long pbs_shard_get_last_seqid(long long njobid);
-
 
 #ifdef  __cplusplus
 }

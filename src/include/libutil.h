@@ -293,7 +293,6 @@ void convert_duration_to_str(time_t duration, char* buf, int bufsize);
 
 int get_max_servers();
 int get_current_servers();
-
 #ifdef  __cplusplus
 }
 #endif
