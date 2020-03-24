@@ -130,6 +130,7 @@ extern void	mom_vnlp_report(vnl_t *vnl, char *header);
 extern	char	*path_hooks;
 extern	unsigned long	hooks_rescdef_checksum;
 extern	int	report_hook_checksums;
+extern	int waiting_hello_resp;
 
 /*
  * Tree search generalized from Knuth (6.2.2) Algorithm T just like
@@ -753,13 +754,16 @@ is_request(int stream, int version)
 		return;
 	}
 
+	if (server_stream == -1)
+		send_hellosvr(stream);
+
 	command = disrsi(stream, &ret);
 	if (ret != DIS_SUCCESS)
 		goto err;
 
 	switch (command) {
 
-		case IS_NULL:		/* a ping from the server */
+		case IS_NULL:		/* a reply from the server */
 			DBPRT(("%s: IS_NULL\n", __func__))
 
 			/*
@@ -779,6 +783,7 @@ is_request(int stream, int version)
 			/*
 			 ** rpp_retry can be zero, i.e. no retries.
 			 */
+			DBPRT(("rpp_retry: %d: rpp_highwater:%d\n", new_retry, new_water))
 			if (new_retry >= 0 && rpp_retry != new_retry) {
 				sprintf(log_buffer, "rpp_retry changed from %d to %d",
 					rpp_retry, new_retry);
@@ -799,7 +804,14 @@ is_request(int stream, int version)
 					LOG_DEBUG, msg_daemonname, log_buffer);
 				rpp_highwater = new_water;
 			}
-			break;
+
+			if (waiting_hello_resp) {
+				(void) time_delta(MOM_DELTA_RESET);
+				waiting_hello_resp = 0;
+				/* fall into IS_HELLO */
+			} else {
+				break;
+			}
 
 		case IS_HELLO:		/* server wants a return greeting (HELLO) */
 			DBPRT(("%s: IS_HELLO, state=0x%x stream=%d\n", __func__,
@@ -814,7 +826,6 @@ is_request(int stream, int version)
 			 * Note, the HELLO2 means the Server is ver 8.0 or higher and
 			 * does "vnodes".
 			 */
-			server_stream = stream;		/* save stream to server */
 			next_sample_time = min_check_poll;
 			reply_hello4(stream);
 			internal_state_update = UPDATE_MOM_STATE;
@@ -822,12 +833,12 @@ is_request(int stream, int version)
 			sprintf(log_buffer, "Hello from server at %s", netaddr(addr));
 			log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER,  LOG_DEBUG,
 				msg_daemonname, log_buffer);
+
 			break;
 
 		case IS_HELLO_NO_INVENTORY:
 			DBPRT(("%s: IS_HELLO_NO_INVENTORY, state=0x%x stream=%d\n", __func__,
 				internal_state, stream))
-			server_stream = stream;         /* save stream to server */
 			next_sample_time = min_check_poll;
 			reply_hello4(stream);
 			internal_state_update = UPDATE_MOM_STATE;
@@ -1538,7 +1549,6 @@ err:
 	log_err(errno, "register_with_server", (char *)dis_emsg[ret]);
 	tpp_close(server_stream);
 	server_stream = -1;
-	return;
 }
 
 /**

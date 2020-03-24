@@ -150,6 +150,8 @@ extern int mock_run;
 #ifdef	_PBS_JOB_H
 
 #define COMM_MATURITY_TIME  60 /* time when we consider a pbs_comm connection as mature */
+#define MOM_DELTA_NORMAL	1
+#define MOM_DELTA_RESET	0
 
 typedef	int	(*pbs_jobfunc_t)(job *);
 typedef	int	(*pbs_jobnode_t)(job *, hnodent *);
@@ -177,6 +179,8 @@ extern int   start_checkpoint(job *, int, struct batch_request *);
 extern int   local_checkpoint(job *, int, struct batch_request *);
 extern int   start_restart(job *, struct batch_request *);
 extern int   local_restart(job *, struct batch_request *);
+extern int   time_delta(int);
+extern char * get_servername_random(uint *);
 
 #ifdef WIN32
 extern void  wait_action(void);
@@ -208,6 +212,7 @@ extern char *set_shell(job *, struct passwd *);
 extern void  start_exec(job *);
 extern void  send_obit(job *, int);
 extern void  send_restart(void);
+extern void send_hellosvr(int);
 extern void  send_wk_job_idle(char *, int);
 extern int   site_job_setup(job *);
 extern int   site_mom_chkuser(job *);

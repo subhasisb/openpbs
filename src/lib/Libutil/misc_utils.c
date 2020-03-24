@@ -2158,3 +2158,9 @@ crc_file(char *filepath)
 	return (crc(buf, sb.st_size));
 #endif
 }
+
+int 
+get_max_servers()
+{
+	return 1;
+}

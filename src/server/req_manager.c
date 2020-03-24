@@ -123,7 +123,6 @@
 #define PERM_MANAGER (ATR_DFLAG_MGWR | ATR_DFLAG_MGRD)
 #define PERM_OPorMGR (ATR_DFLAG_MGWR | ATR_DFLAG_MGRD | ATR_DFLAG_OPRD | ATR_DFLAG_OPWR)
 
-struct work_task *global_ping_task = NULL;
 pntPBS_IP_LIST pbs_iplist = NULL;
 
 AVL_IX_DESC *node_tree = NULL;
@@ -3189,7 +3188,6 @@ create_pbs_node2(char *objname, svrattrl *plist, int perms, int *bad, struct pbs
 			if ((rc == PBSE_UNKNODE) && (server.sv_attr[(int)SRV_ATR_State].at_val.at_long == SV_STATE_INIT)) {
 				/*
 				 * mark node as INUSE_UNRESOLVABLE, pbsnodes will show unresolvable state
-				 * flag INUSE_UNRESOLVABLE will ensure ping_a_mom will never ping for this node
 				 */
 				set_vnode_state(pnode, INUSE_UNRESOLVABLE | INUSE_DOWN, Nd_State_Set);
 
@@ -3588,22 +3586,7 @@ struct batch_request *preq;
 
 
 	reply_ack(preq);		/*request completely successful*/
-}
-/**
- * @brief
- * 		setup_ping	- set up a task to ping nodes.
- *
- * @param[in] delay - delay after which to ping.
- *
- */
-void
-setup_ping(int delay)
-{
-	/* remove existing ping task since we are adding new, delayed one */
-	if (global_ping_task)
-		delete_task(global_ping_task);
-
-	global_ping_task = set_task(WORK_Timed, time_now + delay, ping_nodes, NULL);
+	setup_notification();
 }
 
 /**
@@ -3776,8 +3759,6 @@ struct batch_request *preq;
 		svr_chngNodesfile = 0;
 
 	reply_ack(preq);	    /*create completely successful*/
-
-	setup_ping(2); /* adjust ping to happen in next 2 seconds */
 }
 
 /**
