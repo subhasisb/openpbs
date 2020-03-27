@@ -2160,7 +2160,7 @@ crc_file(char *filepath)
 }
 
 int 
-get_max_servers()
+get_max_servers(void)
 {
 	return 1;
 }

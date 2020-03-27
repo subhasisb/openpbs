@@ -754,6 +754,8 @@ is_request(int stream, int version)
 		return;
 	}
 
+	/* Server can reach out to mom with requests even before mom sending a hello exchange.
+	   This is one such occassion. So trigger hello exchange now */
 	if (server_stream == -1)
 		send_hellosvr(stream);
 
@@ -806,7 +808,7 @@ is_request(int stream, int version)
 			}
 
 			if (waiting_hello_resp) {
-				(void) time_delta(MOM_DELTA_RESET);
+				time_delta(MOM_DELTA_RESET);
 				waiting_hello_resp = 0;
 				/* fall into IS_HELLO */
 			} else {

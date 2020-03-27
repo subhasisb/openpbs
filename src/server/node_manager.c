@@ -4416,7 +4416,6 @@ found:
 				Set_All_State_Regardless);
 			set_all_state(pmom, 1, INUSE_DOWN|INUSE_INIT, NULL,
 				Set_ALL_State_All_Down);
-			psvrmom->msr_timeinit = time_now;
 			if ((psvrmom->msr_state & INUSE_MARKEDDOWN) == 0)
 				log_event(PBSEVENT_DEBUG3, PBS_EVENTCLASS_NODE, LOG_INFO,
 					pmom->mi_host, "Setting host to Initialize");
@@ -4909,7 +4908,6 @@ found:
 				LOG_NOTICE, pmom->mi_host, node_up);
 			}
 			psvrmom->msr_timedown = 0;
-			psvrmom->msr_timeinit = 0;
 
 #if defined(PBS_SECURITY) && (PBS_SECURITY == KRB5)
 			if (psvrmom->msr_state & INUSE_NEED_CREDENTIALS) {

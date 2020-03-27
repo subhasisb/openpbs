@@ -370,7 +370,6 @@ create_svrmom_entry(char *hostname, unsigned int port, unsigned long *pul)
 	psvrmom->msr_stream  = -1;
 	CLEAR_HEAD(psvrmom->msr_deferred_cmds);
 	psvrmom->msr_timedown = (time_t)0;
-	psvrmom->msr_timeinit = (time_t)0;
 	psvrmom->msr_wktask  = 0;
 	psvrmom->msr_addrs   = pul;
 	psvrmom->msr_jbinxsz = 0;
@@ -413,10 +412,6 @@ open_momstream(mominfo_t *pmom)
 	mom_svrinfo_t *psvrmom;
 
 	psvrmom = (mom_svrinfo_t *)pmom->mi_data;
-	if (psvrmom->msr_state & INUSE_NEED_ADDRS)
-		return -1;
-
-	/* take existing stream out of tree */
 	if (psvrmom->msr_stream >= 0) {
 		return -1;
 	}

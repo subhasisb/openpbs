@@ -8087,7 +8087,16 @@ net_restore_handler(void *data)
 	mom_net_up_time = time(0);
 	if (tpp_log_func)
 		tpp_log_func(LOG_INFO, msg_daemonname, "net restore handler called");
-	send_restart();
+	if (server_stream >= 0) {
+		sprintf(log_buffer, "Closing existing server stream %d",
+			server_stream);
+		log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_NOTICE,
+			msg_daemonname, log_buffer);
+		dis_flush(server_stream);
+		tpp_close(server_stream);
+		server_stream = -1;
+	}
+	send_hellosvr_tpp();
 }
 
 /*
@@ -8141,7 +8150,7 @@ net_down_handler(void *data)
 
 /**
  * @brief
- *      This function returns the time delta
+ *      This function returns the time delta in seconds
  * 	after which mom should send the next hello.
  * 	Tries for short bursts followed by longer intervals.
  * @param[in] mode -	reset mode is to bring it back to bursting mode
@@ -8155,7 +8164,7 @@ time_delta(int mode)
 {
 	static int delta = 1;
 	static int cnt = 1;
-	int max_delta_mask = 0x3F;
+	int max_delta_mask = 0x3F;	/* max interval will be 64s */
 
 	DBPRT(("time_delta: mode: %d, delta: %d, cnt: %d", mode, delta, cnt))
 
@@ -8170,7 +8179,7 @@ time_delta(int mode)
 			return delta;
 		}
 		delta <<= 1;
-		cnt = delta * 2;
+		cnt = delta << 1;
 	} else {
 		cnt--;
 	}
@@ -8205,7 +8214,7 @@ main(int argc, char *argv[])
 	time_t				time_state_update = 0;
 	int					tppfd; /* fd for rm and im comm */
 	double				myla;
-	time_t				time_last_hello = 0;
+	time_t				time_next_hello = 0;
 	job					*nxpjob;
 	job					*pjob;
 	extern time_t		wait_time;
@@ -9690,9 +9699,9 @@ main(int argc, char *argv[])
 
 		time_now = time(NULL);
 		if (server_stream == -1) {
-			if (time_now > time_last_hello) {
-				time_last_hello = time_now + time_delta(MOM_DELTA_NORMAL);
-				send_restart();
+			if (time_now > time_next_hello) {
+				send_hellosvr_tpp();
+				time_next_hello = time_now + time_delta(MOM_DELTA_NORMAL);
 			}
 		}
 

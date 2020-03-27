@@ -1594,26 +1594,3 @@ get_servername(unsigned int *port)
 	return name;
 }
 
-/**
- * @brief
- * 		choosing one server in random if a failover server is already set up.
- *
- * @param[out] port - Passed through to parse_servername(), not modified here.
- *
- * @return char *
- * @return NULL - failure
- * @retval !NULL - pointer to server name
- */
-char *
-get_servername_random(unsigned int *port)
-{
-
-	if (rand() % 2 == 0)
-		return get_servername(port);
-	else {
-		if (pbs_conf.pbs_secondary)
-			return parse_servername(pbs_conf.pbs_secondary, port);
-		return NULL;
-	}
-}
-
