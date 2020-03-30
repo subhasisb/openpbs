@@ -791,8 +791,8 @@ setup_notification()
 {
 	int	i;
 	int	nmom;
-	static	time_t last_sent_tm = 0;
 
+	/* CLUSTERADDR2 is not enabled for multi-server case, hence bailing-out. */
 	if (get_max_servers() > 1)
 		return;
 
@@ -808,9 +808,11 @@ setup_notification()
 	}
 
 	/* send IS_CLUSTERADDR2 to happen in next 2 seconds */
-	if (last_sent_tm < time_now) {
-		last_sent_tm = time_now + 2;
-		set_task(WORK_Timed, last_sent_tm, send_nodes_addr, NULL);
+	static	time_t addr_send_tm = 0;
+	if (addr_send_tm <= time_now) {
+		addr_send_tm = time_now + 2;
+		struct work_task *ptask = set_task(WORK_Timed, addr_send_tm, mcast_moms, NULL);
+		ptask->wt_aux = IS_CLUSTER_ADDRS2;
 	}
 }
 

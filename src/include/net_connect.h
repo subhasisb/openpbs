@@ -94,29 +94,21 @@ typedef unsigned long pbs_net_t;        /* for holding host addresses */
  **	Types of Inter Server messages (between Server and Mom).
  */
 #define	IS_NULL			0
-#define	IS_HELLO		1
 #define	IS_CLUSTER_ADDRS	2
 #define IS_UPDATE		3
 #define IS_RESCUSED		4
 #define IS_JOBOBIT		5
 #define IS_BADOBIT		6
-/* #define IS_RESTART		7	 Unused */
+#define IS_REPLYHELLO		7
 #define IS_SHUTDOWN		8
 #define IS_IDLE			9
 #define IS_ACKOBIT		10
-#define IS_GSS_HANDSHAKE	11	/* Deprecated */
-#define IS_CLUSTER_KEY		12	/* Deprecated */
 #define IS_REGISTERMOM		13
 #define IS_UPDATE2		14
-#define IS_HELLO2		15
-#define IS_HOST_TO_VNODE	16
 #define IS_RECVD_VMAP		17
 #define IS_MOM_READY		17	/* alias for IS_RECD_VMAP */
-#define IS_HELLO3		18
 #define IS_DISCARD_JOB		19
-#define IS_HELLO4		20
 #define IS_DISCARD_DONE		21
-#define IS_HPCBP_ATTRIBUTES	22 	/* Deprecated */
 #define	IS_CLUSTER_ADDRS2	23
 #define IS_UPDATE_FROM_HOOK	24 /* request to update vnodes from a hook running on parent mom host */
 #define IS_RESCUSED_FROM_HOOK	25 /* request from child mom for a hook */

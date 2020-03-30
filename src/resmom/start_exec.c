@@ -6079,9 +6079,8 @@ start_exec(job *pjob)
 #endif/* MOM_BGL */
 
 	/* make sure we have an open tpp stream back to the server */
-
 	if (server_stream == -1)
-		send_hellosvr_tpp();
+		send_hellosvr(server_stream);
 
 #if MOM_ALPS
 	/* set ALPS reservation id to -1 to indicate there isn't one yet */

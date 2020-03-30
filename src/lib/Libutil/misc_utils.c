@@ -2159,6 +2159,12 @@ crc_file(char *filepath)
 #endif
 }
 
+/**
+ * @brief
+ * 	Return the maximum number of servers possible in the cluster
+ *
+ * @return int
+ */
 int 
 get_max_servers(void)
 {

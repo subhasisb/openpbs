@@ -1999,6 +1999,7 @@ reset_pool_inventory_mom(mominfo_t *pmom)
 			/* this newly down/deleted Mom was the inventory Mom, */
 			/* clear her as the inventory mom in the pool */
 			ppool->vnpm_inventory_mom = NULL;
+			((mom_svrinfo_t *)(pmom->mi_data))->reporting_mom = 0;
 
 			/* see if another Mom is up to become "the one" */
 			for (i=0; i<ppool->vnpm_nummoms; ++i) {
@@ -2006,6 +2007,7 @@ reset_pool_inventory_mom(mominfo_t *pmom)
 				pxsvrmom = (mom_svrinfo_t *)pxmom->mi_data;
 				if ((pxsvrmom->msr_state & INUSE_DOWN) == 0) {
 					ppool->vnpm_inventory_mom = pxmom;
+					((mom_svrinfo_t *)(pxmom->mi_data))->reporting_mom = 1;
 					sprintf(log_buffer, msg_new_inventory_mom,
 						ppool->vnpm_vnode_pool, pxmom->mi_host);
 					log_event(PBSEVENT_DEBUG, PBS_EVENTCLASS_SERVER,
@@ -2089,6 +2091,7 @@ add_mom_to_pool(mominfo_t *pmom)
 	log_event(PBSEVENT_DEBUG3, PBS_EVENTCLASS_SERVER, LOG_DEBUG, msg_daemonname, log_buffer);
 	if (ppool->vnpm_inventory_mom == NULL) {
 		ppool->vnpm_inventory_mom = pmom;
+		((mom_svrinfo_t *)(pmom->mi_data))->reporting_mom = 1;
 		sprintf(log_buffer, msg_new_inventory_mom, psvrmom->msr_vnode_pool, pmom->mi_host);
 		log_event(PBSEVENT_DEBUG, PBS_EVENTCLASS_SERVER, LOG_DEBUG, msg_daemonname, log_buffer);
 	}
@@ -3583,10 +3586,7 @@ struct batch_request *preq;
 	}
 	have_blue_gene_nodes = rc;
 
-
-
 	reply_ack(preq);		/*request completely successful*/
-	setup_notification();
 }
 
 /**

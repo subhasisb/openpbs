@@ -753,7 +753,8 @@ set_rpp_retry(attribute *pattr, void *pobj, int actmode)
 	}
 
 	if (actmode == ATR_ACTION_ALTER && old_rpp_retry != rpp_retry) {
-		mcast_moms(IS_NULL);
+		struct work_task *ptask = set_task(WORK_Immed, 0, mcast_moms, NULL);
+		ptask->wt_aux = IS_NULL;
 	}
 
 	return PBSE_NONE;
@@ -791,7 +792,8 @@ set_rpp_highwater(attribute *pattr, void *pobj, int actmode)
 	}
 
 	if (actmode == ATR_ACTION_ALTER && old_rpp_highwater != rpp_highwater) {
-		mcast_moms(IS_NULL);
+		struct work_task *ptask = set_task(WORK_Immed, 0, mcast_moms, NULL);
+		ptask->wt_aux = IS_NULL;
 	}
 
 	return PBSE_NONE;

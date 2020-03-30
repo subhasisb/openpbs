@@ -54,8 +54,6 @@
 #include "net_connect.h"
 
 
-
-
 /**
  * @brief - Start a standard inter-server message.
  *

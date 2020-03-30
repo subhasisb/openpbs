@@ -416,7 +416,7 @@ do_tpp(int stream)
 	DIS_tpp_funcs();
 	proto = disrsi(stream, &ret);
 	if (ret != DIS_SUCCESS) {
-		DBPRT(("rpp read failure: ret: %d, proto: %d\n", ret, proto));
+		DBPRT(("tpp read failure: ret: %d, proto: %d\n", ret, proto));
 		stream_eof(stream, ret, NULL);
 		return;
 	}

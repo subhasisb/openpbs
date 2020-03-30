@@ -184,6 +184,8 @@ int		 svr_chngNodesfile = 0;	/* 1 signals want nodes file update */
 /* on server shutdown, (qmgr mods)  */
 int		 is_called_by_job_purge = 0;
 
+static int mtfd_replyhello = -1;
+
 struct pbsnode **pbsndlist = NULL;
 
 static int	 cvt_overflow(size_t, size_t);
@@ -360,48 +362,126 @@ tinsert2(const u_long key1, const u_long key2, mominfo_t *momp, struct tree **ro
 }
 
 /**
- * @brief 
- * send IS_NULL to mom along with rpp_retry and rpp_highwater
- * values.
+ * @brief In case of TPP multicast mode, this function flushes IS_NULL data to be sent out
+ * 	to all the moms
  *
- * @param[in] pmom - pointer to mom
+ * @param[in] mtfd - The TPP multicast channel to flush
+ * @param[in] combine_msg - message will be combined in the caller.
  *
  */
-static void
-reply_hellosvr(mominfo_t *pmom)
+static int
+send_ISNULL(int mtfd, int combine_msg)
 {
-	mom_svrinfo_t *psvrmom = (mom_svrinfo_t *)(pmom->mi_data);
-	struct	sockaddr_in	*addr;
 	int	ret;
 
-	ret = is_compose(psvrmom->msr_stream, IS_NULL);
-	if (ret != DIS_SUCCESS)
-		goto err;
+	DBPRT(("%s: entered\n", __func__))
 
-	/*
-	** Send rpp_retry and rpp_highwater values with IS_NULL.
-	** Old versions of MOM will ignore extra data.
-	*/
-	ret = diswsi(psvrmom->msr_stream, rpp_retry);
-	if (ret != DIS_SUCCESS)
-		goto err;
-	ret = diswsi(psvrmom->msr_stream, rpp_highwater);
-	if (ret != DIS_SUCCESS)
-		goto err;
+	if (mtfd < 0)
+		return -1;
 
-	if (dis_flush(psvrmom->msr_stream) != 0)
-		goto err;
+	if (!combine_msg)
+		if ((ret = is_compose(mtfd, IS_NULL)) != DIS_SUCCESS)
+			return ret;
 
-	return;
+	if ((ret = diswsi(mtfd, rpp_retry)) != DIS_SUCCESS)
+		return ret;
+	if ((ret = diswsi(mtfd, rpp_highwater)) != DIS_SUCCESS)
+		return ret;
 
-	ret = DIS_NOCOMMIT;
+	if (!combine_msg)
+		return dis_flush(mtfd);
+	return 0;
+}
 
-err:
-	addr = tpp_getaddr(psvrmom->msr_stream);
-	snprintf(log_buffer, sizeof(log_buffer), "%s %d to %s(%s)",
-		dis_emsg[ret], errno, pmom->mi_host, netaddr(addr));
-	log_err(-1, __func__, log_buffer);
-	stream_eof(psvrmom->msr_stream, ret, "ping no ack");
+/**
+ * @brief Send the IS_CLUSTER_ADDRS2 message to Mom so she has the
+ *      latest list of IP addresses of the all the Moms in the complex.
+ *
+ * @param[in] stream - the open stream to the Mom
+ * @param[in] combine_msg - combine message in the caller
+ *
+ * @return int
+ * @retval DIS_SUCCESS (0) for success
+ * @retval != 0 otherwise.
+ */
+static int
+send_ip_addrs_to_mom(int stream, int combine_msg)
+{
+	int		j;
+	int		ret;
+
+	DBPRT(("%s: entered\n", __func__))
+
+	if (stream < 0)
+		return -1;
+
+	if (!combine_msg)
+		if ((ret = is_compose(stream, IS_CLUSTER_ADDRS2)) != DIS_SUCCESS)
+			return (ret);
+
+	if ((ret = diswui(stream, pbs_iplist->li_nrowsused)) != DIS_SUCCESS)
+		return ret;
+
+	for (j = 0; j < pbs_iplist->li_nrowsused; j++) {
+#ifdef DEBUG
+		unsigned long	ipaddr;
+		ipaddr = IPLIST_GET_LOW(pbs_iplist, j);
+		DBPRT(("%s: ip %d\t%ld.%ld.%ld.%ld\n", __func__, j,
+			(ipaddr & 0xff000000) >> 24,
+			(ipaddr & 0x00ff0000) >> 16,
+			(ipaddr & 0x0000ff00) >> 8,
+			(ipaddr & 0x000000ff)))
+#endif	/* DEBUG */
+		DBPRT(("%s: depth %ld\n", __func__, (long)IPLIST_GET_HIGH(pbs_iplist, j)))
+		if ((ret = diswul(stream, IPLIST_GET_LOW(pbs_iplist, j))) != DIS_SUCCESS)
+			return (ret);
+		if ((ret = diswul(stream, IPLIST_GET_HIGH(pbs_iplist, j))) != DIS_SUCCESS)
+			return (ret);
+	}
+	if (!combine_msg)
+		return dis_flush(stream);
+	return 0;
+}
+
+/**
+ * @brief Reply to IS_HELLOSVR
+ * Sending all the information mom needs from the server.
+ * including need inventory, rpp value and mom ip addresses.
+ *
+ * @param[in] stream - the open stream to the Mom
+ * @param[in] need_inv - whether the server needs inventory of the mom.
+ *
+ * @return int
+ * @retval DIS_SUCCESS (0) for success
+ * @retval != 0 otherwise.
+ */
+static int
+reply_hellosvr(int stream, int need_inv)
+{
+	int ret;
+
+	DBPRT(("%s: entered\n", __func__))
+
+	if (stream < 0)
+		return -1;
+
+	if ((ret = is_compose(stream, IS_REPLYHELLO)) != DIS_SUCCESS)
+		return ret;
+
+	if ((ret = diswsi(stream, need_inv)) != DIS_SUCCESS)
+		return ret;
+	if ((ret = send_ISNULL(stream, 1)) != DIS_SUCCESS)
+		return ret;
+
+	if (get_max_servers() > 1) {
+		/* For multi-server case, server will not send clusteraddr */
+		return dis_flush(stream);
+	}
+
+	if ((ret = send_ip_addrs_to_mom(stream, 1)) != DIS_SUCCESS)
+		return ret;
+
+	return dis_flush(stream);
 }
 
 /**
@@ -1107,50 +1187,6 @@ momptr_down(mominfo_t *pmom, char *why)
 	}
 
 	return;
-}
-
-/**
- * @brief Send the IS_CLUSTER_ADDRS2 message to Mom so she has the
- *      latest list of IP addresses of the all the Moms in the complex.
- *
- * @param[in] stream - the open stream to the Mom
- *
- * @return int
- * @retval DIS_SUCCESS (0) for success
- * @retval != 0 otherwise.
- */
-int
-send_ip_addrs_to_mom(int stream)
-{
-	int		j;
-	int		ret;
-
-	ret = is_compose(stream, IS_CLUSTER_ADDRS2);
-	if (ret != DIS_SUCCESS)
-		return (ret);
-
-	if (get_max_servers() > 1)
-		return (dis_flush(stream));
-
-	for (j = 0; j < pbs_iplist->li_nrowsused; j++) {
-#ifdef DEBUG
-		unsigned long	ipaddr;
-		ipaddr = IPLIST_GET_LOW(pbs_iplist, j);
-		DBPRT(("%s: ip %d\t%ld.%ld.%ld.%ld\n", __func__, j,
-			(ipaddr & 0xff000000) >> 24,
-			(ipaddr & 0x00ff0000) >> 16,
-			(ipaddr & 0x0000ff00) >> 8,
-			(ipaddr & 0x000000ff)))
-#endif	/* DEBUG */
-		DBPRT(("%s: depth %ld\n", __func__, (long)IPLIST_GET_HIGH(pbs_iplist, j)))
-		ret = diswul(stream, IPLIST_GET_LOW(pbs_iplist, j));
-		if (ret != DIS_SUCCESS)
-			return (ret);
-		ret = diswul(stream, IPLIST_GET_HIGH(pbs_iplist, j));
-		if (ret != DIS_SUCCESS)
-			return (ret);
-	}
-	return (dis_flush(stream));
 }
 
 /**
@@ -2893,6 +2929,8 @@ stream_eof(int stream, int ret, char *msg)
 {
 	mominfo_t		*mp;
 
+	DBPRT(("entering %s", __func__))
+
 	tpp_close(stream);
 
 	/* find who the stream belongs to and mark down */
@@ -2937,6 +2975,8 @@ mark_nodes_unknown(int all)
 	int		stm;
 	mom_svrinfo_t  *psvrmom;
 
+	DBPRT(("entering %s", __func__))
+
 	for (i = 0; i < mominfo_array_size; i++) {
 		if (mominfo_array[i]) {
 			pmom = mominfo_array[i];
@@ -2962,83 +3002,30 @@ mark_nodes_unknown(int all)
 }
 
 /**
- * @brief In case of TPP multicast mode, this function flushes the data to be sent out
- * 	to all the moms that are determined to be part of the mcast message
- *
- * @param[in] mtfd - The TPP multicast channel to flush
- *
- */
-static int
-flush_mcast_ISNULL(int mtfd)
-{
-	int                  ret;
-	int                  *strms;
-	int                  count;
-	int                  i;
-	mominfo_t            *pmom;
-	mom_svrinfo_t        *psvrmom;
-	struct	sockaddr_in  *addr;
-
-	ret = is_compose(mtfd, IS_NULL);
-	if (ret != DIS_SUCCESS)
-		goto err;
-
-	/*
-	** Send rpp_retry and rpp_highwater values with IS_NULL.
-	** Old versions of MOM will ignore extra data.
-	*/
-	ret = diswsi(mtfd, rpp_retry);
-	if (ret != DIS_SUCCESS)
-		goto err;
-	ret = diswsi(mtfd, rpp_highwater);
-	if (ret != DIS_SUCCESS)
-		goto err;
-
-	if (dis_flush(mtfd) == 0) {
-		/*
-		 * If the message later fails to be delivered, with TPP, the network is deemed broken,
-		 * and the stream would automatically get closed and everything will start afresh.
-		 * It is therefore okay for us to reset INUSE_NEEDS_HELLO_PING here.
-		 *
-		 */
-		return 0;
-	}
-	ret = DIS_NOCOMMIT;
-
-err:
-	strms = tpp_mcast_members(mtfd, &count);
-	for(i = 0; i < count; i++) {
-		if ((pmom = tfind2((u_long) strms[i], 0, &streams))) {
-			psvrmom = (mom_svrinfo_t *) (pmom->mi_data);
-			/* find the respective mom from the stream */
-			addr = tpp_getaddr(psvrmom->msr_stream);
-			snprintf(log_buffer, sizeof(log_buffer), "%s %d to %s(%s)",
-				dis_emsg[ret], errno, pmom->mi_host, netaddr(addr));
-			log_err(-1, __func__, log_buffer);
-			stream_eof(psvrmom->msr_stream, ret, "ping no ack");
-		}
-	}
-	return ret;
-}
-
-/**
- * @brief The TPP multicast version of ping_a_mom
- *
- * This is not used when its known that a single mom will be pinged.
- * This is only used from the periodic ping_nodes which typically sends
- * a ping message to a lot of moms.
+ * @brief The TPP multicast version for server -> mom.
  *
  * @param[in] pmom - The mom to ping
- * @param[in] mtfd_isnull  - The TPP channel to add moms as members for those that need IS_NULL
+ * @param[in] mtfd  - The TPP channel to add moms for multicasting.
  *
  */
 static void
-mom_mcast(mominfo_t *pmom, int mtfd_isnull)
+add_mom_mcast(mominfo_t *pmom, int *mtfd)
 {
 	mom_svrinfo_t *psvrmom = (mom_svrinfo_t *)(pmom->mi_data);
 	int rc;
 
-	rc = tpp_mcast_add_strm(mtfd_isnull, psvrmom->msr_stream);
+	DBPRT(("%s: entered\n", __func__))
+
+	if (psvrmom->msr_stream < 0)
+		return;
+
+	/* open the tpp mcast channel here */
+	if (*mtfd == -1 && (*mtfd = tpp_mcast_open()) == -1) {
+		log_err(-1, __func__, "Failed to open TPP mcast channel for mom pings");
+		return;
+	}
+
+	rc = tpp_mcast_add_strm(*mtfd, psvrmom->msr_stream);
 
 	if (rc == -1) {
 		snprintf(log_buffer, sizeof(log_buffer),
@@ -3059,77 +3046,83 @@ mom_mcast(mominfo_t *pmom, int mtfd_isnull)
  * @return	void
  */
 void
-mcast_moms(int cmd)
+mcast_moms(struct work_task *ptask)
 {
-	int	i;
-	int                  *strms;
-	mominfo_t            *pmom;
-	mom_svrinfo_t        *psvrmom;
+	int		i;
+	int		*strms;
+	mominfo_t	*pmom;
+	mom_svrinfo_t	*psvrmom;
 	struct	sockaddr_in  *addr;
-	int	ret = 0;
-	int	count = 0;
+	int		ret = 0;
+	int		count = 0;
 
-	DBPRT(("%s: entered\n", __func__))
-
-	if (tpp_network_up == 1) {
-		int mtfd;
-
-		/* open the tpp mcast channel here */
-		if ((mtfd = tpp_mcast_open()) == -1) {
-			log_err(-1, __func__, "Failed to open TPP mcast channel for mom pings");
-			return;
-		}
-
-		for (i = 0; i < mominfo_array_size; i++) {
-			if (cmd == IS_NULL) {
-				if (mominfo_array[i]) {
-					mom_mcast(mominfo_array[i], mtfd);
-				}
-			} else if (cmd == IS_CLUSTER_ADDRS2) {
-				if (mominfo_array[i] && ((mom_svrinfo_t *)(mominfo_array[i]->mi_data))->msr_state & INUSE_NEED_ADDRS) {
-					mom_mcast(mominfo_array[i], mtfd);
-				}	
-			}
-		}
-
-		if (cmd == IS_NULL)
-			ret = flush_mcast_ISNULL(mtfd);
-		else if (cmd == IS_CLUSTER_ADDRS2)
-			ret = send_ip_addrs_to_mom(mtfd);
-		if (ret != DIS_SUCCESS) {
-			strms = tpp_mcast_members(mtfd, &count);
-			for(i = 0; i < count; i++) {
-				if ((pmom = tfind2((u_long) strms[i], 0, &streams))) {
-					psvrmom = (mom_svrinfo_t *) (pmom->mi_data);
-					/* find the respective mom from the stream */
-					addr = tpp_getaddr(psvrmom->msr_stream);
-					snprintf(log_buffer, sizeof(log_buffer), "%s %d to %s(%s)",
-						dis_emsg[ret], errno, pmom->mi_host, netaddr(addr));
-					log_err(-1, __func__, log_buffer);
-					stream_eof(psvrmom->msr_stream, ret, "ping no ack");
-				}
-			}
-		}
-		tpp_mcast_close(mtfd);
-	}
-}
-
-/**
- * @brief
- * 		Send IS_CLUSTER_ADDR2 in case of single server mode
- * @par
- *		If wt_parm1 is NULL, set up a worktask to do again.
- *
- * @param[in]	ptask	-	work task structure.
- *
- * @return	void
- */
-void
-send_nodes_addr(struct work_task *ptask)
-{
 	if (!ptask)
 		return;
-	mcast_moms(IS_CLUSTER_ADDRS2);
+
+	DBPRT(("%s: entered\n cmd: %d", __func__, ptask->wt_aux))
+
+	int cmd = ptask->wt_aux;
+	int mtfd = -1;
+
+	switch (cmd)
+	{
+	case IS_NULL:
+		for (i = 0; i < mominfo_array_size; i++) {
+			if (mominfo_array[i]) {
+				add_mom_mcast(mominfo_array[i], &mtfd);
+			}
+		}
+		ret = send_ISNULL(mtfd, 0);
+		break;
+
+	case IS_CLUSTER_ADDRS2:
+		for (i = 0; i < mominfo_array_size; i++) {
+			if (!mominfo_array[i])
+				continue;
+			psvrmom = (mom_svrinfo_t *)(mominfo_array[i]->mi_data);
+			if (psvrmom->msr_state & INUSE_NEED_ADDRS) {
+				add_mom_mcast(mominfo_array[i], &mtfd);
+				if (psvrmom->msr_state & INUSE_MARKEDDOWN)
+					psvrmom->msr_state &= ~INUSE_MARKEDDOWN;
+				set_all_state(mominfo_array[i], 0, INUSE_DOWN | INUSE_NEED_ADDRS,
+									NULL, Set_All_State_Regardless);
+			}
+		}
+		ret = send_ip_addrs_to_mom(mtfd, 0);
+		break;
+
+	case IS_REPLYHELLO:
+		ret = reply_hellosvr(mtfd_replyhello, 1);
+		break;
+	
+	default:
+		break;
+	}
+
+	if (ret != DIS_SUCCESS) {
+		if (cmd == IS_REPLYHELLO)
+			strms = tpp_mcast_members(mtfd_replyhello, &count);
+		else
+			strms = tpp_mcast_members(mtfd, &count);
+
+		for(i = 0; i < count; i++) {
+			if ((pmom = tfind2((u_long) strms[i], 0, &streams)) != NULL) {
+				psvrmom = (mom_svrinfo_t *) (pmom->mi_data);
+				/* find the respective mom from the stream */
+				addr = tpp_getaddr(psvrmom->msr_stream);
+				snprintf(log_buffer, sizeof(log_buffer), "%s %d to %s(%s)",
+					dis_emsg[ret], errno, pmom->mi_host, netaddr(addr));
+				log_err(-1, __func__, log_buffer);
+				stream_eof(psvrmom->msr_stream, ret, "ping no ack");
+			}
+		}
+	}
+	if (cmd == IS_REPLYHELLO) {
+		tpp_mcast_close(mtfd_replyhello);
+		mtfd_replyhello = -1;
+	} else {
+		tpp_mcast_close(mtfd);
+	}
 }
 
 /**
@@ -4275,7 +4268,6 @@ is_request(int stream, int version)
 	mominfo_t		*pmom;
 	mom_svrinfo_t		*psvrmom;
 	int			 s;
-	char			hellosvrmsg[]="Mom sent hellosvr on host";
 	char			*val;
 	unsigned long		 oldstate;
 	vnl_t			*vnlp;			/* vnode list */
@@ -4314,22 +4306,34 @@ is_request(int stream, int version)
 		if (ret != DIS_SUCCESS)
 			goto badcon;
 
-		DBPRT(("%s: IS_HELLOSVR port %lu\n", __func__, port))
+		DBPRT(("%s: IS_HELLOSVR addr: %s, port %lu\n", __func__, netaddr(addr), port))
 
 		if ((pmom = tfind2(ipaddr, port, &ipaddrs)) == NULL)
 			goto badcon;
 
 		log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_NODE,
-			LOG_NOTICE, pmom->mi_host, hellosvrmsg);
+			LOG_NOTICE, pmom->mi_host, "Mom sent hellosvr on host");
 
-		((mom_svrinfo_t *)(pmom->mi_data))->msr_state |= INUSE_UNKNOWN;
+		psvrmom = (mom_svrinfo_t *)(pmom->mi_data);
+		psvrmom->msr_state |= INUSE_UNKNOWN;
+		if (psvrmom->msr_stream >= 0 && psvrmom->msr_stream != stream) {
+			DBPRT(("%s: stream %d from %s:%d already open on %d\n",
+				__func__, stream, pmom->mi_host,
+				ntohs(addr->sin_port), psvrmom->msr_stream))
+			tpp_close(psvrmom->msr_stream);
+#ifdef NAS /* localmod 005 */
+			tdelete2((u_long)psvrmom->msr_stream, 0ul, &streams);
+#else
+			tdelete2((u_long)psvrmom->msr_stream, 0, &streams);
+#endif /* localmod 005 */
+		}
 
 #if defined(PBS_SECURITY) && (PBS_SECURITY == KRB5)
 		if (((mom_svrinfo_t *)(pmom->mi_data))->msr_numjobs > 0)
 			((mom_svrinfo_t *)(pmom->mi_data))->msr_state |= INUSE_NEED_CREDENTIALS;
 #endif
 
-		if (((mom_svrinfo_t *)(pmom->mi_data))->msr_vnode_pool != 0) {
+		if (psvrmom->msr_vnode_pool != 0) {
 			/*
 			 * Mom has a pool, see if the pool has an
 			 * inventory Mom already, if not make this Mom the one
@@ -4339,6 +4343,7 @@ is_request(int stream, int version)
 			if (ppool != NULL) {
 				if (ppool->vnpm_inventory_mom == NULL) {
 					ppool->vnpm_inventory_mom = pmom;
+					psvrmom->reporting_mom = 1;
 					sprintf(log_buffer,
 						msg_new_inventory_mom,
 						ppool->vnpm_vnode_pool,
@@ -4350,8 +4355,8 @@ is_request(int stream, int version)
 		}
 
 		/* we save this stream for future communications */
-		((mom_svrinfo_t *)(pmom->mi_data))->msr_stream = stream;
-		((mom_svrinfo_t *)(pmom->mi_data))->msr_state &= ~INUSE_INIT;
+		psvrmom->msr_stream = stream;
+		psvrmom->msr_state &= ~INUSE_INIT;
 #ifdef NAS /* localmod 005 */
 		tinsert2((u_long)stream, 0ul, pmom, &streams);
 #else
@@ -4359,9 +4364,23 @@ is_request(int stream, int version)
 #endif /* localmod 005 */
 
 		tpp_eom(stream);
-		reply_hellosvr(pmom);
+		if (psvrmom->msr_vnode_pool > 0 ? psvrmom->reporting_mom : 1) {
+			/* mcast reply togethor */
+			add_mom_mcast(pmom, &mtfd_replyhello);
+			static int reply_send_tm = 0;
+			if (reply_send_tm <= time_now) {
+				/* time to wait depends on the no of moms server knows */
+				reply_send_tm = time_now + (mominfo_array_size > 1024 ? 2 : 0);
+				struct work_task *ptask = set_task(WORK_Timed, reply_send_tm, mcast_moms, NULL);
+				ptask->wt_aux = IS_REPLYHELLO;
+			}
+		} else {
+			/* reply immediately if the server does not need inventory.
+		   	only Cray XC support this */
+			if ((ret = reply_hellosvr(psvrmom->msr_stream, 0)) != DIS_SUCCESS)
+				goto err;
+		}
 		return;
-
 	} else {
 		/* check that machine is known */
 		DBPRT(("%s: connect from %s\n", __func__, netaddr(addr)))
@@ -4385,24 +4404,8 @@ found:
 			process_DreplyTPP(stream);
 			break;
 
-		case IS_NULL:		/* a ping from server */
-			DBPRT(("%s: IS_NULL\n", __func__))
-			break;
-
-			/* fall into HELLO2, HELLO3 case */
-		case IS_HELLO2:
-		case IS_HELLO3:
-		case IS_HELLO4:
-#ifdef DEBUG
-			if (command == IS_HELLO4)
-				printf("%s: IS_HELLO4\n", __func__);
-			else if (command == IS_HELLO3)
-				printf("%s: IS_HELLO3\n", __func__);
-			else if (command == IS_HELLO2)
-				printf("%s: IS_HELLO2\n", __func__);
-			else
-				printf("%s: IS_HELLO\n", __func__);
-#endif	/* DEBUG */
+		
+		case IS_REGISTERMOM:
 			if (psvrmom->msr_wktask) { /* if task requeue jobs, delete it */
 				delete_task(psvrmom->msr_wktask);
 				psvrmom->msr_wktask = 0;
@@ -4424,15 +4427,10 @@ found:
 			/* Must be dealt with in the order sent (defined bit wise */
 			/* See resmom/mom_server.c				  */
 
-			if (command == IS_HELLO4) {
-				/* get the options set */
-				hello_opts = disrui(stream, &ret);
-				if (ret != DIS_SUCCESS)
-					goto err;
-			} else if (command == IS_HELLO3) {
-				hello_opts = HELLO4_running_jobs;
-			} else
-				hello_opts = 0;	/* no optional data */
+			/* get the options set */
+			hello_opts = disrui(stream, &ret);
+			if (ret != DIS_SUCCESS)
+				goto err;
 
 			if (hello_opts & HELLO4_vmap_version) {
 				/* Mom sending vnodemap file info which is */
@@ -4453,16 +4451,15 @@ found:
 			 * all addresses of all Moms
 			 */
 
-			/* Send the Mom addresses		    */
-			/* Mom will respond when she receives these */
-			ret = send_ip_addrs_to_mom(stream);
-			if (ret != DIS_SUCCESS)
-				goto err;
-
-			break;
+			/* fall into IS_UPDATE */
 
 		case IS_UPDATE:
 		case IS_UPDATE2:
+			if (command == IS_REGISTERMOM)
+				command = disrui(stream, &ret);
+			if (ret != DIS_SUCCESS)
+				goto err;
+
 			if (psvrmom->msr_vnode_pool != 0) {
 				sprintf(log_buffer, "POOL: IS_UPDATE%c received",
 					(command == IS_UPDATE)?' ':'2');
@@ -4472,6 +4469,7 @@ found:
 
 			cr_node = 0;
 			made_new_vnodes = 0;
+
 			if (command == IS_UPDATE) {
 				DBPRT(("%s: IS_UPDATE %s\n", __func__, pmom->mi_host))
 			} else {
@@ -4535,10 +4533,6 @@ found:
 			DBPRT(("arch %s ", val))
 			free(psvrmom->msr_arch);
 			psvrmom->msr_arch = val;
-
-			i = disrui(stream, &ret);  /* license type, no longer used */
-			if (ret != DIS_SUCCESS)
-				goto err;
 
 			if ((psvrmom->msr_state & INUSE_MARKEDDOWN) == 0) {
 				sprintf(log_buffer, "update%c state:%d ncpus:%ld",
@@ -4863,34 +4857,11 @@ found:
 			if (made_new_vnodes || cr_node) {
 				save_nodes_db(1, pmom); /* update the node database */
 			}
-			break;
+		/* Fall into IS_MOM_READY */
 
-		case IS_RESCUSED:
-		case IS_RESCUSED_FROM_HOOK:
-#ifdef  DEBUG
-			if (command == IS_RESCUSED)
-				DBPRT(("%s: IS_RESCUSED\n", __func__))
-				else
-					DBPRT(("%s: IS_RESCUSED_FROM_HOOK\n", __func__))
-#endif	/* DEBUG */
-
-					stat_update(stream);
-			break;
-
-		case IS_JOBOBIT:
-			DBPRT(("%s: IS_JOBOBIT\n", __func__))
-			recv_job_obit(stream);
-			break;
-
-		case IS_IDLE:
-			DBPRT(("%s: IS_IDLE\n", __func__))
-			recv_wk_job_idle(stream);
-			break;
-
-		case IS_MOM_READY:	/* was IS_RECV_VMAP */
+		case IS_MOM_READY:
 			/* Mom is acknowledging the info sent by the Server */
 			/* Mark the Mom and associated vnodes as up */
-			DBPRT(("%s: IS_MOM_READY\n", __func__))
 			oldstate = psvrmom->msr_state;
 			if (psvrmom->msr_state & INUSE_MARKEDDOWN)
 				psvrmom->msr_state &= ~INUSE_MARKEDDOWN;
@@ -4922,7 +4893,28 @@ found:
 				psvrmom->msr_state &= ~INUSE_NEED_CREDENTIALS;
 			}
 #endif
+			break;
 
+		case IS_RESCUSED:
+		case IS_RESCUSED_FROM_HOOK:
+#ifdef  DEBUG
+			if (command == IS_RESCUSED)
+				DBPRT(("%s: IS_RESCUSED\n", __func__))
+				else
+					DBPRT(("%s: IS_RESCUSED_FROM_HOOK\n", __func__))
+#endif	/* DEBUG */
+
+					stat_update(stream);
+			break;
+
+		case IS_JOBOBIT:
+			DBPRT(("%s: IS_JOBOBIT\n", __func__))
+			recv_job_obit(stream);
+			break;
+
+		case IS_IDLE:
+			DBPRT(("%s: IS_IDLE\n", __func__))
+			recv_wk_job_idle(stream);
 			break;
 
 		case IS_DISCARD_DONE:

@@ -100,7 +100,6 @@ extern pbs_list_head	svr_alljobs;
 extern int		exiting_tasks;
 extern char		*msg_daemonname;
 extern int		svr_hook_resend_job_attrs;
-extern int		waiting_hello_resp;
 #ifdef	WIN32
 extern char		*mom_home;
 #endif
@@ -1940,46 +1939,6 @@ end_loop:
 
 /**
  * @brief
- * 	send IS_HELLOSVR message to Server.
- *
- * @param[in]	stream  - rpp stream
- * 
- * @see send_hellosvr_rpp
- *
- * @return	void
- *
- * @return void
- */
-
-void
-send_hellosvr(int stream)
-{
-
-	if (stream < 0) {
-		sprintf(log_buffer, "invalid stream");
-		log_err(errno, msg_daemonname, log_buffer);
-		return;
-	}
-
-	if (is_compose(stream, IS_HELLOSVR) != DIS_SUCCESS) {
-		sprintf(log_buffer, "Failed to compose IS_HELLOSVR message");
-		log_err(errno, msg_daemonname, log_buffer);
-		tpp_close(stream);
-		return;
-	}
-
-	diswui(stream, pbs_mom_port);
-	dis_flush(stream);
-
-	sprintf(log_buffer, "HELLOSVR sent to server at stream:%d", stream);
-	log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_NOTICE,
-		msg_daemonname, log_buffer);
-	server_stream = stream;
-	waiting_hello_resp = 1;
-}
-
-/**
- * @brief
  * 		choosing one server in random if a failover server is already set up.
  *
  * @param[out] port - Passed through to parse_servername(), not modified here.
@@ -2005,24 +1964,31 @@ get_servername_random(unsigned int *port)
 /**
  * @brief
  * 	send IS_HELLOSVR message to Server.
+ * 
+ * @param[in]	stream	- connection stream
  *
  * @par
- *	Open an RPP stream to the named server/port, compose the IS_HELLOSVR,
- *	flush the stream and then close it.
+ *	Open a connection stream to the named server/port if not already exists,
+ *	compose the IS_HELLOSVR, flush the stream and remember for future use.
+ *
  *
  * @return	void
  *
  */
 
 void
-send_hellosvr_tpp(void)
+send_hellosvr(int stream)
 {
-	int		stream;
-	char	       *svr;
+	int rc = 0;
+	char	       *svr = NULL;
 	unsigned int	port = default_server_port;
 
-	svr = get_servername_random(&port);
-	stream = tpp_open(svr, port);
+	DBPRT(("Sending hellosvr"))
+
+	if (stream < 0) {
+		svr = get_servername_random(&port);
+		stream = tpp_open(svr, port);
+	}
 
 	if (stream < 0) {
 		sprintf(log_buffer, "tpp_open(%s, %d) failed", svr, port);
@@ -2030,10 +1996,37 @@ send_hellosvr_tpp(void)
 		return;
 	}
 
-	send_hellosvr(stream);
-	sprintf(log_buffer, "HELLOSVR sent to server at %s:%d", svr, port);
+	
+	if (stream < 0) {
+		sprintf(log_buffer, "invalid stream");
+		log_err(errno, msg_daemonname, log_buffer);
+		return;
+	}
+
+	if ((rc = is_compose(stream, IS_HELLOSVR)) != DIS_SUCCESS) {
+		goto err;
+	}
+
+	if ((rc = diswui(stream, pbs_mom_port)) != DIS_SUCCESS)
+		goto err;
+	if ((rc = dis_flush(stream)) != DIS_SUCCESS)
+		goto err;
+
+	server_stream = stream;
+
+	if (svr)
+		sprintf(log_buffer, "HELLOSVR sent to server at %s:%d", svr, port);
+	else
+		sprintf(log_buffer, "HELLOSVR sent to server at stream:%d", stream);
 	log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_NOTICE,
 		msg_daemonname, log_buffer);
+	return;
+
+err:
+	sprintf(log_buffer, "Failed to send IS_HELLOSVR message");
+	log_err(errno, msg_daemonname, log_buffer);
+	tpp_close(stream);
+	return;
 }
 
 /**
