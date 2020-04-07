@@ -837,7 +837,7 @@ main(int argc, char **argv)
 	if (pbs_loadconf(0) == 0)
 		return (1);
 	/* initialize the shard lib */
-	if (pbs_shard_init(get_max_servers(), (struct server_instance **)pbs_conf.psi, get_current_servers()) == -1)
+	if (pbs_shard_init(get_max_servers(), (server_instance_t **)pbs_conf.psi, get_current_servers()) == -1)
 		return (1);
 
 	set_log_conf(pbs_conf.pbs_leaf_name, pbs_conf.pbs_mom_node_name,
@@ -872,12 +872,12 @@ main(int argc, char **argv)
 
 	self.name = strdup(server_host);
 	self.port = pbs_conf.batch_service_port;
-		if (get_max_servers() > 1) {
-			if ((myindex = get_svr_index(&self)) == -1) {
-				fprintf(stderr, "Wrong Multi Server configuration. Please start server after correcting /etc/pbs.conf\n");
-				return 1;
-			}
+	if (get_max_servers() > 1) {
+		if ((myindex = get_svr_index(&self)) == -1) {
+			fprintf(stderr, "Wrong Multi Server configuration. Please start server after correcting /etc/pbs.conf\n");
+			return 1;
 		}
+	}
 
 
 	if(set_msgdaemonname(daemonname)) {

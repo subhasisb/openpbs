@@ -122,7 +122,7 @@ struct shard_conn {
 	int secondary_sd;           /* Secondary File descriptor for the open socket */
 	int state;                  /* Connection state */
 	time_t state_change_time;   /* Connnetion state change time */
-	time_t last_used;           /* Last used time for the connection */
+	time_t last_used_time;           /* Last used time for the connection */
 };
 
 typedef struct pbs_conn {
@@ -380,7 +380,6 @@ extern int tcp_pre_process(conn_t *);
 extern char *PBSD_modify_resv(int, char *, struct attropl *, char *);
 extern int PBSD_cred(int, char *, char *, int, char *, long, int, char **);
 int tcp_send_auth_req(int, unsigned int, char *);
-int tcp_send_auth_req(int sock, unsigned int port, char *user);
 extern int get_svr_index(struct pbs_server_instance *instance);
 
 #ifdef __cplusplus

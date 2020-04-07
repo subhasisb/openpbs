@@ -757,6 +757,9 @@ pbs_db_get_maxjobid(pbs_db_conn_t *conn,  long long *jobid)
 
 	PQclear(res);
 
+	if (jobid == NULL)
+		return -1;
+
 	*jobid = last_jobid;
 
 	return 0;

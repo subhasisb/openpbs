@@ -40,7 +40,7 @@ lib_LTLIBRARIES = libshard.la
 
 libshard_la_CPPFLAGS = -I$(top_srcdir)/src/include
 
-libshard_la_LDFLAGS = -version-info 0:0:0
+libshard_la_LDFLAGS = -version-info 1:0:0
 
 libshard_la_LIBADD = -lm
 

@@ -186,19 +186,22 @@ is_compose_cmd(int stream, int command, char **ret_msgid)
 int
 PBSD_rdytocmt(int c, char *jobid, int prot, char **msgid)
 {
-	int     rc;
+	int rc;
 	struct batch_reply *reply;
+	int sock;
 
 	if (prot == PROT_TCP) {
+		sock = get_svr_shard_connection(c, -1, NULL);
 		DIS_tcp_funcs();
 	} else {
-		if ((rc = is_compose_cmd(c, IS_CMD, msgid)) != DIS_SUCCESS)
+		sock = c;
+		if ((rc = is_compose_cmd(sock, IS_CMD, msgid)) != DIS_SUCCESS)
 			return rc;
 	}
 
-	if ((rc=encode_DIS_ReqHdr(c, PBS_BATCH_RdytoCommit, pbs_current_user)) ||
-		(rc = encode_DIS_JobId(c, jobid))  ||
-		(rc = encode_DIS_ReqExtend(c, NULL))) {
+	if ((rc=encode_DIS_ReqHdr(sock, PBS_BATCH_RdytoCommit, pbs_current_user)) ||
+		(rc = encode_DIS_JobId(sock, jobid))  ||
+		(rc = encode_DIS_ReqExtend(sock, NULL))) {
 		if (prot == PROT_TCP) {
 			if (set_conn_errtxt(c, dis_emsg[rc]) != 0) {
 				return (pbs_errno = PBSE_SYSTEM);
@@ -207,15 +210,12 @@ PBSD_rdytocmt(int c, char *jobid, int prot, char **msgid)
 		return (pbs_errno = PBSE_PROTOCOL);
 	}
 
+	pbs_errno = PBSE_NONE;
+	if (dis_flush(sock))
+		return (pbs_errno = PBSE_PROTOCOL);
 	if (prot == PROT_TPP) {
-		pbs_errno = PBSE_NONE;
-		if (dis_flush(c))
-			pbs_errno = PBSE_PROTOCOL;
 		return pbs_errno;
 	}
-
-	if (dis_flush(c))
-		return (pbs_errno = PBSE_PROTOCOL);
 
 	/* read reply */
 
@@ -268,15 +268,13 @@ PBSD_commit(int c, char *jobid, int prot, char **msgid)
 		return (pbs_errno = PBSE_PROTOCOL);
 	}
 
-	if (prot == PROT_TPP) {
-		pbs_errno = PBSE_NONE;
-		if (dis_flush(sock))
-			pbs_errno = PBSE_PROTOCOL;
-		return pbs_errno;
-	}
 
+	pbs_errno = PBSE_NONE;
 	if (dis_flush(sock)) {
 		return (pbs_errno = PBSE_PROTOCOL);
+	}
+	if (prot == PROT_TPP) {
+		return pbs_errno;
 	}
 
 	reply = PBSD_rdrpy(c);
@@ -339,15 +337,13 @@ PBSD_scbuf(int c, int reqtype, int seq, char *buf, int len, char *jobid, enum jo
 		return (pbs_errno = PBSE_PROTOCOL);
 	}
 
-	if (prot == PROT_TPP) {
-		pbs_errno = PBSE_NONE;
-		if (dis_flush(sock))
-			pbs_errno = PBSE_PROTOCOL;
-		return pbs_errno;
-	}
 
+	pbs_errno = PBSE_NONE;
 	if (dis_flush(sock)) {
 		return (pbs_errno = PBSE_PROTOCOL);
+	}
+	if (prot == PROT_TPP) {
+		return pbs_errno;
 	}
 
 	/* read reply */
@@ -524,8 +520,8 @@ char *
 PBSD_queuejob(int c, char *jobid, char *destin, struct attropl *attrib, char *extend, int prot, char **msgid)
 {
 	struct batch_reply *reply;
-	char  *return_jobid = NULL;
-	int    rc;
+	char *return_jobid = NULL;
+	int rc;
 	int sock;
 
 	if (prot == PROT_TCP) {
@@ -562,7 +558,6 @@ PBSD_queuejob(int c, char *jobid, char *destin, struct attropl *attrib, char *ex
 		pbs_errno = PBSE_NONE;
 		if (dis_flush(sock))
 			pbs_errno = PBSE_PROTOCOL;
-
 		return (""); /* return something NON-NULL for tpp */
 	}
 

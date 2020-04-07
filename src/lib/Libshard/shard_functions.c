@@ -67,15 +67,15 @@
 
 int compute_srv_ind(char *obj_id);
 int max_num_of_servers = 0;
-struct server_instance **configured_servers = NULL;
+server_instance_t **configured_servers = NULL;
 int configured_num_servers = 0;
 
 #ifdef WIN32
 int gettimeofday(struct timeval * tp, struct timezone * tzp)
 {
-	// Note: some broken versions only have 8 trailing zero's, the correct epoch has 9 trailing zero's
-	// This magic number is the number of 100 nanosecond intervals since January 1, 1601 (UTC)
-	// until 00:00:00 January 1, 1970 
+	/* Note: some broken versions only have 8 trailing zero's, the correct epoch has 9 trailing zero's
+	   This magic number is the number of 100 nanosecond intervals since January 1, 1601 (UTC)
+	   until 00:00:00 January 1, 1970 */
 	static const uint64_t EPOCH = ((uint64_t)116444736000000000ULL);
 
 	SYSTEMTIME  system_time;
@@ -108,7 +108,7 @@ int gettimeofday(struct timeval * tp, struct timezone * tzp)
  * @retval -1	- error
  */
 DLLEXPORT int
-pbs_shard_init(int max_allowed_servers, struct server_instance **server_instances, int num_instances) {
+pbs_shard_init(int max_allowed_servers, server_instance_t **server_instances, int num_instances) {
         
         if (server_instances == NULL)
                 return -1;

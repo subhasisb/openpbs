@@ -572,16 +572,16 @@ set_conn_shard_context(int vfd, int sock)
  * @par MT-safe: Yes
  */
 int
-get_conn_shard_context(int fd)
+get_conn_shard_context(int vfd)
 {
 	pbs_conn_t *p = NULL;
 	int sock = -1;
 
-	if (INVALID_SOCK(fd))
+	if (INVALID_SOCK(vfd))
 		return -1;
 
 	LOCK_TABLE(-1);
-	p = get_connection(fd);
+	p = get_connection(vfd);
 	if (p == NULL) {
 		UNLOCK_TABLE(-1);
 		return -1;
@@ -608,15 +608,15 @@ get_conn_shard_context(int fd)
  * @par MT-safe: Yes
  */
 int
-set_conn_shards(int fd, struct shard_conn ** shards)
+set_conn_shards(int vfd, struct shard_conn ** shards)
 {
 	pbs_conn_t *p = NULL;
 
-	if (INVALID_SOCK(fd))
+	if (INVALID_SOCK(vfd))
 		return -1;
 
 	LOCK_TABLE(-1);
-	p = get_connection(fd);
+	p = get_connection(vfd);
 	if (p == NULL) {
 		errno = ENOTCONN;
 		UNLOCK_TABLE(-1);
@@ -624,6 +624,22 @@ set_conn_shards(int fd, struct shard_conn ** shards)
 	}
 	p->ch_shards = shards;
 	UNLOCK_TABLE(-1);
+	return 0;
+}
+
+int initialise_shard_conn(int vfd){
+	int i;
+	struct shard_conn **shard_connection = calloc(get_current_servers(), sizeof(struct shard_conn *));
+	if (!shard_connection)
+		return -1;
+	for (i = 0; i < get_current_servers(); i++) {
+		shard_connection[i] = malloc(sizeof(struct shard_conn));
+		shard_connection[i]->sd = -1;
+		shard_connection[i]->state = SHARD_CONN_STATE_DOWN;
+		shard_connection[i]->state_change_time = 0;
+		shard_connection[i]->last_used_time = 0;
+	}
+	set_conn_shards(vfd, shard_connection);
 	return 0;
 }
 
@@ -643,20 +659,26 @@ set_conn_shards(int fd, struct shard_conn ** shards)
  * @par MT-safe: Yes
  */
 struct shard_conn **
-get_conn_shards(int fd)
+get_conn_shards(int vfd)
 {
 	pbs_conn_t *p = NULL;
+	static int ch_shard_init = -1;
 	struct shard_conn **shards = NULL;
 
-	if (INVALID_SOCK(fd))
+	if (INVALID_SOCK(vfd))
 		return NULL;
 
 	LOCK_TABLE(NULL);
-	p = get_connection(fd);
+	p = get_connection(vfd);
 	if (p == NULL) {
 		errno = ENOTCONN;
 		UNLOCK_TABLE(NULL);
 		return NULL;
+	}
+	if (ch_shard_init == -1) {
+		if(initialise_shard_conn(vfd) == -1)
+			return NULL;
+		ch_shard_init = 1;
 	}
 	shards = p->ch_shards;
 	UNLOCK_TABLE(NULL);

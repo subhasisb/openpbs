@@ -454,13 +454,14 @@ get_svr_shard_connection(int vsock, int req_type, void *shard_hint)
 	int i = 0;
 	int inact_srv_index = 0;
 	static int shard_init_flag = -1;
-	int *inactive_servers; 
+	int *inact_svr_indexes; 
 	int num_of_conf_servers = get_current_servers();
+	int max_num_servers = get_max_servers();
 	struct shard_conn **shard_connection = get_conn_shards(vsock);
 
-	if (get_max_servers() > 1) {
+	if (max_num_servers > 1) {
 		if (shard_init_flag == -1) {
-			if (pbs_shard_init(get_max_servers(), (struct server_instance **)pbs_conf.psi, num_of_conf_servers) == -1)
+			if (pbs_shard_init(max_num_servers, (server_instance_t **)pbs_conf.psi, num_of_conf_servers) == -1)
 				return -1;
 			shard_init_flag = 1;
 		}
@@ -468,16 +469,16 @@ get_svr_shard_connection(int vsock, int req_type, void *shard_hint)
 	if (internal_connect == NULL)
 		internal_connect = internal_connect_cli;
 
-	if( !(inactive_servers = (int *)malloc(num_of_conf_servers * sizeof(int))))
+	if( !(inact_svr_indexes = (int *)malloc(num_of_conf_servers * sizeof(int))))
 		return -1;
 
 	for (; i < num_of_conf_servers; i++)
-		inactive_servers[i] = -1;
+		inact_svr_indexes[i] = -1;
 
-	if (get_max_servers() > 1) {
+	if (max_num_servers > 1) {
 		if (shard_hint || get_conn_shard_context(vsock) == -1 ) {
-			srv_index = pbs_shard_get_server_byindex(shard_hint, JOB, inactive_servers);
-			if (srv_index == -1 || srv_index > get_current_servers()) {
+			srv_index = pbs_shard_get_server_byindex(shard_hint, JOB, inact_svr_indexes);
+			if (srv_index == -1 || srv_index > num_of_conf_servers) {
 				return -1;
 			}
 			set_conn_shard_context(vsock, srv_index);		
@@ -490,7 +491,7 @@ tryagain:
 		if (inact_srv_index) {	
 			if (inact_srv_index == num_of_conf_servers)
 				return -1;
-			srv_index = pbs_shard_get_server_byindex(shard_hint, JOB, inactive_servers);
+			srv_index = pbs_shard_get_server_byindex(shard_hint, JOB, inact_svr_indexes);
 			if (srv_index == -1) {
 				return -1;
 			}
@@ -507,7 +508,7 @@ tryagain:
 			}
 			shard_connection[srv_index]->sd = -1;
 			set_conn_shard_context(vsock, -1);
-			inactive_servers[inact_srv_index++] = srv_index;
+			inact_svr_indexes[inact_srv_index++] = srv_index;
 			goto tryagain;
 
 		} else if (shard_connection[srv_index]->state == SHARD_CONN_STATE_DOWN) {
@@ -522,7 +523,7 @@ tryagain:
 				shard_connection[srv_index]->sd = -1;
 				shard_connection[srv_index]->state_change_time = time(0);
 				set_conn_shard_context(vsock, -1);
-				inactive_servers[inact_srv_index++] = srv_index;
+				inact_svr_indexes[inact_srv_index++] = srv_index;
 				goto tryagain;
 			}
 			/* success */
@@ -561,7 +562,6 @@ __pbs_connect_extend(char *server, char *extend_data)
 	int    have_alt = 0;
 	char server_name[PBS_MAXSERVERNAME+1];
 	unsigned int server_port;
-	struct shard_conn **shard_connection;
 #ifdef WIN32
 	struct sockaddr_in to_sock;
 	struct sockaddr_in from_sock;
@@ -596,23 +596,19 @@ __pbs_connect_extend(char *server, char *extend_data)
 			setenv("SystemRoot", "C:\\WINDOWS", 1);
 		}
 #endif
-	sd = socket(AF_INET, SOCK_STREAM, 0);	
+	sd = socket(AF_INET, SOCK_STREAM, 0);
+	if (sd == -1) {
+		pbs_errno = PBSE_NOSERVER;
+		return -1;
+	}
 
-	if ((strcmp(server,pbs_default()) == 0) && pbs_conf.pbs_max_servers > 1) {
+	if ((strcmp(server,pbs_default()) == 0) && get_max_servers() > 1) {
 		set_conn_shard_context(sd, -1);
-		shard_connection = calloc(get_current_servers(), sizeof(struct shard_conn *));
-		for (i = 0; i < get_current_servers(); i++) {
-			shard_connection[i] = malloc(sizeof(struct shard_conn));
-			shard_connection[i]->sd = -1;
-			shard_connection[i]->state = SHARD_CONN_STATE_DOWN;
-			shard_connection[i]->state_change_time = 0;
-			shard_connection[i]->last_used = 0;
-		}
-		set_conn_shards(sd, shard_connection);
-
-
-		/* can't use failover for now, take a different path */
-	return sd; /* actual connects happen when client tries to send a request first */
+		/* can't use failover for now, take a different path. 
+		Actual connects happen when client tries to send a request first. 
+		For multi-server mode, each IFL API's would use possibly different socket 
+		based on their OBJECT(JOB,RESERVATION) in request. */
+		return sd; 
 	}
 
 	if (pbs_conf.pbs_primary && pbs_conf.pbs_secondary) {

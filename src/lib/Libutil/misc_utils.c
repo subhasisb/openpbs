@@ -2182,19 +2182,30 @@ get_current_servers()
 	return pbs_conf.pbs_current_servers;
 }
 
+/**
+ * @brief
+ *	get_svr_index - function to find the server index from its server_instance.
+ *
+  * @param[in]	instance - pbs_server_instance object.
+ *
+ * @return int
+ * @retval	!-1 server's index
+ * @retval	-1, for error	
+ */
 int
 get_svr_index(struct pbs_server_instance *instance)
 {
-        int i;
-        if (get_current_servers() > 1) {
+	int i;
+	if (get_current_servers() > 1) {
 		for(i = 0; i < get_current_servers(); i++) {
 			if (instance->port == pbs_conf.psi[i]->port) {
+				if ( (instance->name == NULL) || (pbs_conf.psi[i]->name == NULL) )
+					return  -1;
 				if (strcmp(instance->name, pbs_conf.psi[i]->name) == 0) 
 					return i;
 			}
 		}
-        } else
-                return 0;
-
-        return -1;
+	} else
+		return 0;
+	return -1;
 }

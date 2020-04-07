@@ -128,6 +128,8 @@ __pbs_terminate(int c, int manner, char *extend)
 	int sock;
 	int count = 0;
 	struct shard_conn **shard_connection = get_conn_shards(c);
+	if (shard_connection == NULL)
+		return PBSE_NOSERVER;
 
 	/* initialize the thread context data, if not already initialized */
 	if (pbs_client_thread_init_thread_context() != 0)

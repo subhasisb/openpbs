@@ -320,7 +320,10 @@ parse_psi(char * conf_value)
 			fprintf(stderr, "Ran out of memory parsing configuration %s", conf_value);
 			return -1;
 		}
-		pbs_conf.psi[count]->name = strdup(host);
+		if (!(pbs_conf.psi[count]->name = strdup(host))) {
+			fprintf(stderr, "Ran out of memory");
+			return -1;			
+		}
 		pbs_conf.psi[count]->port = port;
 
 		token = strtok_r(NULL, ",", &rest);
@@ -344,7 +347,7 @@ void free_psi()
 
 	/* ignore any PBS_SERVER_INSTANCES and default fill */
 	if (pbs_conf.psi) {
-		for(i = 0; i < pbs_conf.pbs_current_servers; i++) {
+		for(i = 0; i < get_current_servers(); i++) {
 			if (pbs_conf.psi[i]->name != NULL)
 				free(pbs_conf.psi[i]->name);
 			free(pbs_conf.psi[i]);

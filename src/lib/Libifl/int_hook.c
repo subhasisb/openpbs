@@ -100,15 +100,14 @@ PBSD_hookbuf(int c, int reqtype, int seq, char *buf, int len, char *hook_filenam
 		return (pbs_errno = PBSE_PROTOCOL);
 	}
 
-	if (prot == PROT_TPP) {
-		pbs_errno = PBSE_NONE;
-		if (dis_flush(sock))
-			pbs_errno = PBSE_PROTOCOL;
-		return pbs_errno;
-	}
 
+	pbs_errno = PBSE_NONE;
 	if (dis_flush(sock)) {
 		return (pbs_errno = PBSE_PROTOCOL);
+	}
+
+	if (prot == PROT_TPP) {
+		return pbs_errno;
 	}
 
 	/* read reply */
@@ -218,15 +217,12 @@ PBSD_delhookfile(int c, char *hook_filename, int prot, char **msgid)
 		return (pbs_errno = PBSE_PROTOCOL);
 	}
 
-	if (prot == PROT_TPP) {
-		pbs_errno = PBSE_NONE;
-		if (dis_flush(sock))
-			pbs_errno = PBSE_PROTOCOL;
-		return pbs_errno;
-	}
-
+	pbs_errno = PBSE_NONE;
 	if (dis_flush(sock)) {
 		return (pbs_errno = PBSE_PROTOCOL);
+	}
+	if (prot == PROT_TPP) {
+		return pbs_errno;
 	}
 
 	/* read reply */

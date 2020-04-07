@@ -104,15 +104,13 @@ PBSD_mgr_put(int c, int function, int command, int objtype, char *objname, struc
 		return (pbs_errno = PBSE_PROTOCOL);
 	}
 
-	if (prot == PROT_TPP) {
-		pbs_errno = PBSE_NONE;
-		if (dis_flush(sock))
-			pbs_errno = PBSE_PROTOCOL;
-		return pbs_errno;
-	}
 
+	pbs_errno = PBSE_NONE;
 	if (dis_flush(sock)) {
 		return (pbs_errno = PBSE_PROTOCOL);
+	}
+	if (prot == PROT_TPP) {
+		return pbs_errno;
 	}
 	return 0;
 }

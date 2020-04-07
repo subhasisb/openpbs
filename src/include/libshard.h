@@ -49,10 +49,10 @@ extern "C" {
 #define DLLEXPORT
 #endif
 
-struct server_instance {
+typedef struct server_instance {
     char *hostname;
     int port;
-};
+}server_instance_t;
 
 enum obj_type_t {JOB, RESERVATION, NODE};
 
@@ -72,7 +72,7 @@ enum obj_type_t {JOB, RESERVATION, NODE};
  * @retval -1	- error
  */
 
-extern DLLEXPORT int pbs_shard_init(int max_allowed_servers, struct server_instance **server_instances, int num_instances);
+extern DLLEXPORT int pbs_shard_init(int max_allowed_servers, server_instance_t **server_instances, int num_instances);
 
 /**
  * @brief
