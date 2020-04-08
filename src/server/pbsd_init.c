@@ -574,14 +574,13 @@ pbsd_init(int type)
 			return (-1);
 		}
 
-		if (njobid == -1)
-			svr_jobidnumber = -1;
-		else {
+		if (njobid == -1) {
+			if (server.sv_qs.sv_jobidnumber > -1)
+				svr_jobidnumber = server.sv_qs.sv_jobidnumber;
+			else
+				svr_jobidnumber = -1;
+		} else {
 			svr_jobidnumber = njobid;
-			if (svr_jobidnumber == -1) {
-				log_err(-1, __func__, "Failed to compute svr_jobidnumber");
-				return (-1);
-			}
 		}
 		if (server.sv_attr[(int)SRV_ATR_resource_assn].at_flags &
 			ATR_VFLAG_SET) {

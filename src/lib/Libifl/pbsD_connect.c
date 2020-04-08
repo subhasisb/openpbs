@@ -292,9 +292,13 @@ internal_tcp_connect(int vsock, char *server, int server_port, char *extend_data
 			setenv("SystemRoot", "C:\\WINDOWS", 1);
 		}
 #endif
-	sd = socket(AF_INET, SOCK_STREAM, 0);	
+	sd = socket(AF_INET, SOCK_STREAM, 0);
+	if (sd == -1) {
+		pbs_errno = PBSE_NOSERVER;
+		return -1;
+	}	
 
-	strcpy(pbs_server, server); /* set for error messages from commands */
+	strncpy(pbs_server, server, sizeof(pbs_server)-1); /* set for error messages from commands */
 		/* and connect... */
 
 	/* If a specific host name is defined which the client should use */
@@ -424,7 +428,7 @@ set_new_shard_context(int vsock)
  * @retval -1	error encountered setting up the connection.
  */
 
-int internal_connect_cli(int vsock, char *server, int port, char *extend_data)
+int internal_client_connect(int vsock, char *server, int port, char *extend_data)
 {
 	return internal_tcp_connect(vsock, server, port, NULL);
 }
@@ -449,15 +453,15 @@ int internal_connect_cli(int vsock, char *server, int port, char *extend_data)
 int 
 get_svr_shard_connection(int vsock, int req_type, void *shard_hint)
 {
-	int srv_index = 0;
 	int sd = -1;
 	int i = 0;
-	int inact_srv_index = 0;
+	int inact_servers = 0;
 	static int shard_init_flag = -1;
 	int *inact_svr_indexes; 
+	struct shard_conn **shard_connection;
 	int num_of_conf_servers = get_current_servers();
 	int max_num_servers = get_max_servers();
-	struct shard_conn **shard_connection = get_conn_shards(vsock);
+	int srv_index = get_conn_shard_context(vsock);
 
 	if (max_num_servers > 1) {
 		if (shard_init_flag == -1) {
@@ -467,39 +471,41 @@ get_svr_shard_connection(int vsock, int req_type, void *shard_hint)
 		}
 	}
 	if (internal_connect == NULL)
-		internal_connect = internal_connect_cli;
-
-	if( !(inact_svr_indexes = (int *)malloc(num_of_conf_servers * sizeof(int))))
-		return -1;
-
-	for (; i < num_of_conf_servers; i++)
-		inact_svr_indexes[i] = -1;
+		internal_connect = internal_client_connect;
 
 	if (max_num_servers > 1) {
-		if (shard_hint || get_conn_shard_context(vsock) == -1 ) {
+		if ( !(shard_connection = get_conn_shards(vsock)) )
+			return -1;
+
+		if( !(inact_svr_indexes = (int *)malloc(num_of_conf_servers * sizeof(int))))
+			return -1;
+
+		for (; i < num_of_conf_servers; i++)
+			inact_svr_indexes[i] = -1;
+
+		if (shard_hint || srv_index == -1 ) {
 			srv_index = pbs_shard_get_server_byindex(shard_hint, JOB, inact_svr_indexes);
-			if (srv_index == -1 || srv_index > num_of_conf_servers) {
+			if (srv_index == -1 || srv_index >= num_of_conf_servers) {
+				free(inact_svr_indexes);
 				return -1;
 			}
 			set_conn_shard_context(vsock, srv_index);		
-		} else {
-			srv_index = get_conn_shard_context(vsock);
 		}
 
 tryagain:
 		
-		if (inact_srv_index) {	
-			if (inact_srv_index == num_of_conf_servers)
+		if (inact_servers) {	
+			if (inact_servers == num_of_conf_servers){
+				free(inact_svr_indexes);
 				return -1;
+			}
 			srv_index = pbs_shard_get_server_byindex(shard_hint, JOB, inact_svr_indexes);
 			if (srv_index == -1) {
+				free(inact_svr_indexes);
 				return -1;
 			}
 		}
 		
-		if (!shard_connection)
-			return -1;
-
 		if (shard_connection[srv_index]->state == SHARD_CONN_STATE_FAILED) {
 			if (time(0) - shard_connection[srv_index]->state_change_time > 60) {
 				/* it is possible service is back up now, reset state try again */
@@ -508,7 +514,7 @@ tryagain:
 			}
 			shard_connection[srv_index]->sd = -1;
 			set_conn_shard_context(vsock, -1);
-			inact_svr_indexes[inact_srv_index++] = srv_index;
+			inact_svr_indexes[inact_servers++] = srv_index;
 			goto tryagain;
 
 		} else if (shard_connection[srv_index]->state == SHARD_CONN_STATE_DOWN) {
@@ -523,7 +529,7 @@ tryagain:
 				shard_connection[srv_index]->sd = -1;
 				shard_connection[srv_index]->state_change_time = time(0);
 				set_conn_shard_context(vsock, -1);
-				inact_svr_indexes[inact_srv_index++] = srv_index;
+				inact_svr_indexes[inact_servers++] = srv_index;
 				goto tryagain;
 			}
 			/* success */
@@ -531,6 +537,7 @@ tryagain:
 			shard_connection[srv_index]->sd = sd;
 			shard_connection[srv_index]->state_change_time = time(0);
 		} else if (shard_connection[srv_index]->state == SHARD_CONN_STATE_CONNECTED) {
+			free(inact_svr_indexes);
 			return  shard_connection[srv_index]->sd;
 		}
 	set_conn_shards(vsock, shard_connection);

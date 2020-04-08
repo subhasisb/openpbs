@@ -321,7 +321,7 @@ parse_psi(char * conf_value)
 			return -1;
 		}
 		if (!(pbs_conf.psi[count]->name = strdup(host))) {
-			fprintf(stderr, "Ran out of memory");
+			fprintf(stderr, "Ran out of memory parsing multi-server configuration");
 			return -1;			
 		}
 		pbs_conf.psi[count]->port = port;
