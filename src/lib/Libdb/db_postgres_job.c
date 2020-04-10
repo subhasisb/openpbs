@@ -295,10 +295,6 @@ pg_db_prepare_job_sqls(pbs_db_conn_t *conn)
 	if (pg_prepare_stmt(conn, STMT_DELETE_JOBSCR, conn->conn_sql, 1) != 0)
 		return -1;
 
-	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select coalesce(max(to_number(ji_jobid, '9999999.')), -1)::bigint as last_jobid from pbs.job;");
-	if (pg_prepare_stmt(conn, STMT_GET_MAXJOBID, conn->conn_sql, 0) != 0)
-		return -1;
-
 	return 0;
 }
 
@@ -730,37 +726,3 @@ pg_db_reset_job(pbs_db_obj_info_t *obj)
 	free_db_attr_list(&(obj->pbs_db_un.pbs_db_job->attr_list));
 }
 
-
-/**
- * @brief
- *	Find the maximum jobid in the datastore.
- *
- * @param[in]	conn - Connection handle
- * @param[out]	jobid  - Job information
- *
- * @return      Error code
- * @retval	 0 - Success
- * @retval	-1 - On Failure
- *
- */
-int
-pbs_db_get_maxjobid(pbs_db_conn_t *conn,  long long *jobid)
-{
-	PGresult *res;
-	long long last_jobid;
-	int rc;
-	
-	if ((rc = pg_db_query(conn, STMT_GET_MAXJOBID, 0, &res)) != 0)
-		return rc;
-
-	GET_PARAM_BIGINT(res, 0, last_jobid, PQfnumber(res, "last_jobid"));
-
-	PQclear(res);
-
-	if (jobid == NULL)
-		return -1;
-
-	*jobid = last_jobid;
-
-	return 0;
-}

@@ -75,7 +75,7 @@
 #include "libshard.h"
 
 
-int (*internal_connect)(int, char *, int , char *) = NULL;
+int (*pfn_connect)(int, char *, int , char *) = NULL;
 /**
  * @brief
  *	-returns the default server name.
@@ -299,7 +299,15 @@ internal_tcp_connect(int vsock, char *server, int server_port, char *extend_data
 	}	
 
 	strncpy(pbs_server, server, sizeof(pbs_server)-1); /* set for error messages from commands */
+	pbs_server[sizeof(pbs_server) - 1] = '\0';
 		/* and connect... */
+
+	/* if specific host name declared for the host on which */
+	/* this client is running,  get its address */
+	if (pbs_conf.pbs_public_host_name) {
+		if (get_hostsockaddr(pbs_conf.pbs_public_host_name, &my_sockaddr) != 0)
+			return -1; /* pbs_errno was set */
+	}
 
 	/* If a specific host name is defined which the client should use */
 	if (pbs_conf.pbs_public_host_name) {
@@ -470,8 +478,8 @@ get_svr_shard_connection(int vsock, int req_type, void *shard_hint)
 			shard_init_flag = 1;
 		}
 	}
-	if (internal_connect == NULL)
-		internal_connect = internal_client_connect;
+	if (pfn_connect == NULL)
+		pfn_connect = internal_client_connect;
 
 	if (max_num_servers > 1) {
 		if ( !(shard_connection = get_conn_shards(vsock)) )
@@ -519,7 +527,7 @@ tryagain:
 
 		} else if (shard_connection[srv_index]->state == SHARD_CONN_STATE_DOWN) {
 			/* connect and authenticate */
-			sd = internal_connect(vsock, pbs_conf.psi[srv_index]->name, pbs_conf.psi[srv_index]->port, NULL);
+			sd = pfn_connect(vsock, pbs_conf.psi[srv_index]->name, pbs_conf.psi[srv_index]->port, NULL);
 			if (sd == -1) {
 				/* connection failed, check the error return
 				* TODO: if shard is down, try the next, if shard returned error, do not try next
@@ -536,6 +544,7 @@ tryagain:
 			shard_connection[srv_index]->state = SHARD_CONN_STATE_CONNECTED;
 			shard_connection[srv_index]->sd = sd;
 			shard_connection[srv_index]->state_change_time = time(0);
+			set_conn_shard_context(vsock, srv_index);
 		} else if (shard_connection[srv_index]->state == SHARD_CONN_STATE_CONNECTED) {
 			free(inact_svr_indexes);
 			return  shard_connection[srv_index]->sd;

@@ -2196,7 +2196,7 @@ int
 get_svr_index(struct pbs_server_instance *instance)
 {
 	int i;
-	if (get_current_servers() > 1) {
+	if (get_max_servers() > 1) {
 		for(i = 0; i < get_current_servers(); i++) {
 			if (instance->port == pbs_conf.psi[i]->port) {
 				if ( (instance->name == NULL) || (pbs_conf.psi[i]->name == NULL) )

@@ -75,7 +75,7 @@ pbs_stagein(int c, char *jobid, char *location, char *extend)
 	if (location == NULL)
 		location = "";
 
-	sock = get_svr_shard_connection(c, -1, NULL);
+	sock = get_svr_shard_connection(c, PBS_BATCH_StageIn, NULL);
 
 	/* initialize the thread context data, if not already initialized */
 	if (pbs_client_thread_init_thread_context() != 0)

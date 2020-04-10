@@ -395,7 +395,6 @@ pbsd_init(int type)
 	char *buf = NULL;
 	int buf_len = 0;
 	pbs_sched *psched;
-	long long njobid = -1;
 
 #ifdef  RLIMIT_CORE
 	int      char_in_cname = 0;
@@ -569,19 +568,7 @@ pbsd_init(int type)
 		 * Retrieve the jobidnumber from the database and use it to generate jobid's locally
 		 * see: get_next_svr_sequence_id(void)
 		 */
-		if (pbs_db_get_maxjobid(conn, &njobid) == -1) {
-			log_err(-1, __func__, "Failed to query last used jobid from datastore");
-			return (-1);
-		}
-
-		if (njobid == -1) {
-			if (server.sv_qs.sv_jobidnumber > -1)
-				svr_jobidnumber = server.sv_qs.sv_jobidnumber;
-			else
-				svr_jobidnumber = -1;
-		} else {
-			svr_jobidnumber = njobid;
-		}
+		svr_jobidnumber = server.sv_qs.sv_jobidnumber;
 		if (server.sv_attr[(int)SRV_ATR_resource_assn].at_flags &
 			ATR_VFLAG_SET) {
 			svr_attr_def[(int)SRV_ATR_resource_assn].at_free(

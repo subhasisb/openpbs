@@ -637,7 +637,9 @@ set_conn_shards(int vfd, struct shard_conn ** shards)
  * @retval 0 - success
  * @retval -1 - error
  */
-int initialise_shard_conn(int vfd){
+int 
+initialise_shard_conn(int vfd)
+{
 	int i;
 	int num_conf_servers = get_current_servers();
 	struct shard_conn **shard_connection = calloc(num_conf_servers, sizeof(struct shard_conn *));
@@ -673,7 +675,6 @@ struct shard_conn **
 get_conn_shards(int vfd)
 {
 	pbs_conn_t *p = NULL;
-	static int ch_shard_init = -1;
 	struct shard_conn **shards = NULL;
 
 	if (INVALID_SOCK(vfd))
@@ -686,10 +687,9 @@ get_conn_shards(int vfd)
 		UNLOCK_TABLE(NULL);
 		return NULL;
 	}
-	if (ch_shard_init == -1) {
+	if (p->ch_shards == NULL) {
 		if(initialise_shard_conn(vfd) == -1)
 			return NULL;
-		ch_shard_init = 1;
 	}
 	shards = p->ch_shards;
 	UNLOCK_TABLE(NULL);

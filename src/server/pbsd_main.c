@@ -874,7 +874,7 @@ main(int argc, char **argv)
 	self.port = pbs_conf.batch_service_port;
 	if (get_max_servers() > 1) {
 		if ((myindex = get_svr_index(&self)) == -1) {
-			fprintf(stderr, "pbsconf error: Wrong Multi Server configuration.\n");
+			fprintf(stderr, "pbsconf error: Wrong Multi Server configuration\n");
 			return 1;
 		}
 	}

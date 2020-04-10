@@ -52,7 +52,7 @@ extern "C" {
 typedef struct server_instance {
     char *hostname;
     int port;
-}server_instance_t;
+} server_instance_t;
 
 enum obj_type_t {JOB, RESERVATION, NODE};
 

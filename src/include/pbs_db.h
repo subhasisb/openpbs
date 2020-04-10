@@ -954,20 +954,6 @@ int pbs_db_get_schema_version(pbs_db_conn_t *conn, int *db_maj_ver, int *db_min_
 
 /**
  * @brief
- *	Find the maximum jobid in the datastore.
- *
- * @param[in]	conn - Connection handle
- * @param[out]	jobid  - Job information
- *
- * @return      Error code
- * @retval	 0 - Success
- * @retval	-1 - On Failure
- *
- */
-int pbs_db_get_maxjobid(pbs_db_conn_t *conn,  long long * jobid);
-
-/**
- * @brief
  *	Attempt to mail a message to "mail_from" (administrator), shut down
  *	the database, close the log and exit the Server.   Called when a
  *	database save fails

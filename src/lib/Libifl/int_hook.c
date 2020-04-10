@@ -196,7 +196,7 @@ PBSD_delhookfile(int c, char *hook_filename, int prot, char **msgid)
 	int	sock;
 
 	if (prot == PROT_TCP) {
-		sock = get_svr_shard_connection(c, -1, NULL);
+		sock = get_svr_shard_connection(c, PBS_BATCH_DelHookFile, NULL);
 		DIS_tcp_funcs();
 	} else {
 		sock = c;

@@ -191,7 +191,7 @@ PBSD_rdytocmt(int c, char *jobid, int prot, char **msgid)
 	int sock;
 
 	if (prot == PROT_TCP) {
-		sock = get_svr_shard_connection(c, -1, NULL);
+		sock = get_svr_shard_connection(c, PBS_BATCH_RdytoCommit, NULL);
 		DIS_tcp_funcs();
 	} else {
 		sock = c;
@@ -249,7 +249,7 @@ PBSD_commit(int c, char *jobid, int prot, char **msgid)
 	int sock;
 
 	if (prot == PROT_TCP) {
-		sock = get_svr_shard_connection(c, -1, NULL);
+		sock = get_svr_shard_connection(c, PBS_BATCH_Commit, NULL);
 		DIS_tcp_funcs();
 	} else {
 		sock = c;
