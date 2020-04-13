@@ -128,7 +128,7 @@ struct shard_conn {
 typedef struct pbs_conn {
 	int ch_errno;                   /* last error on this connection */
 	char *ch_errtxt;                /* pointer to last server error text	*/
-	struct shard_conn **ch_shards;  /* handles to multiple sharded servers */
+	void *ch_shards;                /* handles to multiple sharded servers */
 	int shard_context;              /* last server to which dialogue was going on */
 	pthread_mutex_t ch_mutex;       /* serialize connection between threads */
 	pbs_tcp_chan_t *ch_chan;        /* pointer tcp chan structure for this connection */
@@ -144,8 +144,8 @@ int set_conn_chan(int, pbs_tcp_chan_t *);
 pthread_mutex_t * get_conn_mutex(int);
 int set_conn_shard_context(int, int);
 int get_conn_shard_context(int);
-int set_conn_shards(int, struct shard_conn **);
-struct shard_conn **get_conn_shards(int);
+int set_conn_shards(int, void*);
+void * get_conn_shards(int);
 
 /* max number of preempt orderings */
 #define PREEMPT_ORDER_MAX 20

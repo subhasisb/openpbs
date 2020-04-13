@@ -127,9 +127,7 @@ __pbs_terminate(int c, int manner, char *extend)
 	int i;
 	int sock;
 	int count = 0;
-	struct shard_conn **shard_connection = get_conn_shards(c);
-	if (shard_connection == NULL)
-		return PBSE_NOSERVER;
+	struct shard_conn **shard_connection = NULL;
 
 	/* initialize the thread context data, if not already initialized */
 	if (pbs_client_thread_init_thread_context() != 0)
@@ -145,6 +143,9 @@ __pbs_terminate(int c, int manner, char *extend)
 	if (get_max_servers() > 1) {
 		int errd = 0;
 		int rc_errd = 0;
+		shard_connection = (struct shard_conn **)get_conn_shards(c);
+		if (!shard_connection)
+			return PBSE_NOSERVER;
 		for (i = 0; i < get_current_servers(); i++) {
 			if (shard_connection[i]->state == SHARD_CONN_STATE_CONNECTED)
 				sock = shard_connection[i]->sd;

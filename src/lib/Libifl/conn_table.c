@@ -608,7 +608,7 @@ get_conn_shard_context(int vfd)
  * @par MT-safe: Yes
  */
 int
-set_conn_shards(int vfd, struct shard_conn ** shards)
+set_conn_shards(int vfd, void *shards)
 {
 	pbs_conn_t *p = NULL;
 
@@ -629,35 +629,6 @@ set_conn_shards(int vfd, struct shard_conn ** shards)
 
 /**
  * @brief
- * 	initialise_shard_conn - To intialize the shards connection table.
- *
- * @param[in] vfd - virtual socket number
- *
- * @return int
- * @retval 0 - success
- * @retval -1 - error
- */
-int 
-initialise_shard_conn(int vfd)
-{
-	int i;
-	int num_conf_servers = get_current_servers();
-	struct shard_conn **shard_connection = calloc(num_conf_servers, sizeof(struct shard_conn *));
-	if (!shard_connection)
-		return -1;
-	for (i = 0; i < num_conf_servers; i++) {
-		shard_connection[i] = malloc(sizeof(struct shard_conn));
-		shard_connection[i]->sd = -1;
-		shard_connection[i]->state = SHARD_CONN_STATE_DOWN;
-		shard_connection[i]->state_change_time = 0;
-		shard_connection[i]->last_used_time = 0;
-	}
-	set_conn_shards(vfd, shard_connection);
-	return 0;
-}
-
-/**
- * @brief
  * 	get_conn_shards - get connection shards synchronously
  *
  * @param[in] fd - socket number
@@ -671,11 +642,11 @@ initialise_shard_conn(int vfd)
  *
  * @par MT-safe: Yes
  */
-struct shard_conn **
+void *
 get_conn_shards(int vfd)
 {
 	pbs_conn_t *p = NULL;
-	struct shard_conn **shards = NULL;
+	void *shards = NULL;
 
 	if (INVALID_SOCK(vfd))
 		return NULL;
@@ -686,10 +657,6 @@ get_conn_shards(int vfd)
 		errno = ENOTCONN;
 		UNLOCK_TABLE(NULL);
 		return NULL;
-	}
-	if (p->ch_shards == NULL) {
-		if(initialise_shard_conn(vfd) == -1)
-			return NULL;
 	}
 	shards = p->ch_shards;
 	UNLOCK_TABLE(NULL);

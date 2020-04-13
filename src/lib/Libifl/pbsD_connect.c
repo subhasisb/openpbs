@@ -419,7 +419,7 @@ internal_tcp_connect(int vsock, char *server, int server_port, char *extend_data
 void
 set_new_shard_context(int vsock)
 {
-	set_conn_shard_context(vsock, -1);	
+	set_conn_shard_context(vsock, -1); 
 }
 
 /**
@@ -477,14 +477,14 @@ get_svr_shard_connection(int vsock, int req_type, void *shard_hint)
 				return -1;
 			shard_init_flag = 1;
 		}
-	}
-	if (pfn_connect == NULL)
-		pfn_connect = internal_client_connect;
 
-	if (max_num_servers > 1) {
-		if ( !(shard_connection = get_conn_shards(vsock)) )
-			return -1;
+		if (pfn_connect == NULL)
+			pfn_connect = internal_client_connect;
 
+		if ( !(shard_connection = (struct shard_conn **)get_conn_shards(vsock)) ) {
+			return -1;			
+		}
+			
 		if( !(inact_svr_indexes = (int *)malloc(num_of_conf_servers * sizeof(int))))
 			return -1;
 
@@ -497,7 +497,10 @@ get_svr_shard_connection(int vsock, int req_type, void *shard_hint)
 				free(inact_svr_indexes);
 				return -1;
 			}
-			set_conn_shard_context(vsock, srv_index);		
+			if (set_conn_shard_context(vsock, srv_index)) {
+				free(inact_svr_indexes);
+				return -1;
+			}		
 		}
 
 tryagain:
@@ -521,7 +524,10 @@ tryagain:
 				shard_connection[srv_index]->state_change_time = time(0);
 			}
 			shard_connection[srv_index]->sd = -1;
-			set_conn_shard_context(vsock, -1);
+			if (set_conn_shard_context(vsock, -1)) {
+				free(inact_svr_indexes);
+				return -1;
+			}
 			inact_svr_indexes[inact_servers++] = srv_index;
 			goto tryagain;
 
@@ -536,7 +542,10 @@ tryagain:
 				shard_connection[srv_index]->state  = SHARD_CONN_STATE_FAILED;
 				shard_connection[srv_index]->sd = -1;
 				shard_connection[srv_index]->state_change_time = time(0);
-				set_conn_shard_context(vsock, -1);
+				if (set_conn_shard_context(vsock, -1)) {
+					free(inact_svr_indexes);
+					return -1;
+				}
 				inact_svr_indexes[inact_servers++] = srv_index;
 				goto tryagain;
 			}
@@ -544,16 +553,66 @@ tryagain:
 			shard_connection[srv_index]->state = SHARD_CONN_STATE_CONNECTED;
 			shard_connection[srv_index]->sd = sd;
 			shard_connection[srv_index]->state_change_time = time(0);
-			set_conn_shard_context(vsock, srv_index);
+			if (set_conn_shard_context(vsock, srv_index)) {
+				free(inact_svr_indexes);
+				return -1;
+			}
 		} else if (shard_connection[srv_index]->state == SHARD_CONN_STATE_CONNECTED) {
+			if (set_conn_shard_context(vsock, srv_index)) {
+				free(inact_svr_indexes);
+				return -1;
+			}
 			free(inact_svr_indexes);
 			return  shard_connection[srv_index]->sd;
 		}
-	set_conn_shards(vsock, shard_connection);
+		if (set_conn_shards(vsock, (void *)shard_connection)) {
+			free(inact_svr_indexes);
+			return -1;
+		}
+
 	} else 
 		sd = vsock;
 	return sd;
 }
+
+/**
+ * @brief
+ * 	initialise_shard_conn - To intialize the shards connection table.
+ *
+ * @param[in] vfd - virtual socket number
+ *
+ * @return int
+ * @retval 0 - success
+ * @retval -1 - error
+ */
+int 
+initialise_shard_conn(int vfd)
+{
+	int i;
+	int j;
+	int num_conf_servers = get_current_servers();
+	struct shard_conn **shard_connection = calloc(num_conf_servers, sizeof(struct shard_conn *));
+	if (!shard_connection)
+		return -1;
+	for (i = 0; i < num_conf_servers; i++) {
+		shard_connection[i] = malloc(sizeof(struct shard_conn));
+		if (!shard_connection[i]) {
+			for (j = 0; j < i; j++ )
+				free(shard_connection[j]);
+			free(shard_connection);
+			return -1;
+		}
+		shard_connection[i]->sd = -1;
+		shard_connection[i]->secondary_sd = -1;
+		shard_connection[i]->state = SHARD_CONN_STATE_DOWN;
+		shard_connection[i]->state_change_time = 0;
+		shard_connection[i]->last_used_time = 0;
+	}
+	if ( set_conn_shards(vfd, (void *)shard_connection) )
+		return -1;
+	return 0;
+}
+
 
 /**
  * @brief
@@ -603,6 +662,8 @@ __pbs_connect_extend(char *server, char *extend_data)
 		pbs_errno = PBSE_NOSERVER;
 		return -1;
 	}
+	strncpy(pbs_server, server, sizeof(pbs_server)-1); 
+	pbs_server[sizeof(pbs_server) - 1] = '\0';
 
 #ifdef WIN32
 		/* the following lousy hack is needed since the socket call needs */
@@ -620,6 +681,10 @@ __pbs_connect_extend(char *server, char *extend_data)
 
 	if ((strcmp(server,pbs_default()) == 0) && get_max_servers() > 1) {
 		set_conn_shard_context(sd, -1);
+		if (initialise_shard_conn(sd)) {
+			pbs_errno = PBSE_NOSERVER;
+			return -1;
+		}
 		/* can't use failover for now, take a different path. 
 		Actual connects happen when client tries to send a request first. 
 		For multi-server mode, each IFL API's would use possibly different socket 
