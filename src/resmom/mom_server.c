@@ -295,23 +295,14 @@ static int
 registermom(int stream, int combine_msg)
 {
 	int  count = 0;
-	int  hello4_opts = 0;
 	int  ret;
 	job *pjob;
 
-	/* if we have a vnode map, send the version number */
-
-	if ((mominfo_time.mit_time > 0) || (mominfo_time.mit_gen > 0))
-		hello4_opts |= HELLO4_vmap_version;
-
 	/* how many jobs are present */
-
 	for (pjob = (job *)GET_NEXT(svr_alljobs);
 		pjob; pjob = (job *)GET_NEXT(pjob->ji_alljobs)) {
 		++count;
 	}
-	if (count > 0)
-		hello4_opts |= HELLO4_running_jobs;
 
 	/* Now that all of the options data items are set, send */
 	/* the option set, followed by the optional data if any */
@@ -321,65 +312,50 @@ registermom(int stream, int combine_msg)
 	if (!combine_msg)
 		if ((ret = is_compose(stream, IS_REGISTERMOM)) != DIS_SUCCESS)
 			goto err;
-	if ((ret = diswui(stream, hello4_opts)) != DIS_SUCCESS)
-		goto err;
-
-	/* Send vmap version (when that is ready post 8.0.x */
-	if (hello4_opts & HELLO4_vmap_version) {
-		if ((ret = diswul(stream, mominfo_time.mit_time)) != DIS_SUCCESS)
-			goto err;
-		if ((ret = diswsi(stream, mominfo_time.mit_gen)) != DIS_SUCCESS)
-			goto err;
-	}
 
 	/* if there are running jobs, report them to the Server */
+	/*
+		* Add to the REGISTERMOM the count of jobs and the
+		* following per running job:
+		*   string  - job id
+		*   int     - job substate
+		*   long    - run version (count)
+		*   int     - Node Id  (0 if Mother Superior)
+		*   string  - exec_vnode string
+		*   string  - pset value if set, otherwise null string
+	*/
 
-	if (hello4_opts & HELLO4_running_jobs) {
+	if ((ret = diswui(stream, count)) != DIS_SUCCESS)
+		goto err;
+	for (pjob = (job *)GET_NEXT(svr_alljobs);
+		pjob && (count > 0);
+		pjob = (job *)GET_NEXT(pjob->ji_alljobs)) {
 
-		/*
-		 * Add to the HELLO4 the count of jobs and the
-		 * following per running job:
-		 *   string  - job id
-		 *   int     - job substate
-		 *   long    - run version (count)
-		 *   int     - Node Id  (0 if Mother Superior)
-		 *   string  - exec_vnode string
-		 *   string  - pset value if set, otherwise null string
-		 */
+		--count;
 
-		if ((ret = diswui(stream, count)) != DIS_SUCCESS)
+		if ((ret = diswst(stream, pjob->ji_qs.ji_jobid)) != DIS_SUCCESS)
 			goto err;
-		for (pjob = (job *)GET_NEXT(svr_alljobs);
-			pjob && (count > 0);
-			pjob = (job *)GET_NEXT(pjob->ji_alljobs)) {
+		if ((ret = diswsi(stream, pjob->ji_qs.ji_substate)) != DIS_SUCCESS)
+			goto err;
 
-			--count;
-
-			if ((ret = diswst(stream, pjob->ji_qs.ji_jobid)) != DIS_SUCCESS)
-				goto err;
-			if ((ret = diswsi(stream, pjob->ji_qs.ji_substate)) != DIS_SUCCESS)
-				goto err;
-
-			if (pjob->ji_wattr[(int)JOB_ATR_run_version].at_flags & ATR_VFLAG_SET) {
-				ret = diswsl(stream, pjob->ji_wattr[(int)JOB_ATR_run_version].at_val.at_long);
-			} else {
-				ret = diswsl(stream, pjob->ji_wattr[(int)JOB_ATR_runcount].at_val.at_long);
-			}
-			if (ret != DIS_SUCCESS)
-				goto err;
-			/* send Node Id */
-			if ((ret = diswsi(stream, pjob->ji_nodeid)) != DIS_SUCCESS)
-				goto err;
-			if ((ret = diswst(stream, pjob->ji_wattr[(int)JOB_ATR_exec_vnode].at_val.at_str)) != DIS_SUCCESS)
-				goto err;
-			if (pjob->ji_wattr[(int)JOB_ATR_pset].at_flags & ATR_VFLAG_SET)
-				ret = diswst(stream, pjob->ji_wattr[(int)JOB_ATR_pset].at_val.at_str);
-			else
-				ret = diswst(stream, ""); /* send null string */
-			if (ret != DIS_SUCCESS)
-				goto err;
+		if (pjob->ji_wattr[(int)JOB_ATR_run_version].at_flags & ATR_VFLAG_SET) {
+			ret = diswsl(stream, pjob->ji_wattr[(int)JOB_ATR_run_version].at_val.at_long);
+		} else {
+			ret = diswsl(stream, pjob->ji_wattr[(int)JOB_ATR_runcount].at_val.at_long);
 		}
-
+		if (ret != DIS_SUCCESS)
+			goto err;
+		/* send Node Id */
+		if ((ret = diswsi(stream, pjob->ji_nodeid)) != DIS_SUCCESS)
+			goto err;
+		if ((ret = diswst(stream, pjob->ji_wattr[(int)JOB_ATR_exec_vnode].at_val.at_str)) != DIS_SUCCESS)
+			goto err;
+		if (pjob->ji_wattr[(int)JOB_ATR_pset].at_flags & ATR_VFLAG_SET)
+			ret = diswst(stream, pjob->ji_wattr[(int)JOB_ATR_pset].at_val.at_str);
+		else
+			ret = diswst(stream, ""); /* send null string */
+		if (ret != DIS_SUCCESS)
+			goto err;
 	}
 
 	if (!combine_msg)
@@ -694,8 +670,7 @@ err:
  * @retval	!0: Error code
  */
 static int
-process_rpp_values(int stream)
-{
+process_rpp_values(int stream) {
 	int new_retry, new_water;
 	int ret = 0;
 
@@ -969,11 +944,10 @@ is_request(int stream, int version)
 			if (pjob) {
 				long runver;
 
-				if (pjob->ji_wattr[(int)JOB_ATR_run_version].at_flags & ATR_VFLAG_SET) {
+				if (pjob->ji_wattr[(int)JOB_ATR_run_version].at_flags & ATR_VFLAG_SET)
 					runver = pjob->ji_wattr[(int)JOB_ATR_run_version].at_val.at_long;
-				} else {
+				else
 					runver = pjob->ji_wattr[(int)JOB_ATR_runcount].at_val.at_long;
-				}
 				/* a run_version of -1 means any version is to be discarded */
 				if ((n == -1) || (runver == n)) {
 					log_event(PBSEVENT_ERROR, PBS_EVENTCLASS_JOB,

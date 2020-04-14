@@ -4261,7 +4261,6 @@ is_request(int stream, int version)
 	unsigned long		port;
 	struct	sockaddr_in	*addr;
 	struct	pbsnode		*np = NULL;
-	int			 hello_opts;
 	attribute		*pala;
 	resource_def		*prd;
 	resource		*prc;
@@ -4411,9 +4410,6 @@ found:
 				psvrmom->msr_wktask = 0;
 			}
 
-			/* clear INUSE_NEEDS_HELL0 to prevent resending of HELLO */
-			/* and set initializing and the time		     */
-
 			set_all_state(pmom, 0,
 				INUSE_UNKNOWN|INUSE_NEED_ADDRS, NULL,
 				Set_All_State_Regardless);
@@ -4423,29 +4419,8 @@ found:
 				log_event(PBSEVENT_DEBUG3, PBS_EVENTCLASS_NODE, LOG_INFO,
 					pmom->mi_host, "Setting host to Initialize");
 
-			/* Now process the optional data sent along on the HELLO4 */
-			/* Must be dealt with in the order sent (defined bit wise */
-			/* See resmom/mom_server.c				  */
-
-			/* get the options set */
-			hello_opts = disrui(stream, &ret);
-			if (ret != DIS_SUCCESS)
-				goto err;
-
-			if (hello_opts & HELLO4_vmap_version) {
-				/* Mom sending vnodemap file info which is */
-				/* no longer used,  just read and ignore   */
-				(void)disrul(stream, &ret);
-				if (ret != DIS_SUCCESS)
-					goto err;
-				(void)disrsi(stream, &ret);
-				if (ret != DIS_SUCCESS)
-					goto err;
-			}
-			if (hello_opts & HELLO4_running_jobs) {
-				/* validate jobs Mom reported against what I have */
-				mom_running_jobs(stream);
-			}
+			/* validate jobs Mom reported against what I have */
+			mom_running_jobs(stream);
 			/*
 			 * respond to HELLO from Mom by sending her optional vmap and
 			 * all addresses of all Moms

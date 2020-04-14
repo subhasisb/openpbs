@@ -8073,7 +8073,7 @@ badguy:
 /*
  * @brief
  *	Function called by the Libtpp layer when the network connection to
- *	the pbs_comm router is restored. In this implementation for the mom.
+ *	the pbs_comm router is restored. This is the implementation for mom.
  *
  * @param[in] data - currently unused
  *

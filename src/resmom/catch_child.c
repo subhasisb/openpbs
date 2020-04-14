@@ -1979,8 +1979,8 @@ get_servername_random(unsigned int *port)
 void
 send_hellosvr(int stream)
 {
-	int rc = 0;
-	char	       *svr = NULL;
+	int		rc = 0;
+	char		*svr = NULL;
 	unsigned int	port = default_server_port;
 
 	DBPRT(("Sending hellosvr"))
@@ -1988,24 +1988,15 @@ send_hellosvr(int stream)
 	if (stream < 0) {
 		svr = get_servername_random(&port);
 		stream = tpp_open(svr, port);
+		if (stream < 0) {
+			sprintf(log_buffer, "tpp_open(%s, %d) failed", svr, port);
+			log_err(errno, msg_daemonname, log_buffer);
+			return;
+		}
 	}
 
-	if (stream < 0) {
-		sprintf(log_buffer, "tpp_open(%s, %d) failed", svr, port);
-		log_err(errno, msg_daemonname, log_buffer);
-		return;
-	}
-
-	
-	if (stream < 0) {
-		sprintf(log_buffer, "invalid stream");
-		log_err(errno, msg_daemonname, log_buffer);
-		return;
-	}
-
-	if ((rc = is_compose(stream, IS_HELLOSVR)) != DIS_SUCCESS) {
+	if ((rc = is_compose(stream, IS_HELLOSVR)) != DIS_SUCCESS)
 		goto err;
-	}
 
 	if ((rc = diswui(stream, pbs_mom_port)) != DIS_SUCCESS)
 		goto err;

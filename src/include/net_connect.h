@@ -123,10 +123,6 @@ typedef unsigned long pbs_net_t;        /* for holding host addresses */
 #define IS_CMD          40
 #define IS_CMD_REPLY    41
 
-/* Bits for IS_HELLO4 contents */
-#define HELLO4_vmap_version	 1
-#define HELLO4_running_jobs	 2
-
 /* return codes for client_to_svr() */
 
 #define PBS_NET_RC_FATAL -1

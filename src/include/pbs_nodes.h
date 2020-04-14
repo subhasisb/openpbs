@@ -307,7 +307,7 @@ enum	part_flags { PART_refig, PART_add, PART_rmv };
 /* Node all VPs in use by jobs		*/
 #define INUSE_STALE	0x20	/* Vnode not reported by Mom            */
 #define INUSE_JOBEXCL	0x40	/* Node is used by one job (exclusive)	*/
-#define	INUSE_BUSY	0x80	/* Node is busy (high loadave)		*/
+#define INUSE_BUSY	0x80	/* Node is busy (high loadave)		*/
 #define INUSE_UNKNOWN	0x100	/* Node has not been heard from yet	*/
 #define INUSE_INIT	0x200	/* Node getting vnode map info		*/
 #define INUSE_PROV	0x400	/* Node is being provisioned		*/

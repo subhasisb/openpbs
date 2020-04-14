@@ -151,7 +151,7 @@ extern int mock_run;
 
 #define COMM_MATURITY_TIME  60 /* time when we consider a pbs_comm connection as mature */
 #define MOM_DELTA_NORMAL	1	/* Normal mode of operation for time_delta function */
-#define MOM_DELTA_RESET		0	/* Reset the values of time_delta function back to 1 */
+#define MOM_DELTA_RESET 	0	/* Reset the values of time_delta function back to 1 */
 
 typedef	int	(*pbs_jobfunc_t)(job *);
 typedef	int	(*pbs_jobnode_t)(job *, hnodent *);
