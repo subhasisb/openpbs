@@ -147,7 +147,7 @@ struct mom_svrinfo {
 	int		msr_jbinxsz;  /* size of job index array */
 	struct job	**msr_jobindx;  /* index array of jobs on this Mom */
 	long		msr_vnode_pool;/* the pool of vnodes that belong to this Mom */
-	int		reporting_mom;
+	int		reporting_mom; /* Tells whether mom is an inventory reporting mom */
 };
 typedef struct mom_svrinfo mom_svrinfo_t;
 

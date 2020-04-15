@@ -1986,7 +1986,11 @@ send_hellosvr(int stream)
 	DBPRT(("Sending hellosvr"))
 
 	if (stream < 0) {
-		svr = get_servername_random(&port);
+		if ((svr = get_servername_random(&port)) == NULL) {
+			log_err(errno, msg_daemonname, "get_servername_random() failed");
+			return;
+		}
+
 		stream = tpp_open(svr, port);
 		if (stream < 0) {
 			sprintf(log_buffer, "tpp_open(%s, %d) failed", svr, port);

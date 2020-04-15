@@ -3039,9 +3039,9 @@ add_mom_mcast(mominfo_t *pmom, int *mtfd)
 
 /**
  * @brief
- * 		Send rpp_stream and rpp_highwater to all the moms
+ * 		Mom multicast functions to broadcast a single command to all the moms.
  * 
- * @param[in]	cmd	- what message needs to be multicasted.
+ * @param[in]	ptask	- work task structure
  *
  * @return	void
  */
@@ -3099,6 +3099,7 @@ mcast_moms(struct work_task *ptask)
 		break;
 	}
 
+	/* Close all the failure mom streams */
 	if (ret != DIS_SUCCESS) {
 		if (cmd == IS_REPLYHELLO)
 			strms = tpp_mcast_members(mtfd_replyhello, &count);
@@ -4363,14 +4364,17 @@ is_request(int stream, int version)
 #endif /* localmod 005 */
 
 		tpp_eom(stream);
-		if (psvrmom->msr_vnode_pool > 0 ? psvrmom->reporting_mom : 1) {
+		if (psvrmom->msr_vnode_pool <= 0 || psvrmom->reporting_mom) {
+			static int reply_send_tm = 0;
+
 			/* mcast reply togethor */
 			add_mom_mcast(pmom, &mtfd_replyhello);
-			static int reply_send_tm = 0;
 			if (reply_send_tm <= time_now) {
+				struct work_task *ptask;
+
 				/* time to wait depends on the no of moms server knows */
 				reply_send_tm = time_now + (mominfo_array_size > 1024 ? 2 : 0);
-				struct work_task *ptask = set_task(WORK_Timed, reply_send_tm, mcast_moms, NULL);
+				ptask = set_task(WORK_Timed, reply_send_tm, mcast_moms, NULL);
 				ptask->wt_aux = IS_REPLYHELLO;
 			}
 		} else {
