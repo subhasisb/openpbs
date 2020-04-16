@@ -2161,12 +2161,51 @@ crc_file(char *filepath)
 
 /**
  * @brief
- * 	Return the maximum number of servers possible in the cluster
+ *	get_max_servers - Getter function to get the PBS_MAX_SERVERS from pbs.conf file.
+ *
+ */
+
+int 
+get_max_servers()
+{
+	return pbs_conf.pbs_max_servers;
+}
+
+/**
+ * @brief
+ *	get_current_servers - Getter function to get number of servers configured in PBS complex.
+ *
+ */
+int
+get_current_servers()
+{
+	return pbs_conf.pbs_current_servers;
+}
+
+/**
+ * @brief
+ *	get_svr_index - function to find the server index from its server_instance.
+ *
+  * @param[in]	instance - pbs_server_instance object.
  *
  * @return int
+ * @retval	!-1 server's index
+ * @retval	-1, for error	
  */
-int 
-get_max_servers(void)
+int
+get_svr_index(pbs_server_instance_t *instance)
 {
-	return 1;
+	int i;
+	if (get_max_servers() > 1) {
+		for(i = 0; i < get_current_servers(); i++) {
+			if (instance->port == pbs_conf.psi[i]->port) {
+				if ( (instance->name == NULL) || (pbs_conf.psi[i]->name == NULL) )
+					return  -1;
+				if (strcmp(instance->name, pbs_conf.psi[i]->name) == 0) 
+					return i;
+			}
+		}
+	} else
+		return 0;
+	return -1;
 }

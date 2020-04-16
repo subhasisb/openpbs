@@ -68,6 +68,7 @@ __pbs_orderjob(int c, char *job1, char *job2, char *extend)
 {
 	struct batch_reply *reply;
 	int rc;
+	int sock;
 
 
 	if ((job1 == NULL) || (*job1 == '\0') ||
@@ -83,13 +84,22 @@ __pbs_orderjob(int c, char *job1, char *job2, char *extend)
 	if (pbs_client_thread_lock_connection(c) != 0)
 		return pbs_errno;
 
+	/* Below reset would force the connection to execute the sharding logic afresh */
+	set_new_shard_context(c);
+	sock = get_svr_shard_connection(c, JOB, job1);
+	if (sock == -1) {
+		if (set_conn_errtxt(c, pbse_to_txt(PBSE_NOCONNECTION)) != 0)
+			return (pbs_errno = PBSE_SYSTEM);
+		return (pbs_errno = PBSE_NOCONNECTION);
+	}
+
 	/* setup DIS support routines for following DIS calls */
 
 	DIS_tcp_funcs();
 
-	if ((rc = encode_DIS_ReqHdr(c, PBS_BATCH_OrderJob, pbs_current_user)) ||
-		(rc = encode_DIS_MoveJob(c, job1, job2)) ||
-		(rc = encode_DIS_ReqExtend(c, extend))) {
+	if ((rc = encode_DIS_ReqHdr(sock, PBS_BATCH_OrderJob, pbs_current_user)) ||
+		(rc = encode_DIS_MoveJob(sock, job1, job2)) ||
+		(rc = encode_DIS_ReqExtend(sock, extend))) {
 		if (set_conn_errtxt(c, dis_emsg[rc]) != 0) {
 			pbs_errno = PBSE_SYSTEM;
 		} else {
@@ -98,7 +108,7 @@ __pbs_orderjob(int c, char *job1, char *job2, char *extend)
 		(void)pbs_client_thread_unlock_connection(c);
 		return pbs_errno;
 	}
-	if (dis_flush(c)) {
+	if (dis_flush(sock)) {
 		pbs_errno = PBSE_PROTOCOL;
 		(void)pbs_client_thread_unlock_connection(c);
 		return pbs_errno;

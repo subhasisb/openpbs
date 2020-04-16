@@ -71,21 +71,29 @@ int
 PBSD_msg_put(int c, char *jobid, int fileopt, char *msg, char *extend, int prot, char **msgid)
 {
 	int rc = 0;
+	int sock;
 
 	if (prot == PROT_TCP) {
+		sock = get_svr_shard_connection(c, -1, NULL);
+		if (sock == -1) {
+			if (set_conn_errtxt(c, pbse_to_txt(PBSE_NOCONNECTION)) != 0)
+				return (pbs_errno = PBSE_SYSTEM);
+			return (pbs_errno = PBSE_NOCONNECTION);
+		}
 		DIS_tcp_funcs();
 	} else {
-		if ((rc = is_compose_cmd(c, IS_CMD, msgid)) != DIS_SUCCESS)
+		sock = c;
+		if ((rc = is_compose_cmd(sock, IS_CMD, msgid)) != DIS_SUCCESS)
 			return rc;
 	}
 
-	if ((rc = encode_DIS_ReqHdr(c, PBS_BATCH_MessJob, pbs_current_user)) ||
-		(rc = encode_DIS_MessageJob(c, jobid, fileopt, msg)) ||
-		(rc = encode_DIS_ReqExtend(c, extend))) {
+	if ((rc = encode_DIS_ReqHdr(sock, PBS_BATCH_MessJob, pbs_current_user)) ||
+		(rc = encode_DIS_MessageJob(sock, jobid, fileopt, msg)) ||
+		(rc = encode_DIS_ReqExtend(sock, extend))) {
 		return (pbs_errno = PBSE_PROTOCOL);
 	}
 
-	if (dis_flush(c)) {
+	if (dis_flush(sock)) {
 		pbs_errno = PBSE_PROTOCOL;
 		rc	  = pbs_errno;
 	}
@@ -112,21 +120,29 @@ int
 PBSD_py_spawn_put(int c, char *jobid, char **argv, char **envp, int prot, char **msgid)
 {
 	int rc = 0;
+	int sock;
 
 	if (prot == PROT_TCP) {
+		sock = get_svr_shard_connection(c, -1, NULL);
+		if (sock == -1) {
+			if (set_conn_errtxt(c, pbse_to_txt(PBSE_NOCONNECTION)) != 0)
+				return (pbs_errno = PBSE_SYSTEM);
+			return (pbs_errno = PBSE_NOCONNECTION);
+		}
 		DIS_tcp_funcs();
 	} else {
-		if ((rc = is_compose_cmd(c, IS_CMD, msgid)) != DIS_SUCCESS)
+		sock = c;
+		if ((rc = is_compose_cmd(sock, IS_CMD, msgid)) != DIS_SUCCESS)
 			return rc;
 	}
 
-	if ((rc = encode_DIS_ReqHdr(c, PBS_BATCH_PySpawn, pbs_current_user)) ||
-		(rc = encode_DIS_PySpawn(c, jobid, argv, envp)) ||
-		(rc = encode_DIS_ReqExtend(c, NULL))) {
+	if ((rc = encode_DIS_ReqHdr(sock, PBS_BATCH_PySpawn, pbs_current_user)) ||
+		(rc = encode_DIS_PySpawn(sock, jobid, argv, envp)) ||
+		(rc = encode_DIS_ReqExtend(sock, NULL))) {
 			return (pbs_errno = PBSE_PROTOCOL);
 	}
 
-	if (dis_flush(c)) {
+	if (dis_flush(sock)) {
 		pbs_errno = PBSE_PROTOCOL;
 		rc = pbs_errno;
 	}
@@ -143,21 +159,29 @@ int
 PBSD_relnodes_put(int c, char *jobid, char *node_list, char *extend, int prot, char **msgid)
 {
 	int rc = 0;
+	int sock;
 
 	if (prot == PROT_TCP) {
+		sock = get_svr_shard_connection(c, -1, NULL);
+		if (sock == -1) {
+			if (set_conn_errtxt(c, pbse_to_txt(PBSE_NOCONNECTION)) != 0)
+				return (pbs_errno = PBSE_SYSTEM);
+			return (pbs_errno = PBSE_NOCONNECTION);
+		}
 		DIS_tcp_funcs();
 	} else {
-		if ((rc = is_compose_cmd(c, IS_CMD, msgid)) != DIS_SUCCESS)
+		sock = c;
+		if ((rc = is_compose_cmd(sock, IS_CMD, msgid)) != DIS_SUCCESS)
 			return rc;
 	}
 
-	if ((rc = encode_DIS_ReqHdr(c, PBS_BATCH_RelnodesJob, pbs_current_user)) ||
-		(rc = encode_DIS_RelnodesJob(c, jobid, node_list)) ||
-		(rc = encode_DIS_ReqExtend(c, extend))) {
+	if ((rc = encode_DIS_ReqHdr(sock, PBS_BATCH_RelnodesJob, pbs_current_user)) ||
+		(rc = encode_DIS_RelnodesJob(sock, jobid, node_list)) ||
+		(rc = encode_DIS_ReqExtend(sock, extend))) {
 		return (pbs_errno = PBSE_PROTOCOL);
 	}
 
-	if (dis_flush(c)) {
+	if (dis_flush(sock)) {
 		pbs_errno = PBSE_PROTOCOL;
 		rc	  = pbs_errno;
 	}

@@ -113,6 +113,7 @@ PBSD_rdrpy(int c)
 {
 	int rc;
 	struct batch_reply *reply;
+	int sock;
 
 	/* clear any prior error message */
 
@@ -120,7 +121,14 @@ PBSD_rdrpy(int c)
 		pbs_errno = PBSE_SYSTEM;
 		return NULL;
 	}
-	reply = PBSD_rdrpy_sock(c, &rc);
+
+	sock = get_svr_shard_connection(c, -1, NULL);
+	if (sock == -1) {
+		pbs_errno = PBSE_NOCONNECTION;
+		return NULL;
+	}
+
+	reply = PBSD_rdrpy_sock(sock, &rc);
 	if (reply == NULL) {
 		if (set_conn_errno(c, PBSE_PROTOCOL) != 0) {
 			pbs_errno = PBSE_SYSTEM;

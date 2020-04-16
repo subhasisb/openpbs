@@ -320,6 +320,16 @@ extern char *netaddr(struct sockaddr_in *);
 extern unsigned long crc_file(char *fname);
 extern int get_fullhostname(char *, char *, int);
 
+/**
+ * Getter function to get the max number of servers.
+ */
+extern int get_max_servers();
+
+/**
+ * Getter function to get the number of currently configured servers.
+ */
+extern int get_current_servers();
+
 #ifdef  __cplusplus
 }
 #endif

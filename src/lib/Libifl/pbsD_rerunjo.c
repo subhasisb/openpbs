@@ -70,6 +70,7 @@ __pbs_rerunjob(int c, char *jobid, char *extend)
 	int	rc;
 	struct batch_reply *reply;
 	time_t  old_tcp_timeout;
+	int	sock;
 
 	if ((jobid == NULL) || (*jobid == '\0'))
 		return (pbs_errno = PBSE_IVALREQ);
@@ -83,13 +84,22 @@ __pbs_rerunjob(int c, char *jobid, char *extend)
 	if (pbs_client_thread_lock_connection(c) != 0)
 		return pbs_errno;
 
+	/* Below reset would force the connection to execute the sharding logic afresh */
+	set_new_shard_context(c);
+	sock = get_svr_shard_connection(c, JOB, jobid);
+	if (sock == -1) {
+		if (set_conn_errtxt(c, pbse_to_txt(PBSE_NOCONNECTION)) != 0)
+			return (pbs_errno = PBSE_SYSTEM);
+		return (pbs_errno = PBSE_NOCONNECTION);
+	}
+
 	/* setup DIS support routines for following DIS calls */
 
 	DIS_tcp_funcs();
 
-	if ((rc = encode_DIS_ReqHdr(c, PBS_BATCH_Rerun, pbs_current_user)) ||
-		(rc = encode_DIS_JobId(c, jobid)) ||
-		(rc = encode_DIS_ReqExtend(c, extend))) {
+	if ((rc = encode_DIS_ReqHdr(sock, PBS_BATCH_Rerun, pbs_current_user)) ||
+		(rc = encode_DIS_JobId(sock, jobid)) ||
+		(rc = encode_DIS_ReqExtend(sock, extend))) {
 		if (set_conn_errtxt(c, dis_emsg[rc]) != 0) {
 			pbs_errno = PBSE_SYSTEM;
 		} else {
@@ -101,7 +111,7 @@ __pbs_rerunjob(int c, char *jobid, char *extend)
 
 	/* write data */
 
-	if (dis_flush(c)) {
+	if (dis_flush(sock)) {
 		pbs_errno = PBSE_PROTOCOL;
 		(void)pbs_client_thread_unlock_connection(c);
 		return pbs_errno;

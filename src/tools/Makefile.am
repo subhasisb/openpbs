@@ -66,9 +66,10 @@ common_libs = \
 	$(top_builddir)/src/lib/Libutil/libutil.a \
 	$(top_builddir)/src/lib/Libnet/libnet.a \
 	$(top_builddir)/src/lib/Libsec/libsec.a \
+	$(top_builddir)/src/lib/Libshard/libshard.la \
 	-lpthread \
 	@socket_lib@ \
-	@KRB5_LIBS@
+	@KRB5_LIBS@ 
 
 pbs_sleep_LDFLAGS = -all-static
 pbs_sleep_SOURCES = pbs_sleep.c
@@ -81,6 +82,7 @@ pbs_ds_monitor_CPPFLAGS = ${common_cflags}
 pbs_ds_monitor_LDADD = \
 	$(top_builddir)/src/lib/Libdb/libdb.a \
 	${common_libs} \
+	$(top_builddir)/src/lib/Libshard/libshard.la \
 	@database_ldflags@ \
 	@database_lib@ \
 	-lssl \
@@ -100,6 +102,9 @@ pbs_hostn_CPPFLAGS = ${common_cflags}
 pbs_hostn_LDADD = ${common_libs}
 pbs_hostn_SOURCES = hostn.c
 
+common_sources = \
+        $(top_srcdir)/src/lib/Libcmds/cmds_common.c
+
 pbs_probe_CPPFLAGS = \
 	${common_cflags} \
 	@PYTHON_INCLUDES@
@@ -107,7 +112,7 @@ pbs_probe_LDADD = \
 	${common_libs} \
 	@PYTHON_LDFLAGS@ \
 	@PYTHON_LIBS@
-pbs_probe_SOURCES = pbs_probe.c
+pbs_probe_SOURCES = pbs_probe.c ${common_sources}
 
 pbs_python_CPPFLAGS =  \
 	-DPBS_PYTHON=1.1 \
@@ -119,6 +124,7 @@ pbs_python_LDADD = \
 	$(top_builddir)/src/lib/Liblog/liblog.a \
 	$(top_builddir)/src/lib/Libattr/libattr.a \
 	${common_libs} \
+	$(top_builddir)/src/lib/Libshard/libshard.la \
 	@PYTHON_LDFLAGS@ \
 	@PYTHON_LIBS@
 
@@ -149,6 +155,7 @@ pbs_tclsh_LDADD = \
 	$(top_builddir)/src/lib/Libutil/libutil.a \
 	$(top_builddir)/src/lib/Libnet/libnet.a \
 	$(top_builddir)/src/lib/Libsec/libsec.a \
+	$(top_builddir)/src/lib/Libshard/libshard.la \
 	-lpthread \
 	@socket_lib@ \
 	@KRB5_LIBS@ \
@@ -176,6 +183,7 @@ pbs_wish_LDADD = \
 	$(top_builddir)/src/lib/Libutil/libutil.a \
 	$(top_builddir)/src/lib/Libnet/libnet.a \
 	$(top_builddir)/src/lib/Libsec/libsec.a \
+	$(top_builddir)/src/lib/Libshard/libshard.la \
 	-lpthread \
 	@socket_lib@ \
 	@KRB5_LIBS@ \
@@ -200,6 +208,7 @@ printjob_svr_bin_CPPFLAGS = \
 printjob_svr_bin_LDADD = \
 	$(top_builddir)/src/lib/Libdb/libdb.a \
 	${common_libs} \
+	$(top_builddir)/src/lib/Libshard/libshard.la \
 	@database_ldflags@ \
 	@database_lib@ \
 	-lssl \

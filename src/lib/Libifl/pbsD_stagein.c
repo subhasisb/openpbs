@@ -68,11 +68,17 @@ pbs_stagein(int c, char *jobid, char *location, char *extend)
 {
 	int	rc;
 	struct batch_reply   *reply;
+	int	sock;
 
 	if ((jobid == NULL) || (*jobid == '\0'))
 		return (pbs_errno = PBSE_IVALREQ);
 	if (location == NULL)
 		location = "";
+
+	sock = get_svr_shard_connection(c, -1, NULL);
+	if (sock == -1) {
+		return (pbs_errno = PBSE_NOCONNECTION);
+	}
 
 	/* initialize the thread context data, if not already initialized */
 	if (pbs_client_thread_init_thread_context() != 0)
@@ -89,9 +95,9 @@ pbs_stagein(int c, char *jobid, char *location, char *extend)
 
 	/* send stagein request, a run request with a different id */
 
-	if ((rc = encode_DIS_ReqHdr(c, PBS_BATCH_StageIn, pbs_current_user)) ||
-		(rc = encode_DIS_Run(c, jobid, location, 0)) ||
-		(rc = encode_DIS_ReqExtend(c, extend))) {
+	if ((rc = encode_DIS_ReqHdr(sock, PBS_BATCH_StageIn, pbs_current_user)) ||
+		(rc = encode_DIS_Run(sock, jobid, location, 0)) ||
+		(rc = encode_DIS_ReqExtend(sock, extend))) {
 		if (set_conn_errtxt(c, dis_emsg[rc]) != 0) {
 			pbs_errno = PBSE_SYSTEM;
 		} else {
@@ -101,7 +107,7 @@ pbs_stagein(int c, char *jobid, char *location, char *extend)
 		return pbs_errno;
 	}
 
-	if (dis_flush(c)) {
+	if (dis_flush(sock)) {
 		pbs_errno = PBSE_PROTOCOL;
 		(void)pbs_client_thread_unlock_connection(c);
 		return pbs_errno;

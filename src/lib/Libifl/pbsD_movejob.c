@@ -68,12 +68,22 @@ __pbs_movejob(int c, char *jobid, char *destin, char *extend)
 {
 	int		    rc;
 	struct batch_reply *reply;
+	int		    sock;
 
 
 	if ((jobid == NULL) || (*jobid == '\0'))
 		return (pbs_errno = PBSE_IVALREQ);
 	if (destin == NULL)
 		destin = "";
+
+	/* Below reset would force the connection to execute the sharding logic afresh */
+	set_new_shard_context(c);
+	sock = get_svr_shard_connection(c, -1, NULL);
+	if (sock == -1) {
+		if (set_conn_errtxt(c, pbse_to_txt(PBSE_NOCONNECTION)) != 0)
+			return (pbs_errno = PBSE_SYSTEM);
+		return (pbs_errno = PBSE_NOSERVER);
+	}
 
 	/* initialize the thread context data, if not already initialized */
 	if (pbs_client_thread_init_thread_context() != 0)
@@ -88,9 +98,9 @@ __pbs_movejob(int c, char *jobid, char *destin, char *extend)
 
 	DIS_tcp_funcs();
 
-	if ((rc=encode_DIS_ReqHdr(c, PBS_BATCH_MoveJob, pbs_current_user)) ||
-		(rc = encode_DIS_MoveJob(c, jobid, destin))   ||
-		(rc = encode_DIS_ReqExtend(c, extend))) {
+	if ((rc=encode_DIS_ReqHdr(sock, PBS_BATCH_MoveJob, pbs_current_user)) ||
+		(rc = encode_DIS_MoveJob(sock, jobid, destin))   ||
+		(rc = encode_DIS_ReqExtend(sock, extend))) {
 		if (set_conn_errtxt(c, dis_emsg[rc]) != 0) {
 			pbs_errno = PBSE_SYSTEM;
 		} else {
@@ -100,7 +110,7 @@ __pbs_movejob(int c, char *jobid, char *destin, char *extend)
 		return pbs_errno;
 	}
 
-	if (dis_flush(c)) {
+	if (dis_flush(sock)) {
 		pbs_errno = PBSE_PROTOCOL;
 		(void)pbs_client_thread_unlock_connection(c);
 		return pbs_errno;

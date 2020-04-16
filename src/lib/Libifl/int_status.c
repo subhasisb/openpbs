@@ -76,6 +76,9 @@ PBSD_status(int c, int function, char *objid, struct attrl *attrib, char *extend
 	if (objid == NULL)
 		objid = "";	/* set to null string for encoding */
 
+	/* Below reset would force the connection to execute the sharding logic afresh */
+	set_new_shard_context(c);
+
 	rc = PBSD_status_put(c, function, objid, attrib, extend, PROT_TCP, NULL);
 	if (rc) {
 		return NULL;

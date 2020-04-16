@@ -133,6 +133,7 @@
 #include <pbs_python.h>  /* for python interpreter */
 #include "pbs_undolr.h"
 #include "auth.h"
+#include "libshard.h"
 
 /* External functions called */
 
@@ -207,6 +208,8 @@ unsigned int	pbs_mom_port;
 unsigned int	pbs_rm_port;
 pbs_net_t	pbs_server_addr;
 unsigned int	pbs_server_port_dis;
+pbs_server_instance_t self;
+int myindex = 0;
 /*
  * the names of the Server:
  *    pbs_server_name - from PBS_SERVER_HOST_NAME
@@ -830,6 +833,9 @@ main(int argc, char **argv)
 
 	if (pbs_loadconf(0) == 0)
 		return (1);
+	/* initialize the shard lib */
+	if (pbs_shard_init(get_max_servers(), (server_instance_t **)pbs_conf.psi, get_current_servers()) == -1)
+		return (1);
 
 	set_log_conf(pbs_conf.pbs_leaf_name, pbs_conf.pbs_mom_node_name,
 			pbs_conf.locallog, pbs_conf.syslogfac,
@@ -860,6 +866,19 @@ main(int argc, char **argv)
 	(void)strcat(daemonname, server_host);
 	if ((pc = strchr(daemonname, (int)'.')) != NULL)
 		*pc = '\0';
+
+	if (!(self.name = strdup(server_host))) {
+		log_err(-1, __func__, "Out of memory\n");
+		return -1;			
+	}
+	self.port = pbs_conf.batch_service_port;
+	if (get_max_servers() > 1) {
+		if ((myindex = get_svr_index(&self)) == -1) {
+			fprintf(stderr, "pbsconf error: Wrong Multi Server configuration\n");
+			return 1;
+		}
+	}
+
 
 	if(set_msgdaemonname(daemonname)) {
 		fprintf(stderr, "Out of memory\n");

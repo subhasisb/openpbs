@@ -72,7 +72,10 @@
 #include "pbs_internal.h"
 #include "log.h"
 #include "auth.h"
+#include "libshard.h"
 
+
+int (*pfn_connect)(int, char *, int , char *) = NULL;
 /**
  * @brief
  *	-returns the default server name.
@@ -253,6 +256,335 @@ get_hostsockaddr(char *host, struct sockaddr_in *sap)
 	return -1;
 }
 
+
+/**
+ * @brief
+ *	This function establishes the network connection to the choose server.
+ *
+ * @param[in]   vsock - The virtual socket used to demux and find the physical server socket.
+ * @param[in]   server - The hostname of the pbs server to connect to.
+ * @param[in]   port - Port number of the pbs server to connect to.
+ * @param[in]   extend_data - a string to send as "extend" data
+ * 
+ *
+ * @return int
+ * @retval >= 0	The physical server socket.
+ * @retval -1	error encountered setting up the connection.
+ */
+
+int
+tcp_connect(int vsock, char *server, int server_port, char *extend_data)
+{
+	int i;
+	int sd;
+	int rc;
+	struct sockaddr_in server_addr;
+	struct sockaddr_in my_sockaddr;
+	struct batch_reply	*reply;
+	char errbuf[LOG_BUF_SIZE] = {'\0'};
+
+		/* get socket	*/
+#ifdef WIN32
+		/* the following lousy hack is needed since the socket call needs */
+		/* SYSTEMROOT env variable properly set! */
+		if (getenv("SYSTEMROOT") == NULL) {
+			setenv("SYSTEMROOT", "C:\\WINDOWS", 1);
+			setenv("SystemRoot", "C:\\WINDOWS", 1);
+		}
+#endif
+	sd = socket(AF_INET, SOCK_STREAM, 0);
+	if (sd == -1) {
+		pbs_errno = PBSE_SYSTEM;
+		return -1;
+	}	
+
+	strncpy(pbs_server, server, sizeof(pbs_server)-1); /* set for error messages from commands */
+	pbs_server[sizeof(pbs_server) - 1] = '\0';
+		/* and connect... */
+
+	/* If a specific host name is defined which the client should use */
+	if (pbs_conf.pbs_public_host_name) {
+		if (get_hostsockaddr(pbs_conf.pbs_public_host_name, &my_sockaddr) != 0)
+			return -1; /* pbs_errno was set */
+		/* my address will be in my_sockaddr,  bind the socket to it */
+		my_sockaddr.sin_port = 0;
+		if (bind(sd, (struct sockaddr *)&my_sockaddr, sizeof(my_sockaddr)) != 0) {
+			return -1;
+		}
+	}
+
+	if (get_hostsockaddr(server, &server_addr) != 0)
+		return -1;
+
+	server_addr.sin_port = htons(server_port);
+	if (connect(sd, (struct sockaddr *)&server_addr, sizeof(struct sockaddr)) != 0) {
+		/* connect attempt failed */
+		CLOSESOCKET(sd);
+		pbs_errno = errno;
+		return -1;
+	}
+	
+	/* setup connection level thread context */
+	if (pbs_client_thread_init_connect_context(sd) != 0) {
+		CLOSESOCKET(sd);
+		pbs_errno = PBSE_SYSTEM;
+		return -1;
+	}
+
+
+	/*
+	 * No need for global lock now on, since rest of the code
+	 * is only communication on a connection handle.
+	 * But we dont need to lock the connection handle, since this
+	 * connection handle is not yet been returned to the client
+	 */
+
+	if (load_auths(AUTH_CLIENT)) {
+		CLOSESOCKET(sd);
+		pbs_errno = PBSE_SYSTEM;
+		return -1;
+	}
+
+	/* setup DIS support routines for following pbs_* calls */
+	DIS_tcp_funcs();
+
+	/* The following code was originally  put in for HPUX systems to deal
+	 * with the issue where returning from the connect() call doesn't
+	 * mean the connection is complete.  However, this has also been
+	 * experienced in some Linux ppc64 systems like js-2. Decision was
+	 * made to enable this harmless code for all architectures.
+	 * FIX: Need to use the socket to send
+	 * a message to complete the process.  For IFF authentication there is
+	 * no leading authentication message needing to be sent on the client
+	 * socket, so will send a "dummy" message and discard the replyback.
+	 */
+	if ((i = encode_DIS_ReqHdr(sd, PBS_BATCH_Connect, pbs_current_user)) ||
+		(i = encode_DIS_ReqExtend(sd, extend_data))) {
+		CLOSESOCKET(sd);
+		pbs_errno = PBSE_SYSTEM;
+		return -1;
+	}
+	if (dis_flush(sd)) {
+		CLOSESOCKET(sd);
+		pbs_errno = PBSE_SYSTEM;
+		return -1;
+	}
+
+	reply = PBSD_rdrpy_sock(sd, &rc);
+	PBSD_FreeReply(reply);
+	if (rc != DIS_SUCCESS) {
+		CLOSESOCKET(sd);
+		return -1;
+	}
+
+	if (engage_client_auth(sd, server, server_port, errbuf, sizeof(errbuf)) != 0) {
+		if (pbs_errno == 0)
+			pbs_errno = PBSE_PERM;
+		fprintf(stderr, "auth: error returned: %d\n", pbs_errno);
+		if (errbuf[0] != '\0')
+			fprintf(stderr, "auth: %s\n", errbuf);
+		CLOSESOCKET(sd);
+		return -1;
+	}
+
+	pbs_tcp_timeout = PBS_DIS_TCP_TIMEOUT_VLONG;	/* set for 3 hours */
+
+	/*
+	 * Disable Nagle's algorithm on the TCP connection to server.
+	 * Nagle's algorithm is hurting cmd-server communication.
+	 */
+	if (pbs_connection_set_nodelay(sd) == -1) {
+		CLOSESOCKET(sd);
+		pbs_errno = PBSE_SYSTEM;
+		return -1;
+	}
+
+	return sd;
+}
+
+/**
+ * @brief
+ *	This function resets the shard_context in connection struct. 
+ * The value -1 represents to connect to a new server rather the last contacted one.
+ *
+ * @param[in]   vsock - The virtual socket used to demux and find the physical server socket.
+ * 
+ * @return void
+*/
+void
+set_new_shard_context(int vsock)
+{
+	set_conn_shard_context(vsock, -1); 
+}
+
+/**
+ * @brief
+ *	This function dynamically sets the api to use for connecting PBS server.
+ *
+ * @param[in]   vsock - The virtual socket used to demux and find the physical server socket.
+ * @param[in]   server - The hostname of the pbs server to connect to.
+ * @param[in]   port - Port number of the pbs server to connect to.
+ * @param[in]   extend_data - a string to send as "extend" data
+ * 
+ * @return int
+ * @retval >= 0	The physical server socket.
+ * @retval -1	error encountered setting up the connection.
+ */
+
+int internal_client_connect(int vsock, char *server, int port, char *extend_data)
+{
+	return tcp_connect(vsock, server, port, NULL);
+}
+
+/**
+ * @brief
+ *  This function chooses the respective server among multiple servers by 
+ *  using internal sharding logic and return the connected socket to it
+ * 
+ *  For single-server mode, always returns the same connected socket
+ *
+ * @param[in]   vsock - The virtual socket used to demux and find the physical server socket
+ * @param[in]   obj_type - Caller object type
+ * @param[in]   obj_id - Hint used by internal sharding logic
+ *
+ * @return int
+ * @retval >= 0 The physical server socket
+ * @retval -1   error encountered setting up the connection
+ */
+int 
+get_svr_shard_connection(int vsock, enum pbs_obj_type obj_type, void *obj_id)
+{
+	int sd = -1;
+	int i = 0;
+	int inact_servers = 0;
+	static int shard_init_flag = -1;
+	int *inact_svr_indexes = NULL; 
+	shard_conn_t **shard_connection;
+	int num_of_conf_servers;
+	int max_num_servers;
+	int srv_index;
+	int done = 0;
+	max_num_servers = get_max_servers();
+	if (max_num_servers == 1)
+		return vsock;
+	/* below code only for multi-server case */
+	num_of_conf_servers = get_current_servers();
+	if (shard_init_flag == -1) {
+		if (pbs_shard_init(max_num_servers, (server_instance_t **)pbs_conf.psi, num_of_conf_servers) == -1) {
+			pbs_errno = PBSE_NOCONNECTION;
+			goto err;
+		}
+		shard_init_flag = 1;
+	}
+	if (!(shard_connection = (shard_conn_t **) get_conn_shards(vsock))) {
+		pbs_errno = PBSE_INTERNAL;
+		goto err;
+	}
+	if (pfn_connect == NULL)
+		pfn_connect = internal_client_connect;
+	srv_index = get_conn_shard_context(vsock);
+	do {
+		if (srv_index == -1) {
+			srv_index = pbs_shard_get_server_byindex(obj_type, obj_id, inact_svr_indexes);
+			if (srv_index == -1 || srv_index >= num_of_conf_servers) {
+				pbs_errno = PBSE_NOCONNECTION;
+				goto err;
+			}
+		}
+		/* 
+		* Check the status of this shard:
+		*	SHARD_CONN_STATE_DOWN - never tried recently, simply means we need to try to connect
+		*	SHARD_CONN_STATE_FAILED - failed while connecting, will not be retried right away
+		*	SHARD_CONN_STATE_CONNECTED - connection succeeded 
+		*/
+		switch (shard_connection[srv_index]->state) {
+			case SHARD_CONN_STATE_CONNECTED:
+				done = 1;
+				break;
+			case SHARD_CONN_STATE_DOWN: 
+				/* connect and authenticate */
+				sd = pfn_connect(vsock, pbs_conf.psi[srv_index]->name, pbs_conf.psi[srv_index]->port, NULL);
+				shard_connection[srv_index]->sd = sd;
+				shard_connection[srv_index]->state_change_time = time(0);
+				if (sd != -1) {
+					shard_connection[srv_index]->state = SHARD_CONN_STATE_CONNECTED;
+					break;
+				} else {
+					shard_connection[srv_index]->state = SHARD_CONN_STATE_FAILED;
+				}
+				/* no break, call into case SHARD_CONN_STATE_FAILED */
+			case SHARD_CONN_STATE_FAILED:
+				if (time(0) - shard_connection[srv_index]->state_change_time > 60) {
+					/* it is possible service is back up now, reset state try again */
+					shard_connection[srv_index]->state = SHARD_CONN_STATE_DOWN;
+					shard_connection[srv_index]->state_change_time = time(0);
+				} else {
+					/* we need to add the server index to the list of inactive servers */
+					if (!inact_svr_indexes) {
+						inact_servers = 0;
+						if (!(inact_svr_indexes = (int *)malloc(num_of_conf_servers * sizeof(int)))) {
+							pbs_errno = PBSE_SYSTEM;
+							goto err;
+						}
+						for (; i < num_of_conf_servers; i++)
+							inact_svr_indexes[i] = -1;
+					}
+					inact_svr_indexes[inact_servers++] = srv_index;
+				}
+				srv_index = -1; /* this forces call to pbs_shard_get_server_byindex */
+		}
+	} while (!done);
+	free(inact_svr_indexes);
+	set_conn_shard_context(vsock, srv_index);
+	return (shard_connection[srv_index]->sd);
+err:
+	free(inact_svr_indexes);
+	set_conn_shard_context(vsock, -1);
+	return (-1);
+}
+
+
+
+
+/**
+ * @brief
+ * 	initialise_shard_conn - To intialize the shards connection table.
+ *
+ * @param[in] vfd - virtual socket number
+ *
+ * @return int
+ * @retval 0 - success
+ * @retval -1 - error
+ */
+int 
+initialise_shard_conn(int vfd)
+{
+	int i;
+	int j;
+	int num_conf_servers = get_current_servers();
+	shard_conn_t **shard_connection = calloc(num_conf_servers, sizeof(shard_conn_t *));
+	if (!shard_connection)
+		return -1;
+	for (i = 0; i < num_conf_servers; i++) {
+		shard_connection[i] = malloc(sizeof(shard_conn_t));
+		if (!shard_connection[i]) {
+			for (j = 0; j < i; j++ )
+				free(shard_connection[j]);
+			free(shard_connection);
+			return -1;
+		}
+		shard_connection[i]->sd = -1;
+		shard_connection[i]->secondary_sd = -1;
+		shard_connection[i]->state = SHARD_CONN_STATE_DOWN;
+		shard_connection[i]->state_change_time = 0;
+		shard_connection[i]->last_used_time = 0;
+	}
+	if ( set_conn_shards(vfd, (void *)shard_connection) )
+		return -1;
+	return 0;
+}
+
+
 /**
  * @brief
  *	Makes a PBS_BATCH_Connect request to 'server'.
@@ -268,17 +600,14 @@ get_hostsockaddr(char *host, struct sockaddr_in *sap)
 int
 __pbs_connect_extend(char *server, char *extend_data)
 {
-	struct sockaddr_in server_addr;
-	struct sockaddr_in my_sockaddr;
 	int sock;
+	int sd;
 	int i;
 	int f;
 	char  *altservers[2];
 	int    have_alt = 0;
-	struct batch_reply	*reply;
 	char server_name[PBS_MAXSERVERNAME+1];
 	unsigned int server_port;
-	char errbuf[LOG_BUF_SIZE] = {'\0'};
 #ifdef WIN32
 	struct sockaddr_in to_sock;
 	struct sockaddr_in from_sock;
@@ -303,6 +632,35 @@ __pbs_connect_extend(char *server, char *extend_data)
 	if (server == NULL) {
 		pbs_errno = PBSE_NOSERVER;
 		return -1;
+	}
+	strncpy(pbs_server, server, sizeof(pbs_server)-1); 
+	pbs_server[sizeof(pbs_server) - 1] = '\0';
+
+#ifdef WIN32
+		/* the following lousy hack is needed since the socket call needs */
+		/* SYSTEMROOT env variable properly set! */
+		if (getenv("SYSTEMROOT") == NULL) {
+			setenv("SYSTEMROOT", "C:\\WINDOWS", 1);
+			setenv("SystemRoot", "C:\\WINDOWS", 1);
+		}
+#endif
+	sd = socket(AF_INET, SOCK_STREAM, 0);
+	if (sd == -1) {
+		pbs_errno = PBSE_SYSTEM;
+		return -1;
+	}
+
+	if ((strcmp(server,pbs_default()) == 0) && get_max_servers() > 1) {
+		set_conn_shard_context(sd, -1);
+		if (initialise_shard_conn(sd)) {
+			pbs_errno = PBSE_INTERNAL;
+			return -1;
+		}
+		/* can't use failover for now, take a different path. 
+		Actual connects happen when client tries to send a request first. 
+		For multi-server mode, each IFL API's would use possibly different socket 
+		based on their OBJECT(JOB,RESERVATION) in request. */
+		return sd; 
 	}
 
 	if (pbs_conf.pbs_primary && pbs_conf.pbs_secondary) {
@@ -336,13 +694,6 @@ __pbs_connect_extend(char *server, char *extend_data)
 		}
 	}
 
-	/* if specific host name declared for the host on which */
-	/* this client is running,  get its address */
-	if (pbs_conf.pbs_public_host_name) {
-		if (get_hostsockaddr(pbs_conf.pbs_public_host_name, &my_sockaddr) != 0)
-			return -1; /* pbs_errno was set */
-	}
-
 	/*
 	 * connect to server ...
 	 * If attempt to connect fails and if Failover configured and
@@ -350,47 +701,12 @@ __pbs_connect_extend(char *server, char *extend_data)
 	 *   if attempting to connect to Secondary, try the Primary
 	 */
 	for (i=0; i<(have_alt+1); ++i) {
-
-		/* get socket	*/
-
-#ifdef WIN32
-		/* the following lousy hack is needed since the socket call needs */
-		/* SYSTEMROOT env variable properly set! */
-		if (getenv("SYSTEMROOT") == NULL) {
-			setenv("SYSTEMROOT", "C:\\WINDOWS", 1);
-			setenv("SystemRoot", "C:\\WINDOWS", 1);
-		}
-#endif
-		sock = socket(AF_INET, SOCK_STREAM, 0);
-
-		/* and connect... */
-
-		if (have_alt) {
+		if (have_alt) 
 			server = altservers[i];
-		}
-		strcpy(pbs_server, server); /* set for error messages from commands */
 
-		/* If a specific host name is defined which the client should use */
-
-		if (pbs_conf.pbs_public_host_name) {
-			/* my address will be in my_sockaddr,  bind the socket to it */
-			my_sockaddr.sin_port = 0;
-			if (bind(sock, (struct sockaddr *)&my_sockaddr, sizeof(my_sockaddr)) != 0) {
-				return -1;
-			}
-		}
-
-		if (get_hostsockaddr(server, &server_addr) != 0)
-			return -1;
-
-		server_addr.sin_port = htons(server_port);
-		if (connect(sock, (struct sockaddr *)&server_addr, sizeof(struct sockaddr)) == 0) {
+		sock = tcp_connect(sd, server, server_port, extend_data);
+		if (sock >= 0)
 			break;
-		} else {
-			/* connect attempt failed */
-			CLOSESOCKET(sock);
-			pbs_errno = errno;
-		}
 	}
 	if (i >= (have_alt+1)) {
 		return -1; 		/* cannot connect */
@@ -411,76 +727,8 @@ __pbs_connect_extend(char *server, char *extend_data)
 	}
 #endif
 
-	/* setup connection level thread context */
-	if (pbs_client_thread_init_connect_context(sock) != 0) {
-		CLOSESOCKET(sock);
-		pbs_errno = PBSE_SYSTEM;
-		return -1;
-	}
+return sock;
 
-	/*
-	 * No need for global lock now on, since rest of the code
-	 * is only communication on a connection handle.
-	 * But we dont need to lock the connection handle, since this
-	 * connection handle is not yet been returned to the client
-	 */
-
-	if (load_auths(AUTH_CLIENT)) {
-		CLOSESOCKET(sock);
-		pbs_errno = PBSE_SYSTEM;
-		return -1;
-	}
-
-	/* setup DIS support routines for following pbs_* calls */
-	DIS_tcp_funcs();
-
-	/* The following code was originally  put in for HPUX systems to deal
-	 * with the issue where returning from the connect() call doesn't
-	 * mean the connection is complete.  However, this has also been
-	 * experienced in some Linux ppc64 systems like js-2. Decision was
-	 * made to enable this harmless code for all architectures.
-	 * FIX: Need to use the socket to send
-	 * a message to complete the process.  For IFF authentication there is
-	 * no leading authentication message needing to be sent on the client
-	 * socket, so will send a "dummy" message and discard the replyback.
-	 */
-	if ((i = encode_DIS_ReqHdr(sock, PBS_BATCH_Connect, pbs_current_user)) ||
-		(i = encode_DIS_ReqExtend(sock, extend_data))) {
-		CLOSESOCKET(sock);
-		pbs_errno = PBSE_SYSTEM;
-		return -1;
-	}
-	if (dis_flush(sock)) {
-		CLOSESOCKET(sock);
-		pbs_errno = PBSE_SYSTEM;
-		return -1;
-	}
-	reply = PBSD_rdrpy(sock);
-	PBSD_FreeReply(reply);
-
-	if (engage_client_auth(sock, server_name, server_port, errbuf, sizeof(errbuf)) != 0) {
-		if (pbs_errno == 0)
-			pbs_errno = PBSE_PERM;
-		fprintf(stderr, "auth: error returned: %d\n", pbs_errno);
-		if (errbuf[0] != '\0')
-			fprintf(stderr, "auth: %s\n", errbuf);
-		CLOSESOCKET(sock);
-		return -1;
-	}
-
-	pbs_tcp_timeout = PBS_DIS_TCP_TIMEOUT_VLONG;	/* set for 3 hours */
-
-	/*
-	 * Disable Nagle's algorithm on the TCP connection to server.
-	 * Nagle's algorithm is hurting cmd-server communication.
-	 */
-	if (pbs_connection_set_nodelay(sock) == -1) {
-		CLOSESOCKET(sock);
-		pbs_errno = PBSE_SYSTEM;
-		return -1;
-	}
-
-	return sock;
 }
 
 /**
@@ -530,6 +778,38 @@ __pbs_connect(char *server)
 
 /**
  * @brief
+ *	-send close connection batch request to multi servers
+ *
+ * @param[in] sock - socket descriptor
+ *
+ */
+void
+close_tcp_connection(int sock)
+{
+	char x;
+
+	/* send close-connection message */
+
+	DIS_tcp_funcs();
+	if ((encode_DIS_ReqHdr(sock, PBS_BATCH_Disconnect, pbs_current_user) == 0) &&
+		(dis_flush(sock) == 0)) {
+		for (;;) {	/* wait for server to close connection */
+#ifdef WIN32
+			if (recv(sock, &x, 1, 0) < 1)
+#else
+			if (read(sock, &x, 1) < 1)
+#endif
+				break;
+		}
+	}
+
+	CS_close_socket(sock);
+	CLOSESOCKET(sock);
+	dis_destroy_chan(sock);
+}
+
+/**
+ * @brief
  *	-send close connection batch request
  *
  * @param[in] connect - socket descriptor
@@ -542,8 +822,8 @@ __pbs_connect(char *server)
 int
 __pbs_disconnect(int connect)
 {
-	char x;
-
+	shard_conn_t **shard_connection = NULL;
+	int i;
 	if (connect < 0)
 		return 0;
 
@@ -558,31 +838,29 @@ __pbs_disconnect(int connect)
 	if (pbs_client_thread_lock_connection(connect) != 0)
 		return -1;
 
-	/*
-	 * check again to ensure that another racing thread
-	 * had not already closed the connection
-	 */
-	if (get_conn_chan(connect) == NULL)
-		return 0;
-
-	/* send close-connection message */
-
-	DIS_tcp_funcs();
-	if ((encode_DIS_ReqHdr(connect, PBS_BATCH_Disconnect, pbs_current_user) == 0) &&
-		(dis_flush(connect) == 0)) {
-		for (;;) {	/* wait for server to close connection */
-#ifdef WIN32
-			if (recv(connect, &x, 1, 0) < 1)
-#else
-			if (read(connect, &x, 1) < 1)
-#endif
-				break;
-		}
+	/* send disconnect request to all servers that are up */
+	if (get_max_servers() > 1) {
+		shard_connection = (shard_conn_t **)get_conn_shards(connect);
+		if (!shard_connection)
+			return -1;
+		for (i = 0; i < get_current_servers(); i++) {
+			if (shard_connection[i] && 
+				shard_connection[i]->sd >= 0 && 
+				shard_connection[i]->state == SHARD_CONN_STATE_CONNECTED) {
+					if (get_conn_chan(shard_connection[i]->sd) == NULL)
+						continue;
+					close_tcp_connection(shard_connection[i]->sd);
+				}
+		}	
+	} else {
+		/*
+		* check again to ensure that another racing thread
+		* had not already closed the connection
+		*/
+		if (get_conn_chan(connect) == NULL)
+			return 0;
+		close_tcp_connection(connect);
 	}
-
-	CS_close_socket(connect);
-	CLOSESOCKET(connect);
-	dis_destroy_chan(connect);
 
 	/* unlock the connection level lock */
 	if (pbs_client_thread_unlock_connection(connect) != 0)

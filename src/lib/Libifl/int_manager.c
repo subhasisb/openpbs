@@ -93,6 +93,9 @@ PBSD_manager(int c, int function, int command, int objtype, char *objname, struc
 	if (pbs_client_thread_lock_connection(c) != 0)
 		return pbs_errno;
 
+	/* Below reset would force the next connection request to select a random server */
+	set_new_shard_context(c);
+
 	/* send the manage request */
 	i = PBSD_mgr_put(c, function, command, objtype, objname, aoplp, extend, PROT_TCP, NULL);
 	if (i) {

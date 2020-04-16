@@ -72,6 +72,7 @@ __pbs_msgjob(int c, char *jobid, int fileopt, char *msg, char *extend)
 {
 	struct batch_reply *reply;
 	int	rc;
+	int sock;
 
 	if ((jobid == NULL) || (*jobid == '\0') ||
 		(msg == NULL) || (*msg == '\0'))
@@ -85,6 +86,15 @@ __pbs_msgjob(int c, char *jobid, int fileopt, char *msg, char *extend)
 	/* blocking call, waits for mutex release */
 	if (pbs_client_thread_lock_connection(c) != 0)
 		return pbs_errno;
+
+	/* Below reset would force the connection to execute the sharding logic afresh */
+	set_new_shard_context(c);
+	sock = get_svr_shard_connection(c, JOB, jobid);
+	if (sock == -1) {
+		if (set_conn_errtxt(c, pbse_to_txt(PBSE_NOCONNECTION)) != 0)
+			return (pbs_errno = PBSE_SYSTEM);
+		return (pbs_errno = PBSE_NOCONNECTION);
+	}
 
 	/* setup DIS support routines for following DIS calls */
 	DIS_tcp_funcs();
@@ -207,6 +217,7 @@ char *extend;
 {
 	struct batch_reply *reply;
 	int	rc;
+	int sock;
 
 	if ((jobid == NULL) || (*jobid == '\0') ||
 					(node_list == NULL))
@@ -269,6 +280,15 @@ char *extend;
 	/* blocking call, waits for mutex release */
 	if (pbs_client_thread_lock_connection(c) != 0)
 		return pbs_errno;
+
+	/* Below reset would force the connection to execute the sharding logic afresh */
+	set_new_shard_context(c);
+	sock = get_svr_shard_connection(c, JOB, jobid);
+	if (sock == -1) {
+		if (set_conn_errtxt(c, pbse_to_txt(PBSE_NOCONNECTION)) != 0)
+			return (pbs_errno = PBSE_SYSTEM);
+		return (pbs_errno = PBSE_NOCONNECTION);
+	}
 
 	/* setup DIS support routines for following DIS calls */
 

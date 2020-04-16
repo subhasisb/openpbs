@@ -113,11 +113,25 @@ extern char pbs_current_group[];
 #define PBS_MAX_CONNECTIONS 5000 /* Max connections in the connections array */
 #define PBS_LOCAL_CONNECTION INT_MAX
 
+
+#define SHARD_CONN_STATE_DOWN           0
+#define SHARD_CONN_STATE_CONNECTED      1
+#define SHARD_CONN_STATE_FAILED         -1
+typedef struct shard_conn {
+	int sd;                     /* File descriptor for the open socket */
+	int secondary_sd;           /* Secondary File descriptor for the open socket */
+	int state;                  /* Connection state */
+	time_t state_change_time;   /* Connnetion state change time */
+	time_t last_used_time;           /* Last used time for the connection */
+} shard_conn_t;
+
 typedef struct pbs_conn {
-	int ch_errno;		  /* last error on this connection */
-	char *ch_errtxt;	  /* pointer to last server error text	*/
-	pthread_mutex_t ch_mutex; /* serialize connection between threads */
-	pbs_tcp_chan_t *ch_chan;  /* pointer tcp chan structure for this connection */
+	int ch_errno;                   /* last error on this connection */
+	char *ch_errtxt;                /* pointer to last server error text	*/
+	void *ch_shards;                /* handles to multiple sharded servers */
+	int shard_context;              /* last server to which dialogue was going on */
+	pthread_mutex_t ch_mutex;       /* serialize connection between threads */
+	pbs_tcp_chan_t *ch_chan;        /* pointer tcp chan structure for this connection */
 } pbs_conn_t;
 
 int destroy_connection(int);
@@ -128,6 +142,10 @@ int get_conn_errno(int);
 pbs_tcp_chan_t * get_conn_chan(int);
 int set_conn_chan(int, pbs_tcp_chan_t *);
 pthread_mutex_t * get_conn_mutex(int);
+int set_conn_shard_context(int, int);
+int get_conn_shard_context(int);
+int set_conn_shards(int, void*);
+void * get_conn_shards(int);
 
 /* max number of preempt orderings */
 #define PREEMPT_ORDER_MAX 20
@@ -362,8 +380,8 @@ extern void pbs_authors(void);
 extern int tcp_pre_process(conn_t *);
 extern char *PBSD_modify_resv(int, char *, struct attropl *, char *);
 extern int PBSD_cred(int, char *, char *, int, char *, long, int, char **);
-
 int tcp_send_auth_req(int, unsigned int, char *);
+extern int get_svr_index(pbs_server_instance_t *);
 
 #ifdef __cplusplus
 }
