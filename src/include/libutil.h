@@ -324,3 +324,5 @@ extern int get_fullhostname(char *, char *, int);
 }
 #endif
 #endif
+
+int get_max_servers(void);

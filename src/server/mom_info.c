@@ -360,7 +360,7 @@ create_svrmom_entry(char *hostname, unsigned int port, unsigned long *pul)
 		return NULL;
 	}
 
-	psvrmom->msr_state =INUSE_UNKNOWN | INUSE_NEEDS_HELLO_PING | INUSE_DOWN;
+	psvrmom->msr_state =INUSE_UNKNOWN | INUSE_DOWN;
 	psvrmom->msr_pcpus = 0;
 	psvrmom->msr_acpus = 0;
 	psvrmom->msr_pmem  = 0;
@@ -370,7 +370,6 @@ create_svrmom_entry(char *hostname, unsigned int port, unsigned long *pul)
 	psvrmom->msr_stream  = -1;
 	CLEAR_HEAD(psvrmom->msr_deferred_cmds);
 	psvrmom->msr_timedown = (time_t)0;
-	psvrmom->msr_timeinit = (time_t)0;
 	psvrmom->msr_wktask  = 0;
 	psvrmom->msr_addrs   = pul;
 	psvrmom->msr_jbinxsz = 0;
@@ -378,6 +377,7 @@ create_svrmom_entry(char *hostname, unsigned int port, unsigned long *pul)
 	psvrmom->msr_numvnds = 0;
 	psvrmom->msr_numvslots = 1;
 	psvrmom->msr_vnode_pool = 0;
+	psvrmom->reporting_mom = 0;
 	psvrmom->msr_children =
 		(struct pbsnode **)calloc((size_t)(psvrmom->msr_numvslots),
 		sizeof(struct pbsnode *));
@@ -394,6 +394,36 @@ create_svrmom_entry(char *hostname, unsigned int port, unsigned long *pul)
 	}
 
 	return pmom;
+}
+
+/**
+ * @brief
+ * 		open_momstream - do an tpp_open if it is safe to do so.
+ *
+ * @param[in]	pmom	- pointer to mominfo structure
+ *
+ * @return	int
+ * @retval	-1: cannot be opened or error on opening
+ * @retval	>=0: success
+ */
+int
+open_momstream(mominfo_t *pmom)
+{
+	int stream = -1;
+	mom_svrinfo_t *psvrmom;
+
+	psvrmom = (mom_svrinfo_t *)pmom->mi_data;
+	if (psvrmom->msr_stream >= 0) {
+		return -1;
+	}
+
+	stream = tpp_open(pmom->mi_host, pmom->mi_rmport);
+	psvrmom->msr_stream = stream;
+	if (stream >= 0) {
+		psvrmom->msr_state &= ~(INUSE_UNKNOWN | INUSE_DOWN);
+		tinsert2((u_long)stream, 0, pmom, &streams);
+	}
+	return stream;
 }
 
 
