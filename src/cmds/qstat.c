@@ -2922,9 +2922,8 @@ job_no_args:
 					any_failed = pbs_errno;
 					if ((errmsg = pbs_geterrmsg(connect)) != NULL)
 						fprintf(stderr, "qstat: %s\n", errmsg);
-					else {
+					else
 						fprintf(stderr, "qstat: Error %d\n", pbs_errno);
-					}
 					break;
 				}
 

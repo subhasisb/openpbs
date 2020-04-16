@@ -144,7 +144,7 @@ PBS_resc(int c, int reqtype, char **rescl, int ct, pbs_resource_t rh)
 
 	sock = get_svr_shard_connection(c, -1, NULL);
 	if (sock == -1) {
-		pbs_errno = PBSE_NOSERVER;
+		pbs_errno = PBSE_NOCONNECTION;
 		return pbs_errno;
 	}
 

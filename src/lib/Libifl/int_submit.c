@@ -191,7 +191,7 @@ PBSD_rdytocmt(int c, char *jobid, int prot, char **msgid)
 	if (prot == PROT_TCP) {
 		sock = get_svr_shard_connection(c, -1, NULL);
 		if (sock == -1) {
-			return (pbs_errno = PBSE_NOSERVER);
+			return (pbs_errno = PBSE_NOCONNECTION);
 		}
 		DIS_tcp_funcs();
 	} else {
@@ -252,7 +252,7 @@ PBSD_commit(int c, char *jobid, int prot, char **msgid)
 	if (prot == PROT_TCP) {
 		sock = get_svr_shard_connection(c, -1, NULL);
 		if (sock == -1) {
-			return (pbs_errno = PBSE_NOSERVER);
+			return (pbs_errno = PBSE_NOCONNECTION);
 		}
 		DIS_tcp_funcs();
 	} else {
@@ -320,7 +320,7 @@ PBSD_scbuf(int c, int reqtype, int seq, char *buf, int len, char *jobid, enum jo
 		DIS_tcp_funcs();
 		sock = get_svr_shard_connection(c, -1, NULL);
 		if (sock == -1)
-			return (pbs_errno = PBSE_NOSERVER);
+			return (pbs_errno = PBSE_NOCONNECTION);
 	} else {
 		sock = c;
 		if ((rc = is_compose_cmd(sock, IS_CMD, msgid)) != DIS_SUCCESS)
@@ -533,11 +533,11 @@ PBSD_queuejob(int c, char *jobid, char *destin, struct attropl *attrib, char *ex
 		DIS_tcp_funcs();
 		sock = get_svr_shard_connection(c, -1, NULL);
 		if (sock == -1) {
-			if (set_conn_errtxt(c, "cannot connect to server") != 0) {
+			if (set_conn_errtxt(c, pbse_to_txt(PBSE_NOCONNECTION)) != 0) {
 				pbs_errno = PBSE_SYSTEM;
 				return NULL;
 			}
-			pbs_errno = PBSE_NOSERVER;
+			pbs_errno = PBSE_NOCONNECTION;
 			return NULL;
 		}
 	} else {

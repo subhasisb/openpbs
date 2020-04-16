@@ -76,9 +76,9 @@ PBSD_msg_put(int c, char *jobid, int fileopt, char *msg, char *extend, int prot,
 	if (prot == PROT_TCP) {
 		sock = get_svr_shard_connection(c, -1, NULL);
 		if (sock == -1) {
-			if (set_conn_errtxt(c, "cannot connect to server") != 0)
+			if (set_conn_errtxt(c, pbse_to_txt(PBSE_NOCONNECTION)) != 0)
 				return (pbs_errno = PBSE_SYSTEM);
-			return (pbs_errno = PBSE_NOSERVER);
+			return (pbs_errno = PBSE_NOCONNECTION);
 		}
 		DIS_tcp_funcs();
 	} else {
@@ -125,9 +125,9 @@ PBSD_py_spawn_put(int c, char *jobid, char **argv, char **envp, int prot, char *
 	if (prot == PROT_TCP) {
 		sock = get_svr_shard_connection(c, -1, NULL);
 		if (sock == -1) {
-			if (set_conn_errtxt(c, "cannot connect to server") != 0)
+			if (set_conn_errtxt(c, pbse_to_txt(PBSE_NOCONNECTION)) != 0)
 				return (pbs_errno = PBSE_SYSTEM);
-			return (pbs_errno = PBSE_NOSERVER);
+			return (pbs_errno = PBSE_NOCONNECTION);
 		}
 		DIS_tcp_funcs();
 	} else {
@@ -164,9 +164,9 @@ PBSD_relnodes_put(int c, char *jobid, char *node_list, char *extend, int prot, c
 	if (prot == PROT_TCP) {
 		sock = get_svr_shard_connection(c, -1, NULL);
 		if (sock == -1) {
-			if (set_conn_errtxt(c, "cannot connect to server") != 0)
+			if (set_conn_errtxt(c, pbse_to_txt(PBSE_NOCONNECTION)) != 0)
 				return (pbs_errno = PBSE_SYSTEM);
-			return (pbs_errno = PBSE_NOSERVER);
+			return (pbs_errno = PBSE_NOCONNECTION);
 		}
 		DIS_tcp_funcs();
 	} else {

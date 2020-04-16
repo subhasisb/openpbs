@@ -196,7 +196,7 @@ cnt:
 				any_failed = pbs_errno;
 				if ((errmsg = pbs_geterrmsg(connect)) != NULL)
 					fprintf(stderr, "qdel: %s\n", errmsg);
-				else 
+				else
 					fprintf(stderr, "qdel: Error %d\n", pbs_errno);
 				break;
 			}

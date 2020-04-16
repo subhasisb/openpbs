@@ -89,9 +89,9 @@ __pbs_runjob(int c, char *jobid, char *location, char *extend)
 	set_new_shard_context(c);
 	sock = get_svr_shard_connection(c, JOB, jobid);
 	if (sock == -1) {
-		if (set_conn_errtxt(c, "cannot connect to server") != 0)
+		if (set_conn_errtxt(c, pbse_to_txt(PBSE_NOCONNECTION)) != 0)
 			return (pbs_errno = PBSE_SYSTEM);
-		return (pbs_errno = PBSE_NOSERVER);
+		return (pbs_errno = PBSE_NOCONNECTION);
 	}
 
 	/* setup DIS support routines for following DIS calls */

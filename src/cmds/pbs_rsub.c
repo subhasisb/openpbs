@@ -955,7 +955,8 @@ main(int argc, char *argv[], char *envp[])
 		errmsg = pbs_geterrmsg(connect);
 		if (errmsg != NULL) {
 			fprintf(stderr, "pbs_rsub: %s\n", errmsg);
-		} else 
+		}
+		else
 			fprintf(stderr, "pbs_rsub: Error (%d) submitting reservation\n", pbs_errno);
 		CS_close_app();
 		exit(pbs_errno);

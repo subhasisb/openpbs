@@ -163,7 +163,7 @@ __pbs_terminate(int c, int manner, char *extend)
 		}
 		if (count == 0) {
 			/* could not send to any servers, all down */
-			rc = PBSE_NOSERVER;
+			rc = PBSE_NOCONNECTION;
 		}
 		if (errd > 0) {
 			rc = rc_errd;

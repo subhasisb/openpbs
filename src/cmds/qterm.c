@@ -224,8 +224,9 @@ execute(int manner, char *server)
 	if ((ct = cnt2server(server)) > 0) {
 		err = pbs_terminate(ct, manner, NULL);
 		if (err != 0) {
-			if (err == PBSE_NOSERVER) {
+			if (err == PBSE_NOCONNECTION) {
 				fprintf(stderr, "qterm: could not connect to server %s (%d)\n", server, pbs_errno);
+				exitstatus = 2;
 			} else {
 				errmsg = pbs_geterrmsg(ct);
 				if (errmsg != NULL) {
@@ -234,8 +235,8 @@ execute(int manner, char *server)
 					fprintf(stderr, "qterm: Error (%d) terminating server ", pbs_errno);
 				}
 				fprintf(stderr, "%s\n", server);
+				exitstatus = 2;
 			}
-			exitstatus = 2;
 		}
 		pbs_disconnect(ct);
 	} else {

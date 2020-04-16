@@ -663,9 +663,8 @@ refresh_dfltqsubargs(void)
 	if (ss == NULL && pbs_errno != PBSE_NONE) {
 		if ((errmsg = pbs_geterrmsg(sd_svr)) != NULL)
 			fprintf(stderr, "qsub: %s\n", errmsg);
-		else {
+		else
 			fprintf(stderr, "qsub: Error %d\n", pbs_errno);
-		}
 		return;
 	}
 

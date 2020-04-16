@@ -471,7 +471,7 @@ get_svr_shard_connection(int vsock, enum pbs_obj_type obj_type, void *obj_id)
 	num_of_conf_servers = get_current_servers();
 	if (shard_init_flag == -1) {
 		if (pbs_shard_init(max_num_servers, (server_instance_t **)pbs_conf.psi, num_of_conf_servers) == -1) {
-			pbs_errno = PBSE_NOSERVER;
+			pbs_errno = PBSE_NOCONNECTION;
 			goto err;
 		}
 		shard_init_flag = 1;
@@ -487,7 +487,7 @@ get_svr_shard_connection(int vsock, enum pbs_obj_type obj_type, void *obj_id)
 		if (srv_index == -1) {
 			srv_index = pbs_shard_get_server_byindex(obj_type, obj_id, inact_svr_indexes);
 			if (srv_index == -1 || srv_index >= num_of_conf_servers) {
-				pbs_errno = PBSE_NOSERVER;
+				pbs_errno = PBSE_NOCONNECTION;
 				goto err;
 			}
 		}

@@ -80,7 +80,7 @@ __pbs_movejob(int c, char *jobid, char *destin, char *extend)
 	set_new_shard_context(c);
 	sock = get_svr_shard_connection(c, -1, NULL);
 	if (sock == -1) {
-		if (set_conn_errtxt(c, "cannot connect to server") != 0)
+		if (set_conn_errtxt(c, pbse_to_txt(PBSE_NOCONNECTION)) != 0)
 			return (pbs_errno = PBSE_SYSTEM);
 		return (pbs_errno = PBSE_NOSERVER);
 	}

@@ -77,7 +77,7 @@ pbs_stagein(int c, char *jobid, char *location, char *extend)
 
 	sock = get_svr_shard_connection(c, -1, NULL);
 	if (sock == -1) {
-		return (pbs_errno = PBSE_NOSERVER);
+		return (pbs_errno = PBSE_NOCONNECTION);
 	}
 
 	/* initialize the thread context data, if not already initialized */

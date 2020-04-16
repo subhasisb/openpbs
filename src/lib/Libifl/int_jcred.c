@@ -82,7 +82,7 @@ PBSD_jcred(int c, int type, char *buf, int len, int prot, char **msgid)
 	if (prot == PROT_TCP) {
 		sock = get_svr_shard_connection(c, -1, NULL);
 		if (sock == -1) {
-			return (pbs_errno = PBSE_NOSERVER);
+			return (pbs_errno = PBSE_NOCONNECTION);
 		}
 		DIS_tcp_funcs();
 	} else {

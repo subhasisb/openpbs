@@ -183,9 +183,9 @@ PBSD_select_put(int c, int type, struct attropl *attrib,
 
 	sock = get_svr_shard_connection(c, -1, NULL);
 	if (sock == -1) {
-		if (set_conn_errtxt(c, "cannot connect to server") != 0)
+		if (set_conn_errtxt(c, pbse_to_txt(PBSE_NOCONNECTION)) != 0)
 			return (pbs_errno = PBSE_SYSTEM);
-		return (pbs_errno = PBSE_NOSERVER);
+		return (pbs_errno = PBSE_NOCONNECTION);
 	}
 
 	/* setup DIS support routines for following DIS calls */

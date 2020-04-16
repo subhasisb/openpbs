@@ -344,8 +344,8 @@ handle_resv(char *resv_id, char *server, int how)
 		if (server_attrs == NULL && pbs_errno != PBSE_NONE) {
 			if ((errmsg = pbs_geterrmsg(pbs_sd)) != NULL)
 				fprintf(stderr, "pbs_rstat: %s\n", errmsg);
-			else 
-				fprintf(stderr, "pbs_rstat: Error %d\n", pbs_errno);			
+			else
+				fprintf(stderr, "pbs_rstat: Error %d\n", pbs_errno);
 			return;
 		}
 

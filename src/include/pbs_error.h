@@ -168,6 +168,7 @@ extern "C" {
 #define PBSE_SSIGNON_UNSET_REJECT 15101	/* SVR_ssignon_enable not set */
 #define PBSE_SSIGNON_SET_REJECT 15102	/* SVR_ssignon_enable set */
 #define PBSE_SSIGNON_BAD_TRANSITION1 15103 /* bad attempt: true to false */
+#define PBSE_NOCONNECTION 15104		/* could not connect to any servers */
 
 /*
  * Error number 15104 for PBSE_SSIGNON_BAD_TRANSITION2

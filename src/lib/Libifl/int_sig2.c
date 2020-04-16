@@ -76,9 +76,9 @@ PBSD_sig_put(int c, char *jobid, char *signal, char *extend, int prot, char **ms
 	if (prot == PROT_TCP) {
 		sock = get_svr_shard_connection(c, JOB, jobid);
 		if (sock == -1) {
-			if (set_conn_errtxt(c, "cannot connect to server") != 0)
+			if (set_conn_errtxt(c, pbse_to_txt(PBSE_NOCONNECTION)) != 0)
 				return (pbs_errno = PBSE_SYSTEM);
-			return (pbs_errno = PBSE_NOSERVER);
+			return (pbs_errno = PBSE_NOCONNECTION);
 		}
 		DIS_tcp_funcs();
 	} else {
