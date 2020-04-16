@@ -84,10 +84,12 @@ __pbs_orderjob(int c, char *job1, char *job2, char *extend)
 	if (pbs_client_thread_lock_connection(c) != 0)
 		return pbs_errno;
 
-	/* Below reset would force the next connection request to select a random server */
+	/* Below reset would force the connection to execute the sharding logic afresh */
 	set_new_shard_context(c);
 	sock = get_svr_shard_connection(c, JOB, job1);
 	if (sock == -1) {
+		if (set_conn_errtxt(c, "cannot connect to server") != 0)
+			return (pbs_errno = PBSE_SYSTEM);
 		return (pbs_errno = PBSE_NOSERVER);
 	}
 

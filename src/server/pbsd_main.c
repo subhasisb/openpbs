@@ -867,7 +867,7 @@ main(int argc, char **argv)
 	if ((pc = strchr(daemonname, (int)'.')) != NULL)
 		*pc = '\0';
 
-	if(!(self.name = strdup(server_host))) {
+	if (!(self.name = strdup(server_host))) {
 		log_err(-1, __func__, "Out of memory\n");
 		return -1;			
 	}

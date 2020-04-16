@@ -1107,12 +1107,8 @@ main(int argc, char *argv[])
 				if (!quiet) {
 					if ((errmsg = pbs_geterrmsg(con)) != NULL)
 						fprintf(stderr, "%s: %s\n", argv[0], errmsg);
-					else {
-						if (pbs_errno == PBSE_NOSERVER) 
-							fprintf(stderr, "%s: cannot connect to server (%d)\n", argv[0], pbs_errno);
-						else
-							fprintf(stderr, "%s: Error %d\n", argv[0], pbs_errno);
-					}						
+					else 
+						fprintf(stderr, "%s: Error %d\n", argv[0], pbs_errno);						
 				}
 				exit(1);
 			} else {

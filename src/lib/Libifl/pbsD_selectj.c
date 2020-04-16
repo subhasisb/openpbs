@@ -93,7 +93,7 @@ __pbs_selectjob(int c, struct attropl *attrib, char *extend)
 	if (pbs_client_thread_lock_connection(c) != 0)
 		return NULL;
 
-	/* Below reset would force the next connection request to select a random server */
+	/* Below reset would force the connection to execute the sharding logic afresh */
 	set_new_shard_context(c);
 	if (PBSD_select_put(c, PBS_BATCH_SelectJobs, attrib, NULL, extend) == 0)
 		ret = PBSD_select_get(c);
@@ -146,7 +146,7 @@ __pbs_selstat(int c, struct attropl *attrib, struct attrl   *rattrib, char *exte
 	if (pbs_client_thread_lock_connection(c) != 0)
 		return NULL;
 
-	/* Below reset would force the next connection request to select a random server */
+	/* Below reset would force the connection to execute the sharding logic afresh */
 	set_new_shard_context(c);
 	if (PBSD_select_put(c, PBS_BATCH_SelStat, attrib, rattrib, extend) == 0)
 		ret = PBSD_status_get(c);
@@ -183,6 +183,8 @@ PBSD_select_put(int c, int type, struct attropl *attrib,
 
 	sock = get_svr_shard_connection(c, -1, NULL);
 	if (sock == -1) {
+		if (set_conn_errtxt(c, "cannot connect to server") != 0)
+			return (pbs_errno = PBSE_SYSTEM);
 		return (pbs_errno = PBSE_NOSERVER);
 	}
 

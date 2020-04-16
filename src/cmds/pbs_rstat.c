@@ -344,12 +344,8 @@ handle_resv(char *resv_id, char *server, int how)
 		if (server_attrs == NULL && pbs_errno != PBSE_NONE) {
 			if ((errmsg = pbs_geterrmsg(pbs_sd)) != NULL)
 				fprintf(stderr, "pbs_rstat: %s\n", errmsg);
-			else {
-				if (pbs_errno == PBSE_NOSERVER) 
-					fprintf(stderr, "pbs_rstat: cannot connect to server (%d)\n", pbs_errno);
-				else
-					fprintf(stderr, "pbs_rstat: Error %d\n", pbs_errno);
-			}				
+			else 
+				fprintf(stderr, "pbs_rstat: Error %d\n", pbs_errno);			
 			return;
 		}
 

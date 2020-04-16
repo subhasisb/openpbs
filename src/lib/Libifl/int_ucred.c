@@ -84,6 +84,8 @@ PBSD_ucred(int c, char *user, int type, char *buf, int len)
 
 	sock = get_svr_shard_connection(c, -1, NULL);
 	if (sock == -1) {
+		if (set_conn_errtxt(c, "cannot connect to server") != 0)
+			return (pbs_errno = PBSE_SYSTEM);
 		return (pbs_errno = PBSE_NOSERVER);
 	}
 
@@ -149,6 +151,8 @@ PBSD_user_migrate(int c, char *tohost)
 
 	sock = get_svr_shard_connection(c, -1, NULL);
 	if (sock == -1) {
+		if (set_conn_errtxt(c, "cannot connect to server") != 0)
+			return (pbs_errno = PBSE_SYSTEM);
 		return (pbs_errno = PBSE_NOSERVER);
 	}
 

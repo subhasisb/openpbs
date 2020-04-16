@@ -486,7 +486,7 @@ PBSD_jobfile(int c, int req_type, char *path, char *jobid, enum job_file which, 
 	}
 	i = 0;
 	cc = read(fd, s_buf, SCRIPT_CHUNK_Z);
-	/* Below reset would force the next connection request to select a random server */
+	/* Below reset would force the connection to execute the sharding logic afresh */
 	set_new_shard_context(c);
 	while ((cc > 0) &&
 		((rc = PBSD_scbuf(c, req_type, i, s_buf, cc, jobid, which, prot, msgid)) == 0)) {
@@ -533,6 +533,10 @@ PBSD_queuejob(int c, char *jobid, char *destin, struct attropl *attrib, char *ex
 		DIS_tcp_funcs();
 		sock = get_svr_shard_connection(c, -1, NULL);
 		if (sock == -1) {
+			if (set_conn_errtxt(c, "cannot connect to server") != 0) {
+				pbs_errno = PBSE_SYSTEM;
+				return NULL;
+			}
 			pbs_errno = PBSE_NOSERVER;
 			return NULL;
 		}

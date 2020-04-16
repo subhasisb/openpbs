@@ -302,15 +302,10 @@ tcp_connect(int vsock, char *server, int server_port, char *extend_data)
 	pbs_server[sizeof(pbs_server) - 1] = '\0';
 		/* and connect... */
 
-	/* if specific host name declared for the host on which */
-	/* this client is running,  get its address */
+	/* If a specific host name is defined which the client should use */
 	if (pbs_conf.pbs_public_host_name) {
 		if (get_hostsockaddr(pbs_conf.pbs_public_host_name, &my_sockaddr) != 0)
 			return -1; /* pbs_errno was set */
-	}
-
-	/* If a specific host name is defined which the client should use */
-	if (pbs_conf.pbs_public_host_name) {
 		/* my address will be in my_sockaddr,  bind the socket to it */
 		my_sockaddr.sin_port = 0;
 		if (bind(sd, (struct sockaddr *)&my_sockaddr, sizeof(my_sockaddr)) != 0) {
@@ -850,7 +845,7 @@ __pbs_disconnect(int connect)
 			return -1;
 		for (i = 0; i < get_current_servers(); i++) {
 			if (shard_connection[i] && 
-				shard_connection[i]->sd >=0 && 
+				shard_connection[i]->sd >= 0 && 
 				shard_connection[i]->state == SHARD_CONN_STATE_CONNECTED) {
 					if (get_conn_chan(shard_connection[i]->sd) == NULL)
 						continue;

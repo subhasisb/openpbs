@@ -74,6 +74,10 @@ PBSD_submit_resv(int connect, char *resv_id, struct attropl *attrib, char *exten
 
 	sock = get_svr_shard_connection(connect, -1, NULL);
 	if (sock == -1) {
+		if (set_conn_errtxt(connect, "cannot connect to server") != 0){
+			pbs_errno = PBSE_SYSTEM;
+			return NULL;
+		}
 		pbs_errno = PBSE_NOSERVER;
 		return NULL;
 	}

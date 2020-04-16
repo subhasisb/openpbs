@@ -87,10 +87,12 @@ __pbs_msgjob(int c, char *jobid, int fileopt, char *msg, char *extend)
 	if (pbs_client_thread_lock_connection(c) != 0)
 		return pbs_errno;
 
-	/* Below reset would force the next connection request to select a random server */
+	/* Below reset would force the connection to execute the sharding logic afresh */
 	set_new_shard_context(c);
 	sock = get_svr_shard_connection(c, JOB, jobid);
 	if (sock == -1) {
+		if (set_conn_errtxt(c, "cannot connect to server") != 0)
+			return (pbs_errno = PBSE_SYSTEM);
 		return (pbs_errno = PBSE_NOSERVER);
 	}
 
@@ -279,10 +281,12 @@ char *extend;
 	if (pbs_client_thread_lock_connection(c) != 0)
 		return pbs_errno;
 
-	/* Below reset would force the next connection request to select a random server */
+	/* Below reset would force the connection to execute the sharding logic afresh */
 	set_new_shard_context(c);
 	sock = get_svr_shard_connection(c, JOB, jobid);
 	if (sock == -1) {
+		if (set_conn_errtxt(c, "cannot connect to server") != 0)
+			return (pbs_errno = PBSE_SYSTEM);
 		return (pbs_errno = PBSE_NOSERVER);
 	}
 

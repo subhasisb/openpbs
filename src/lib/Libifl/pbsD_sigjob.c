@@ -80,7 +80,7 @@ __pbs_sigjob(int c, char *jobid, char *signal, char *extend)
 	if (pbs_client_thread_lock_connection(c) != 0)
 		return pbs_errno;
 
-	/* Below reset would force the next connection request to select a random server */
+	/* Below reset would force the connection to execute the sharding logic afresh */
 	set_new_shard_context(c);
 	/* send request */
 	if ((rc = PBSD_sig_put(c, jobid, signal, extend, PROT_TCP, NULL)) != 0) {

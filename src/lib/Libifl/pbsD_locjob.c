@@ -78,6 +78,10 @@ __pbs_locjob(int c, char *jobid, char *extend)
 
 	sock = get_svr_shard_connection(c, JOB, jobid);
 	if (sock == -1) {
+		if (set_conn_errtxt(c, "cannot connect to server") != 0) {
+			pbs_errno = PBSE_SYSTEM;
+			return NULL;
+		}
 		pbs_errno = PBSE_NOSERVER;
 		return NULL;
 	}

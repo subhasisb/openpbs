@@ -152,10 +152,7 @@ execute(char *queue, char *server)
 			if (errmsg != NULL) {
 				fprintf(stderr, "qstop: %s ", errmsg);
 			} else {
-				if (pbs_errno == PBSE_NOSERVER) 
-					fprintf(stderr, "qstop: cannot connect to server (%d) ", pbs_errno);
-				else
-					fprintf(stderr, "qstop: Error (%d) disabling queue ", pbs_errno);
+				fprintf(stderr, "qstop: Error (%d) disabling queue ", pbs_errno);
 			}
 			if (notNULL(queue))
 				fprintf(stderr, "%s", queue);

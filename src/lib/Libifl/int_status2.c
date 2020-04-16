@@ -77,6 +77,8 @@ PBSD_status_put(int c, int function, char *id, struct attrl *attrib, char *exten
 		DIS_tcp_funcs();
 		sock = get_svr_shard_connection(c, -1, NULL);
 		if (sock == -1) {
+			if (set_conn_errtxt(c, "cannot connect to server") != 0)
+				return (pbs_errno = PBSE_SYSTEM);
 			return 	(pbs_errno = PBSE_NOSERVER);
 		}
 	} else {

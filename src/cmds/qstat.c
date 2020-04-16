@@ -2923,10 +2923,7 @@ job_no_args:
 					if ((errmsg = pbs_geterrmsg(connect)) != NULL)
 						fprintf(stderr, "qstat: %s\n", errmsg);
 					else {
-						if (pbs_errno == PBSE_NOSERVER) 
-							fprintf(stderr, "qstat: cannot connect to server (%d)\n", pbs_errno);
-						else
-							fprintf(stderr, "qstat: Error %d\n", pbs_errno);
+						fprintf(stderr, "qstat: Error %d\n", pbs_errno);
 					}
 					break;
 				}
