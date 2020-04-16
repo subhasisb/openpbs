@@ -71,10 +71,21 @@ __pbs_locjob(int c, char *jobid, char *extend)
 	int	rc;
 	struct batch_reply *reply;
 	char       *ploc = NULL;
+	int sock;
 
 	if ((jobid == NULL) || (*jobid == '\0')) {
 		pbs_errno = PBSE_IVALREQ;
 		return (ploc);
+	}
+
+	sock = get_svr_shard_connection(c, JOB, jobid);
+	if (sock == -1) {
+		if (set_conn_errtxt(c, pbse_to_txt(PBSE_NOCONNECTION)) != 0) {
+			pbs_errno = PBSE_SYSTEM;
+			return NULL;
+		}
+		pbs_errno = PBSE_NOCONNECTION;
+		return NULL;
 	}
 
 	/* initialize the thread context data, if not already initialized */
@@ -90,9 +101,9 @@ __pbs_locjob(int c, char *jobid, char *extend)
 
 	DIS_tcp_funcs();
 
-	if ((rc = encode_DIS_ReqHdr(c, PBS_BATCH_LocateJob, pbs_current_user)) ||
-		(rc = encode_DIS_JobId(c, jobid))	   ||
-		(rc = encode_DIS_ReqExtend(c, extend))) {
+	if ((rc = encode_DIS_ReqHdr(sock, PBS_BATCH_LocateJob, pbs_current_user)) ||
+		(rc = encode_DIS_JobId(sock, jobid))	   ||
+		(rc = encode_DIS_ReqExtend(sock, extend))) {
 		if (set_conn_errtxt(c, dis_emsg[rc]) != 0) {
 			pbs_errno = PBSE_SYSTEM;
 		} else {
@@ -104,7 +115,7 @@ __pbs_locjob(int c, char *jobid, char *extend)
 
 	/* write data over tcp stream */
 
-	if (dis_flush(c)) {
+	if (dis_flush(sock)) {
 		pbs_errno = PBSE_PROTOCOL;
 		(void)pbs_client_thread_unlock_connection(c);
 		return NULL;

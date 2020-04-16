@@ -116,6 +116,7 @@ __runjob_helper(int c, char *jobid, char *location, char *extend, int req_type)
 {
 	int rc = 0;
 	unsigned long resch = 0;
+	int	sock;
 
 	if ((jobid == NULL) || (*jobid == '\0'))
 		return (pbs_errno = PBSE_IVALREQ);
@@ -130,6 +131,15 @@ __runjob_helper(int c, char *jobid, char *location, char *extend, int req_type)
 	/* blocking call, waits for mutex release */
 	if (pbs_client_thread_lock_connection(c) != 0)
 		return pbs_errno;
+
+	/* Below reset would force the connection to execute the sharding logic afresh */
+	set_new_shard_context(c);
+	sock = get_svr_shard_connection(c, JOB, jobid);
+	if (sock == -1) {
+		if (set_conn_errtxt(c, pbse_to_txt(PBSE_NOCONNECTION)) != 0)
+			return (pbs_errno = PBSE_SYSTEM);
+		return (pbs_errno = PBSE_NOCONNECTION);
+	}
 
 	/* setup DIS support routines for following DIS calls */
 
@@ -149,7 +159,7 @@ __runjob_helper(int c, char *jobid, char *location, char *extend, int req_type)
 		return pbs_errno;
 	}
 
-	if (dis_flush(c)) {
+	if (dis_flush(sock)) {
 		pbs_errno = PBSE_PROTOCOL;
 		pbs_client_thread_unlock_connection(c);
 		return pbs_errno;

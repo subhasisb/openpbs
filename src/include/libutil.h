@@ -334,6 +334,15 @@ DECLDIR void encode_SHA(char*, size_t, char **);
 void encode_SHA(char*, size_t, char **);
 #endif
 
+/**
+ * Getter function to get the max number of servers.
+ */
+extern int get_max_servers();
+
+/**
+ * Getter function to get the number of currently configured servers.
+ */
+extern int get_current_servers();
 
 #ifdef  __cplusplus
 }

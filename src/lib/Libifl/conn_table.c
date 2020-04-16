@@ -522,3 +522,145 @@ get_conn_mutex(int fd)
 	UNLOCK_TABLE(NULL);
 	return mutex;
 }
+
+/**
+ * @brief
+ * 	set_conn_shard_context - set connection shard context synchronously
+ *
+ * @param[in] vfd - Virtual socket number
+ * @param[in] sock - socket on connection
+ *
+ * @return int
+ * @retval 0 - success
+ * @retval -1 - error
+ *
+ * @par Side Effects:
+ *	None
+ *
+ * @par MT-safe: Yes
+ */
+int
+set_conn_shard_context(int vfd, int index)
+{
+	pbs_conn_t *p = NULL;
+
+	if (INVALID_SOCK(vfd))
+		return -1;
+
+	LOCK_TABLE(-1);
+	p = get_connection(vfd);
+	if (p == NULL) {
+		UNLOCK_TABLE(-1);
+		return -1;
+	}
+	p->shard_context = index;
+	UNLOCK_TABLE(-1);
+	return 0;
+}
+
+/**
+ * @brief
+ * 	get_conn_shard_context - get connection shard context synchronously
+ *
+ * @param[in] fd - socket number
+ *
+ * @return int
+ * @retval >= 0 - success
+ * @retval -1 - error
+ *
+ * @par Side Effects:
+ *	None
+ *
+ * @par MT-safe: Yes
+ */
+int
+get_conn_shard_context(int vfd)
+{
+	pbs_conn_t *p = NULL;
+	int index = -1;
+
+	if (INVALID_SOCK(vfd))
+		return -1;
+
+	LOCK_TABLE(-1);
+	p = get_connection(vfd);
+	if (p == NULL) {
+		UNLOCK_TABLE(-1);
+		return -1;
+	}
+	index = p->shard_context;
+	UNLOCK_TABLE(-1);
+	return index;
+}
+
+/**
+ * @brief
+ * 	set_conn_shards - set connection shards structure synchronously
+ *
+ * @param[in] fd - socket number
+ * @param[in] shards - tcp chan to set on connection
+ *
+ * @return int
+ * @retval 0 - success
+ * @retval -1 - error
+ *
+ * @par Side Effects:
+ *	None
+ *
+ * @par MT-safe: Yes
+ */
+int
+set_conn_shards(int vfd, void *shards)
+{
+	pbs_conn_t *p = NULL;
+
+	if (INVALID_SOCK(vfd))
+		return -1;
+
+	LOCK_TABLE(-1);
+	p = get_connection(vfd);
+	if (p == NULL) {
+		errno = ENOTCONN;
+		UNLOCK_TABLE(-1);
+		return -1;
+	}
+	p->ch_shards = shards;
+	UNLOCK_TABLE(-1);
+	return 0;
+}
+
+/**
+ * @brief
+ * 	get_conn_shards - get connection shards synchronously
+ *
+ * @param[in] fd - socket number
+ *
+ * @return shard_conn_t **
+ * @retval !NULL - success
+ * @retval NULL - error
+ *
+ * @par Side Effects:
+ *	None
+ *
+ * @par MT-safe: Yes
+ */
+void *
+get_conn_shards(int vfd)
+{
+	pbs_conn_t *p = NULL;
+	void *shards = NULL;
+
+	if (INVALID_SOCK(vfd))
+		return NULL;
+
+	LOCK_TABLE(NULL);
+	p = get_connection(vfd);
+	if (p == NULL) {
+		errno = ENOTCONN;
+		UNLOCK_TABLE(NULL);
+		return NULL;
+	}
+	shards = p->ch_shards;
+	UNLOCK_TABLE(NULL);
+	return shards;
+}

@@ -78,17 +78,29 @@ int
 PBSD_mgr_put(int c, int function, int command, int objtype, char *objname, struct attropl *aoplp, char *extend, int prot, char **msgid)
 {
 	int rc;
+	int sock;
 
 	if (prot == PROT_TCP) {
+		char *shardhint = NULL;
+		if (objtype == MGR_OBJ_JOB || objtype == MGR_OBJ_RESV)
+			shardhint = objname;
+
+		sock = get_svr_shard_connection(c, JOB, shardhint);
+		if (sock == -1) {
+			if (set_conn_errtxt(c, pbse_to_txt(PBSE_NOCONNECTION)) != 0)
+				return (pbs_errno = PBSE_SYSTEM);
+			return (pbs_errno = PBSE_NOCONNECTION);
+		}
 		DIS_tcp_funcs();
 	} else {
-		if ((rc = is_compose_cmd(c, IS_CMD, msgid)) != DIS_SUCCESS)
+		sock = c;
+		if ((rc = is_compose_cmd(sock, IS_CMD, msgid)) != DIS_SUCCESS)
 			return rc;
 	}
 
-	if ((rc = encode_DIS_ReqHdr(c, function, pbs_current_user)) ||
-		(rc = encode_DIS_Manage(c, command, objtype, objname, aoplp)) ||
-		(rc = encode_DIS_ReqExtend(c, extend))) {
+	if ((rc = encode_DIS_ReqHdr(sock, function, pbs_current_user)) ||
+		(rc = encode_DIS_Manage(sock, command, objtype, objname, aoplp)) ||
+		(rc = encode_DIS_ReqExtend(sock, extend))) {
 		if (prot == PROT_TCP) {
 			if (set_conn_errtxt(c, dis_emsg[rc]) != 0)
 				return (pbs_errno = PBSE_SYSTEM);
@@ -96,15 +108,13 @@ PBSD_mgr_put(int c, int function, int command, int objtype, char *objname, struc
 		return (pbs_errno = PBSE_PROTOCOL);
 	}
 
-	if (prot == PROT_TPP) {
-		pbs_errno = PBSE_NONE;
-		if (dis_flush(c))
-			pbs_errno = PBSE_PROTOCOL;
-		return pbs_errno;
-	}
 
-	if (dis_flush(c)) {
+	pbs_errno = PBSE_NONE;
+	if (dis_flush(sock)) {
 		return (pbs_errno = PBSE_PROTOCOL);
+	}
+	if (prot == PROT_TPP) {
+		return pbs_errno;
 	}
 	return 0;
 }

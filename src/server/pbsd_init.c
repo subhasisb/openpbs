@@ -116,7 +116,7 @@
 #include "hook_func.h"
 #include "pbs_share.h"
 #include "pbs_undolr.h"
-
+#include "libshard.h"
 #ifndef SIGKILL
 /* there is some weid stuff in gcc include files signal.h & sys/params.h */
 #include <signal.h>
@@ -195,6 +195,7 @@ extern int		brought_up_db;
 extern pbs_db_conn_t	*svr_db_conn;
 
 extern	pbs_list_head	svr_allhooks;
+extern long long svr_jobidnumber;
 
 
 /* External Functions Called */

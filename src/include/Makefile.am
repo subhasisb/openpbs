@@ -44,7 +44,8 @@ include_HEADERS = \
 	pbs_ifl.h \
 	rm.h \
 	tm_.h \
-	tm.h
+	tm.h \
+	libshard.h
 
 noinst_HEADERS = \
 	acct.h \

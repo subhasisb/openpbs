@@ -167,6 +167,7 @@ extern "C" {
 #define PBSE_LICENSEUNAV 15098		/* Floating License unavailable  */
 #define PBSE_NOSCHEDULER 15099		/* Unable to contact Scheduler */
 #define PBSE_RESCNOTSTR  15100		/* resource is not of type string */
+#define PBSE_NOCONNECTION 15104		/* could not connect to any servers */
 
 #define PBSE_MaxArraySize	     15107 /* max array size exceeded */
 #define PBSE_INVALSELECTRESC	     15108 /* resc invalid in select spec */

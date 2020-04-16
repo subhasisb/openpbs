@@ -44,10 +44,12 @@ SUBDIRS = \
 	Libdb \
 	Liblog \
 	Libnet \
+	Libshard \
 	Libpbs \
 	Libpython \
 	Libsite \
 	Libsec \
 	Libtpp \
 	Libutil \
-	Libauth
+	Libauth 
+

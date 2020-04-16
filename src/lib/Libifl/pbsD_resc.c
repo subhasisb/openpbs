@@ -142,14 +142,21 @@ static int
 PBS_resc(int c, int reqtype, char **rescl, int ct, pbs_resource_t rh)
 {
 	int rc;
+	int sock;
+
+	sock = get_svr_shard_connection(c, -1, NULL);
+	if (sock == -1) {
+		pbs_errno = PBSE_NOCONNECTION;
+		return pbs_errno;
+	}
 
 	/* setup DIS support routines for following DIS calls */
 
 	DIS_tcp_funcs();
 
-	if ((rc = encode_DIS_ReqHdr(c, reqtype, pbs_current_user)) ||
-		(rc = encode_DIS_Resc(c, rescl, ct, rh)) ||
-		(rc = encode_DIS_ReqExtend(c, NULL))) {
+	if ((rc = encode_DIS_ReqHdr(sock, reqtype, pbs_current_user)) ||
+		(rc = encode_DIS_Resc(sock, rescl, ct, rh)) ||
+		(rc = encode_DIS_ReqExtend(sock, NULL))) {
 		if (set_conn_errtxt(c, dis_emsg[rc]) != 0) {
 			pbs_errno = PBSE_SYSTEM;
 		} else {
@@ -157,7 +164,7 @@ PBS_resc(int c, int reqtype, char **rescl, int ct, pbs_resource_t rh)
 		}
 		return (pbs_errno);
 	}
-	if (dis_flush(c)) {
+	if (dis_flush(sock)) {
 		return (pbs_errno = PBSE_PROTOCOL);
 	}
 	return (0);
