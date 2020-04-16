@@ -153,7 +153,10 @@ execute(char *queue, char *server)
 			if (errmsg != NULL) {
 				fprintf(stderr, "qenable: %s ", errmsg);
 			} else {
-				fprintf(stderr, "qenable: Error (%d) enabling queue ", pbs_errno);
+					if (pbs_errno == PBSE_NOSERVER) 
+						fprintf(stderr, "qenable: cannot connect to server (%d) ", pbs_errno);
+					else
+						fprintf(stderr, "qenable: Error (%d) enabling queue ", pbs_errno);
 			}
 			if (notNULL(queue))
 				fprintf(stderr, "%s", queue);

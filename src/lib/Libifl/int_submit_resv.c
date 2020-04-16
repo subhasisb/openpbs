@@ -72,7 +72,7 @@ PBSD_submit_resv(int connect, char *resv_id, struct attropl *attrib, char *exten
 	int    rc;
 	int    sock;
 
-	sock = get_svr_shard_connection(connect, JOB, NULL);
+	sock = get_svr_shard_connection(connect, -1, NULL);
 	if (sock == -1) {
 		pbs_errno = PBSE_NOSERVER;
 		return NULL;

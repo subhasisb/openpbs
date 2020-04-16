@@ -96,8 +96,8 @@ struct pbs_config pbs_conf = {
 	NULL,					/* pbs_exec_path */
 	NULL,					/* pbs_server_name */
 	NULL,					/* PBS server id */
-	1,						/* single pbs server instance by default */
-	0,						/* single pbs server instance by default */
+	1,					/* single pbs server instance by default */
+	0,					/* single pbs server instance by default */
 	NULL,					/* pbs_server_instances */
 	NULL,					/* scp_path */
 	NULL,					/* rcp_path */
@@ -279,7 +279,7 @@ parse_psi(char * conf_value)
 	free(pbs_conf.psi);
 
 	if (!(tmp = strdup(conf_value))) {
-		fprintf(stderr, "Ran out of memory parsing configuration %s", conf_value);
+		fprintf(stderr, "Ran out of memory parsing configuration %s\n", conf_value);
 		return -1;
 	}
 
@@ -291,13 +291,13 @@ parse_psi(char * conf_value)
 		token = strtok_r(NULL, ",", &rest);
 	}
 	free(tmp);
-	if (!(pbs_conf.psi = calloc(count, sizeof(struct pbs_server_instance)))) {
-		fprintf(stderr, "Ran out of memory parsing configuration %s", conf_value);
+	if (!(pbs_conf.psi = calloc(count, sizeof(pbs_server_instance_t)))) {
+		fprintf(stderr, "Ran out of memory parsing configuration %s\n", conf_value);
 		return -1;
 	}
 
 	if (!(tmp = strdup(conf_value))) {
-		fprintf(stderr, "Ran out of memory parsing configuration %s", conf_value);
+		fprintf(stderr, "Ran out of memory parsing configuration %s\n", conf_value);
 		return -1;
 	}
 	rest = tmp;
@@ -309,15 +309,15 @@ parse_psi(char * conf_value)
 		port = PBS_BATCH_SERVICE_PORT;
 		if ((p = strchr(token, ':'))) {
 			*p = '\0';
-			port = atol(p+1);
+			port = (int)strtol(p+1, NULL, 10);
 		}
 		host = token;
 		if (*host == '\0') {
 			host = pbs_conf.pbs_server_name;
 		}
 
-		if (!(pbs_conf.psi[count] = calloc(1, sizeof(struct pbs_server_instance)))) {
-			fprintf(stderr, "Ran out of memory parsing configuration %s", conf_value);
+		if (!(pbs_conf.psi[count] = calloc(1, sizeof(pbs_server_instance_t)))) {
+			fprintf(stderr, "Ran out of memory parsing configuration %s\n", conf_value);
 			return -1;
 		}
 		if (!(pbs_conf.psi[count]->name = strdup(host))) {

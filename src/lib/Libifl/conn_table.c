@@ -538,7 +538,7 @@ get_conn_mutex(int fd)
  * @par MT-safe: Yes
  */
 int
-set_conn_shard_context(int vfd, int sock)
+set_conn_shard_context(int vfd, int index)
 {
 	pbs_conn_t *p = NULL;
 
@@ -551,7 +551,7 @@ set_conn_shard_context(int vfd, int sock)
 		UNLOCK_TABLE(-1);
 		return -1;
 	}
-	p->shard_context = sock;
+	p->shard_context = index;
 	UNLOCK_TABLE(-1);
 	return 0;
 }
@@ -575,7 +575,7 @@ int
 get_conn_shard_context(int vfd)
 {
 	pbs_conn_t *p = NULL;
-	int sock = -1;
+	int index = -1;
 
 	if (INVALID_SOCK(vfd))
 		return -1;
@@ -586,9 +586,9 @@ get_conn_shard_context(int vfd)
 		UNLOCK_TABLE(-1);
 		return -1;
 	}
-	sock = p->shard_context;
+	index = p->shard_context;
 	UNLOCK_TABLE(-1);
-	return sock;
+	return index;
 }
 
 /**
@@ -633,7 +633,7 @@ set_conn_shards(int vfd, void *shards)
  *
  * @param[in] fd - socket number
  *
- * @return struct shard_conn **
+ * @return shard_conn_t **
  * @retval !NULL - success
  * @retval NULL - error
  *

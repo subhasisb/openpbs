@@ -295,6 +295,7 @@ pg_db_prepare_job_sqls(pbs_db_conn_t *conn)
 	if (pg_prepare_stmt(conn, STMT_DELETE_JOBSCR, conn->conn_sql, 1) != 0)
 		return -1;
 
+
 	return 0;
 }
 

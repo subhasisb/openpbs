@@ -208,7 +208,7 @@ unsigned int	pbs_mom_port;
 unsigned int	pbs_rm_port;
 pbs_net_t	pbs_server_addr;
 unsigned int	pbs_server_port_dis;
-struct pbs_server_instance self;
+pbs_server_instance_t self;
 int myindex = 0;
 /*
  * the names of the Server:
@@ -867,7 +867,10 @@ main(int argc, char **argv)
 	if ((pc = strchr(daemonname, (int)'.')) != NULL)
 		*pc = '\0';
 
-	self.name = strdup(server_host);
+	if(!(self.name = strdup(server_host))) {
+		log_err(-1, __func__, "Out of memory\n");
+		return -1;			
+	}
 	self.port = pbs_conf.batch_service_port;
 	if (get_max_servers() > 1) {
 		if ((myindex = get_svr_index(&self)) == -1) {

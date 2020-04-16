@@ -82,7 +82,10 @@ PBSD_ucred(int c, char *user, int type, char *buf, int len)
 	struct batch_reply	*reply = NULL;
 	int	sock;
 
-	sock = get_svr_shard_connection(c, JOB, NULL);
+	sock = get_svr_shard_connection(c, -1, NULL);
+	if (sock == -1) {
+		return (pbs_errno = PBSE_NOSERVER);
+	}
 
 	/* initialize the thread context data, if not already initialized */
 	if (pbs_client_thread_init_thread_context() != 0)
@@ -144,7 +147,10 @@ PBSD_user_migrate(int c, char *tohost)
 	struct batch_reply	*reply = NULL;
 	int	sock;
 
-	sock = get_svr_shard_connection(c, JOB, NULL);
+	sock = get_svr_shard_connection(c, -1, NULL);
+	if (sock == -1) {
+		return (pbs_errno = PBSE_NOSERVER);
+	}
 
 	/* initialize the thread context data, if not already initialized */
 	if (pbs_client_thread_init_thread_context() != 0)

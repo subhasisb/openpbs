@@ -84,6 +84,7 @@ __pbs_asyrunjob(int c, char *jobid, char *location, char *extend)
 	if (pbs_client_thread_lock_connection(c) != 0)
 		return pbs_errno;
 
+	/* Below reset would force the next connection request to select a random server */
 	set_new_shard_context(c);
 	sock = get_svr_shard_connection(c, JOB, jobid);
 	if (sock == -1) {

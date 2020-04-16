@@ -142,7 +142,11 @@ PBS_resc(int c, int reqtype, char **rescl, int ct, pbs_resource_t rh)
 	int rc;
 	int sock;
 
-	sock = get_svr_shard_connection(c, JOB, NULL);
+	sock = get_svr_shard_connection(c, -1, NULL);
+	if (sock == -1) {
+		pbs_errno = PBSE_NOSERVER;
+		return pbs_errno;
+	}
 
 	/* setup DIS support routines for following DIS calls */
 

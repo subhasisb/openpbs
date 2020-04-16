@@ -2193,7 +2193,7 @@ get_current_servers()
  * @retval	-1, for error	
  */
 int
-get_svr_index(struct pbs_server_instance *instance)
+get_svr_index(pbs_server_instance_t *instance)
 {
 	int i;
 	if (get_max_servers() > 1) {

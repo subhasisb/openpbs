@@ -951,7 +951,6 @@ void pbs_db_free_conn_info(pbs_db_conn_t *conn);
  */
 int pbs_db_get_schema_version(pbs_db_conn_t *conn, int *db_maj_ver, int *db_min_ver);
 
-
 /**
  * @brief
  *	Attempt to mail a message to "mail_from" (administrator), shut down

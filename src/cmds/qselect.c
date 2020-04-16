@@ -588,7 +588,10 @@ main(int argc, char **argv, char **envp) /* qselect */
 			if (errmsg != NULL) {
 				fprintf(stderr, "qselect: %s\n", errmsg);
 			} else {
-				fprintf(stderr, "qselect: Error (%d) selecting jobs\n", pbs_errno);
+				if (pbs_errno == PBSE_NOSERVER) 
+					fprintf(stderr, "qselect: cannot connect to server (%d)\n", pbs_errno);
+				else
+					fprintf(stderr, "qselect: Error (%d) selecting jobs\n", pbs_errno);
 			}
 
 			/*

@@ -273,7 +273,7 @@ get_hostsockaddr(char *host, struct sockaddr_in *sap)
  */
 
 int
-internal_tcp_connect(int vsock, char *server, int server_port, char *extend_data)
+tcp_connect(int vsock, char *server, int server_port, char *extend_data)
 {
 	int i;
 	int sd;
@@ -294,7 +294,7 @@ internal_tcp_connect(int vsock, char *server, int server_port, char *extend_data
 #endif
 	sd = socket(AF_INET, SOCK_STREAM, 0);
 	if (sd == -1) {
-		pbs_errno = PBSE_NOSERVER;
+		pbs_errno = PBSE_SYSTEM;
 		return -1;
 	}	
 
@@ -438,7 +438,7 @@ set_new_shard_context(int vsock)
 
 int internal_client_connect(int vsock, char *server, int port, char *extend_data)
 {
-	return internal_tcp_connect(vsock, server, port, NULL);
+	return tcp_connect(vsock, server, port, NULL);
 }
 
 /**
@@ -464,7 +464,7 @@ get_svr_shard_connection(int vsock, enum pbs_obj_type obj_type, void *obj_id)
 	int inact_servers = 0;
 	static int shard_init_flag = -1;
 	int *inact_svr_indexes = NULL; 
-	struct shard_conn **shard_connection;
+	shard_conn_t **shard_connection;
 	int num_of_conf_servers;
 	int max_num_servers;
 	int srv_index;
@@ -481,7 +481,7 @@ get_svr_shard_connection(int vsock, enum pbs_obj_type obj_type, void *obj_id)
 		}
 		shard_init_flag = 1;
 	}
-	if (!(shard_connection = (struct shard_conn **) get_conn_shards(vsock))) {
+	if (!(shard_connection = (shard_conn_t **) get_conn_shards(vsock))) {
 		pbs_errno = PBSE_INTERNAL;
 		goto err;
 	}
@@ -567,11 +567,11 @@ initialise_shard_conn(int vfd)
 	int i;
 	int j;
 	int num_conf_servers = get_current_servers();
-	struct shard_conn **shard_connection = calloc(num_conf_servers, sizeof(struct shard_conn *));
+	shard_conn_t **shard_connection = calloc(num_conf_servers, sizeof(shard_conn_t *));
 	if (!shard_connection)
 		return -1;
 	for (i = 0; i < num_conf_servers; i++) {
-		shard_connection[i] = malloc(sizeof(struct shard_conn));
+		shard_connection[i] = malloc(sizeof(shard_conn_t));
 		if (!shard_connection[i]) {
 			for (j = 0; j < i; j++ )
 				free(shard_connection[j]);
@@ -651,14 +651,14 @@ __pbs_connect_extend(char *server, char *extend_data)
 #endif
 	sd = socket(AF_INET, SOCK_STREAM, 0);
 	if (sd == -1) {
-		pbs_errno = PBSE_NOSERVER;
+		pbs_errno = PBSE_SYSTEM;
 		return -1;
 	}
 
 	if ((strcmp(server,pbs_default()) == 0) && get_max_servers() > 1) {
 		set_conn_shard_context(sd, -1);
 		if (initialise_shard_conn(sd)) {
-			pbs_errno = PBSE_NOSERVER;
+			pbs_errno = PBSE_INTERNAL;
 			return -1;
 		}
 		/* can't use failover for now, take a different path. 
@@ -709,7 +709,7 @@ __pbs_connect_extend(char *server, char *extend_data)
 		if (have_alt) 
 			server = altservers[i];
 
-		sock = internal_tcp_connect(sd, server, server_port, extend_data);
+		sock = tcp_connect(sd, server, server_port, extend_data);
 		if (sock >= 0)
 			break;
 	}
@@ -827,7 +827,7 @@ close_tcp_connection(int sock)
 int
 __pbs_disconnect(int connect)
 {
-	struct shard_conn **shard_connection = NULL;
+	shard_conn_t **shard_connection = NULL;
 	int i;
 	if (connect < 0)
 		return 0;
@@ -845,7 +845,7 @@ __pbs_disconnect(int connect)
 
 	/* send disconnect request to all servers that are up */
 	if (get_max_servers() > 1) {
-		shard_connection = (struct shard_conn **)get_conn_shards(connect);
+		shard_connection = (shard_conn_t **)get_conn_shards(connect);
 		if (!shard_connection)
 			return -1;
 		for (i = 0; i < get_current_servers(); i++) {

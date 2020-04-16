@@ -117,13 +117,13 @@ extern char pbs_current_group[];
 #define SHARD_CONN_STATE_DOWN           0
 #define SHARD_CONN_STATE_CONNECTED      1
 #define SHARD_CONN_STATE_FAILED         -1
-struct shard_conn {
+typedef struct shard_conn {
 	int sd;                     /* File descriptor for the open socket */
 	int secondary_sd;           /* Secondary File descriptor for the open socket */
 	int state;                  /* Connection state */
 	time_t state_change_time;   /* Connnetion state change time */
 	time_t last_used_time;           /* Last used time for the connection */
-};
+} shard_conn_t;
 
 typedef struct pbs_conn {
 	int ch_errno;                   /* last error on this connection */
@@ -381,7 +381,7 @@ extern int tcp_pre_process(conn_t *);
 extern char *PBSD_modify_resv(int, char *, struct attropl *, char *);
 extern int PBSD_cred(int, char *, char *, int, char *, long, int, char **);
 int tcp_send_auth_req(int, unsigned int, char *);
-extern int get_svr_index(struct pbs_server_instance *instance);
+extern int get_svr_index(pbs_server_instance_t *);
 
 #ifdef __cplusplus
 }

@@ -199,6 +199,7 @@ __pbs_submit(int c, struct attropl  *attrib, char *script, char *destination, ch
 	for (pal = attrib; pal; pal = pal->next)
 		pal->op = SET;		/* force operator to SET */
 
+	/* Below reset would force the next connection request to select a random server */
 	set_new_shard_context(c);
 	/* Queue job with null string for job id */
 	return_jobid = PBSD_queuejob(c, "", destination, attrib, extend, PROT_TCP, NULL);

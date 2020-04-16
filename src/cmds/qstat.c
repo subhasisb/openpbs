@@ -2922,8 +2922,12 @@ job_no_args:
 					any_failed = pbs_errno;
 					if ((errmsg = pbs_geterrmsg(connect)) != NULL)
 						fprintf(stderr, "qstat: %s\n", errmsg);
-					else
-						fprintf(stderr, "qstat: Error %d\n", pbs_errno);
+					else {
+						if (pbs_errno == PBSE_NOSERVER) 
+							fprintf(stderr, "qstat: cannot connect to server (%d)\n", pbs_errno);
+						else
+							fprintf(stderr, "qstat: Error %d\n", pbs_errno);
+					}
 					break;
 				}
 

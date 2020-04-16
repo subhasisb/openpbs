@@ -75,15 +75,23 @@ prt_job_err(char *cmd, int connect, char *id)
 				free(histerrmsg);
 				histerrmsg = NULL;
 			} else {
-				fprintf(stderr,
-					"%s: Server returned error %d for job %s\n",
-					cmd, pbs_errno, id);
+				if (pbs_errno == PBSE_NOSERVER) {
+					fprintf(stderr, "%s: cannot connect to server (%d)\n", cmd, pbs_errno);
+					return;
+				} else
+					fprintf(stderr,
+						"%s: Server returned error %d for job %s\n",
+						cmd, pbs_errno, id);
 			}
 			return;
 		}
 		fprintf(stderr, "%s: %s ", cmd, errmsg);
 	} else {
-		fprintf(stderr, "%s: Server returned error %d for job ", cmd, pbs_errno);
+			if (pbs_errno == PBSE_NOSERVER) {
+				fprintf(stderr, "%s: cannot connect to server (%d)\n", cmd, pbs_errno);
+				return;
+			} else
+				fprintf(stderr, "%s: Server returned error %d for job ", cmd, pbs_errno);
 	}
 	fprintf(stderr, "%s\n", id);
 }

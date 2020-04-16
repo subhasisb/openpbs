@@ -2939,6 +2939,9 @@ execute(int aopt, int oper, int type, char *names, struct attropl *attribs)
 					else if (pbs_errno == PBSE_HOOKERROR) {
 						pstderr("qmgr: hook error returned from server\n");
 					}
+					else if (pbs_errno == PBSE_NOSERVER) {
+						PSTDERR1("qmgr: cannot connect to server (%d) \n", pbs_errno)
+					}
 					else
 						if (pbs_errno != 0)  /* 0 happens with hooks if no hooks found */
 							PSTDERR1("qmgr: Error (%d) returned from server\n", pbs_errno)

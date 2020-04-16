@@ -190,11 +190,11 @@ extern "C" {
 /* Default value of preempt_sort */
 #define PBS_PREEMPT_SORT_DEFAULT	"min_time_since_start"
 
-struct pbs_server_instance 
+typedef struct pbs_server_instance 
 {
 	char *name;
 	int port;
-};
+} pbs_server_instance_t;
 
 struct pbs_config
 {
@@ -541,7 +541,7 @@ extern enum vnode_sharing place_sharing_type(char *, enum vnode_sharing);
 
 extern int get_svr_shard_connection(int, enum pbs_obj_type, void *);
 extern void set_new_shard_context(int);
-int internal_tcp_connect(int, char *, int, char *);
+extern int tcp_connect(int, char *, int, char *);
 
 /* This was added to pbs_ifl.h for use by AIF */
 extern int 	pbs_isexecutable(char *);

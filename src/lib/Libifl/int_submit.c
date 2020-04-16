@@ -189,7 +189,10 @@ PBSD_rdytocmt(int c, char *jobid, int prot, char **msgid)
 	int sock;
 
 	if (prot == PROT_TCP) {
-		sock = get_svr_shard_connection(c, JOB, NULL);
+		sock = get_svr_shard_connection(c, -1, NULL);
+		if (sock == -1) {
+			return (pbs_errno = PBSE_NOSERVER);
+		}
 		DIS_tcp_funcs();
 	} else {
 		sock = c;
@@ -247,7 +250,10 @@ PBSD_commit(int c, char *jobid, int prot, char **msgid)
 	int sock;
 
 	if (prot == PROT_TCP) {
-		sock = get_svr_shard_connection(c, JOB, NULL);
+		sock = get_svr_shard_connection(c, -1, NULL);
+		if (sock == -1) {
+			return (pbs_errno = PBSE_NOSERVER);
+		}
 		DIS_tcp_funcs();
 	} else {
 		sock = c;
@@ -312,8 +318,8 @@ PBSD_scbuf(int c, int reqtype, int seq, char *buf, int len, char *jobid, enum jo
 
 	if (prot == PROT_TCP) {
 		DIS_tcp_funcs();
-		sock = get_svr_shard_connection(c, JOB, NULL);
-		if (c == -1)
+		sock = get_svr_shard_connection(c, -1, NULL);
+		if (sock == -1)
 			return (pbs_errno = PBSE_NOSERVER);
 	} else {
 		sock = c;
@@ -480,6 +486,7 @@ PBSD_jobfile(int c, int req_type, char *path, char *jobid, enum job_file which, 
 	}
 	i = 0;
 	cc = read(fd, s_buf, SCRIPT_CHUNK_Z);
+	/* Below reset would force the next connection request to select a random server */
 	set_new_shard_context(c);
 	while ((cc > 0) &&
 		((rc = PBSD_scbuf(c, req_type, i, s_buf, cc, jobid, which, prot, msgid)) == 0)) {
@@ -524,7 +531,7 @@ PBSD_queuejob(int c, char *jobid, char *destin, struct attropl *attrib, char *ex
 
 	if (prot == PROT_TCP) {
 		DIS_tcp_funcs();
-		sock = get_svr_shard_connection(c, JOB, NULL);
+		sock = get_svr_shard_connection(c, -1, NULL);
 		if (sock == -1) {
 			pbs_errno = PBSE_NOSERVER;
 			return NULL;

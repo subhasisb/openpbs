@@ -153,7 +153,10 @@ execute(char *queue, char *server)
 			if (errmsg != NULL) {
 				fprintf(stderr, "qstart: %s ", errmsg);
 			} else {
-				fprintf(stderr, "qstart: Error (%d) starting queue ", pbs_errno);
+					if (pbs_errno == PBSE_NOSERVER) 
+						fprintf(stderr, "qstart: cannot connect to server (%d) ", pbs_errno);
+					else
+						fprintf(stderr, "qstart: Error (%d) starting queue ", pbs_errno);
 			}
 			if (notNULL(queue))
 				fprintf(stderr, "%s", queue);

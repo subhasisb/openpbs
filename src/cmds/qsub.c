@@ -663,8 +663,12 @@ refresh_dfltqsubargs(void)
 	if (ss == NULL && pbs_errno != PBSE_NONE) {
 		if ((errmsg = pbs_geterrmsg(sd_svr)) != NULL)
 			fprintf(stderr, "qsub: %s\n", errmsg);
-		else
-			fprintf(stderr, "qsub: Error %d\n", pbs_errno);
+		else {
+			if (pbs_errno == PBSE_NOSERVER) 
+				fprintf(stderr, "qsub: cannot connect to server (%d)\n", pbs_errno);
+			else
+				fprintf(stderr, "qsub: Error %d\n", pbs_errno);
+		}
 		return;
 	}
 

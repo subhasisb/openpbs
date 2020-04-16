@@ -88,7 +88,8 @@ pbs_defschreply(int c, int cmd, char *id, int err, char *txt, char *extend)
 	/* blocking call, waits for mutex release */
 	if (pbs_client_thread_lock_connection(c) != 0)
 		return pbs_errno;
-		
+
+	/* Below reset would force the next connection request to select a random server */	
 	set_new_shard_context(c);
 	sock = get_svr_shard_connection(c, JOB, id);
 	if (sock == -1) {
