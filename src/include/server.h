@@ -177,6 +177,7 @@ extern attribute_def svr_attr_def[];
 /* for trillion job id */
 extern long long svr_max_job_sequence_id;
 extern long long svr_jobidnumber;
+extern long long next_svr_sequence_id;
 /* for history jobs*/
 extern long svr_history_enable;
 extern long svr_history_duration;

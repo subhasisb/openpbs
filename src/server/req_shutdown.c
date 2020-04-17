@@ -136,7 +136,7 @@ svr_shutdown(int type)
       /* Saving server jobid number to the database as server is going to shutdown.
 	 * Once server will come up then it will start jobid/resvid from this number onwards.
 	 */
-	server.sv_qs.sv_jobidnumber = svr_jobidnumber;
+	server.sv_qs.sv_jobidnumber = next_svr_sequence_id;
 	state = &server.sv_attr[(int)SRV_ATR_State].at_val.at_long;
 	(void)strcpy(log_buffer, msg_shutdown_start);
 
