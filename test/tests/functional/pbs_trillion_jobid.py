@@ -364,7 +364,7 @@ exit 0
         """
         # Abruptly kill the server so next jobid should be 1000 after server
         # start
-        self.set_svr_sv_jobidnumber(-1)
+        self.set_svr_sv_jobidnumber(0)
         self.submit_job(job_id='0')
         self.submit_job(lower=1, upper=2, job_id='1[]')
         self.submit_resv(resv_id='R2')

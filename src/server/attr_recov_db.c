@@ -145,8 +145,9 @@ encode_single_attr_db(struct attribute_def *padef, struct attribute *pattr, pbs_
  * @param[in]	padef - Address of parent's attribute definition array
  * @param[in]	pattr - Address of the parent objects attribute array
  * @param[in]	numattr - Number of attributes in the list
- * @param[out]  attr_list - pointer to the structure of type pbs_db_attr_list_t to which the attributes are encoded
- * @param[in]   all  - Encode all attributes
+ * @param[out]	cache_attr_list - pointer to the structure of type pbs_db_attr_list_t for storing in cache
+ * @param[out]	db_attr_list - pointer to the structure of type pbs_db_attr_list_t for storing in DB
+ * @param[in]	all  - Encode all attributes
  *
  * @return  error code
  * @retval   -1 - Failure

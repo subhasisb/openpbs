@@ -680,7 +680,7 @@ encode_resvs(attribute *pattr, pbs_list_head *ph, char *aname, char *rname, int 
  *
  * @return      int
  * @retval      <0      an error encountered; value is negative of an error code
- * @retval      >=0      ok, encode happened and svrattrl created and linked in >0,
+ * @retval      >=0     ok, encode happened and svrattrl created and linked in >0,
  *                      or nothing to encode = 0
  */
 

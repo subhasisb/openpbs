@@ -273,15 +273,11 @@ local_move(job *jobp, struct batch_request *req)
 	}
 
 	if (server.sv_attr[(int)SRV_ATR_EligibleTimeEnable].at_val.at_long == 1) {
-		
 		newtype = determine_accruetype(jobp);
 		if (newtype == -1)
-			/* unable to determine accruetype, set it to NEW */
-			(void)update_eligible_time(JOB_INITIAL, jobp);
+			(void)update_eligible_time(JOB_INITIAL, jobp); /* unable to determine accruetype, set it to NEW */
 		else
-			/* found suiting accruetype, update to this */
-			(void)update_eligible_time(newtype, jobp);
-
+			(void)update_eligible_time(newtype, jobp); /* found suiting accruetype, update to this */
 	}
 
 

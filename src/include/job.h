@@ -741,7 +741,7 @@ struct job {
 
 	attribute	ji_wattr[JOB_ATR_LAST]; /* decoded attributes  */
 
-	char     ji_savetm[DB_TIMESTAMP_LEN + 1];
+	char     ji_savetm[DB_TIMESTAMP_LEN + 1]; /* last time job was saved */
 };
 
 typedef struct job job;

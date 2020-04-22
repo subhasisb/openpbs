@@ -120,10 +120,9 @@ update_svrlive()
  *
  * @param[in]	ps	-	Address of the server in pbs server
  * @param[out]	pdbsvr	-	Address of the database server object
- * @param[in]   updatetype -    quick or full update
  *
  * @retval   -1  Failure
- * @retval   >=0    Success
+ * @retval	>=0 What to save: 0=nothing, OBJ_SAVE_NEW or OBJ_SAVE_QS
  *
  */
 static int
@@ -170,11 +169,10 @@ db_2_svr(struct server *ps, pbs_db_svr_info_t *pdbsvr)
  *	convert sched structure to DB format
  *
  * @param[in]	ps - Address of the scheduler in pbs server
- * @param[out] pdbsched  - Address of the database scheduler object
- * @param[in] updatetype - quick or full update
+ * @param[out]  pdbsched  - Address of the database scheduler object
  *
  * @retval   -1  Failure
- * @retval   >=0    Success
+ * @retval	>=0 What to save: 0=nothing, OBJ_SAVE_NEW or OBJ_SAVE_QS
  */
 static int
 sched_2_db(struct pbs_sched *ps, pbs_db_sched_info_t *pdbsched)
@@ -306,13 +304,12 @@ done:
 /**
  * @brief Recover Schedulers
  *
- * @see	pbsd_init.c
+ * @param[in]	sname	- scheduler name
+ * @param[in]	ps	- scheduler pointer, if any, to be updated
  *
- *
- * @return	Error code
- * @retval	 0 :	On successful recovery and creation of server structure
- * @retval	-1 :	On failure to open or read file.
- * @retval	-2 :	No schedulers found.
+ * @return	The recovered sched structure
+ * @retval	NULL - Failure
+ * @retval	!NULL - Success - address of recovered sched returned
  * */
 
 pbs_sched *

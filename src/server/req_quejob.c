@@ -3357,7 +3357,8 @@ validate_place_req_of_job_in_reservation(job *pj)
  * @retval	-1	: database error
  *
  */
-long long get_next_svr_sequence_id(void)
+long long 
+get_next_svr_sequence_id(void)
 {
 	static long long lastid = -1;
 	long long seq = server.sv_qs.sv_jobidnumber;

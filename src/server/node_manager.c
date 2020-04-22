@@ -4282,7 +4282,7 @@ is_request(int stream, int version)
 			goto badcon;
 
 		log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_NODE,
-			LOG_NOTICE, pmom->mi_host, "Mom sent hellosvr on host");
+			LOG_NOTICE, pmom->mi_host, "Mom sent hellosvr");
 
 		psvrmom = (mom_svrinfo_t *)(pmom->mi_data);
 		psvrmom->msr_state |= INUSE_UNKNOWN;

@@ -132,8 +132,7 @@ db_2_node(struct pbsnode *pnode, pbs_db_node_info_t *pdbnd)
  *		Recover a node from the database
  *
  * @param[in]	nd_name	- node name
- * @param[in]	pnode	- node object pointer
- * @param[in]	lock	- whether db row has to be locked
+ * @param[in]	pnode	- node pointer, if any, to be updated
  *
  * @return	The recovered node structure
  * @retval	NULL - Failure
@@ -191,7 +190,7 @@ node_recov_db(char *nd_name, struct pbsnode *pnode)
  * @param[out]	pdbnd - Address of the database node object
  *
  * @return 0    Success
- * @return !=0  Failure
+ * @retval	>=0 What to save: 0=nothing, OBJ_SAVE_NEW or OBJ_SAVE_QS
  */
 static int
 node_2_db(struct pbsnode *pnode, pbs_db_node_info_t *pdbnd)

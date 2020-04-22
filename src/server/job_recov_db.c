@@ -112,8 +112,8 @@ extern time_t time_now;
  * @param[in]	pjob - Address of the job in the server
  * @param[out]	dbjob - Address of the database job object
  *
- * @retval   -1  Failure
- * @retval   >=0    Success
+ * @retval	-1  Failure
+ * @retval	>=0 What to save: 0=nothing, OBJ_SAVE_NEW or OBJ_SAVE_QS
  */
 static int
 job_2_db(job *pjob, pbs_db_job_info_t *dbjob)
@@ -337,6 +337,7 @@ job_recov_db_spl(pbs_db_job_info_t *dbjob, job *pjob)
  *	Recover job from database
  *
  * @param[in]	jid - Job id of job to recover
+ * @param[in]	pjob - job pointer, if any, to be updated
  *
  * @return      The recovered job
  * @retval	 NULL - Failure
@@ -383,7 +384,7 @@ job_recov_db(char *jid, job *pjob)
  * @param[out]  dbresv - Address of the database resv object
  *
  * @retval   -1  Failure
- * @retval   >=0    Success
+ * @retval   >=0 What to save: 0=nothing, OBJ_SAVE_NEW or OBJ_SAVE_QS
  */
 static int
 resv_2_db(resc_resv *presv,  pbs_db_resv_info_t *dbresv)
@@ -534,6 +535,7 @@ done:
  *	Recover resv from database
  *
  * @param[in]	resvid - Resv id to recover
+ * @param[in]	presv - Resv pointer, if any, to be updated
  *
  * @return      The recovered reservation
  * @retval	 NULL - Failure

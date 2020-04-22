@@ -83,8 +83,8 @@ extern "C" {
 #define DB_TIMESTAMP_LEN 50
 
 /* type of saves bit wise flags - see savetype */
-#define OBJ_SAVE_NEW 			1
-#define OBJ_SAVE_QS 			2
+#define OBJ_SAVE_NEW    1   /* object is new, so whole object should be saved */
+#define OBJ_SAVE_QS     2   /* quick save area modified, it should be saved */
 
 /**
  * @brief
@@ -630,7 +630,8 @@ int pbs_db_delete_obj(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj);
  *
  * @param[in]	conn - Connected database handle
  * @param[in]	pbs_db_obj_info_t - Wrapper object that describes the object
- * @param[in]   obj_id - The object id of the parent (jobid, node-name etc)
+ * @param[in]	obj_id - The object id of the parent (jobid, node-name etc)
+ * @param[in]	sv_time - update the last saved time of the job
  * @param[in]	cache_attr_list - List of attributes to remove from cache
  * @param[in]	db_attr_list _ List of attributes to remove from DB
  *
@@ -875,7 +876,7 @@ int pg_db_delete_svrattr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj);
  *
  * @param[in]	qs  - pointer to the quick save area
  * @param[in]	len - length of the quick save area
- * @param[in]   oh  - pointer to a opaque value of current quick save area signature/hash
+ * @param[in]	oldhash  - pointer to a opaque value of current quick save area signature/hash
  *
  * @return      Error code
  * @retval	 0 - quick save area was not changed

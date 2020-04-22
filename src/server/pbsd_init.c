@@ -193,7 +193,6 @@ extern int		brought_up_db;
 extern pbs_db_conn_t	*svr_db_conn;
 
 extern	pbs_list_head	svr_allhooks;
-extern long long svr_jobidnumber;
 
 
 /* External Functions Called */

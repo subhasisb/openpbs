@@ -81,7 +81,7 @@ extern pbs_db_conn_t	*svr_db_conn;
  * @param[out]	pdbque  - Address of the database queue object
  *
  * @retval   -1  Failure
- * @retval   >=0    Success
+ * @retval	>=0 What to save: 0=nothing, OBJ_SAVE_NEW or OBJ_SAVE_QS
  */
 static int
 que_2_db(pbs_queue *pque, pbs_db_que_info_t *pdbque)
@@ -187,6 +187,7 @@ done:
  *		Recover a queue from the database
  *
  * @param[in]	qname	- Name of the queue to recover
+ * @param[out]  pq - Queue pointer, if any, to be updated
  *
  * @return	The recovered queue structure
  * @retval	NULL	- Failure
