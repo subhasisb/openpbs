@@ -867,24 +867,6 @@ main(int argc, char **argv)
 	if ((pc = strchr(daemonname, (int)'.')) != NULL)
 		*pc = '\0';
 
-	if (!(self.name = strdup(server_host))) {
-		log_err(-1, __func__, "Out of memory\n");
-		return -1;			
-	}
-	self.port = pbs_conf.batch_service_port;
-	if (get_max_servers() > 1) {
-		if ((myindex = get_svr_index(&self)) == -1) {
-			fprintf(stderr, "pbsconf error: Wrong Multi Server configuration\n");
-			return 1;
-		}
-	}
-
-
-	if(set_msgdaemonname(daemonname)) {
-		fprintf(stderr, "Out of memory\n");
-		return 1;
-	}
-
 	/* initialize service port numbers for self, Scheduler, and MOM */
 
 	pbs_server_port_dis = pbs_conf.batch_service_port;
@@ -1040,6 +1022,28 @@ main(int argc, char **argv)
 		return (1);
 	}
 
+	if (get_max_servers() > 1) {
+		char buf[PBS_MAXHOSTNAME+18];
+		if (!(self.name = strdup(server_host))) {
+			log_err(-1, __func__, "Out of memory\n");
+			return -1;			
+		}
+		if ((pc = strchr(self.name, (int)'.')) != NULL)
+			*pc = '\0';
+		self.port = pbs_server_port_dis;
+		if ((myindex = get_svr_index(&self)) == -1) {
+			fprintf(stderr, "pbsconf error: Wrong Multi Server configuration\n");
+			return 1;
+		}
+		sprintf(buf, "%s_%d", daemonname, pbs_server_port_dis);
+		strncpy(daemonname, buf, sizeof(daemonname));
+		daemonname[sizeof(daemonname) - 1] = '\0';
+	}
+
+	if(set_msgdaemonname(daemonname)) {
+		fprintf(stderr, "Out of memory\n");
+		return 1;
+	}
 	/* make sure no other server is running with this home directory */
 
 	(void)sprintf(lockfile, "%s/%s/server.lock", pbs_conf.pbs_home_path,
@@ -1878,7 +1882,8 @@ try_db_again:
 		shutdown_nodes();
 
 	/* if brought up the DB, take it down */
-	stop_db();
+	if (get_max_servers() == 1)
+		stop_db();
 
 	if (are_primary == FAILOVER_SECONDARY) {
 		/* we are the secondary server */

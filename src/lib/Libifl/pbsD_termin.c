@@ -86,6 +86,11 @@ send_terminate(int c, int sock, int manner, char *extend)
 
 	reply = PBSD_rdrpy_sock(sock, &rc);
 
+	if (reply == NULL) {
+		pbs_errno = PBSE_PROTOCOL;
+		return pbs_errno;
+	}
+
 	if (set_conn_errno(c, reply->brp_code) != 0) {
 		pbs_errno = reply->brp_code;
 		return pbs_errno;
@@ -95,7 +100,7 @@ send_terminate(int c, int sock, int manner, char *extend)
 	if (reply->brp_choice == BATCH_REPLY_CHOICE_Text) {
 		if (reply->brp_un.brp_txt.brp_str != NULL) {
 			if (set_conn_errtxt(c, reply->brp_un.brp_txt.brp_str) != 0) {
-				pbs_errno = PBSE_SYSTEM;
+				pbs_errno = PBSE_PROTOCOL;
 				return pbs_errno;
 			}
 		}
