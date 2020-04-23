@@ -118,6 +118,7 @@ extern useconds_t	alps_release_jitter;
 #endif
 
 extern char		*path_hooks_workdir;
+extern int conn_slot;
 
 #ifndef WIN32
 /**
@@ -1939,6 +1940,111 @@ end_loop:
 
 /**
  * @brief
+ * 	Internal function to open TPP stream to given server info.
+ *
+ * @param[in]	server  - name of Server to which to send the restart
+ * @param[in]	port - port Server would be expecting to receive IM messages
+ * @param[in]	channel - not used 
+ * @param[in]	extend_data - not used
+ * 
+ * @return	int
+ *
+ */
+int 
+internal_connect_mom(int channel, char *server, int port, char *extend_data)
+{
+	return tpp_open(server, port);
+}
+
+/**
+ * @brief
+ * 	Initialise the shard connection table and utilize the 
+ *  get_svr_shard_connection() to choose the sharded server.
+ *
+ * @param[in]	svr  - name of Server to which to send the restart
+ * @param[in]	port - port Server would be expecting to receive IM messages
+ *
+ * @return	int
+ *
+ */
+int
+get_server_stream(char *svr, unsigned int port, char *jobid)
+{
+	int	stream = -1;
+	if (get_max_servers() > 1) {
+		if (conn_slot == -1) {
+			conn_slot = socket(AF_INET, SOCK_STREAM, 0);
+			if (conn_slot == -1) {
+				pbs_errno = PBSE_SYSTEM;
+				log_err(-1, __func__, "connection table initialization failed");
+				return -1;
+			}
+			if (initialise_shard_conn(conn_slot)) {
+				pbs_errno = PBSE_INTERNAL;
+				return -1;
+			}
+		}
+		set_new_shard_context(conn_slot);
+		pfn_connect = internal_connect_mom;
+		stream = get_svr_shard_connection(conn_slot, -1 , jobid);	
+	} else {
+		if (server_stream == -1) {
+			if (svr == NULL)
+				svr = get_servername(&port);
+			stream = tpp_open(svr, port);
+		} else
+			return server_stream;
+	}
+	return stream;
+}
+
+/**
+ * @brief
+ * 	Used to set the connected stream in the shard connection table.
+ *
+ * @param[in]	hostname  - Name of Server 
+ * @param[in]	port -  Server port
+ * @param[in]	stream  - Stream to the connected server.
+ * 
+ * @return	void
+ *
+ */
+
+void
+set_server_stream(char * hostname, unsigned int port, int stream)
+{
+	shard_conn_t **shard_connection = NULL;
+	int srv_index;
+	if (get_max_servers() > 1) {
+		struct pbs_server_instance si;
+		si.name = strdup(hostname);
+		if (!si.name) {
+			log_err(-1, __func__, "Out of memory");
+			return;
+		}
+		si.port = port;
+		shard_connection = (shard_conn_t **)get_conn_shards(conn_slot);
+		if ((srv_index = get_svr_index(&si)) == -1) {
+			log_err(-1, __func__, "Invalid shard index");
+			return;
+		}
+		if (!shard_connection || !shard_connection[srv_index]) {
+			log_err(-1, __func__, "Invalid shard connection; failed to set connection stream");
+			return;
+		}
+
+		if (shard_connection[srv_index]->state == SHARD_CONN_STATE_DOWN) {
+			shard_connection[srv_index]->state = SHARD_CONN_STATE_CONNECTED;
+			shard_connection[srv_index]->sd = stream;
+			shard_connection[srv_index]->state_change_time = time(0);
+		}
+	}
+}
+
+
+
+/**
+ * @brief
  * 		choosing one server in random if a failover server is already set up.
  *
  * @param[out] port - Passed through to parse_servername(), not modified here.
@@ -1982,6 +2088,7 @@ send_hellosvr(int stream)
 	int		rc = 0;
 	char		*svr = NULL;
 	unsigned int	port = default_server_port;
+	struct	sockaddr_in	*addr;
 
 	DBPRT(("Sending hellosvr"))
 
@@ -1991,12 +2098,14 @@ send_hellosvr(int stream)
 			return;
 		}
 
-		stream = tpp_open(svr, port);
+		stream = get_server_stream(svr, port, NULL);
 		if (stream < 0) {
 			sprintf(log_buffer, "tpp_open(%s, %d) failed", svr, port);
 			log_err(errno, msg_daemonname, log_buffer);
 			return;
 		}
+		addr = tpp_getaddr(stream);
+		port = ntohs((unsigned short)addr->sin_port);
 	}
 
 	if ((rc = is_compose(stream, IS_HELLOSVR)) != DIS_SUCCESS)
