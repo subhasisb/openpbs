@@ -272,7 +272,7 @@ status_job(job *pjob, struct batch_request *preq, svrattrl *pal, pbs_list_head *
 			time(&tm);
 			oldtime = pjob->ji_wattr[(int)JOB_ATR_eligible_time].at_val.at_long;
 			pjob->ji_wattr[(int)JOB_ATR_eligible_time].at_val.at_long += ((long)tm - pjob->ji_wattr[(int)JOB_ATR_sample_starttime].at_val.at_long);
-			pjob->ji_wattr[(int)JOB_ATR_eligible_time].at_flags |= ATR_VFLAG_MODCACHE;
+			pjob->ji_wattr[(int)JOB_ATR_eligible_time].at_flags |= ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 
 			/* Note: ATR_VFLAG_MODCACHE must be set because of svr_cached() does */
 			/* 	 not correctly check ATR_VFLAG_SET */
@@ -282,11 +282,11 @@ status_job(job *pjob, struct batch_request *preq, svrattrl *pal, pbs_list_head *
 		/* clear set flag so that eligible_time and accrue type dont show */
 		old_elig_flags = pjob->ji_wattr[(int)JOB_ATR_eligible_time].at_flags;
 		pjob->ji_wattr[(int)JOB_ATR_eligible_time].at_flags &= ~ATR_VFLAG_SET;
-		pjob->ji_wattr[(int)JOB_ATR_eligible_time].at_flags |= (ATR_VFLAG_MODCACHE);
+		pjob->ji_wattr[(int)JOB_ATR_eligible_time].at_flags |= (ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE);
 
 		old_atyp_flags = pjob->ji_wattr[(int)JOB_ATR_accrue_type].at_flags;
 		pjob->ji_wattr[(int)JOB_ATR_accrue_type].at_flags &= ~ATR_VFLAG_SET;
-		pjob->ji_wattr[(int)JOB_ATR_accrue_type].at_flags |= (ATR_VFLAG_MODCACHE);
+		pjob->ji_wattr[(int)JOB_ATR_accrue_type].at_flags |= (ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE);
 
 		/* Note: ATR_VFLAG_MODCACHE must be set because of svr_cached() does */
 		/*		not correctly check ATR_VFLAG_SET */
@@ -315,7 +315,7 @@ status_job(job *pjob, struct batch_request *preq, svrattrl *pal, pbs_list_head *
 	if (server.sv_attr[(int)SRV_ATR_EligibleTimeEnable].at_val.at_long != 0) {
 		if (pjob->ji_wattr[(int)JOB_ATR_accrue_type].at_val.at_long == JOB_ELIGIBLE) {
 			pjob->ji_wattr[(int)JOB_ATR_eligible_time].at_val.at_long = oldtime;
-			pjob->ji_wattr[(int)JOB_ATR_eligible_time].at_flags |= ATR_VFLAG_MODCACHE;
+			pjob->ji_wattr[(int)JOB_ATR_eligible_time].at_flags |= ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 
 			/* Note: ATR_VFLAG_MODCACHE must be set because of svr_cached() does */
 			/*	 not correctly check ATR_VFLAG_SET */
@@ -405,7 +405,7 @@ status_subjob(job *pjob, struct batch_request *preq, svrattrl *pal, int subj, pb
 	subjob_state = get_subjob_state(pjob, subj);
 	realstate = pjob->ji_wattr[(int)JOB_ATR_state].at_val.at_char;
 	pjob->ji_wattr[(int)JOB_ATR_state].at_val.at_char = statechars[subjob_state];
-	pjob->ji_wattr[(int)JOB_ATR_state].at_flags |= ATR_VFLAG_MODCACHE;
+	pjob->ji_wattr[(int)JOB_ATR_state].at_flags |= ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 
 	if (subjob_state == JOB_STATE_EXPIRED || subjob_state == JOB_STATE_FINISHED) {
 		if (pjob->ji_ajtrk->tkm_tbl[subj].trk_substate == JOB_SUBSTATE_FINISHED) {
@@ -449,11 +449,11 @@ status_subjob(job *pjob, struct batch_request *preq, svrattrl *pal, int subj, pb
 	if (server.sv_attr[(int)SRV_ATR_EligibleTimeEnable].at_val.at_long == 0) {
 		oldeligflags = pjob->ji_wattr[(int)JOB_ATR_eligible_time].at_flags;
 		pjob->ji_wattr[(int)JOB_ATR_eligible_time].at_flags &= ~ATR_VFLAG_SET;
-		pjob->ji_wattr[(int)JOB_ATR_eligible_time].at_flags |= ATR_VFLAG_MODCACHE;
+		pjob->ji_wattr[(int)JOB_ATR_eligible_time].at_flags |= ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 
 		oldatypflags = pjob->ji_wattr[(int)JOB_ATR_accrue_type].at_flags;
 		pjob->ji_wattr[(int)JOB_ATR_accrue_type].at_flags &= ~ATR_VFLAG_SET;
-		pjob->ji_wattr[(int)JOB_ATR_accrue_type].at_flags |= ATR_VFLAG_MODCACHE;
+		pjob->ji_wattr[(int)JOB_ATR_accrue_type].at_flags |= ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 
 		/* Note: ATR_VFLAG_MODCACHE must be set because of svr_cached() does */
 		/* 	 not correctly check ATR_VFLAG_SET */
@@ -466,7 +466,7 @@ status_subjob(job *pjob, struct batch_request *preq, svrattrl *pal, int subj, pb
 	/* Set the parent state back to what it really is */
 
 	pjob->ji_wattr[(int)JOB_ATR_state].at_val.at_char = realstate;
-	pjob->ji_wattr[(int)JOB_ATR_state].at_flags |= ATR_VFLAG_MODCACHE;
+	pjob->ji_wattr[(int)JOB_ATR_state].at_flags |= ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 
 	/* Set the parent comment back to what it really is */
 	if (old_subjob_comment != NULL) {

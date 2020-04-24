@@ -367,7 +367,7 @@ exit 0
         """
         # Abruptly kill the server so next jobid should be 1000 after server
         # start
-        self.set_svr_sv_jobidnumber(-1)
+        self.set_svr_sv_jobidnumber(0)
         self.submit_job(job_id='0')
         self.submit_job(lower=1, upper=2, job_id='1[]')
         self.submit_resv(resv_id='R2')
@@ -385,9 +385,9 @@ exit 0
         # Gracefully stop the server so jobid's will continue from the last
         # jobid
         self.stop_and_restart_svr('normal')
-        self.submit_job(job_id='2004')
-        self.submit_job(lower=1, upper=2, job_id='2005[]')
-        self.submit_resv(resv_id='R2006')
+        self.submit_job(job_id='2003')
+        self.submit_job(lower=1, upper=2, job_id='2004[]')
+        self.submit_resv(resv_id='R2005')
 
         # Verify the sequence window, incase of submitting more than 1001 jobs
         # and all jobs should submit successfully without any duplication error
@@ -442,9 +442,8 @@ exit 0
         # Abruptly kill and start the server twice consecutively
         self.stop_and_restart_svr('kill')
         self.stop_and_restart_svr('kill')
-        # Adding 1000 in current jobid for the sequence window buffer and
-        # 4 for the jobs that ran already after server start
-        curr_id += 1000 + 4
+        # Starting at 1000 in current jobid for the sequence window buffer
+        curr_id = 1000
         self.submit_job(job_id='%s' % str(curr_id))
         self.submit_job(lower=1, upper=2, job_id='%s[]' % str(curr_id + 1))
         self.submit_resv(resv_id='R%s' % str(curr_id + 2))
