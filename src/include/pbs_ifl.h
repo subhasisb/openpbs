@@ -484,6 +484,7 @@ enum mgr_obj {
 #define PBS_STDNG_RESV_ID_CHAR   'S'   /* Character in front of a resv ID */
 #define PBS_MNTNC_RESV_ID_CHAR   'M'   /* Character in front of a resv ID */
 #define PBS_AUTH_KEY_LEN    (129)
+#define PBS_MAXDAEMONNAME	(PBS_MAXHOSTNAME + 18) /* max daemon name contains hostname and its port */
 
 /* the pair to this list is in module_pbs_v1.c and must be updated to reflect any changes */
 enum batch_op {	SET, UNSET, INCR, DECR,

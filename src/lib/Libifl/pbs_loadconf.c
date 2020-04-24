@@ -275,6 +275,7 @@ parse_psi(char * conf_value)
 	char *host;
 	int port;
 	int count = 0;
+	char fullhost[PBS_MAXHOSTNAME+1];
 	free(pbs_conf.psi);
 
 	if (!(tmp = strdup(conf_value))) {
@@ -312,14 +313,26 @@ parse_psi(char * conf_value)
 		}
 		host = token;
 		if (*host == '\0') {
-			host = pbs_conf.pbs_server_name;
+			if (pbs_conf.pbs_server_host_name)
+				host = pbs_conf.pbs_server_host_name;
+			else if (pbs_conf.pbs_server_name)
+				host = pbs_conf.pbs_server_name;
+			else {
+				fprintf(stderr, "Unable to get host name");
+				return -1;
+			}
+		}
+
+		if ((get_fullhostname(host, fullhost, (sizeof(fullhost) - 1)) == -1)) {
+			fprintf(stderr, "Unable to get full host name");
+			return -1;
 		}
 
 		if (!(pbs_conf.psi[count] = calloc(1, sizeof(pbs_server_instance_t)))) {
 			fprintf(stderr, "Ran out of memory parsing configuration %s\n", conf_value);
 			return -1;
 		}
-		if (!(pbs_conf.psi[count]->name = strdup(host))) {
+		if (!(pbs_conf.psi[count]->name = strdup(fullhost))) {
 			fprintf(stderr, "Ran out of memory parsing multi-server configuration \n");
 			return -1;			
 		}

@@ -8313,6 +8313,10 @@ main(int argc, char *argv[])
 #ifdef WIN32
 
 	if (g_ssHandle != 0) SetServiceStatus(g_ssHandle, &ss);
+
+	if (winsock_init()) {
+		return 1;
+	}
 	/* load the pbs conf file */
 	if (pbs_loadconf(0) == 0) {
 		g_dwCurrentState = SERVICE_STOPPED;
@@ -8843,9 +8847,6 @@ main(int argc, char *argv[])
 #endif  /* not DEBUG and not NO_SECURITY_CHECK */
 
 #ifdef	WIN32
-	if (winsock_init()) {
-		return 1;
-	}
 
 	/* Under WIN32, create structure that will be used to track child processes. */
 	if (initpids() == 0) {
