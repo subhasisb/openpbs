@@ -2377,6 +2377,9 @@ stop_db()
 {
 	char *db_err = NULL;
 
+	if (get_max_servers() > 1)
+		return; /* No need to stop in Multi-server case */
+
 	pbs_db_disconnect(svr_db_conn);
 	pbs_db_destroy_connection(svr_db_conn);
 	svr_db_conn = NULL;

@@ -167,7 +167,6 @@ extern "C" {
 #define PBSE_LICENSEUNAV 15098		/* Floating License unavailable  */
 #define PBSE_NOSCHEDULER 15099		/* Unable to contact Scheduler */
 #define PBSE_RESCNOTSTR  15100		/* resource is not of type string */
-#define PBSE_NOCONNECTION 15104		/* could not connect to any servers */
 
 #define PBSE_MaxArraySize	     15107 /* max array size exceeded */
 #define PBSE_INVALSELECTRESC	     15108 /* resc invalid in select spec */
@@ -286,6 +285,7 @@ extern "C" {
 #define PBSE_NODE_BUSY	15227		 /* Node is busy */
 #define PBSE_DEFAULT_PARTITION 15228	/* Default partition name is not allowed */
 #define PBSE_HISTDEPEND  15229		/* Finished job did not satisfy dependency */
+#define PBSE_NOCONNECTION 15230		/* could not connect to any servers */
 
 /* the following structure is used to tie error number      */
 /* with text to be returned to a client, see svr_messages.c */
