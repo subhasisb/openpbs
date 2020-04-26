@@ -168,7 +168,6 @@ extern "C" {
 #define PBSE_SSIGNON_UNSET_REJECT 15101	/* SVR_ssignon_enable not set */
 #define PBSE_SSIGNON_SET_REJECT 15102	/* SVR_ssignon_enable set */
 #define PBSE_SSIGNON_BAD_TRANSITION1 15103 /* bad attempt: true to false */
-#define PBSE_NOCONNECTION 15104		/* could not connect to any servers */
 
 /*
  * Error number 15104 for PBSE_SSIGNON_BAD_TRANSITION2
@@ -303,6 +302,7 @@ extern "C" {
 #define PBSE_NODE_BUSY	15227		 /* Node is busy */
 #define PBSE_DEFAULT_PARTITION 15228	/* Default partition name is not allowed */
 #define PBSE_HISTDEPEND  15229		/* Finished job did not satisfy dependency */
+#define PBSE_NOCONNECTION 15230		/* could not connect to any servers */
 
 /* the following structure is used to tie error number      */
 /* with text to be returned to a client, see svr_messages.c */

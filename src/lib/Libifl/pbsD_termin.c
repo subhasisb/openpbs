@@ -86,6 +86,8 @@ send_terminate(int c, int sock, int manner, char *extend)
 
 	reply = PBSD_rdrpy_sock(sock, &rc);
 
+	if (reply == NULL)
+		return pbs_errno;
 	if (set_conn_errno(c, reply->brp_code) != 0) {
 		pbs_errno = reply->brp_code;
 		return pbs_errno;

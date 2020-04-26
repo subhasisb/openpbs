@@ -1878,7 +1878,8 @@ try_db_again:
 		shutdown_nodes();
 
 	/* if brought up the DB, take it down */
-	stop_db();
+	if (get_max_servers() == 1)
+		stop_db();
 
 	if (are_primary == FAILOVER_SECONDARY) {
 		/* we are the secondary server */
