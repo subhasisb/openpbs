@@ -1878,8 +1878,7 @@ try_db_again:
 		shutdown_nodes();
 
 	/* if brought up the DB, take it down */
-	if (get_max_servers() == 1)
-		stop_db();
+	stop_db();
 
 	if (are_primary == FAILOVER_SECONDARY) {
 		/* we are the secondary server */
@@ -2400,6 +2399,9 @@ void
 stop_db()
 {
 	char *db_err = NULL;
+
+	if (get_max_servers() > 1)
+		return; /* No need to stop in Multi-server case */
 
 	pbs_db_disconnect(svr_db_conn);
 	pbs_db_destroy_connection(svr_db_conn);
