@@ -623,22 +623,14 @@ pg_db_delete_job(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj)
 
 	SET_PARAM_STR(conn, pj->ji_jobid, 0);
 
-	if (pbs_db_begin_trx(conn, 0, 0) != 0)
-		goto err;
-
 	if ((rc = pg_db_cmd(conn, STMT_DELETE_JOB, 1)) == -1)
 		goto err;
 
 	if (pg_db_cmd(conn, STMT_DELETE_JOBSCR, 1) == -1)
 		goto err;
 
-
-	if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0)
-		goto err;
-
 	return rc;
 err:
-	(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
 	return -1;
 }
 

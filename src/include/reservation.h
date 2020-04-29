@@ -287,6 +287,7 @@ struct resc_resv {
 	 */
 	attribute		ri_wattr[RESV_ATR_LAST];  /*reservation's attributes*/
 	char    		ri_savetm[DB_TIMESTAMP_LEN + 1];
+	int     		ld_trx_id; /* record the server iteration id of when this record was loaded */
 };
 
 /*

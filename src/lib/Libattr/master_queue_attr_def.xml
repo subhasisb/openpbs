@@ -136,7 +136,7 @@
     <attributes>
 	/* QA_ATR_TotalJobs */
 	<member_name><both>ATTR_total </both></member_name>		<!-- "total_jobs" --> 
-	<member_at_decode>decode_null </member_at_decode>
+	<member_at_decode>decode_l </member_at_decode>
 	<member_at_encode>encode_l </member_at_encode>
 	<member_at_set>set_null </member_at_set>
 	<member_at_comp>comp_l </member_at_comp>
@@ -153,7 +153,7 @@
     <attributes>
 	/* QA_ATR_JobsByState */
 	<member_name><both>ATTR_count </both></member_name>		<!-- "state_count" --> 
-	<member_at_decode>decode_null </member_at_decode>		<!--  note-use fixed memory in queue struct  --> 
+	<member_at_decode>decode_str </member_at_decode>		<!--  note-use fixed memory in queue struct  --> 
 	<member_at_encode>encode_str </member_at_encode>
 	<member_at_set>set_null </member_at_set>
 	<member_at_comp>comp_str </member_at_comp>

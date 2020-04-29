@@ -108,10 +108,11 @@ int gettimeofday(struct timeval * tp, struct timezone * tzp)
  * @retval -1	- error
  */
 DLLEXPORT int
-pbs_shard_init(int max_allowed_servers, server_instance_t **server_instances, int num_instances) {
-
+pbs_shard_init(int max_allowed_servers, server_instance_t **server_instances, int num_instances) 
+{
 	if (server_instances == NULL)
 		return -1;
+	
 	max_num_of_servers = max_allowed_servers;
 	configured_servers = server_instances;
 	configured_num_servers = num_instances;

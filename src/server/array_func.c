@@ -965,6 +965,7 @@ create_subjob(job *parent, char *newjid, int *rc)
 	job_attr_def[JOB_ATR_errpath].at_decode(psub, NULL, NULL,
 		subst_array_index(subj, tmp_path));
 
+	subj->initialized = 1; /* very important */
 	*rc = PBSE_NONE;
 	return subj;
 }

@@ -75,12 +75,11 @@ extern "C" {
 #define PBS_MAXATTRNAME 64
 #define PBS_MAXATTRRESC 64
 #define MAX_SQL_LENGTH 8192
-#define PBS_DB_COMMIT   0
-#define PBS_DB_ROLLBACK 1
 #define PBS_MAX_DB_CONN_INIT_ERR  500
 #define MAX_SCHEMA_VERSION_LEN 9
 
 #define DB_TIMESTAMP_LEN 50
+#define UNIQUE_KEY_VIOLATION 23505 /* postgres throws this error code in case of primary key violation */
 
 /* type of saves bit wise flags - see savetype */
 #define OBJ_SAVE_NEW    1   /* object is new, so whole object should be saved */
@@ -303,7 +302,8 @@ typedef struct pbs_db_resv_info pbs_db_resv_info_t;
  */
 struct pbs_db_query_options {
 	int	flags;
-	time_t	timestamp;
+	char *timestamp;
+	char *hostname;
 };
 typedef struct pbs_db_query_options pbs_db_query_options_t;
 
@@ -486,42 +486,6 @@ void pbs_db_disconnect(pbs_db_conn_t *conn);
  *
  */
 int pbs_db_prepare_sqls(pbs_db_conn_t *conn);
-
-/**
- * @brief
- *	Start a database transaction
- *	If a transaction is already on, just increment the transactioin nest
- *	count in the database handle object
- *
- * @param[in]	conn - Connected database handle
- * @param[in]	isolation_level - Isolation level to set for the transaction
- * @param[in]	async - Set synchronous/asynchronous commit behavior
- *
- * @return      int
- * @retval       0  - success
- * @retval      -1  - Failure
- *
- */
-int pbs_db_begin_trx(pbs_db_conn_t *conn, int isolation_level, int async);
-
-/**
- * @brief
- *	End a database transaction
- *	Decrement the transaction nest count in the connection object. If the
- *	count reaches zero, then end the database transaction.
- *
- * @param[in]	conn - Connected database handle
- * @param[in]	commit - If commit is PBS_DB_COMMIT, then the transaction is
- *			    commited. If commi tis PBS_DB_ROLLBACK, then the
- *			    transaction is rolled back.
- *
- * @return      int
- * @retval       0  - success
- * @retval      -1  - Failure
- *
- */
-int pbs_db_end_trx(pbs_db_conn_t *conn, int commit);
-
 
 /**
  * @brief

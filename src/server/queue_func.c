@@ -293,7 +293,8 @@ find_queuebyname(char *quename)
 	}
 	if (pc)
 		*pc = '@';	/* restore '@' server portion */
-	return (pque);
+
+	return que_recov_db(quename, pque);
 }
 
 /**

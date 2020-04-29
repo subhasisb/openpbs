@@ -487,7 +487,7 @@ svr_enquejob(job *pjob)
 
 			/* better notify the Scheduler we have a new job */
 
-			if (find_assoc_sched_jid(pjob->ji_qs.ji_jobid, &psched))
+			if (find_assoc_sched_pjob(pjob, &psched))
 				set_scheduler_flag(SCH_SCHEDULE_NEW, psched);
 			else {
 				sprintf(log_buffer, "Unable to reach scheduler associated with job %s", pjob->ji_qs.ji_jobid);
@@ -498,7 +498,7 @@ svr_enquejob(job *pjob)
 
 			/* notify the Scheduler we have moved a job here */
 
-			if (find_assoc_sched_jid(pjob->ji_qs.ji_jobid, &psched))
+			if (find_assoc_sched_pjob(pjob, &psched))
 				set_scheduler_flag(SCH_SCHEDULE_MVLOCAL, psched);
 			else {
 				sprintf(log_buffer, "Unable to reach scheduler associated with job %s", pjob->ji_qs.ji_jobid);
@@ -639,7 +639,7 @@ svr_setjobstate(job *pjob, int newstate, int newsubstate)
 					(newstate == JOB_STATE_QUEUED)) {
 					attribute *etime = &pjob->ji_wattr[(int)JOB_ATR_etime];
 
-					if (find_assoc_sched_jid(pjob->ji_qs.ji_jobid, &psched))
+					if (find_assoc_sched_pjob(pjob, &psched))
 						set_scheduler_flag(SCH_SCHEDULE_NEW, psched);
 					else {
 						sprintf(log_buffer, "Unable to reach scheduler associated with job %s", pjob->ji_qs.ji_jobid);

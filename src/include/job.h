@@ -742,6 +742,8 @@ struct job {
 	attribute	ji_wattr[JOB_ATR_LAST]; /* decoded attributes  */
 
 	char     ji_savetm[DB_TIMESTAMP_LEN + 1]; /* last time job was saved */
+	int      ld_trx_id; /* record the server iteration id of when this record was loaded */
+	int 	 initialized;
 };
 
 typedef struct job job;
@@ -1104,6 +1106,7 @@ extern struct depend_job *find_dependjob(struct depend *pdep, char *name);
 extern int send_depend_req(job *pjob, struct depend_job *pparent, int type, int op, int schedhint, void (*postfunc)(struct work_task *));
 extern void post_runone(struct work_task *pwt);
 extern job  *find_job(char *);
+extern job  *find_job_avl(char *);
 extern char *get_egroup(job *);
 extern char *get_variable(job *, char *);
 extern void  check_block(job *, char *);
@@ -1208,7 +1211,6 @@ extern int   get_softwall(job*);
 extern int   get_used_wall(job*);
 extern int   get_used_cput(job*);
 extern int   get_cput(job*);
-extern void  remove_deleted_resvs(void);
 
 extern void  clear_and_populate_svr_unlicensedjobs(void);
 extern void  relicense_svr_unlicensedjobs(void);
@@ -1216,6 +1218,8 @@ extern int   set_cpu_licenses_need(job *, char *);
 extern void  allocate_cpu_licenses(job *);
 extern void  deallocate_cpu_licenses(job *);
 extern void  deallocate_cpu_licenses2(job *, int);
+extern int Rmv_if_resv_not_possible(job *pjob);
+extern int pbsd_init_job(job *pjob);
 
 extern void del_job_related_file(job *pjob, char *fsuffix);
 #ifdef PBS_MOM

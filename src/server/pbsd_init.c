@@ -124,7 +124,7 @@
 /* global Data Items */
 
 extern char	*msg_startup3;
-extern char     *msg_daemonname;
+extern char *msg_daemonname;
 extern char	*msg_init_abt;
 extern char	*msg_init_queued;
 extern char	*msg_init_substate;
@@ -180,6 +180,7 @@ extern pbs_list_head task_list_event;
 extern time_t	 time_now;
 
 extern struct server server;
+extern struct server *psvr;
 extern struct attribute attr_jobscript_max_size;
 extern int      pbs_mom_port;
 struct license_block licenses;
@@ -211,11 +212,9 @@ static void  init_abt_job(job *);
 static void  change_logs(int);
 int   chk_save_file(char *filename);
 static void  need_y_response(int, char *);
-static int   pbsd_init_job(job *pjob, int type);
-static int   pbsd_init_reque(job *job, int change_state);
+int   pbsd_init_reque(job *job, int change_state);
 static void  resume_net_move(struct work_task *);
 static void  stop_me(int);
-static int   Rmv_if_resv_not_possible(job *);
 static int   attach_queue_to_reservation(resc_resv *);
 static void  call_log_license(struct work_task *);
 extern int create_resreleased(job *pjob);
@@ -414,8 +413,6 @@ pbsd_init(int type)
 	char	 zone_dir[MAXPATHLEN];
 	char	*hook_suffix = HOOK_FILE_SUFFIX;
 	int	hook_suf_len = strlen(hook_suffix);
-	int	 numjobs;
-	job	*pjob;
 	hook	*phook, *phook_current;
 	pbs_queue *pque;
 	resc_resv *presv;
@@ -423,12 +420,9 @@ pbsd_init(int type)
 	int	 rc;
 	struct stat statbuf;
 	char	hook_msg[HOOK_MSG_SIZE];
-
 	struct sigaction act;
 	struct sigaction oact;
-
 	struct tm	*ptm;
-	pbs_db_job_info_t	dbjob = {{0}};
 	pbs_db_resv_info_t	dbresv = {{0}};
 	pbs_db_que_info_t	dbque = {{0}};
 	pbs_db_sched_info_t	dbsched = {{0}};
@@ -597,15 +591,15 @@ pbsd_init(int type)
 
 	/* 5. If not a "create" initialization, recover server db */
 	/*    and sched db					  */
-	rc = svr_recov_db();
-	if ((rc != 0) && (type != RECOV_CREATE)) {
+	psvr = svr_recov_db(psvr);
+	if ((!psvr) && (type != RECOV_CREATE)) {
 		need_y_response(type, "no server database exists");
 		type = RECOV_CREATE;
 	}
 	if (type != RECOV_CREATE) {
 		/* Server read success full ?*/
 
-		if (rc != 0) {
+		if (!psvr) {
 			log_err(rc, __func__, msg_init_baddb);
 			return (-1);
 		}
@@ -613,12 +607,13 @@ pbsd_init(int type)
 		if (server.sv_attr[(int)SRV_ATR_resource_assn].at_flags & ATR_VFLAG_SET) {
 			svr_attr_def[(int)SRV_ATR_resource_assn].at_free(&server.sv_attr[(int)SRV_ATR_resource_assn]);
 		}
+
 		if (new_log_event_mask) {
 			/* set to what was given on command line -e option */
 			server.sv_attr[(int)SRV_ATR_log_events].at_val.at_long = new_log_event_mask;
 			server.sv_attr[(int)SRV_ATR_log_events].at_flags = ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
-
 		}
+
 		/* if server comment is a default, clear it */
 		/* it will be reset as needed               */
 		if ((server.sv_attr[(int)SRV_ATR_Comment].at_flags & (ATR_VFLAG_SET | ATR_VFLAG_DEFLT)) == (ATR_VFLAG_SET | ATR_VFLAG_DEFLT)) {
@@ -626,10 +621,6 @@ pbsd_init(int type)
 		}
 
 		/* now do sched db */
-		/* start a transaction */
-		if (pbs_db_begin_trx(conn, 0, 0) != 0)
-			return (-1);
-
 		obj.pbs_db_obj_type = PBS_DB_SCHED;
 		obj.pbs_db_un.pbs_db_sched = &dbsched;
 
@@ -638,7 +629,6 @@ pbsd_init(int type)
 			snprintf(log_buffer, LOG_BUF_SIZE, "%s", (char *) conn->conn_db_err);
 			log_err(-1, "pbsd_init", log_buffer);
 			pbs_db_cursor_close(conn, state);
-			(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
 			return (-1);
 		}
 
@@ -652,19 +642,17 @@ pbsd_init(int type)
 				psched->pbs_scheduler_port = psched->sch_attr[SCHED_ATR_sched_port].at_val.at_long;
 				psched->pbs_scheduler_addr = get_hostaddr(psched->sch_attr[SCHED_ATR_SchedHost].at_val.at_str);
 			}
+			free_db_attr_list(&dbsched.db_attr_list);
+			free_db_attr_list(&dbsched.cache_attr_list);
 		}
 
 		pbs_db_cursor_close(conn, state);
 
 		if (server.sv_attr[SRV_ATR_scheduling].at_val.at_long)
 			set_scheduler_flag(SCH_SCHEDULE_ETE_ON, NULL);
-
-		/* end the transaction */
-		if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0)
-			return (-1);
 		
 	} else {	/* init type is "create" */
-		if (rc == 0) {		/* server was loaded */
+		if (psvr) {		/* server was loaded */
 			need_y_response(type, "server database exists");
 
 			/* reinitialize schema by dropping PBS schema */
@@ -758,10 +746,6 @@ pbsd_init(int type)
 	 */
 	server.sv_qs.sv_numque = 0;
 
-	/* start a transaction */
-	if (pbs_db_begin_trx(conn, 0, 0) != 0)
-		return (-1);
-
 	/* get jobs from DB for this instance of server, by port and address */
 	obj.pbs_db_obj_type = PBS_DB_QUEUE;
 	obj.pbs_db_un.pbs_db_que = &dbque;
@@ -771,31 +755,22 @@ pbsd_init(int type)
 		sprintf(log_buffer, "%s", (char *) conn->conn_db_err);
 		log_err(-1, __func__, log_buffer);
 		pbs_db_cursor_close(conn, state);
-		(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
 		return (-1);
 	}
 	while ((rc = pbs_db_cursor_next(conn, state, &obj)) == 0) {
 		/* recover queue */
 		if ((pque = que_recov_db(dbque.qu_name, NULL)) != NULL) {
 			/* que_recov increments sv_numque */
-			sprintf(log_buffer, msg_init_recovque,
-				pque->qu_qs.qu_name);
-			log_event(PBSEVENT_SYSTEM | PBSEVENT_ADMIN |
-				PBSEVENT_DEBUG, PBS_EVENTCLASS_SERVER,
-				LOG_INFO, msg_daemonname, log_buffer);
-			if (pque->qu_attr[(int) QE_ATR_ResourceAssn].at_flags &
-				ATR_VFLAG_SET) {
-				que_attr_def[(int) QE_ATR_ResourceAssn].at_free(
-					&pque->qu_attr[(int) QE_ATR_ResourceAssn]);
+			sprintf(log_buffer, msg_init_recovque, pque->qu_qs.qu_name);
+			log_event(PBSEVENT_SYSTEM | PBSEVENT_ADMIN | PBSEVENT_DEBUG, PBS_EVENTCLASS_SERVER, LOG_INFO, msg_daemonname, log_buffer);
+			if (pque->qu_attr[(int) QE_ATR_ResourceAssn].at_flags & ATR_VFLAG_SET) {
+				que_attr_def[(int) QE_ATR_ResourceAssn].at_free(&pque->qu_attr[(int) QE_ATR_ResourceAssn]);
 			}
 		}
+		free_db_attr_list(&dbque.db_attr_list);
+		free_db_attr_list(&dbque.cache_attr_list);
 	}
-
 	pbs_db_cursor_close(conn, state);
-
-	/* end the transaction */
-	if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0)
-		return (-1);
 
 	/* Open and read in node list if one exists */
 	if ((rc = setup_nodes()) == -1) {
@@ -818,10 +793,6 @@ pbsd_init(int type)
 	sprintf(zone_dir, "%s%s", pbs_conf.pbs_exec_path, ICAL_ZONEINFO_DIR);
 	set_ical_zoneinfo(zone_dir);
 
-	/* start a transaction */
-	if (pbs_db_begin_trx(conn, 0, 0) != 0)
-		return (-1);
-
 	/* load reservations */
 	obj.pbs_db_obj_type = PBS_DB_RESV;
 	obj.pbs_db_un.pbs_db_resv = &dbresv;
@@ -830,7 +801,6 @@ pbsd_init(int type)
 		sprintf(log_buffer, "%s", (char *) conn->conn_db_err);
 		log_err(-1, __func__, log_buffer);
 		pbs_db_cursor_close(conn, state);
-		(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
 		return (-1);
 	}
 	while ((rc = pbs_db_cursor_next(conn, state, &obj)) == 0) {
@@ -843,22 +813,16 @@ pbsd_init(int type)
 
 			append_link(&svr_allresvs, &presv->ri_allresvs, presv);
 			if (attach_queue_to_reservation(presv)) {
-
 				/* reservation needed queue; failed to find it */
-				sprintf(log_buffer, msg_init_resvNOq,
-					presv->ri_qs.ri_queue, presv->ri_qs.ri_resvID);
-				log_event(PBSEVENT_SYSTEM | PBSEVENT_ADMIN |
-					PBSEVENT_DEBUG, PBS_EVENTCLASS_RESV,
-					LOG_NOTICE, msg_daemonname, log_buffer);
+				sprintf(log_buffer, msg_init_resvNOq, presv->ri_qs.ri_queue, presv->ri_qs.ri_resvID);
+				log_event(PBSEVENT_SYSTEM | PBSEVENT_ADMIN | PBSEVENT_DEBUG, PBS_EVENTCLASS_RESV, LOG_NOTICE, msg_daemonname, log_buffer);
 			} else {
-
-				sprintf(log_buffer, msg_init_recovresv,
-					presv->ri_qs.ri_resvID);
-				log_event(PBSEVENT_SYSTEM | PBSEVENT_ADMIN |
-					PBSEVENT_DEBUG, PBS_EVENTCLASS_SERVER,
-					LOG_INFO, msg_daemonname, log_buffer);
+				sprintf(log_buffer, msg_init_recovresv, presv->ri_qs.ri_resvID);
+				log_event(PBSEVENT_SYSTEM | PBSEVENT_ADMIN | PBSEVENT_DEBUG, PBS_EVENTCLASS_SERVER, LOG_INFO, msg_daemonname, log_buffer);
 			}
 		}
+		free_db_attr_list(&dbresv.db_attr_list);
+		free_db_attr_list(&dbresv.cache_attr_list);
 	}
 	pbs_db_cursor_close(conn, state);
 
@@ -875,77 +839,8 @@ pbsd_init(int type)
 	avl_create_index(AVL_jctx, AVL_NO_DUP_KEYS, 0);
 
 	server.sv_qs.sv_numjobs = 0;
-
-	/* get jobs from DB */
-	obj.pbs_db_obj_type = PBS_DB_JOB;
-	obj.pbs_db_un.pbs_db_job = &dbjob;
-	state = pbs_db_cursor_init(conn, &obj, NULL);
-	if (state == NULL) {
-		sprintf(log_buffer, "%s", (char *) conn->conn_db_err);
-		log_err(-1, __func__, log_buffer);
-		pbs_db_cursor_close(conn, state);
-		(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
-		return (-1);
-	}
-	
-	/* Now, for each job found ... */
-	numjobs = 0;
-	while ((rc = pbs_db_cursor_next(conn, state, &obj)) == 0) {
-		if ((pjob = job_recov_db_spl(&dbjob, NULL)) == NULL) {
-			if ((type == RECOV_COLD) || (type == RECOV_CREATE)) {
-				/* remove the loaded job from db */
-				if (pbs_db_delete_obj(conn, &obj) != 0) {
-					sprintf(log_buffer, "job %s not purged", dbjob.ji_jobid);
-					log_err(-1, __func__, log_buffer);
-				}
-			} else {
-				sprintf(log_buffer, "Failed to recover job %s", dbjob.ji_jobid);
-				log_event(PBSEVENT_SYSTEM,
-					PBS_EVENTCLASS_SERVER, LOG_NOTICE,
-					msg_daemonname, log_buffer);
-			}
-			continue;
-		}
-		free_db_attr_list(&dbjob.db_attr_list);
-		free_db_attr_list(&dbjob.cache_attr_list);
-
-		/*chk if job belongs to a reservation or
-			*is a reservation job.  If this is true
-			*and the reservation is no longer possible,
-			*return (1) else return (0)
-			*/
-		if (Rmv_if_resv_not_possible(pjob)) {
-			account_record(PBS_ACCT_ABT, pjob, "");
-			svr_mailowner(pjob, MAIL_ABORT, MAIL_NORMAL,
-				msg_init_abt);
-			check_block(pjob, msg_init_abt);
-			job_purge(pjob);
-			continue;
-		}
-
-		rc = pbsd_init_job(pjob, type);
-		/*
-			*	in the db version, job always has job script
-			*	since they are saved together, so nothing to
-			*	check
-			*
-			*/
-		if ((++numjobs % 20) == 0) {
-			/* periodically touch the file so the  */
-			/* world knows we are alive and active */
-			(void)update_svrlive();
-		}
-	}
-
-	sprintf(log_buffer, msg_init_exptjobs,
-		server.sv_qs.sv_numjobs);
-	log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_NOTICE,
-		msg_daemonname, log_buffer);
-
-	pbs_db_cursor_close(conn, state);
-	/* close transaction */
-	if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0)
-		return (-1);
+	/* do not recover jobs */
+	get_all_db_jobs();
 
 	/* If we have trial licenses, we would need to immediately
 	 * license the jobs under svr_unlicensedjobs list
@@ -1489,8 +1384,8 @@ reassign_resc(job *pjob)
  * @retval	0	- success
  * @retval	-1	- error.
  */
-static int
-pbsd_init_job(job *pjob, int type)
+int
+pbsd_init_job(job *pjob)
 {
 	unsigned int d;
 	int	 newstate;
@@ -1500,232 +1395,211 @@ pbsd_init_job(job *pjob, int type)
 	pjob->ji_mom_prot = PROT_INVALID;
 
 	/* update at_server attribute in case name changed */
+	job_attr_def[(int)JOB_ATR_at_server].at_free(&pjob->ji_wattr[(int)JOB_ATR_at_server]);
+	job_attr_def[(int)JOB_ATR_at_server].at_decode(&pjob->ji_wattr[(int)JOB_ATR_at_server], NULL, NULL, server_name);
 
-	job_attr_def[(int)JOB_ATR_at_server].at_free(
-		&pjob->ji_wattr[(int)JOB_ATR_at_server]);
-	job_attr_def[(int)JOB_ATR_at_server].at_decode(
-		&pjob->ji_wattr[(int)JOB_ATR_at_server],
-		NULL, NULL, server_name);
 
-	/* now based on the initialization type */
+	/* make sure JOB_SVFLG_RescAssn is cleared,		   */
+	/* we will reassign resources if needed	based on the job's */
+	/* substate (if the job had resources when server exited   */
+	/* JOB_SVFLG_RescAssn is reset when the resources are	   */
+	/* reassigned by calling reassign_resc().		   */
+	pjob->ji_qs.ji_svrflags &= ~JOB_SVFLG_RescAssn;
 
-	if ((type == RECOV_COLD) || (type == RECOV_CREATE)) {
-		need_y_response(type, "jobs exists");
-		init_abt_job(pjob);
+	/* Update run_version if it is not set but run_count is,   */
+	/* Likely means recovering a job from a older version      */
+	if (((pjob->ji_wattr[(int)JOB_ATR_run_version].at_flags & ATR_VFLAG_SET) == 0) && ((pjob->ji_wattr[(int)JOB_ATR_runcount].at_flags & ATR_VFLAG_SET) != 0)) {
+		pjob->ji_wattr[(int)JOB_ATR_run_version].at_val.at_long = pjob->ji_wattr[(int)JOB_ATR_runcount].at_val.at_long;
+		pjob->ji_wattr[(int)JOB_ATR_run_version].at_flags |= (ATR_VFLAG_SET & ATR_VFLAG_MODIFY & ATR_VFLAG_MODCACHE);
+	}
 
-	} else {
-
-		if (type != RECOV_HOT)
-			pjob->ji_qs.ji_svrflags &= ~JOB_SVFLG_HOTSTART;
-
-		/* make sure JOB_SVFLG_RescAssn is cleared,		   */
-		/* we will reassign resources if needed	based on the job's */
-		/* substate (if the job had resources when server exited   */
-		/* JOB_SVFLG_RescAssn is reset when the resources are	   */
-		/* reassigned by calling reassign_resc().		   */
-		pjob->ji_qs.ji_svrflags &= ~JOB_SVFLG_RescAssn;
-
-		/* Update run_version if it is not set but run_count is,   */
-		/* Likely means recovering a job from a older version      */
-		if (((pjob->ji_wattr[(int)JOB_ATR_run_version].at_flags & ATR_VFLAG_SET) == 0) && ((pjob->ji_wattr[(int)JOB_ATR_runcount].at_flags & ATR_VFLAG_SET) != 0)) {
-			pjob->ji_wattr[(int)JOB_ATR_run_version].at_val.at_long = pjob->ji_wattr[(int)JOB_ATR_runcount].at_val.at_long;
-			pjob->ji_wattr[(int)JOB_ATR_run_version].at_flags |= (ATR_VFLAG_SET & ATR_VFLAG_MODIFY & ATR_VFLAG_MODCACHE);
+	if (pjob->ji_qs.ji_svrflags & JOB_SVFLG_SubJob) {
+		if ((pjob->ji_parentaj = find_arrayparent(pjob->ji_qs.ji_jobid)) == NULL) {
+			/* parent job object not found */
+			init_abt_job(pjob);
+			return -1;
 		}
 
-		if (pjob->ji_qs.ji_svrflags & JOB_SVFLG_SubJob) {
-			if ((pjob->ji_parentaj = find_arrayparent(pjob->ji_qs.ji_jobid)) == NULL) {
-				/* parent job object not found */
-				init_abt_job(pjob);
-				return -1;
-			}
+		pjob->ji_subjindx = subjob_index_to_offset(pjob->ji_parentaj, get_index_from_jid(pjob->ji_qs.ji_jobid));
+		pjob->ji_parentaj->ji_ajtrk->tkm_tbl[pjob->ji_subjindx].trk_psubjob = pjob;
+		/* update the tracking table */
+		set_subjob_tblstate(pjob->ji_parentaj, pjob->ji_subjindx, pjob->ji_qs.ji_state);
+	}
 
-			pjob->ji_subjindx = subjob_index_to_offset(pjob->ji_parentaj, get_index_from_jid(pjob->ji_qs.ji_jobid));
-			pjob->ji_parentaj->ji_ajtrk->tkm_tbl[pjob->ji_subjindx].trk_psubjob = pjob;
-			/* update the tracking table */
-			set_subjob_tblstate(pjob->ji_parentaj, pjob->ji_subjindx, pjob->ji_qs.ji_state);
-		}
+	switch (pjob->ji_qs.ji_substate) {
 
-		switch (pjob->ji_qs.ji_substate) {
+		case JOB_SUBSTATE_TRANSICM:
+			if (pjob->ji_qs.ji_svrflags & JOB_SVFLG_HERE) {
 
-			case JOB_SUBSTATE_TRANSICM:
-				if (pjob->ji_qs.ji_svrflags & JOB_SVFLG_HERE) {
+				/*
+					* This server created the job, so client
+					* was qsub (a transient client), it won't be
+					* arround to recommit, so auto-commit now
+					*/
 
-					/*
-					 * This server created the job, so client
-					 * was qsub (a transient client), it won't be
-					 * arround to recommit, so auto-commit now
-					 */
-
-					pjob->ji_qs.ji_state = JOB_STATE_QUEUED;
-					pjob->ji_qs.ji_substate = JOB_SUBSTATE_QUEUED;
-					if (pbsd_init_reque(pjob, CHANGE_STATE) == -1)
-						return -1;
-				} else {
-					/*
-					 * another server is sending, append to new job
-					 * list and wait for commit; need to clear
-					 * receiving sock number though
-					 */
-					pjob->ji_qs.ji_un.ji_newt.ji_fromsock = -1;
-					append_link(&svr_newjobs,
-						&pjob->ji_alljobs, pjob);
-
-				}
-				break;
-
-			case JOB_SUBSTATE_TRNOUT:
 				pjob->ji_qs.ji_state = JOB_STATE_QUEUED;
 				pjob->ji_qs.ji_substate = JOB_SUBSTATE_QUEUED;
-				/* requeue as queued */
 				if (pbsd_init_reque(pjob, CHANGE_STATE) == -1)
 					return -1;
-				break;
-
-			case JOB_SUBSTATE_TRNOUTCM:
-
-				if (pjob->ji_qs.ji_state == JOB_STATE_RUNNING) {
-					/* was sending to Mom, requeue for now */
-
-					svr_evaljobstate(pjob, &newstate, &newsubstate, 1);
-					(void)svr_setjobstate(pjob, newstate, newsubstate);
-				} else {
-					/* requeue as is - rdy to cmt */
-
-					/* resend rtc */
-					set_task(WORK_Immed, 0, resume_net_move, (void *)pjob);
-				}
-				if (pbsd_init_reque(pjob, KEEP_STATE) == -1)
-					return -1;
-				break;
-
-			case JOB_SUBSTATE_QUEUED:
-			case JOB_SUBSTATE_PRESTAGEIN:
-			case JOB_SUBSTATE_STAGEIN:
-			case JOB_SUBSTATE_STAGECMP:
-			case JOB_SUBSTATE_STAGEFAIL:
-			case JOB_SUBSTATE_STAGEGO:
-			case JOB_SUBSTATE_HELD:
-			case JOB_SUBSTATE_SYNCHOLD:
-			case JOB_SUBSTATE_DEPNHOLD:
-			case JOB_SUBSTATE_WAITING:
-			case JOB_SUBSTATE_PRERUN:
-				if (pbsd_init_reque(pjob, CHANGE_STATE) == -1)
-					return -1;
-				break;
-
-			case JOB_SUBSTATE_PROVISION:
-				if (pjob->ji_wattr[(int)JOB_ATR_prov_vnode].at_flags &
-					ATR_VFLAG_SET) {
-					/* If JOB_ATR_prov_vnode is set, free it */
-					job_attr_def[(int)JOB_ATR_prov_vnode].at_free(
-						&pjob->ji_wattr[(int)JOB_ATR_prov_vnode]);
-				}
-				if (pbsd_init_reque(pjob, CHANGE_STATE) == -1)
-					return -1;
-				break;
-
-			case JOB_SUBSTATE_RUNNING:
-			case JOB_SUBSTATE_SUSPEND:
-			case JOB_SUBSTATE_SCHSUSP:
-			case JOB_SUBSTATE_BEGUN:
-				if (pbsd_init_reque(pjob, KEEP_STATE) == -1)
-					return -1;
-				if (pjob->ji_qs.ji_substate == JOB_SUBSTATE_RUNNING ||
-					((pjob->ji_wattr[(int) JOB_ATR_resc_released].at_flags & ATR_VFLAG_SET)
-					 && (pjob->ji_qs.ji_substate ==  JOB_SUBSTATE_SCHSUSP ||
-					pjob->ji_qs.ji_substate == JOB_SUBSTATE_SUSPEND))) {
-
-					reassign_resc(pjob);
-					if (type == RECOV_HOT)
-						pjob->ji_qs.ji_svrflags |= JOB_SVFLG_HOTSTART;
-				}
-				break;
-
-
-			case JOB_SUBSTATE_SYNCRES:
-
-				/* clear all dependent job ready flags */
-
-				if (pbsd_init_reque(pjob, CHANGE_STATE) == -1)
-					return -1;
-				break;
-
-			case JOB_SUBSTATE_TERM:
-			case JOB_SUBSTATE_EXITING:
-			case JOB_SUBSTATE_STAGEOUT:
-			case JOB_SUBSTATE_STAGEDEL:
-			case JOB_SUBSTATE_EXITED:
-				set_task(WORK_Immed, 0, on_job_exit, (void *)pjob);
-				if (pbsd_init_reque(pjob, KEEP_STATE) == -1)
-					return -1;
-				reassign_resc(pjob);
-				break;
-
-			case JOB_SUBSTATE_ABORT:
-				/* requeue job and if no nodes assigned,thats all */
-				if (pbsd_init_reque(pjob, KEEP_STATE) == -1)
-					return -1;
-				if ((pjob->ji_qs.ji_svrflags & JOB_SVFLG_HasNodes) != 0) {
-					/* has nodes so reassign */
-					set_task(WORK_Immed, 0, on_job_exit, (void *)pjob);
-					reassign_resc(pjob);
-				}
-				break;
-
-			case JOB_SUBSTATE_MOVED:
-			case JOB_SUBSTATE_FAILED:
-			case JOB_SUBSTATE_FINISHED:
-			case JOB_SUBSTATE_TERMINATED:
-				if (pbsd_init_reque(pjob, KEEP_STATE) == -1)
-					return -1;
-				break;
-
-			case JOB_SUBSTATE_RERUN:
-				if (pjob->ji_qs.ji_state == JOB_STATE_EXITING)
-					set_task(WORK_Immed, 0, on_job_rerun, (void *)pjob);
-				if (pbsd_init_reque(pjob, KEEP_STATE) == -1)
-					return -1;
-				break;
-
-			case JOB_SUBSTATE_RERUN1:
-			case JOB_SUBSTATE_RERUN2:
-			case JOB_SUBSTATE_RERUN3:
-				set_task(WORK_Immed, 0, on_job_rerun, (void *)pjob);
-				if (pbsd_init_reque(pjob, KEEP_STATE) == -1)
-					return -1;
-				break;
-
-			default:
-				(void)sprintf(log_buffer,
-					msg_init_unkstate, pjob->ji_qs.ji_substate);
-				log_event(PBSEVENT_ERROR, PBS_EVENTCLASS_JOB,
-					LOG_NOTICE,
-					pjob->ji_qs.ji_jobid, log_buffer);
-				job_abt(pjob, log_buffer);
-				return -1;
-		}
-
-		/* update entity limit sums for this job */
-		(void)account_entity_limit_usages(pjob, NULL, NULL, INCR, ETLIM_ACC_ALL);
-
-		/* if job has IP address of Mom, it may have changed */
-		/* reset based on hostname                           */
-
-		if ((pjob->ji_qs.ji_un_type == JOB_UNION_TYPE_EXEC) &&
-			(pjob->ji_qs.ji_un.ji_exect.ji_momaddr != 0)) {
-
-			if (pjob->ji_wattr[(int)JOB_ATR_exec_host].at_flags & ATR_VFLAG_SET) {
-				pjob->ji_qs.ji_un.ji_exect.ji_momaddr =
-					get_addr_of_nodebyname(
-					pjob->ji_wattr[(int)JOB_ATR_exec_host].
-					at_val.at_str, &d);
-				pjob->ji_qs.ji_un.ji_exect.ji_momport = d;
 			} else {
-				pjob->ji_qs.ji_un.ji_exect.ji_momaddr = 0;
-				pjob->ji_qs.ji_un.ji_exect.ji_momport = 0;
+				/*
+					* another server is sending, append to new job
+					* list and wait for commit; need to clear
+					* receiving sock number though
+					*/
+				pjob->ji_qs.ji_un.ji_newt.ji_fromsock = -1;
+				append_link(&svr_newjobs,
+					&pjob->ji_alljobs, pjob);
+
 			}
+			break;
+
+		case JOB_SUBSTATE_TRNOUT:
+			pjob->ji_qs.ji_state = JOB_STATE_QUEUED;
+			pjob->ji_qs.ji_substate = JOB_SUBSTATE_QUEUED;
+			/* requeue as queued */
+			if (pbsd_init_reque(pjob, CHANGE_STATE) == -1)
+				return -1;
+			break;
+
+		case JOB_SUBSTATE_TRNOUTCM:
+
+			if (pjob->ji_qs.ji_state == JOB_STATE_RUNNING) {
+				/* was sending to Mom, requeue for now */
+
+				svr_evaljobstate(pjob, &newstate, &newsubstate, 1);
+				(void)svr_setjobstate(pjob, newstate, newsubstate);
+			} else {
+				/* requeue as is - rdy to cmt */
+
+				/* resend rtc */
+				set_task(WORK_Immed, 0, resume_net_move, (void *)pjob);
+			}
+			if (pbsd_init_reque(pjob, KEEP_STATE) == -1)
+				return -1;
+			break;
+
+		case JOB_SUBSTATE_QUEUED:
+		case JOB_SUBSTATE_PRESTAGEIN:
+		case JOB_SUBSTATE_STAGEIN:
+		case JOB_SUBSTATE_STAGECMP:
+		case JOB_SUBSTATE_STAGEFAIL:
+		case JOB_SUBSTATE_STAGEGO:
+		case JOB_SUBSTATE_HELD:
+		case JOB_SUBSTATE_SYNCHOLD:
+		case JOB_SUBSTATE_DEPNHOLD:
+		case JOB_SUBSTATE_WAITING:
+		case JOB_SUBSTATE_PRERUN:
+			if (pbsd_init_reque(pjob, CHANGE_STATE) == -1)
+				return -1;
+			break;
+
+		case JOB_SUBSTATE_PROVISION:
+			if (pjob->ji_wattr[(int)JOB_ATR_prov_vnode].at_flags &
+				ATR_VFLAG_SET) {
+				/* If JOB_ATR_prov_vnode is set, free it */
+				job_attr_def[(int)JOB_ATR_prov_vnode].at_free(
+					&pjob->ji_wattr[(int)JOB_ATR_prov_vnode]);
+			}
+			if (pbsd_init_reque(pjob, CHANGE_STATE) == -1)
+				return -1;
+			break;
+
+		case JOB_SUBSTATE_RUNNING:
+		case JOB_SUBSTATE_SUSPEND:
+		case JOB_SUBSTATE_SCHSUSP:
+		case JOB_SUBSTATE_BEGUN:
+			if (pbsd_init_reque(pjob, KEEP_STATE) == -1)
+				return -1;
+			if (pjob->ji_qs.ji_substate == JOB_SUBSTATE_RUNNING ||
+				((pjob->ji_wattr[(int) JOB_ATR_resc_released].at_flags & ATR_VFLAG_SET)
+					&& (pjob->ji_qs.ji_substate ==  JOB_SUBSTATE_SCHSUSP ||
+				pjob->ji_qs.ji_substate == JOB_SUBSTATE_SUSPEND))) {
+
+				reassign_resc(pjob);
+				pjob->ji_qs.ji_svrflags |= JOB_SVFLG_HOTSTART;
+			}
+			break;
+
+
+		case JOB_SUBSTATE_SYNCRES:
+
+			/* clear all dependent job ready flags */
+
+			if (pbsd_init_reque(pjob, CHANGE_STATE) == -1)
+				return -1;
+			break;
+
+		case JOB_SUBSTATE_TERM:
+		case JOB_SUBSTATE_EXITING:
+		case JOB_SUBSTATE_STAGEOUT:
+		case JOB_SUBSTATE_STAGEDEL:
+		case JOB_SUBSTATE_EXITED:
+			set_task(WORK_Immed, 0, on_job_exit, (void *)pjob);
+			if (pbsd_init_reque(pjob, KEEP_STATE) == -1)
+				return -1;
+			reassign_resc(pjob);
+			break;
+
+		case JOB_SUBSTATE_ABORT:
+			/* requeue job and if no nodes assigned,thats all */
+			if (pbsd_init_reque(pjob, KEEP_STATE) == -1)
+				return -1;
+			if ((pjob->ji_qs.ji_svrflags & JOB_SVFLG_HasNodes) != 0) {
+				/* has nodes so reassign */
+				set_task(WORK_Immed, 0, on_job_exit, (void *)pjob);
+				reassign_resc(pjob);
+			}
+			break;
+
+		case JOB_SUBSTATE_MOVED:
+		case JOB_SUBSTATE_FAILED:
+		case JOB_SUBSTATE_FINISHED:
+		case JOB_SUBSTATE_TERMINATED:
+			if (pbsd_init_reque(pjob, KEEP_STATE) == -1)
+				return -1;
+			break;
+
+		case JOB_SUBSTATE_RERUN:
+			if (pjob->ji_qs.ji_state == JOB_STATE_EXITING)
+				set_task(WORK_Immed, 0, on_job_rerun, (void *)pjob);
+			if (pbsd_init_reque(pjob, KEEP_STATE) == -1)
+				return -1;
+			break;
+
+		case JOB_SUBSTATE_RERUN1:
+		case JOB_SUBSTATE_RERUN2:
+		case JOB_SUBSTATE_RERUN3:
+			set_task(WORK_Immed, 0, on_job_rerun, (void *)pjob);
+			if (pbsd_init_reque(pjob, KEEP_STATE) == -1)
+				return -1;
+			break;
+
+		default:
+			(void)sprintf(log_buffer, msg_init_unkstate, pjob->ji_qs.ji_substate);
+			log_event(PBSEVENT_ERROR, PBS_EVENTCLASS_JOB, LOG_NOTICE, pjob->ji_qs.ji_jobid, log_buffer);
+			job_abt(pjob, log_buffer);
+			return -1;
+	}
+
+	/* update entity limit sums for this job */
+	(void)account_entity_limit_usages(pjob, NULL, NULL, INCR, ETLIM_ACC_ALL);
+
+	/* if job has IP address of Mom, it may have changed */
+	/* reset based on hostname                           */
+
+	if ((pjob->ji_qs.ji_un_type == JOB_UNION_TYPE_EXEC) &&
+		(pjob->ji_qs.ji_un.ji_exect.ji_momaddr != 0)) {
+
+		if (pjob->ji_wattr[(int)JOB_ATR_exec_host].at_flags & ATR_VFLAG_SET) {
+			pjob->ji_qs.ji_un.ji_exect.ji_momaddr = get_addr_of_nodebyname(pjob->ji_wattr[(int)JOB_ATR_exec_host].at_val.at_str, &d);
+			pjob->ji_qs.ji_un.ji_exect.ji_momport = d;
+		} else {
+			pjob->ji_qs.ji_un.ji_exect.ji_momaddr = 0;
+			pjob->ji_qs.ji_un.ji_exect.ji_momport = 0;
 		}
 	}
+	
 	return 0;
 }
 
@@ -1745,16 +1619,13 @@ pbsd_init_job(job *pjob, int type)
  * @retval	0	- success
  * @retval	-1	- error.
  */
-static int
+int
 pbsd_init_reque(job *pjob, int change_state)
 {
 	char logbuf[384];
 	int newstate;
 	int newsubstate;
 	int rc;
-
-	(void)sprintf(logbuf, msg_init_substate,
-		pjob->ji_qs.ji_substate);
 
 	/* re-enqueue the job into the queue it was in */
 
@@ -1772,17 +1643,10 @@ pbsd_init_reque(job *pjob, int change_state)
 	pjob->ji_wattr[(int)JOB_ATR_substate].at_val.at_long = pjob->ji_qs.ji_substate;
 	pjob->ji_wattr[(int)JOB_ATR_substate].at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 
-	if ((rc = svr_enquejob(pjob)) == 0) {
-		(void)strcat(logbuf, msg_init_queued);
-		(void)strcat(logbuf, pjob->ji_qs.ji_queue);
-		log_event(PBSEVENT_SYSTEM | PBSEVENT_ADMIN | PBSEVENT_DEBUG,
-			PBS_EVENTCLASS_JOB, LOG_INFO,
-			pjob->ji_qs.ji_jobid, logbuf);
-	} else {
+	if ((rc = svr_enquejob(pjob)) != 0) {
 		if (rc == PBSE_UNKQUE) {
 
 			/* Oops, this should never happen */
-
 			sprintf(logbuf, "%s %s; job %s queue %s",
 				msg_err_noqueue, msg_err_noqueue1,
 				pjob->ji_qs.ji_jobid, pjob->ji_qs.ji_queue);
@@ -1993,14 +1857,12 @@ init_abt_job(job *pjob)
  * @retval	0	- OK to requeue
  * @retval	1	- should not be requeued
  */
-static int
+int
 Rmv_if_resv_not_possible(job *pjob)
 {
 	int	    rc=0;	/*assume OK to requeue*/
 	resc_resv   *presv;
 	pbs_queue   *pque;
-
-
 
 	if (pjob->ji_wattr[JOB_ATR_reserve_state].at_flags &
 		ATR_VFLAG_SET) {
