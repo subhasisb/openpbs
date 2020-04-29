@@ -85,6 +85,7 @@ extern "C" {
 #define STMT_UPDATE_JOB_QUICK "update_job_quick"
 #define STMT_FINDJOBS_ORDBY_QRANK   "findjobs_ordby_qrank"
 #define STMT_FINDJOBS_BYQUE_ORDBY_QRANK "findjobs_byque_ordby_qrank"
+#define STMT_FINDJOBS_FROM_TIME "findjobs_from_time"
 #define STMT_DELETE_JOB "delete_job"
 #define STMT_REMOVE_JOBATTRS "remove_jobattrs"
 
@@ -101,9 +102,8 @@ extern "C" {
 #define STMT_SELECT_RESV "select_resv"
 #define STMT_DELETE_RESV "delete_resv"
 #define STMT_REMOVE_RESVATTRS "remove_resvattrs"
-
-/* creattm is the table field that holds the creation time */
 #define STMT_FINDRESVS_ORDBY_CREATTM "findresvs_ordby_creattm"
+#define STMT_FINDRESVS_FROM_TIME_ORDBY_SAVETM "findresvs_from_time_ordby_savetm"
 
 
 /* server & seq statement names */
@@ -125,6 +125,7 @@ extern "C" {
 #define STMT_SELECT_QUE "select_que"
 #define STMT_DELETE_QUE "delete_que"
 #define STMT_FIND_QUES_ORDBY_CREATTM "find_ques_ordby_creattm"
+#define STMT_FIND_QUES_FROM_TIME_ORDBY_SAVETM "find_ques_from_time_ordby_savetm"
 #define STMT_REMOVE_QUEATTRS "remove_queattrs"
 
 /* node statement names */
@@ -141,6 +142,8 @@ extern "C" {
 #define STMT_SELECT_MOMINFO_TIME "select_mominfo_time"
 #define STMT_INSERT_MOMINFO_TIME "insert_mominfo_time"
 #define STMT_UPDATE_MOMINFO_TIME "update_mominfo_time"
+#define STMT_FIND_NODES_ORDBY_INDEX_FILTERBY_SAVETM "find_nodes_ordby_index_filterby_savetm"
+#define STMT_FIND_NODES_ORDBY_INDEX_FILTERBY_HOSTNAME "find_nodes_ordby_index_filterby_hostname"
 
 /* node job statements */
 #define STMT_SELECT_NODEJOB "select_nodejob"

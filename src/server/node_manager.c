@@ -2887,7 +2887,7 @@ deallocate_job(mominfo_t *pmom, job *pjob)
 		free(new_exec_vnode);
 
 	}
-	if (find_assoc_sched_jid(pjob->ji_qs.ji_jobid, &psched))
+	if (find_assoc_sched_pjob(pjob, &psched))
 		set_scheduler_flag(SCH_SCHEDULE_TERM, psched);
 	else {
 		log_err(-1, __func__, "Unable to find scheduler associated with partition");
@@ -8050,7 +8050,7 @@ free_sister_vnodes(job *pjob, char *vnodelist, char *keep_select, char *err_msg,
 	/* increment everything found in new exec_vnode */
 	set_resc_assigned((void *)pjob, 0,  INCR);
 
-	if (find_assoc_sched_jid(pjob->ji_qs.ji_jobid, &psched))
+	if (find_assoc_sched_pjob(pjob, &psched))
 		set_scheduler_flag(SCH_SCHEDULE_TERM, psched);
 	else {
 		log_err(-1, __func__, "Unable to find scheduler associated with partition");

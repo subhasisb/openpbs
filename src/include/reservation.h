@@ -123,6 +123,7 @@ enum resv_atr {
 	RESV_ATR_job,
 	RESV_ATR_node_set,
 	RESV_ATR_partition,
+	RESV_ATR_server_index,
 	RESV_ATR_UNKN,
 	RESV_ATR_LAST
 };
@@ -287,6 +288,7 @@ struct resc_resv {
 	 */
 	attribute		ri_wattr[RESV_ATR_LAST];  /*reservation's attributes*/
 	char    		ri_savetm[DB_TIMESTAMP_LEN + 1];
+	int     		ld_trx_id; /* record the server iteration id of when this record was loaded */
 };
 
 /*
