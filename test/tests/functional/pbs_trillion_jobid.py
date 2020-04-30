@@ -66,7 +66,7 @@ exit 0
             (conf_path, num))
         self.du.chmod(path=fn, mode=0o755)
         fail_msg = 'Failed to set sequence id in database'
-        ret = self.du.run_cmd(cmd=fn)
+        ret = self.du.run_cmd(cmd=fn, sudo=True)
         self.assertEqual(ret['rc'], 0, fail_msg)
         # Start the PBS server
         start_msg = 'Failed to restart PBS'
