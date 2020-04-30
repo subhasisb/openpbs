@@ -342,7 +342,7 @@ load_svinst_last_jobid(int sv_index)
 	FILE *fp;
 
 	sprintf(last_jobidfile, "%s/%s/server_%d.lastjobid", pbs_conf.pbs_home_path, PBS_SVR_PRIVATE, sv_index);
-	if (!(fp = fopen(last_jobidfile, "rt"))) {
+	if (!(fp = fopen(last_jobidfile, "r"))) {
 		if (errno != ENOENT) { /* be silent if file does not exist */
 			sprintf(log_buffer, "unable to open lastjobid file %s", last_jobidfile);
 			log_err(errno, msg_daemonname, log_buffer);
@@ -377,7 +377,7 @@ save_svinst_last_jobid(int sv_index, long long last_jobid)
 	FILE *fp;
 
 	sprintf(last_jobidfile, "%s/%s/server_%d.lastjobid", pbs_conf.pbs_home_path, PBS_SVR_PRIVATE, sv_index);
-	if (!(fp = fopen(last_jobidfile, "wt"))) {
+	if (!(fp = fopen(last_jobidfile, "w"))) {
 		sprintf(log_buffer, "unable to open lastjobid file %s", last_jobidfile);
 		log_err(errno, msg_daemonname, log_buffer);
 		return (-1);
