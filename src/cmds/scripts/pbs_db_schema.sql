@@ -62,7 +62,6 @@ INSERT INTO pbs.info values('1.4.0'); /* schema version */
  * Table pbs.server holds server object information
  */
 CREATE TABLE pbs.server (
-    sv_jobidnumber  BIGINT      NOT NULL,
     sv_savetm       TIMESTAMP   NOT NULL,
     sv_creattm      TIMESTAMP   NOT NULL,
     attributes      hstore      NOT NULL DEFAULT ''	

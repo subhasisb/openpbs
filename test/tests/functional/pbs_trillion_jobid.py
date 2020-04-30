@@ -45,57 +45,8 @@ class TestTrillionJobid(TestFunctional):
 
     update_svr_db_script = """#!/bin/bash
 . %s
-. ${PBS_EXEC}/libexec/pbs_pgsql_env.sh
 
-DATA_PORT=${PBS_DATA_SERVICE_PORT}
-if [ -z ${DATA_PORT} ]; then
-    DATA_PORT=15007
-fi
-
-sudo ls ${PBS_HOME}/server_priv/db_user &>/dev/null
-if [ $? -eq 0 ]; then
-    DATA_USER=`sudo cat ${PBS_HOME}/server_priv/db_user`
-    if [ $? -ne 0 ]; then
-        exit 1
-    fi
-fi
-
-sudo ${PBS_EXEC}/sbin/pbs_ds_password test
-if [ $? -eq 0 ]; then
-    sudo ${PBS_EXEC}/sbin/pbs_dataservice stop
-    if [ $? -ne 0 ]; then
-        exit 1
-    fi
-fi
-
-sudo ${PBS_EXEC}/sbin/pbs_dataservice status
-if [ $? -eq 0 ]; then
-    sudo ${PBS_EXEC}/sbin/pbs_dataservice stop
-    if [ $? -ne 0 ]; then
-        exit 1
-    fi
-fi
-
-sudo ${PBS_EXEC}/sbin/pbs_dataservice start
-if [ $? -ne 0 ]; then
-    exit 1
-fi
-
-args="-U ${DATA_USER} -p ${DATA_PORT} -d pbs_datastore"
-PGPASSWORD=test ${PGSQL_BIN}/psql ${args} <<-EOF
-    UPDATE pbs.server SET sv_jobidnumber = %d;
-EOF
-
-ret=$?
-if [ $ret -eq 0 ]; then
-    echo "Server sv_jobidnumber attribute has been updated successfully"
-fi
-
-sudo ${PBS_EXEC}/sbin/pbs_dataservice stop
-if [ $? -ne 0 ]; then
-    exit 1
-fi
-
+echo %d > $PBS_HOME/server_priv/server_0.lastjobid
 exit 0
 
 """
@@ -115,7 +66,7 @@ exit 0
             (conf_path, num))
         self.du.chmod(path=fn, mode=0o755)
         fail_msg = 'Failed to set sequence id in database'
-        ret = self.du.run_cmd(cmd=fn)
+        ret = self.du.run_cmd(cmd=fn, sudo=True)
         self.assertEqual(ret['rc'], 0, fail_msg)
         # Start the PBS server
         start_msg = 'Failed to restart PBS'

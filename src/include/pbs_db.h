@@ -151,7 +151,6 @@ typedef struct pbs_db_attr_list pbs_db_attr_list_t;
 struct pbs_db_svr_info {
 	char  sv_creattm[DB_TIMESTAMP_LEN + 1];
 	char  sv_savetm[DB_TIMESTAMP_LEN + 1];
-	BIGINT  sv_jobidnumber;
 	pbs_db_attr_list_t cache_attr_list; /* list of attributes */
 	pbs_db_attr_list_t db_attr_list; /* list of attributes */
 };

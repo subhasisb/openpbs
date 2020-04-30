@@ -134,6 +134,8 @@ extern pbs_queue *find_resvqueuebyname(char *quename);
 extern resc_resv *find_resv_by_quename(char *quename);
 extern int make_schedselect(attribute *patrl, resource *pselect, pbs_queue *pque, attribute *psched);
 extern long long get_next_svr_sequence_id(void);
+extern long long load_svinst_last_jobid(int sv_index);
+extern int save_svinst_last_jobid(int sv_index, long long last_jobid);
 
 #ifdef _PROVISION_H
 extern int find_prov_vnode_list(job *, exec_vnode_listtype *, char **);
