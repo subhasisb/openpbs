@@ -131,7 +131,6 @@ svr_2_db(struct server *ps, pbs_db_svr_info_t *pdbsvr)
 	int savetype = 0;
 
 	strcpy(pdbsvr->sv_savetm, ps->sv_savetm);
-	pdbsvr->sv_jobidnumber = ps->sv_qs.sv_lastid;
 
 	if ((encode_attr_db(svr_attr_def, ps->sv_attr, (int)SRV_ATR_LAST, &pdbsvr->cache_attr_list, &pdbsvr->db_attr_list, 1)) != 0) /* encode all attributes */
 		return -1;
@@ -159,7 +158,6 @@ db_2_svr(struct server *ps, pbs_db_svr_info_t *pdbsvr)
 		return -1;
 
 	strcpy(ps->sv_savetm, pdbsvr->sv_savetm);
-	ps->sv_qs.sv_jobidnumber = pdbsvr->sv_jobidnumber;
 
 	return 0;
 }

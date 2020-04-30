@@ -186,7 +186,6 @@ struct server {
 		int		sv_numjobs;	/* number of job owned by server   */
 		int		sv_numque;	/* nuber of queues managed          */
 		long long sv_jobidnumber;	/* next number to use in new jobid  */
-		long long sv_lastid; /* block increment to avoid many saves */
 	} sv_qs;
 	attribute sv_attr[SRV_ATR_LAST]; /* the server attributes 	    */
 	char	  sv_savetm[DB_TIMESTAMP_LEN + 1];
