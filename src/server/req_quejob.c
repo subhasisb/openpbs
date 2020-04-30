@@ -3262,21 +3262,21 @@ long long
 get_next_svr_sequence_id(void)
 {
 	static long long lastid = -1;
-	long long seq = server.sv_qs.sv_jobidnumber;
+	long long next = server.sv_qs.sv_jobidnumber; /* only for returning */
 
-	/* If server job limit is over, reset back to zero */
-	if (++server.sv_qs.sv_jobidnumber > svr_max_job_sequence_id) {
-		server.sv_qs.sv_jobidnumber = 0;
+	server.sv_qs.sv_jobidnumber = 
+		pbs_shard_get_next_seqid(server.sv_qs.sv_jobidnumber, svr_max_job_sequence_id, myindex);
+	
+	if (server.sv_qs.sv_jobidnumber == 0) {
 		lastid = -1;
 	}
 
-	/* check if we should save jobid */
+	/* check if we should save jobid increments now */
 	if (lastid == -1 ||  server.sv_qs.sv_jobidnumber == lastid) {
 		lastid = ((server.sv_qs.sv_jobidnumber / 1000)+1)*1000;
-		server.sv_qs.sv_lastid = lastid;
-		svr_save_db(&server);
+		save_svinst_last_jobid(myindex, lastid);
 	}
-	return seq;
+	return next;
 }
 
 

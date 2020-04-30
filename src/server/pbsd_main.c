@@ -211,7 +211,7 @@ unsigned int	pbs_rm_port;
 pbs_net_t	pbs_server_addr;
 unsigned int	pbs_server_port_dis;
 pbs_server_instance_t self;
-int myindex = 0;
+int myindex = 0; /* defaults to 0 for single server mode */
 /*
  * the names of the Server:
  *    pbs_server_name - from PBS_SERVER_HOST_NAME
@@ -1840,7 +1840,7 @@ try_db_again:
 	DBPRT(("Server out of main loop, state is %ld\n", *state))
 
 	/* set the current seq id to the last id before final save */
-	server.sv_qs.sv_lastid = server.sv_qs.sv_jobidnumber;
+	save_svinst_last_jobid(myindex, server.sv_qs.sv_jobidnumber);
 	svr_save_db(&server);	/* final recording of server */
 	track_save(NULL);	/* save tracking data	     */
 

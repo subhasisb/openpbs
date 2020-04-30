@@ -193,6 +193,7 @@ extern pbs_list_head       prov_allvnodes;
 extern int 		max_concurrent_prov;
 extern int		brought_up_db;
 extern pbs_db_conn_t	*svr_db_conn;
+extern int myindex;
 
 extern	pbs_list_head	svr_allhooks;
 
@@ -326,6 +327,72 @@ init_server_attrs()
 
 	}
 }
+
+#ifndef PBS_MOM
+
+/**
+ * @brief
+ *		get the last saved jobid by this server instance
+ *
+ * @param[in]	sv_index - The index of this server
+ *
+ * @return	last jobid >= 0
+ *
+ */
+long long
+load_svinst_last_jobid(int sv_index)
+{
+	char last_jobidfile[MAXPATHLEN+1];
+	long long last_jobid;
+	FILE *fp;
+
+	sprintf(last_jobidfile, "%s/%s/server_%d.lastjobid", pbs_conf.pbs_home_path, PBS_SVR_PRIVATE, sv_index);
+	if (!(fp = fopen(last_jobidfile, "r"))) {
+		if (errno != ENOENT) { /* be silent if file does not exist */
+			sprintf(log_buffer, "unable to open lastjobid file %s", last_jobidfile);
+			log_err(errno, msg_daemonname, log_buffer);
+		}
+		return (0);
+	}
+	fscanf(fp, "%lld", &last_jobid);
+	fclose(fp);
+
+	if (last_jobid < 0)
+		last_jobid = 0;
+
+	return last_jobid;
+}
+
+/**
+ * @brief
+ *		save the last saved jobid by this server instance
+ *
+ * @param[in] sv_index    - The index of this server
+ * @param[in] last_jobid  - the jobid sequence to save
+ *
+ * @return error code
+ * @retval 0 - error
+ * @retval 1 - failure
+ *
+ */
+int
+save_svinst_last_jobid(int sv_index, long long last_jobid)
+{
+	char last_jobidfile[MAXPATHLEN+1];
+	FILE *fp;
+
+	sprintf(last_jobidfile, "%s/%s/server_%d.lastjobid", pbs_conf.pbs_home_path, PBS_SVR_PRIVATE, sv_index);
+	if (!(fp = fopen(last_jobidfile, "w"))) {
+		sprintf(log_buffer, "unable to open lastjobid file %s", last_jobidfile);
+		log_err(errno, msg_daemonname, log_buffer);
+		return (-1);
+	}
+	fprintf(fp, "%lld\n", last_jobid);
+	fclose(fp);
+
+	return 0;
+}
+#endif
 
 /**
  * @brief
@@ -531,6 +598,9 @@ pbsd_init(int type)
 		a_opt = server.sv_attr[(int)SRV_ATR_scheduling].at_val.at_long;
 
 	init_server_attrs();
+
+	/* retrieve the server job-id number from a file for this instance */
+	server.sv_qs.sv_jobidnumber = load_svinst_last_jobid(myindex);
 
 	/* 5. If not a "create" initialization, recover server db */
 	/*    and sched db					  */
