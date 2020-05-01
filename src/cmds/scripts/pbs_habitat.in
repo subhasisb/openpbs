@@ -241,7 +241,7 @@ upgrade_pbs_database() {
 		echo "Database version file: ${data_dir}/PG_VERSION not found, cannot continue"
 		return 1
 	fi
-	
+
 	sys_pgsql_ver=$(echo `${PGSQL_BIN}/postgres -V` | awk 'NR==1 {print $NF}' | cut -d '.' -f 1,2)
 	old_pgsql_ver=`cat ${data_dir}/PG_VERSION`
 	# strip the minor version from sys_pgsql_ver if old_pgsql_ver does not have minor version (for comparison).
@@ -532,6 +532,16 @@ if [ -f "$PBS_HOME/pbs_version" ]; then
 	old_pbs_version=`cat $PBS_HOME/pbs_version`
 fi
 
+# If multiserver is configure then use first server
+# in the given list of server instances for this
+# script
+if [ "x${PBS_SERVER_INSTANCES}" != "x" ]; then
+	_first_svr=${PBS_SERVER_INSTANCES%%,*}
+	_first_svr=${_first_svr#*:}
+	export PBS_BATCH_SERVICE_PORT=${_first_svr}
+	unset _first_svr
+fi
+
 # Get the current PBS Pro version from qstat
 if [ -x "$PBS_EXEC/bin/qstat" ]; then
 	pbs_version=`"${PBS_EXEC}/bin/qstat" --version | sed -e 's/^.* = //'`
@@ -666,7 +676,7 @@ if [ "${PBS_START_SERVER:-0}" != 0 ] ; then
 				echo "The PBS Pro database must be manually upgraded. Please refer to the"
 				echo "instructions in the release notes for version @PBS_VERSION@ located here:"
 				echo "https://github.com/PBSPro/pbspro/releases"
-			else 
+			else
 				echo "Failed to upgrade PBS Datastore"
 			fi
 			exit $ret

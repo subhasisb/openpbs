@@ -81,8 +81,6 @@ getpid() {
 # update_pids may cause an I/O read to block if PBS_HOME is on a shared
 # mount, it is called selectively after sanity checks are performed
 update_pids() {
-	pbs_server_pid=`getpid ${PBS_HOME}/server_priv/server.lock`
-	pbs_secondary_server_pid=`getpid ${PBS_HOME}/server_priv/server.lock.secondary`
 	pbs_mom_pid=`getpid ${PBS_MOM_HOME}/mom_priv/mom.lock`
 	pbs_sched_pid=`getpid ${PBS_HOME}/sched_priv/sched.lock`
 	pbs_secondary_sched_pid=`getpid ${PBS_HOME}/sched_priv/sched.lock.secondary`
@@ -110,7 +108,9 @@ lc_host_name()
 #
 : check_started
 check_started() {
-
+	if [ "x${1}" == "x" -o "x${1}" == "x-1" ]; then
+		return 1
+	fi
   ps_out=`ps -p $1 -o args 2> /dev/null | tail -1`
   if [ -z "${ps_out}" -o "`echo ${ps_out} | cut -c1`" = "[" ]  ; then
     ps_out=`ps -p $1 -o command 2> /dev/null | tail -1`
@@ -132,9 +132,7 @@ check_started() {
 #              get the pid out of the prog.lock file and run check_started
 #	       on that pid.
 #
-#	$1 is either "server" "oldserver" "mom" or "sched"
-#		"oldserver" is for non-database server (pbs_server)
-#		as opposed to "pbs_server.bin"
+#	$1 is either "mom" or "sched" or "pbs_comm"
 #
 # return value: 0 - program is still running
 #		1 - program is not running
@@ -146,20 +144,6 @@ check_prog() {
     mom)
         daemon_name="pbs_mom"
         pid=${pbs_mom_pid} ;;
-    server)
-        daemon_name="pbs_server.bin"
-        if [ ${is_secondary} -eq 0 ] ; then
-            pid=${pbs_server_pid}
-        else
-            pid=${pbs_secondary_server_pid}
-        fi ;;
-    oldserver)
-        daemon_name="pbs_server"
-        if [ ${is_secondary} -eq 0 ] ; then
-            pid=${pbs_server_pid}
-        else
-            pid=${pbs_secondary_server_pid}
-        fi ;;
     sched)
         daemon_name="pbs_sched"
         if [ ${is_secondary} -eq 0 ] ; then
@@ -179,13 +163,9 @@ check_prog() {
 	 return 1;;
   esac
 
-  if [ -n "${pid}" ]; then
-    if [ "${pid}" -ne -1 ] ; then
       if check_started "${pid}" "$daemon_name" ; then
         return 0
       fi
-    fi
-  fi
 
   # Since the pid file does not exist, PBS has never been run
   return 1
@@ -263,6 +243,114 @@ check_hostname() {
 	# Check DNS
 	host "${1}" >/dev/null 2>&1 && return 0
 	return 1
+}
+
+get_server_pid() {
+	local _lockfn="" _pid=""
+	if [ "x$1" != "x" ]; then
+		_lockfn="server_${1}.lock"
+	else
+		_lockfn="server.lock"
+	fi
+	if [ ${is_secondary} -eq 1 -a "x${PBS_SERVER_INSTANCES}" == "x" ]; then
+		_lockfn="${_lockfn}.secondary"
+	fi
+	echo "`getpid ${PBS_HOME}/server_priv/${_lockfn}`"
+}
+
+check_server() {
+	local _pid="`get_server_pid $1`"
+	if check_started "${_pid}" "pbs_server.bin"
+	then
+		return 0
+	fi
+	return 1
+}
+
+start_server() {
+	local _portmsg=""
+	if [ "x$1" != "x" ]; then
+		_portmsg=" (on port $1)"
+	fi
+	if [ "x$1" != "x" ]; then
+		PBS_BATCH_SERVICE_PORT=$1 ${PBS_EXEC}/sbin/pbs_server
+		ret_val=$?
+	else
+		${PBS_EXEC}/sbin/pbs_server
+		ret_val=$?
+	fi
+	if [ ${ret_val} -eq 0 ]; then
+		echo "PBS server${_portmsg}"
+		return 0
+	elif [ ${ret_val} -eq 4 ] ; then
+		echo "pbs_server${_portmsg} failed to start, will retry once in 30 seconds" >&2
+		sleep 30
+		if [ "x$1" != "x" ]; then
+			PBS_BATCH_SERVICE_PORT=$1 ${PBS_EXEC}/sbin/pbs_server
+			ret_val=$?
+		else
+			${PBS_EXEC}/sbin/pbs_server
+			ret_val=$?
+		fi
+		if [ ${ret_val} -eq 0 ]; then
+			echo "PBS server${_portmsg}"
+			return 0
+		fi
+	fi
+	echo "pbs_server${_portmsg} startup failed, exit ${ret_val} aborting." >&2
+	return 1
+}
+
+start_local_servers() {
+	local _started_any=0 _svr _host _port
+
+	if [ "x${PBS_SERVER_INSTANCES}" == "x" ]; then
+		if ! check_server
+		then
+			if [ -f ${pbslibdir}/init.d/limits.pbs_server ] ; then
+				. ${pbslibdir}/init.d/limits.pbs_server
+			fi
+			if ! start_server
+			then
+				return 1
+			fi
+			if [ -r "${PBS_HOME}/server_priv/qmgr_startup" ]; then
+				echo "pbs_server evaluating ${PBS_HOME}/server_priv/qmgr_startup"
+				${PBS_EXEC}/bin/qmgr < "${PBS_HOME}/server_priv/qmgr_startup"
+			fi
+		else
+			echo "PBS Server already running."
+		fi
+	else
+		if [ -f ${pbslibdir}/init.d/limits.pbs_server ] ; then
+			. ${pbslibdir}/init.d/limits.pbs_server
+		fi
+		for _svr in ${PBS_SERVER_INSTANCES//,/ }
+		do
+			_host=${_svr%%:*}
+			_port=${_svr#*:}
+			# FIXME: For now we are assuming everything is in single host
+			# Once we have multi-host multi-server we have to check host
+			# to be equal to local host
+			if ! check_server ${_port}
+			then
+				if ! start_server ${_port}
+				then
+					return 1
+				else
+					_started_any=1
+				fi
+			else
+				echo "PBS Server (on port ${_port}) already running."
+			fi
+		done
+		if [ ${_started_any} -eq 1 ]; then
+			if [ -r "${PBS_HOME}/server_priv/qmgr_startup" ]; then
+				echo "pbs_server evaluating ${PBS_HOME}/server_priv/qmgr_startup"
+				${PBS_EXEC}/bin/qmgr < "${PBS_HOME}/server_priv/qmgr_startup"
+			fi
+		fi
+	fi
 }
 
 start_pbs() {
@@ -418,37 +506,7 @@ start_pbs() {
     fi
 
     if [ "${PBS_START_SERVER}" -gt 0 ] ; then
-      if check_prog "server" || check_prog "oldserver" ; then
-	echo "PBS Server already running."
-      else
-         if [ -f ${pbslibdir}/init.d/limits.pbs_server ] ; then
-             . ${pbslibdir}/init.d/limits.pbs_server
-         fi
-	 if ${PBS_EXEC}/sbin/pbs_server ; then
-            echo "PBS server"
-         else
-            ret_val=$?
-	    if [ $ret_val -eq 4 ] ; then
-		echo "pbs_server failed to start, will retry once in 30 seconds" >&2
-		sleep 30
-	        if ${PBS_EXEC}/sbin/pbs_server ; then
-		    echo "PBS server"
-		else
-		    ret_val=$?
-            	    echo "pbs_server startup failed, exit ${ret_val} aborting." >&2
-		    return 1
-		fi
-	    else
-		echo "pbs_server startup failed, exit ${ret_val} aborting." >&2
-		return 1
-	    fi
-	 fi
-
-         if [ -r "${PBS_HOME}/server_priv/qmgr_startup" ]; then
-           echo "pbs_server evaluating ${PBS_HOME}/server_priv/qmgr_startup"
-           ${PBS_EXEC}/bin/qmgr <"${PBS_HOME}/server_priv/qmgr_startup"
-         fi
-      fi
+      start_local_servers
     fi
 
     if [ -f ${pbslibdir}/init.d/limits.post_services ] ; then
@@ -461,41 +519,86 @@ start_pbs() {
     return 0
 }
 
+stop_local_servers() {
+	local _act_svr _pid _svr _host _port _pids
+
+	if [ "x${PBS_SERVER_INSTANCES}" == "x" ]; then
+		_act_svr=`lc_host_name \`${PBS_EXEC}/bin/qstat -Bf 2>/dev/null | grep "server_host = " | sed -e "s/.*server_host = //"\``
+		if check_server
+		then
+			_pid=`get_server_pid`
+			if [ "${my_hostname}" = "${_act_svr}" ]; then
+				if [ -z "${PBS_SECONDARY}" -o ${is_secondary} -eq 1 ]; then
+					echo "Shutting server down with qterm."
+				else
+					echo "This is active server, shutting down with qterm, secondary will take over."
+				fi
+				if [ -r "${PBS_HOME}/server_priv/qmgr_shutdown" ]; then
+					echo "pbs_server evaluating ${PBS_HOME}/server_priv/qmgr_shutdown"
+					${PBS_EXEC}/bin/qmgr < "${PBS_HOME}/server_priv/qmgr_shutdown"
+				fi
+				${PBS_EXEC}/bin/qterm -t quick
+				echo "PBS server - was pid: ${_pid}"
+			elif [ ${is_secondary} -eq 1 ]; then
+				echo "This is secondary server, killing process."
+				kill ${_pid}
+				echo "PBS server - was pid: ${_pid}"
+				rm -f ${PBS_HOME}/server_priv/server.lock.secondary
+			else
+				echo "Killing Server."
+				kill ${_pid}
+				echo "PBS server - was pid: ${_pid}"
+			fi
+		fi
+		${PBS_EXEC}/sbin/pbs_dataservice status > /dev/null 2>&1
+		if [ $? -eq 0 ]; then
+			${PBS_EXEC}/sbin/pbs_dataservice stop > /dev/null 2>&1
+		fi
+	else
+		for _svr in ${PBS_SERVER_INSTANCES//,/ }
+		do
+			_host=${_svr%%:*}
+			_port=${_svr#*:}
+			_pid=`get_server_pid ${_port}`
+			if [ "x${_pid}" != "x-1" ]; then
+				_pids="${_pids} ${_port}:${_pid}"
+			fi
+		done
+		if [ "x${_pids}" != "x" ]; then
+			${PBS_EXEC}/bin/qstat -Bf >/dev/null 2>&1
+			if [ $? -eq 0 ]; then
+				echo "Shutting servers down with qterm."
+				${PBS_EXEC}/bin/qterm -t quick
+			else
+				echo "Killing Servers."
+				for _svr in ${_pids}
+				do
+					kill ${_svr#*:}
+				done
+			fi
+			for _svr in ${_pids}
+			do
+				_port=${_svr%%:*}
+				_pid=${_svr#*:}
+				echo "PBS server (on port ${_port}) - was pid: ${_pid}"
+			done
+			${PBS_EXEC}/bin/qstat -Bf >/dev/null 2>&1
+			if [ $? -ne 0 ]; then
+				# All servers are down, shutdown db if running
+				${PBS_EXEC}/sbin/pbs_dataservice status > /dev/null 2>&1
+				if [ $? -eq 0 ]; then
+					${PBS_EXEC}/sbin/pbs_dataservice stop > /dev/null 2>&1
+				fi
+			fi
+		fi
+	fi
+}
+
 stop_pbs() {
     echo "Stopping PBS"
     update_pids
     if [ "${PBS_START_SERVER}" -gt 0 ] ; then
-      active_server=`lc_host_name \`${PBS_EXEC}/bin/qstat -Bf 2>/dev/null | \
-	  grep "server_host = " | \
-	  sed -e "s/.*server_host = //"\``
-      if check_prog "server" || check_prog "oldserver"; then
-	if [ "${my_hostname}" = "${active_server}" ]; then
-	  if [ -z "${PBS_SECONDARY}" -o ${is_secondary} -eq 1 ]; then
-	    echo "Shutting server down with qterm."
-	  else
-	    echo "This is active server, shutting down with qterm, secondary will take over."
-	  fi
-	  if [ -r "${PBS_HOME}/server_priv/qmgr_shutdown" ]; then
-	    echo "pbs_server evaluating ${PBS_HOME}/server_priv/qmgr_shutdown"
-	    ${PBS_EXEC}/bin/qmgr <"${PBS_HOME}/server_priv/qmgr_shutdown"
-	  fi
-	  ${PBS_EXEC}/bin/qterm -t quick
-	  echo "PBS server - was pid: ${pbs_server_pid}"
-	elif [ ${is_secondary} -eq 1 ]; then
-	  echo "This is secondary server, killing process."
-	  kill ${pbs_secondary_server_pid}
-	  echo "PBS server - was pid: ${pbs_secondary_server_pid}"
-	  rm -f ${PBS_HOME}/server_priv/server.lock.secondary
-	else
-	  echo "Killing Server."
-	  kill ${pbs_server_pid}
-	  echo "PBS server - was pid: ${pbs_server_pid}"
-	fi
-      fi
-      ${PBS_EXEC}/sbin/pbs_dataservice status > /dev/null 2>&1
-      if [ $? -eq 0 ]; then
-          ${PBS_EXEC}/sbin/pbs_dataservice stop > /dev/null 2>&1
-      fi
+      stop_local_servers
     fi
     if [ "${PBS_START_MOM}" -gt 0 ] ; then
       if check_prog "mom" ; then
@@ -540,9 +643,22 @@ stop_pbs() {
 	sleep 1
 	something_running=""
 	if [ "${PBS_START_SERVER}" -gt 0 ] ; then
-	    if check_prog "server" || check_prog "oldserver" ; then
-		something_running=" pbs_server"
-	    fi
+		if [ "x${PBS_SERVER_INSTANCES}" != "x" ]; then
+			for _svr in ${PBS_SERVER_INSTANCES//,/ }
+			do
+				_host=${_svr%%:*}
+				_port=${_svr#*:}
+				if check_server ${_port}
+				then
+					something_running="${something_running} pbs_server (on port ${_port})"
+				fi
+			done
+		else
+			if check_server
+			then
+				something_running=" pbs_server"
+			fi
+		fi
 	fi
 	if [ "${PBS_START_MOM}" -gt 0 ] ; then
 	    if check_prog "mom" ; then
@@ -568,14 +684,37 @@ stop_pbs() {
     exit 1
 }
 
+status_server() {
+	local _portmsg="" _port=$1
+	if [ "x$1" != "x" ]; then
+		_portmsg=" (on port ${_port})"
+	fi
+	if check_server ${_port}
+	then
+		echo "pbs_server${_portmsg} is pid `get_server_pid ${_port}`"
+	else
+		echo "pbs_server${_portmsg} is not running"
+	fi
+}
+
+status_local_servers() {
+	local _svr _host _port
+	if [ "x${PBS_SERVER_INSTANCES}" == "x" ]; then
+		status_server
+	else
+		for _svr in ${PBS_SERVER_INSTANCES//,/ }
+		do
+			_host=${_svr%%:*}
+			_port=${_svr#*:}
+			status_server ${_port}
+		done
+	fi
+}
+
 status_pbs() {
     update_pids
     if [ "${PBS_START_SERVER}" -gt 0 ] ; then
-      if check_prog "server" || check_prog "oldserver" ; then
-	echo "pbs_server is pid ${pid}"
-      else
-	echo "pbs_server is not running"
-      fi
+      status_local_servers
     fi
     if [ "${PBS_START_MOM}" -gt 0 ] ; then
       if check_prog "mom" ; then
