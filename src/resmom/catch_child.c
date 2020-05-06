@@ -118,7 +118,7 @@ extern useconds_t	alps_release_jitter;
 #endif
 
 extern char		*path_hooks_workdir;
-extern int conn_slot;
+extern int		virtual_sock;
 
 #ifndef WIN32
 /**
@@ -1972,21 +1972,21 @@ get_server_stream(char *svr, unsigned int port, char *jobid)
 {
 	int	stream = -1;
 	if (get_max_servers() > 1) {
-		if (conn_slot == -1) {
-			conn_slot = socket(AF_INET, SOCK_STREAM, 0);
-			if (conn_slot == -1) {
+		if (virtual_sock == -1) {
+			virtual_sock = socket(AF_INET, SOCK_STREAM, 0);
+			if (virtual_sock == -1) {
 				pbs_errno = PBSE_SYSTEM;
 				log_err(-1, __func__, "connection table initialization failed");
 				return -1;
 			}
-			if (initialise_shard_conn(conn_slot)) {
+			if (initialise_shard_conn(virtual_sock)) {
 				pbs_errno = PBSE_INTERNAL;
 				return -1;
 			}
 		}
-		set_new_shard_context(conn_slot);
+		set_new_shard_context(virtual_sock);
 		pfn_connect = internal_connect_mom;
-		stream = get_svr_shard_connection(conn_slot, -1 , jobid);	
+		stream = get_svr_shard_connection(virtual_sock, JOB, jobid);	
 	} else {
 		if (server_stream == -1) {
 			if (svr == NULL)
@@ -2023,11 +2023,11 @@ set_server_stream(char * hostname, unsigned int port, int stream)
 			return;
 		}
 		si.port = port;
-		shard_connection = (shard_conn_t **)get_conn_shards(conn_slot);
 		if ((srv_index = get_svr_index(&si)) == -1) {
 			log_err(-1, __func__, "Invalid shard index");
 			return;
 		}
+		shard_connection = (shard_conn_t **)get_conn_shards(virtual_sock);
 		if (!shard_connection || !shard_connection[srv_index]) {
 			log_err(-1, __func__, "Invalid shard connection; failed to set connection stream");
 			return;

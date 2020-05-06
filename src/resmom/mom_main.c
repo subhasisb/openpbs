@@ -619,7 +619,7 @@ static struct specials addspecial[] = {
 
 char	*log_file = NULL;
 char	*path_log;
-int conn_slot = -1;
+int 	virtual_sock = -1;
 
 
 char			*ret_string;

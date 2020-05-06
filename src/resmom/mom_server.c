@@ -776,28 +776,28 @@ process_cluster_addrs(int stream)
 void
 is_request(int stream, int version)
 {
-	int			command = 0;
-	int			n;
-	int			ret = DIS_SUCCESS;
-	u_long			ipaddr;
-	char			*jobid = NULL;
-	struct	sockaddr_in	*addr;
-	void			init_addrs();
-	job			*pjob;
-	FILE		 	*filen = 0;
-	extern vnl_t		*vnlp;        		/* vnode list */
-	extern vnl_t		*vnlp_from_hook;        /* vnode list updates from hook */
-	int			hktype;
-	unsigned long		hkseq;
+	int						command = 0;
+	int						n;
+	int						ret = DIS_SUCCESS;
+	u_long					ipaddr;
+	char					*jobid = NULL;
+	struct					sockaddr_in	*addr;
+	void					init_addrs();
+	job						*pjob;
+	FILE		 			*filen = 0;
+	extern vnl_t			*vnlp;				/* vnode list */
+	extern vnl_t			*vnlp_from_hook;	/* vnode list updates from hook */
+	int						hktype;
+	unsigned long			hkseq;
 	struct hook_job_action *phjba;
 	struct hook_vnl_action *phvna;
-	int			need_inv;
-	mom_hook_input_t	*phook_input = NULL;
-	mom_hook_output_t	*phook_output = NULL;
-	char	remote_server_name[NI_MAXHOST+1] = {'\0'};
-	struct	sockaddr_in	server_addr;
-	int errcode;
-	short	port;
+	int						need_inv;
+	mom_hook_input_t		*phook_input = NULL;
+	mom_hook_output_t		*phook_output = NULL;
+	char					remote_server_name[NI_MAXHOST+1] = {'\0'};
+	struct					sockaddr_in	server_addr;
+	int 					errcode;
+	short					port;
 
 	DBPRT(("%s: stream %d version %d\n", __func__, stream, version))
 	if (version != IS_PROTOCOL_VER) {

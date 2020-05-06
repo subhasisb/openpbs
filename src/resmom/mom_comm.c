@@ -120,7 +120,7 @@ extern  char   *msg_err_malloc;
 extern int
 write_pipe_data(int upfds, void *data, int data_size);
 char	task_fmt[] = "/%8.8X";
-extern int conn_slot;
+extern int virtual_sock;
 
 
 /* Function pointers
@@ -2398,18 +2398,18 @@ im_eof(int stream, int ret)
 
 
 	for (j = 0; j < get_current_servers(); j++) {
-		shard_connection = (shard_conn_t **)get_conn_shards(conn_slot);
+		shard_connection = (shard_conn_t **)get_conn_shards(virtual_sock);
 		if (!shard_connection || !shard_connection[j]) {
 			log_err(-1, __func__, "Invalid shard connection; failed to reset connection state");
 			continue;
 		}
 		if (stream == shard_connection[j]->sd) {
-			sprintf(log_buffer, "Server connection closed; changing connection state");
+			snprintf(log_buffer, sizeof(log_buffer), "Server connection closed; changing connection state");
 			log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_NOTICE,
 				__func__, log_buffer);
 			shard_connection[j]->state = SHARD_CONN_STATE_DOWN;
 			shard_connection[j]->state_change_time = time(0);
-			set_new_shard_context(conn_slot);
+			set_new_shard_context(virtual_sock);
 		}
 	}
 

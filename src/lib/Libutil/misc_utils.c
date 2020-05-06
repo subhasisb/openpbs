@@ -2197,8 +2197,8 @@ get_svr_index(pbs_server_instance_t *instance)
 {
 	int i;
 	char *pc;
-	char *host1 = NULL;
-	char *host2 = NULL;
+	char *host1;
+	char *host2;
 	if (get_max_servers() > 1) {
 		for(i = 0; i < get_current_servers(); i++) {
 			if (instance->port == pbs_conf.psi[i]->port) {
