@@ -364,7 +364,7 @@ case "$1" in
 			${PBS_EXEC}/bin/qstat -Bf >/dev/null 2>&1
 			if [ $? -eq 0 ]; then
 				if [ "x${PBS_SERVER_INSTANCES}" != "x" ]; then
-					echo "PBS Servers is running. Cannot stop PBS Data Service now."
+					echo "PBS Servers are running. Cannot stop PBS Data Service now."
 				else
 					echo "PBS server is running. Cannot stop PBS Data Service now."
 					server_pid="`ps -ef | grep "${PBS_EXEC}/sbin/pbs_server.bi[n]" | awk '{print $2}'`"
