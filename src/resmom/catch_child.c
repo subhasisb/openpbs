@@ -1972,20 +1972,8 @@ get_server_stream(char *svr, unsigned int port, char *jobid)
 {
 	int	stream = -1;
 	if (get_max_servers() > 1) {
-		if (virtual_sock == -1) {
-			virtual_sock = socket(AF_INET, SOCK_STREAM, 0);
-			if (virtual_sock == -1) {
-				pbs_errno = PBSE_SYSTEM;
-				log_err(-1, __func__, "connection table initialization failed");
-				return -1;
-			}
-			if (initialise_shard_conn(virtual_sock)) {
-				pbs_errno = PBSE_INTERNAL;
-				return -1;
-			}
-		}
-		set_new_shard_context(virtual_sock);
 		pfn_connect = internal_connect_mom;
+		set_new_shard_context(virtual_sock);
 		stream = get_svr_shard_connection(virtual_sock, JOB, jobid);	
 	} else {
 		if (server_stream == -1) {

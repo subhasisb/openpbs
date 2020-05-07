@@ -2396,20 +2396,21 @@ im_eof(int stream, int ret)
 		server_stream = -1;
 	}
 
-
-	for (j = 0; j < get_current_servers(); j++) {
-		shard_connection = (shard_conn_t **)get_conn_shards(virtual_sock);
-		if (!shard_connection || !shard_connection[j]) {
-			log_err(-1, __func__, "Invalid shard connection; failed to reset connection state");
-			continue;
-		}
-		if (stream == shard_connection[j]->sd) {
-			snprintf(log_buffer, sizeof(log_buffer), "Server connection closed; changing connection state");
-			log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_NOTICE,
-				__func__, log_buffer);
-			shard_connection[j]->state = SHARD_CONN_STATE_DOWN;
-			shard_connection[j]->state_change_time = time(0);
-			set_new_shard_context(virtual_sock);
+	if (get_max_servers() > 1) {
+		for (j = 0; j < get_current_servers(); j++) {
+			shard_connection = (shard_conn_t **)get_conn_shards(virtual_sock);
+			if (!shard_connection || !shard_connection[j]) {
+				log_err(-1, __func__, "Invalid shard connection; failed to reset connection state");
+				continue;
+			}
+			if (stream == shard_connection[j]->sd) {
+				snprintf(log_buffer, sizeof(log_buffer), "Server connection closed; changing connection state");
+				log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_NOTICE,
+					__func__, log_buffer);
+				shard_connection[j]->state = SHARD_CONN_STATE_DOWN;
+				shard_connection[j]->state_change_time = time(0);
+				set_new_shard_context(virtual_sock);
+			}
 		}
 	}
 

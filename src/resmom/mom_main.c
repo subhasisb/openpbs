@@ -620,6 +620,7 @@ static struct specials addspecial[] = {
 char	*log_file = NULL;
 char	*path_log;
 int 	virtual_sock = -1;
+static int	initialise_virtual_sock();
 
 
 char			*ret_string;
@@ -872,6 +873,36 @@ validuser(struct rm_attribute *attrib)
 	} else {
 		return "no";
 	}
+}
+
+/**
+ * @brief
+ *  	initialise_virtual_sock - Initializes virtual sock.
+ *
+ * @return	int
+ * @retval	-1	-	if an error occurs.
+ * @reval	0	-	if success
+ *
+ */
+
+static int
+initialise_virtual_sock()
+{
+	if (get_max_servers() > 1) {
+		if (virtual_sock == -1) {
+			virtual_sock = socket(AF_INET, SOCK_STREAM, 0);
+			if (virtual_sock == -1) {
+				pbs_errno = PBSE_SYSTEM;
+				log_err(-1, __func__, "connection table initialization failed");
+				return -1;
+			}
+			if (initialise_shard_conn(virtual_sock)) {
+				pbs_errno = PBSE_INTERNAL;
+				return -1;
+			}
+		}
+	}
+	return 0;
 }
 
 /**
@@ -9029,6 +9060,11 @@ main(int argc, char *argv[])
 		if (g_ssHandle != 0) SetServiceStatus(g_ssHandle, &ss);
 #endif	/* WIN32 */
 		return (3);
+	}
+
+	if (initialise_virtual_sock() == -1) {
+		log_err(-1, __func__, "Failed to initialise virtual sock");
+		exit(3);
 	}
 
 	/*Initialize security library's internal data structures*/
