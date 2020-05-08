@@ -363,16 +363,20 @@ case "$1" in
 		fi
 		if [ "$2" != "PBS" ]; then
 			# Check if PBS is running
-			${PBS_EXEC}/bin/qstat >/dev/null 2>&1
+			${PBS_EXEC}/bin/qstat -Bf >/dev/null 2>&1
 			if [ $? -eq 0 ]; then
-				echo "PBS server is running. Cannot stop PBS Data Service now."
-				server_pid="`ps -ef | grep "${PBS_EXEC}/sbin/pbs_server.bi[n]" | awk '{print $2}'`"
-				if [ -z "${server_pid}" ]; then
-					server_host="`${PBS_EXEC}/bin/qstat -Bf | grep 'server_host' | awk '{print $NF}'`"
-					if [ ! -z "${server_host}" ]; then
-						echo "PBS server is running on host ${server_host}."
+				if [ "x${PBS_SERVER_INSTANCES}" != "x" ]; then
+					echo "PBS Servers are running. Cannot stop PBS Data Service now."
+				else
+					echo "PBS server is running. Cannot stop PBS Data Service now."
+					server_pid="`ps -ef | grep "pbs_server.bi[n]" | awk '{print $2}'`"
+					if [ -z "${server_pid}" ]; then
+						server_host="`${PBS_EXEC}/bin/qstat -Bf | grep 'server_host' | awk '{print $NF}'`"
+						if [ ! -z "${server_host}" ]; then
+							echo "PBS server is running on host ${server_host}."
+						fi
+						echo "Please check pbs.conf file to verify PBS is configured with correct server host value. Exiting."
 					fi
-					echo "Please check pbs.conf file to verify PBS is configured with correct server host value. Exiting."
 				fi
 				exit 1
 			fi

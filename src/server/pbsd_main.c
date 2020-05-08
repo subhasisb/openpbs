@@ -872,7 +872,7 @@ main(int argc, char **argv)
 
 	if (!(self.name = strdup(server_host))) {
 		log_err(-1, __func__, "Out of memory\n");
-		return -1;			
+		return -1;
 	}
 	self.port = pbs_conf.batch_service_port;
 	if (get_max_servers() > 1) {
@@ -1041,10 +1041,10 @@ main(int argc, char **argv)
 		return (1);
 	}
 
-	/* make sure no other server is running with this home directory */
-
-	(void)sprintf(lockfile, "%s/%s/server.lock", pbs_conf.pbs_home_path,
-		PBS_SVR_PRIVATE);
+	if (get_max_servers() > 1)
+		(void)sprintf(lockfile, "%s/%s/server_%d.lock", pbs_conf.pbs_home_path, PBS_SVR_PRIVATE, pbs_server_port_dis);
+	else
+		(void)sprintf(lockfile, "%s/%s/server.lock", pbs_conf.pbs_home_path, PBS_SVR_PRIVATE);
 	if ((are_primary = are_we_primary()) == FAILOVER_SECONDARY) {
 		strcat(lockfile, ".secondary");
 	} else if (are_primary == FAILOVER_CONFIG_ERROR) {

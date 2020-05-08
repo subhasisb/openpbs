@@ -529,7 +529,17 @@ if [ -f "$PBS_HOME/pbs_version" ]; then
 	old_pbs_version=`cat $PBS_HOME/pbs_version`
 fi
 
-# Get the current PBS version from qstat
+# If multiserver is configure then use first server
+# in the given list of server instances for this
+# script
+if [ "x${PBS_SERVER_INSTANCES}" != "x" ]; then
+	_first_svr_port=${PBS_SERVER_INSTANCES%%,*}
+	_first_svr_port=${_first_svr_port#*:}
+	export PBS_BATCH_SERVICE_PORT=${_first_svr_port}
+	unset _first_svr_port
+fi
+
+# Get the current PBS Pro version from qstat
 if [ -x "$PBS_EXEC/bin/qstat" ]; then
 	pbs_version=`"${PBS_EXEC}/bin/qstat" --version | sed -e 's/^.* = //'`
 	if [ -z "$pbs_version" ]; then
