@@ -367,7 +367,7 @@ case "$1" in
 					echo "PBS Servers are running. Cannot stop PBS Data Service now."
 				else
 					echo "PBS server is running. Cannot stop PBS Data Service now."
-					server_pid="`ps -ef | grep "${PBS_EXEC}/sbin/pbs_server.bi[n]" | awk '{print $2}'`"
+					server_pid="`ps -ef | grep "pbs_server.bi[n]" | awk '{print $2}'`"
 					if [ -z "${server_pid}" ]; then
 						server_host="`${PBS_EXEC}/bin/qstat -Bf | grep 'server_host' | awk '{print $NF}'`"
 						if [ ! -z "${server_host}" ]; then

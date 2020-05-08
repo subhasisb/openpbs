@@ -302,7 +302,7 @@ start_server() {
 }
 
 start_local_servers() {
-	local _started_any=0 _svr _host _port
+	local _svr _host _port
 
 	if [ "x${PBS_SERVER_INSTANCES}" == "x" ]; then
 		if ! check_server
@@ -313,10 +313,6 @@ start_local_servers() {
 			if ! start_server
 			then
 				return 1
-			fi
-			if [ -r "${PBS_HOME}/server_priv/qmgr_startup" ]; then
-				echo "pbs_server evaluating ${PBS_HOME}/server_priv/qmgr_startup"
-				${PBS_EXEC}/bin/qmgr < "${PBS_HOME}/server_priv/qmgr_startup"
 			fi
 		else
 			echo "PBS Server already running."
@@ -337,19 +333,11 @@ start_local_servers() {
 				if ! start_server ${_port}
 				then
 					return 1
-				else
-					_started_any=1
 				fi
 			else
 				echo "PBS Server (on port ${_port}) already running."
 			fi
 		done
-		if [ ${_started_any} -eq 1 ]; then
-			if [ -r "${PBS_HOME}/server_priv/qmgr_startup" ]; then
-				echo "pbs_server evaluating ${PBS_HOME}/server_priv/qmgr_startup"
-				${PBS_EXEC}/bin/qmgr < "${PBS_HOME}/server_priv/qmgr_startup"
-			fi
-		fi
 	fi
 }
 
@@ -533,10 +521,6 @@ stop_local_servers() {
 				else
 					echo "This is active server, shutting down with qterm, secondary will take over."
 				fi
-				if [ -r "${PBS_HOME}/server_priv/qmgr_shutdown" ]; then
-					echo "pbs_server evaluating ${PBS_HOME}/server_priv/qmgr_shutdown"
-					${PBS_EXEC}/bin/qmgr < "${PBS_HOME}/server_priv/qmgr_shutdown"
-				fi
 				${PBS_EXEC}/bin/qterm -t quick
 				echo "PBS server - was pid: ${_pid}"
 			elif [ ${is_secondary} -eq 1 ]; then
@@ -549,10 +533,6 @@ stop_local_servers() {
 				kill ${_pid}
 				echo "PBS server - was pid: ${_pid}"
 			fi
-		fi
-		${PBS_EXEC}/sbin/pbs_dataservice status > /dev/null 2>&1
-		if [ $? -eq 0 ]; then
-			${PBS_EXEC}/sbin/pbs_dataservice stop > /dev/null 2>&1
 		fi
 	else
 		for _svr in ${PBS_SERVER_INSTANCES//,/ }
@@ -582,66 +562,13 @@ stop_local_servers() {
 				_pid=${_svr#*:}
 				echo "PBS server (on port ${_port}) - was pid: ${_pid}"
 			done
-			${PBS_EXEC}/bin/qstat -Bf >/dev/null 2>&1
-			if [ $? -ne 0 ]; then
-				# All servers are down, shutdown db if running
-				${PBS_EXEC}/sbin/pbs_dataservice status > /dev/null 2>&1
-				if [ $? -eq 0 ]; then
-					${PBS_EXEC}/sbin/pbs_dataservice stop > /dev/null 2>&1
-				fi
-			fi
 		fi
 	fi
+	${PBS_EXEC}/sbin/pbs_dataservice stop > /dev/null 2>&1
 }
 
-stop_pbs() {
-    echo "Stopping PBS"
-    update_pids
-    if [ "${PBS_START_SERVER}" -gt 0 ]; then
-      stop_local_servers
-    fi
-    if [ "${PBS_START_MOM}" -gt 0 ]; then
-      if check_prog "mom" ; then
-	site_mom_cleanup
-	kill ${pbs_mom_pid}
-	echo "PBS mom - was pid: ${pbs_mom_pid}"
-      fi
-    fi
-    if [ "${PBS_START_SCHED}" -gt 0 ]; then
-      if check_prog "sched" ; then
-	if [ ${is_secondary} -eq 0 ]; then
-	  kill ${pbs_sched_pid}
-	  echo "PBS sched - was pid: ${pbs_sched_pid}"
-	else
-	  kill ${pbs_secondary_sched_pid}
-	  echo "PBS schedx - was pid: ${pbs_secondary_sched_pid}"
-	  rm -f ${PBS_HOME}/sched_priv/sched.lock.secondary
-	fi
-      fi
-    fi
-    if [ "${PBS_START_COMM}" -gt 0 ]; then
-      if check_prog "pbs_comm" ; then
-	if [ ${is_secondary} -eq 0 ]; then
-	  kill -TERM ${pbs_comm_pid}
-	  echo "PBS comm - was pid: ${pbs_comm_pid}"
-	else
-	  kill -TERM ${pbs_secondary_comm_pid}
-	  echo "PBS comm - was pid: ${pbs_secondary_comm_pid}"
-	  rm -f ${PBS_HOME}/server_priv/comm.lock.secondary
-	fi
-      fi
-    fi
-    if [ -f ${redhat_subsys_filepath} ]; then
-	  rm -f ${redhat_subsys_filepath}
-    fi
-    # make sure the daemons have exited for up to 180 seconds
-    # if any still there, exit with message and error
-    waitloop=1
-    echo "Waiting for shutdown to complete"
-    while [ ${waitloop} -lt 180 ]
-    do
-	sleep 1
-	something_running=""
+wait_local_servers() {
+	local _running=""
 	if [ "${PBS_START_SERVER}" -gt 0 ]; then
 		if [ "x${PBS_SERVER_INSTANCES}" != "x" ]; then
 			for _svr in ${PBS_SERVER_INSTANCES//,/ }
@@ -650,38 +577,93 @@ stop_pbs() {
 				_port=${_svr#*:}
 				if check_server ${_port}
 				then
-					something_running="${something_running} pbs_server (on port ${_port})"
+					_running="${_running} pbs_server (on port ${_port})"
 				fi
 			done
 		else
 			if check_server
 			then
-				something_running=" pbs_server"
+				_running=" pbs_server"
 			fi
 		fi
 	fi
+	echo ${_running}
+}
+
+# make sure the daemons have exited for up to 180 seconds
+# if any still there, exit with message and error
+wait_pbs() {
+	local waitloop=1 something_running
+	echo "Waiting for shutdown to complete"
+	while [ ${waitloop} -lt 180 ]
+	do
+		sleep 1
+		something_running="$(wait_local_servers)"
+		if [ "${PBS_START_MOM}" -gt 0 ]; then
+			if check_prog "mom" ; then
+				something_running="${something_running} pbs_mom"
+			fi
+		fi
+		if [ "${PBS_START_SCHED}" -gt 0 ]; then
+			if check_prog "sched" ; then
+				something_running="${something_running} pbs_sched"
+			fi
+		fi
+		if [ "${PBS_START_COMM}" -gt 0 ]; then
+			if check_prog "pbs_comm" ; then
+				something_running=" pbs_comm"
+			fi
+		fi
+		if [ "${something_running}" = "" ]; then
+			return
+		fi
+		waitloop=`expr ${waitloop} + 1`
+	done
+	echo "Unable to stop PBS,${something_running} still active"
+	exit 1
+}
+
+stop_pbs() {
+	echo "Stopping PBS"
+	update_pids
+	if [ "${PBS_START_SERVER}" -gt 0 ]; then
+		stop_local_servers
+	fi
 	if [ "${PBS_START_MOM}" -gt 0 ]; then
-	    if check_prog "mom" ; then
-		something_running="${something_running} pbs_mom"
-	    fi
+		if check_prog "mom" ; then
+			site_mom_cleanup
+			kill ${pbs_mom_pid}
+			echo "PBS mom - was pid: ${pbs_mom_pid}"
+		fi
 	fi
 	if [ "${PBS_START_SCHED}" -gt 0 ]; then
-	    if check_prog "sched" ; then
-		something_running="${something_running} pbs_sched"
-	    fi
+		if check_prog "sched" ; then
+			if [ ${is_secondary} -eq 0 ]; then
+				kill ${pbs_sched_pid}
+				echo "PBS sched - was pid: ${pbs_sched_pid}"
+			else
+				kill ${pbs_secondary_sched_pid}
+				echo "PBS schedx - was pid: ${pbs_secondary_sched_pid}"
+				rm -f ${PBS_HOME}/sched_priv/sched.lock.secondary
+			fi
+		fi
 	fi
 	if [ "${PBS_START_COMM}" -gt 0 ]; then
-	    if check_prog "pbs_comm" ; then
-		something_running=" pbs_comm"
-	    fi
+		if check_prog "pbs_comm" ; then
+			if [ ${is_secondary} -eq 0 ]; then
+				kill -TERM ${pbs_comm_pid}
+				echo "PBS comm - was pid: ${pbs_comm_pid}"
+			else
+				kill -TERM ${pbs_secondary_comm_pid}
+				echo "PBS comm - was pid: ${pbs_secondary_comm_pid}"
+				rm -f ${PBS_HOME}/server_priv/comm.lock.secondary
+			fi
+		fi
 	fi
-	if [ "${something_running}" = "" ]; then
-	    return
+	if [ -f ${redhat_subsys_filepath} ]; then
+		rm -f ${redhat_subsys_filepath}
 	fi
-	waitloop=`expr ${waitloop} + 1`
-    done
-    echo "Unable to stop PBS,${something_running} still active"
-    exit 1
+	wait_pbs
 }
 
 status_server() {
