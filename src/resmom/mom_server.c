@@ -131,7 +131,7 @@ extern void	mom_vnlp_report(vnl_t *vnl, char *header);
 extern	char	*path_hooks;
 extern	unsigned long	hooks_rescdef_checksum;
 extern	int	report_hook_checksums;
-extern void set_server_stream(char * hostname, unsigned int port, int stream);
+extern int set_server_stream(struct sockaddr_in *addr, int stream);
 
 /*
  * Tree search generalized from Knuth (6.2.2) Algorithm T just like
@@ -503,7 +503,7 @@ send_hook_job_action(struct hook_job_action *phjba)
 		return;
 	}
 
-	if ((ret=is_compose(shard_server_stream, IS_HOOK_JOB_ACTION)) != DIS_SUCCESS)
+	if ((ret = is_compose(shard_server_stream, IS_HOOK_JOB_ACTION)) != DIS_SUCCESS)
 		goto err;
 
 	ret = diswui(shard_server_stream, count);
@@ -794,10 +794,6 @@ is_request(int stream, int version)
 	int			need_inv;
 	mom_hook_input_t	*phook_input = NULL;
 	mom_hook_output_t	*phook_output = NULL;
-	char			remote_server_name[NI_MAXHOST+1] = {'\0'};
-	struct			sockaddr_in	server_addr;
-	int 			errcode;
-	short			port;
 
 	DBPRT(("%s: stream %d version %d\n", __func__, stream, version))
 	if (version != IS_PROTOCOL_VER) {
@@ -816,17 +812,7 @@ is_request(int stream, int version)
 		return;
 	}
 
-	port = ntohs((unsigned short)addr->sin_port);
 	ipaddr = ntohl(addr->sin_addr.s_addr);
-	memcpy((char *) &server_addr.sin_addr, &(addr->sin_addr), sizeof(server_addr.sin_addr));
-	server_addr.sin_port = addr->sin_port;
-	server_addr.sin_family = AF_INET;
-	if ((errcode = getnameinfo((struct sockaddr *) &server_addr, sizeof(struct sockaddr_in), remote_server_name,
-			sizeof(remote_server_name), NULL, 0, NI_NAMEREQD)) != 0) {
-				sprintf(log_buffer, "could not resolve hostname, errcode: %d", errcode);
-				log_err(-1, __func__, log_buffer);
-				tpp_close(stream);				
-	}
 
 	if (!addrfind(ipaddr)) {
 		sprintf(log_buffer, "bad connect from %s", netaddr(addr));
@@ -840,7 +826,12 @@ is_request(int stream, int version)
 	if (server_stream == -1)
 		send_hellosvr(stream);
 
-	set_server_stream(remote_server_name, port, stream);
+	if (set_server_stream(addr, stream)) {
+		sprintf(log_buffer, "set server stream failed");
+		log_err(-1, __func__, log_buffer);
+		tpp_close(stream);
+		return;
+	}
 
 	command = disrsi(stream, &ret);
 	if (ret != DIS_SUCCESS)
@@ -1023,19 +1014,19 @@ is_request(int stream, int version)
 					free(phook_input);
 				}
 			}
-			if ((ret=is_compose(stream, IS_DISCARD_DONE)) != DIS_SUCCESS) {
+			if ((ret = is_compose(stream, IS_DISCARD_DONE)) != DIS_SUCCESS) {
 				free(jobid);
 				jobid = NULL;
 				goto err;
 			}
-			if ((ret=diswst(stream, jobid)) != DIS_SUCCESS) {
+			if ((ret = diswst(stream, jobid)) != DIS_SUCCESS) {
 				free(jobid);
 				jobid = NULL;
 				goto err;
 			}
 			free(jobid);	/* can be freed now */
 			jobid = NULL;
-			if ((ret=diswsi(stream, n)) != DIS_SUCCESS)
+			if ((ret = diswsi(stream, n)) != DIS_SUCCESS)
 				goto err;
 			dis_flush(stream);
 			break;
@@ -1415,7 +1406,7 @@ send_resc_used(int cmd, int count, struct resc_used_update *rud)
 			if (ret != DIS_SUCCESS)
 				goto err;
 		}
-		ret =diswsi(shard_server_stream, rud->ru_status);
+		ret = diswsi(shard_server_stream, rud->ru_status);
 		if (ret != DIS_SUCCESS)
 			goto err;
 

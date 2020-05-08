@@ -58,6 +58,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <netdb.h>
 #include "dis.h"
 #include "libpbs.h"
 #include "list_link.h"
@@ -1994,31 +1995,54 @@ get_server_stream(char *svr, unsigned int port, char *jobid)
  * @param[in]	port -  Server port
  * @param[in]	stream  - Stream to the connected server.
  * 
- * @return	void
+ * @return	int
  *
  */
 
-void
-set_server_stream(char * hostname, unsigned int port, int stream)
+int
+set_server_stream(struct sockaddr_in *addr, int stream)
 {
-	shard_conn_t **shard_connection = NULL;
-	int srv_index;
 	if (get_max_servers() > 1) {
+		char	remote_server_name[NI_MAXHOST+1] = {'\0'};
+		struct	sockaddr_in	server_addr;
+		int 	errcode;
+		short	port;
 		struct pbs_server_instance si;
-		si.name = strdup(hostname);
+		shard_conn_t **shard_connection = NULL;
+		int srv_index = 0;
+		int i;
+
+		shard_connection = (shard_conn_t **)get_conn_shards(virtual_sock);
+		if (!shard_connection || !shard_connection[srv_index]) {
+			log_err(-1, __func__, "Invalid shard connection; failed to set connection stream");
+			return -1;
+		}
+
+		for (i = 0; i < get_current_servers(); i++) {
+			if (shard_connection[i]->sd == stream)
+				return 0;
+		}
+
+		port = ntohs((unsigned short)addr->sin_port);
+		memcpy((char *) &server_addr.sin_addr, &(addr->sin_addr), sizeof(server_addr.sin_addr));
+		server_addr.sin_port = addr->sin_port;
+		server_addr.sin_family = AF_INET;
+		if ((errcode = getnameinfo((struct sockaddr *) &server_addr, sizeof(struct sockaddr_in), remote_server_name,
+				sizeof(remote_server_name), NULL, 0, NI_NAMEREQD)) != 0) {
+					sprintf(log_buffer, "could not resolve hostname, errcode: %d", errcode);
+					log_err(-1, __func__, log_buffer);
+					return -1;				
+		}
+
+		si.name = remote_server_name;
 		if (!si.name) {
 			log_err(-1, __func__, "Out of memory");
-			return;
+			return -1;
 		}
 		si.port = port;
 		if ((srv_index = get_svr_index(&si)) == -1) {
 			log_err(-1, __func__, "Invalid shard index");
-			return;
-		}
-		shard_connection = (shard_conn_t **)get_conn_shards(virtual_sock);
-		if (!shard_connection || !shard_connection[srv_index]) {
-			log_err(-1, __func__, "Invalid shard connection; failed to set connection stream");
-			return;
+			return -1;
 		}
 
 		if (shard_connection[srv_index]->state == SHARD_CONN_STATE_DOWN) {
@@ -2027,6 +2051,7 @@ set_server_stream(char * hostname, unsigned int port, int stream)
 			shard_connection[srv_index]->state_change_time = time(0);
 		}
 	}
+	return 0;
 }
 
 

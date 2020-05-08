@@ -2197,22 +2197,18 @@ get_svr_index(pbs_server_instance_t *instance)
 {
 	int i;
 	char *pc;
-	char *host1;
-	char *host2;
+	int len = 0;
 	if (get_max_servers() > 1) {
 		for(i = 0; i < get_current_servers(); i++) {
 			if (instance->port == pbs_conf.psi[i]->port) {
 				if ((!instance->name) || (!pbs_conf.psi[i]->name))
 					return  -1;
-				host1 = strdup(instance->name);
-				host2 = strdup(pbs_conf.psi[i]->name);
-				if (!host1 || !host2)
-					return  -1;
-				if ((pc = strchr(host1, (int)'.')) != NULL)
-					*pc = '\0';
-				if ((pc = strchr(host2, (int)'.')) != NULL)
-					*pc = '\0';	
-				if (strcmp(host1, host2) == 0) 
+				pc = strchr(instance->name, (int)'.');
+				if (pc)
+					len = pc - instance->name;
+				else
+					len = strlen(instance->name);
+				if (strncmp(instance->name, pbs_conf.psi[i]->name, len) == 0) 
 					return i;
 			}
 		}

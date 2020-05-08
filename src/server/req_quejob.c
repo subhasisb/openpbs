@@ -3333,6 +3333,9 @@ get_next_svr_sequence_id(void)
 	static long long lastid = -1;
 	long long next = server.sv_qs.sv_jobidnumber; /* only for returning */
 
+	if (next == 0)
+		next = myindex;
+
 	server.sv_qs.sv_jobidnumber = 
 		pbs_shard_get_next_seqid(server.sv_qs.sv_jobidnumber, svr_max_job_sequence_id, myindex);
 	
