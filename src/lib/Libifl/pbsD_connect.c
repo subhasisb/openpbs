@@ -446,13 +446,14 @@ int internal_client_connect(int vsock, char *server, int port, char *extend_data
  * @param[in]   vsock - The virtual socket used to demux and find the physical server socket
  * @param[in]   obj_type - Caller object type
  * @param[in]   obj_id - Hint used by internal sharding logic
+ * @param[out]  svr_index - server's index
  *
  * @return int
  * @retval >= 0 The physical server socket
  * @retval -1   error encountered setting up the connection
  */
 int 
-get_svr_shard_connection(int vsock, enum pbs_obj_type obj_type, void *obj_id)
+get_svr_shard_connection(int vsock, enum pbs_obj_type obj_type, void *obj_id, int *index)
 {
 	int sd = -1;
 	int i = 0;
@@ -467,6 +468,7 @@ get_svr_shard_connection(int vsock, enum pbs_obj_type obj_type, void *obj_id)
 	max_num_servers = get_max_servers();
 	if (max_num_servers == 1)
 		return vsock;
+		
 	/* below code only for multi-server case */
 	num_of_conf_servers = get_current_servers();
 	if (shard_init_flag == -1) {
@@ -536,6 +538,8 @@ get_svr_shard_connection(int vsock, enum pbs_obj_type obj_type, void *obj_id)
 	} while (!done);
 	free(inact_svr_indexes);
 	set_conn_shard_context(vsock, srv_index);
+	if (index)
+		*index = srv_index;
 	return (shard_connection[srv_index]->sd);
 err:
 	free(inact_svr_indexes);
