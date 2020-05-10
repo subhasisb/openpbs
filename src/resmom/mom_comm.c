@@ -120,6 +120,7 @@ extern  char   *msg_err_malloc;
 extern int
 write_pipe_data(int upfds, void *data, int data_size);
 char	task_fmt[] = "/%8.8X";
+extern int virtual_sock;
 
 
 /* Function pointers
@@ -2361,9 +2362,11 @@ void
 im_eof(int stream, int ret)
 {
 	int			num;
+	int			j;
 	job			*pjob;
 	hnodent			*np;
 	struct	sockaddr_in	*addr;
+	shard_conn_t **shard_connection = NULL;
 
 	addr = tpp_getaddr(stream);
 	sprintf(log_buffer, "%s from addr %s on stream %d",
@@ -2376,6 +2379,24 @@ im_eof(int stream, int ret)
 		log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_NOTICE,
 			__func__, log_buffer);
 		server_stream = -1;
+	}
+
+	if (get_max_servers() > 1) {
+		for (j = 0; j < get_current_servers(); j++) {
+			shard_connection = (shard_conn_t **)get_conn_shards(virtual_sock);
+			if (!shard_connection || !shard_connection[j]) {
+				log_err(-1, __func__, "Invalid shard connection; failed to reset connection state");
+				continue;
+			}
+			if (stream == shard_connection[j]->sd) {
+				snprintf(log_buffer, sizeof(log_buffer), "Server connection closed; changing connection state");
+				log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_NOTICE,
+					__func__, log_buffer);
+				shard_connection[j]->state = SHARD_CONN_STATE_DOWN;
+				shard_connection[j]->state_change_time = time(0);
+				set_new_shard_context(virtual_sock);
+			}
+		}
 	}
 
 	/*

@@ -58,6 +58,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <netdb.h>
 #include "dis.h"
 #include "libpbs.h"
 #include "list_link.h"
@@ -118,6 +119,7 @@ extern useconds_t	alps_release_jitter;
 #endif
 
 extern char		*path_hooks_workdir;
+extern int		virtual_sock;
 
 #ifndef WIN32
 /**
@@ -1926,6 +1928,125 @@ end_loop:
 
 /**
  * @brief
+ * 	Internal function to open TPP stream to given server info.
+ *
+ * @param[in]	server  - name of Server to which to send the restart
+ * @param[in]	port - port Server would be expecting to receive IM messages
+ * @param[in]	channel - not used 
+ * @param[in]	extend_data - not used
+ * 
+ * @return	int
+ * @retval	-1	 -	If an error occurs.
+ * @retval	!=-1 -  Success, the fd for the APP to use is returned
+ */
+int 
+internal_connect_mom(int channel, char *server, int port, char *extend_data)
+{
+	return tpp_open(server, port);
+}
+
+/**
+ * @brief
+ * 	Initialise the shard connection table and utilize the 
+ *  get_svr_shard_connection() to choose the sharded server.
+ *
+ * @param[in]	svr  - name of Server to which to send the restart
+ * @param[in]	port - port Server would be expecting to receive IM messages
+ *
+ * @return	int
+ * @retval	-1	 -	If an error occurs.
+ * @retval	!=-1 -  Success, the fd for the APP to use is returned
+ */
+int
+get_server_stream(char *svr, unsigned int port, char *jobid)
+{
+	int	stream = -1;
+	if (get_max_servers() > 1) {
+		pfn_connect = internal_connect_mom;
+		set_new_shard_context(virtual_sock);
+		stream = get_svr_shard_connection(virtual_sock, JOB, jobid);	
+	} else {
+		if (server_stream == -1) {
+			if (svr == NULL)
+				svr = get_servername(&port);
+			stream = tpp_open(svr, port);
+		} else
+			return server_stream;
+	}
+	return stream;
+}
+
+/**
+ * @brief
+ * 	Used to set the connected stream in the shard connection table.
+ *
+ * @param[in]	hostname  - Name of Server 
+ * @param[in]	port -  Server port
+ * @param[in]	stream  - Stream to the connected server.
+ * 
+ * @return	int
+ * @retval	-1	-	if an error occurs.
+ * @retval	0	-	if success
+ *
+ */
+
+int
+set_server_stream(struct sockaddr_in *addr, int stream)
+{
+	if (get_max_servers() > 1) {
+		char	remote_server_name[NI_MAXHOST+1] = {'\0'};
+		struct	sockaddr_in	server_addr;
+		int 	errcode;
+		short	port;
+		struct pbs_server_instance si;
+		shard_conn_t **shard_connection = NULL;
+		int srv_index = 0;
+		int i;
+
+		shard_connection = (shard_conn_t **)get_conn_shards(virtual_sock);
+		if (!shard_connection || !shard_connection[srv_index]) {
+			log_err(-1, __func__, "Invalid shard connection; failed to set connection stream");
+			return -1;
+		}
+
+		for (i = 0; i < get_current_servers(); i++) {
+			if (shard_connection[i]->sd == stream)
+				return 0;
+		}
+
+		port = ntohs((unsigned short)addr->sin_port);
+		memcpy((char *) &server_addr.sin_addr, &(addr->sin_addr), sizeof(server_addr.sin_addr));
+		server_addr.sin_port = addr->sin_port;
+		server_addr.sin_family = AF_INET;
+		if ((errcode = getnameinfo((struct sockaddr *) &server_addr, sizeof(struct sockaddr_in), remote_server_name,
+				sizeof(remote_server_name), NULL, 0, NI_NAMEREQD)) != 0) {
+					sprintf(log_buffer, "could not resolve hostname, errcode: %d", errcode);
+					log_err(-1, __func__, log_buffer);
+					return -1;				
+		}
+
+		si.name = remote_server_name;
+		if (!si.name) {
+			log_err(-1, __func__, "Out of memory");
+			return -1;
+		}
+		si.port = port;
+		if ((srv_index = get_svr_index(&si)) == -1) {
+			log_err(-1, __func__, "Invalid shard index");
+			return -1;
+		}
+
+		if (shard_connection[srv_index]->state == SHARD_CONN_STATE_DOWN) {
+			shard_connection[srv_index]->state = SHARD_CONN_STATE_CONNECTED;
+			shard_connection[srv_index]->sd = stream;
+			shard_connection[srv_index]->state_change_time = time(0);
+		}
+	}
+	return 0;
+}
+
+/**
+ * @brief
  * 		choosing one server in random if a failover server is already set up.
  *
  * @param[out] port - Passed through to parse_servername(), not modified here.
@@ -1969,6 +2090,7 @@ send_hellosvr(int stream)
 	int		rc = 0;
 	char		*svr = NULL;
 	unsigned int	port = default_server_port;
+	struct	sockaddr_in	*addr;
 
 	DBPRT(("Sending hellosvr"))
 
@@ -1978,12 +2100,14 @@ send_hellosvr(int stream)
 			return;
 		}
 
-		stream = tpp_open(svr, port);
+		stream = get_server_stream(svr, port, NULL);
 		if (stream < 0) {
 			sprintf(log_buffer, "tpp_open(%s, %d) failed", svr, port);
 			log_err(errno, msg_daemonname, log_buffer);
 			return;
 		}
+		addr = tpp_getaddr(stream);
+		port = ntohs((unsigned short)addr->sin_port);
 	}
 
 	if ((rc = is_compose(stream, IS_HELLOSVR)) != DIS_SUCCESS)
