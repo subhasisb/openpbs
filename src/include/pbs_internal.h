@@ -539,6 +539,7 @@ extern int get_svr_shard_connection(int, enum pbs_obj_type, void *);
 extern void set_new_shard_context(int);
 extern int tcp_connect(int, char *, int, char *);
 extern int initialise_shard_conn(int);
+extern int (*pfn_connect)(int, char *, int , char *);
 
 /* This was added to pbs_ifl.h for use by AIF */
 extern int 	pbs_isexecutable(char *);

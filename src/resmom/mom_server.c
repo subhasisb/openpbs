@@ -125,13 +125,13 @@ extern  char		*msg_request;
 extern void req_commit(struct batch_request *preq);
 extern void req_quejob(struct batch_request *preq);
 extern void req_jobscript(struct batch_request *preq);
-extern int get_server_stream(char *svr, unsigned int port, char *jobid);
+extern int get_svr_inst_stream(char *svr, unsigned int port, char *jobid);
 
 extern void	mom_vnlp_report(vnl_t *vnl, char *header);
 extern	char	*path_hooks;
 extern	unsigned long	hooks_rescdef_checksum;
 extern	int	report_hook_checksums;
-extern int set_server_stream(struct sockaddr_in *addr, int stream);
+extern int save_svr_inst_stream(struct sockaddr_in *addr, int stream);
 
 /*
  * Tree search generalized from Knuth (6.2.2) Algorithm T just like
@@ -476,7 +476,7 @@ send_hook_job_action(struct hook_job_action *phjba)
 	struct hook_job_action *pka;
 	unsigned int            count;
 	int			ret;
-	int shard_server_stream;
+	int shard_server_stream = -1;
 
 	if (phjba != NULL) {
 		/* single new item to send */
@@ -496,7 +496,7 @@ send_hook_job_action(struct hook_job_action *phjba)
 	}
 
 	if (pka)
-		shard_server_stream = get_server_stream(NULL, default_server_port, pka->hja_jid);
+		shard_server_stream = get_svr_inst_stream(NULL, default_server_port, pka->hja_jid);
 
 	if (shard_server_stream == -1) {
 		/* no stream to server, ok as item already queued to resend */
@@ -826,7 +826,7 @@ is_request(int stream, int version)
 	if (server_stream == -1)
 		send_hellosvr(stream);
 
-	if (set_server_stream(addr, stream)) {
+	if (save_svr_inst_stream(addr, stream)) {
 		sprintf(log_buffer, "set server stream failed");
 		log_err(-1, __func__, log_buffer);
 		tpp_close(stream);
@@ -1372,22 +1372,22 @@ void
 send_resc_used(int cmd, int count, struct resc_used_update *rud)
 {
 	int	ret;
-	int shard_server_stream;
+	int shard_server_stream = -1;
 
 	if (count == 0 || rud == NULL || server_stream < 0)
 		return;
 	DBPRT(("send_resc_used update to server on stream %d\n", server_stream))
 
-	shard_server_stream = get_server_stream(NULL, default_server_port, rud->ru_pjobid);
-	ret = is_compose(shard_server_stream, cmd);
-	if (ret != DIS_SUCCESS)
-		goto err;
-
-	ret = diswui(shard_server_stream, count);
-	if (ret != DIS_SUCCESS)
-		goto err;
-
 	while (rud) {
+		shard_server_stream = get_svr_inst_stream(NULL, default_server_port, rud->ru_pjobid);
+		ret = is_compose(shard_server_stream, cmd);
+		if (ret != DIS_SUCCESS)
+			goto err;
+
+		ret = diswui(shard_server_stream, count);
+		if (ret != DIS_SUCCESS)
+			goto err;
+
 		ret = diswst(shard_server_stream, rud->ru_pjobid);
 		if (ret != DIS_SUCCESS)
 			goto err;
@@ -1420,8 +1420,10 @@ send_resc_used(int cmd, int count, struct resc_used_update *rud)
 			goto err;
 
 		rud = rud->ru_next;
+		
+		dis_flush(shard_server_stream);
 	}
-	dis_flush(shard_server_stream);
+
 	return;
 
 err:
@@ -1454,7 +1456,7 @@ send_wk_job_idle(char *jobid, int idle)
 {
 	int	ret;
 
-	int shard_server_stream = get_server_stream(NULL, default_server_port, jobid);
+	int shard_server_stream = get_svr_inst_stream(NULL, default_server_port, jobid);
 
 	ret = is_compose(shard_server_stream, IS_IDLE);
 	if (ret != DIS_SUCCESS)

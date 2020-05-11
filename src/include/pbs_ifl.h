@@ -811,7 +811,6 @@ extern char *(*pfn_pbs_submit_resv)(int, struct attropl *, char *);
 extern int (*pfn_pbs_delresv)(int, char *, char *);
 extern int (*pfn_pbs_terminate)(int, int, char *);
 extern preempt_job_info *(*pfn_pbs_preempt_jobs)(int, char**);
-extern int (*pfn_connect)(int, char *, int , char *);
 #ifdef	__cplusplus
 }
 #endif

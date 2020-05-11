@@ -123,6 +123,7 @@ typedef struct shard_conn {
 	int state;                  /* Connection state */
 	time_t state_change_time;   /* Connnetion state change time */
 	time_t last_used_time;           /* Last used time for the connection */
+	int failure_count;            /* TPP failure counts  */
 } shard_conn_t;
 
 typedef struct pbs_conn {

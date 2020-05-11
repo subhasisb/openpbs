@@ -506,7 +506,7 @@ get_svr_shard_connection(int vsock, enum pbs_obj_type obj_type, void *obj_id)
 				sd = pfn_connect(vsock, pbs_conf.psi[srv_index]->name, pbs_conf.psi[srv_index]->port, NULL);
 				shard_connection[srv_index]->sd = sd;
 				shard_connection[srv_index]->state_change_time = time(0);
-				if (sd != -1) {
+				if (sd != -1 && (shard_connection[srv_index]->failure_count < 4)) {
 					shard_connection[srv_index]->state = SHARD_CONN_STATE_CONNECTED;
 					break;
 				} else {
@@ -578,6 +578,7 @@ initialise_shard_conn(int vfd)
 		shard_connection[i]->state = SHARD_CONN_STATE_DOWN;
 		shard_connection[i]->state_change_time = 0;
 		shard_connection[i]->last_used_time = 0;
+		shard_connection[i]->failure_count = 0;
 	}
 	if ( set_conn_shards(vfd, (void *)shard_connection) )
 		return -1;

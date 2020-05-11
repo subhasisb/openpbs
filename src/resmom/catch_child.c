@@ -1958,7 +1958,7 @@ internal_connect_mom(int channel, char *server, int port, char *extend_data)
  * @retval	!=-1 -  Success, the fd for the APP to use is returned
  */
 int
-get_server_stream(char *svr, unsigned int port, char *jobid)
+get_svr_inst_stream(char *svr, unsigned int port, char *jobid)
 {
 	int	stream = -1;
 	if (get_max_servers() > 1) {
@@ -1991,7 +1991,7 @@ get_server_stream(char *svr, unsigned int port, char *jobid)
  */
 
 int
-set_server_stream(struct sockaddr_in *addr, int stream)
+save_svr_inst_stream(struct sockaddr_in *addr, int stream)
 {
 	if (get_max_servers() > 1) {
 		char	remote_server_name[NI_MAXHOST+1] = {'\0'};
@@ -2040,6 +2040,7 @@ set_server_stream(struct sockaddr_in *addr, int stream)
 			shard_connection[srv_index]->state = SHARD_CONN_STATE_CONNECTED;
 			shard_connection[srv_index]->sd = stream;
 			shard_connection[srv_index]->state_change_time = time(0);
+			shard_connection[srv_index]->failure_count = 0;
 		}
 	}
 	return 0;
@@ -2100,7 +2101,7 @@ send_hellosvr(int stream)
 			return;
 		}
 
-		stream = get_server_stream(svr, port, NULL);
+		stream = get_svr_inst_stream(svr, port, NULL);
 		if (stream < 0) {
 			sprintf(log_buffer, "tpp_open(%s, %d) failed", svr, port);
 			log_err(errno, msg_daemonname, log_buffer);

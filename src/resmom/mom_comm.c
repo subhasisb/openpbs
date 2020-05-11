@@ -2347,6 +2347,38 @@ term_job(job *pjob)
 	del_job_hw(pjob);	/* release special hardware related resources */
 }
 
+
+/**
+ * @brief
+ * find_server_stream - search the given stream in shard connection table 
+ * and returns its index
+ *
+ * @param[in] stream - server index's stream to search
+ *
+ * @return int
+ *
+ * @retval	-1	 -	If an error occurs.
+ * @retval	!=-1 -  Success, the server index in shard connection table.
+ *
+ */
+int
+find_svr_inst_stream(int stream) {
+	shard_conn_t **shard_connection = NULL;
+	int j;
+
+	shard_connection = (shard_conn_t **)get_conn_shards(virtual_sock);
+	if (!shard_connection) {
+		log_err(-1, __func__, "Invalid shard connection; failed to find the server index");
+		return -1;
+	}
+
+	for (j = 0; j < get_current_servers(); j++) {
+		if (stream == shard_connection[j]->sd)
+			return j;
+	}
+	return -1;
+}
+
 /**
  * @brief
  *	Handle a stream that needs to be closed.
@@ -2362,11 +2394,11 @@ void
 im_eof(int stream, int ret)
 {
 	int			num;
-	int			j;
 	job			*pjob;
 	hnodent			*np;
 	struct	sockaddr_in	*addr;
 	shard_conn_t **shard_connection = NULL;
+	int svr_index;
 
 	addr = tpp_getaddr(stream);
 	sprintf(log_buffer, "%s from addr %s on stream %d",
@@ -2382,20 +2414,19 @@ im_eof(int stream, int ret)
 	}
 
 	if (get_max_servers() > 1) {
-		for (j = 0; j < get_current_servers(); j++) {
-			shard_connection = (shard_conn_t **)get_conn_shards(virtual_sock);
-			if (!shard_connection || !shard_connection[j]) {
-				log_err(-1, __func__, "Invalid shard connection; failed to reset connection state");
-				continue;
-			}
-			if (stream == shard_connection[j]->sd) {
-				snprintf(log_buffer, sizeof(log_buffer), "Server connection closed; changing connection state");
-				log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_NOTICE,
-					__func__, log_buffer);
-				shard_connection[j]->state = SHARD_CONN_STATE_DOWN;
-				shard_connection[j]->state_change_time = time(0);
-				set_new_shard_context(virtual_sock);
-			}
+		shard_connection = (shard_conn_t **)get_conn_shards(virtual_sock);
+		if (!shard_connection) {
+			log_err(-1, __func__, "Invalid shard connection; failed to reset connection state");
+			tpp_close(stream);
+		}
+		if ((svr_index = find_svr_inst_stream(stream)) != -1) {
+			snprintf(log_buffer, sizeof(log_buffer), "Server connection closed; changing connection state");
+			log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_NOTICE,
+				__func__, log_buffer);
+			shard_connection[svr_index]->state = SHARD_CONN_STATE_DOWN;
+			shard_connection[svr_index]->state_change_time = time(0);
+			shard_connection[svr_index]->failure_count++;
+			set_new_shard_context(virtual_sock);
 		}
 	}
 
