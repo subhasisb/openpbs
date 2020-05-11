@@ -1098,7 +1098,7 @@ void
 update_ajob_status_using_cmd(job *pjob, int cmd, int use_rtn_list_ext)
 {
 	struct resc_used_update rused;
-		
+
 	/* pass user-client privilege to encode_resc() */
 
 	resc_access_perm = ATR_DFLAG_MGRD;
@@ -1722,8 +1722,7 @@ end_loop:
 					resc_used(pjob, "mem", getsize));
 				(void)diswul(stream,
 					resc_used(pjob, "cpupercent", gettime));
-				(void)send_resc_used_to_ms(stream,
-							pjob->ji_qs.ji_jobid);
+				(void)send_resc_used_to_ms(stream, pjob);
 				(void)dis_flush(stream);
 				pjob->ji_obit = TM_NULL_EVENT;
 			}
