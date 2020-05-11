@@ -2040,6 +2040,7 @@ init_abort_jobs(int recover)
 		pj->ji_grpcache = NULL;
 		check_pwd(pj);
 		append_link(&svr_alljobs, &pj->ji_alljobs, pj);
+		tree_add_del(AVL_jobs, (void *)pj->ji_qs.ji_jobid, (void *)pj, TREE_OP_ADD);
 		job_nodes(pj);
 		task_recov(pj);
 

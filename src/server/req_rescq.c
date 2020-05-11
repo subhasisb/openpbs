@@ -96,9 +96,9 @@ extern int cnvrt_local_move(job *, struct batch_request *);
 
 /**
  * @brief work task to delete reservation if there are no jobs in the reservation queue
- * 
+ *
  * @param[in] ptask - work task
- * 
+ *
  */
 void
 resv_idle_delete(struct work_task *ptask)
@@ -113,12 +113,12 @@ resv_idle_delete(struct work_task *ptask)
 
 	num_jobs = presv->ri_qp->qu_numjobs;
 	if (svr_chk_history_conf()) {
-		num_jobs -= (presv->ri_qp->qu_njstate[JOB_STATE_MOVED] + presv->ri_qp->qu_njstate[JOB_STATE_FINISHED] + 
+		num_jobs -= (presv->ri_qp->qu_njstate[JOB_STATE_MOVED] + presv->ri_qp->qu_njstate[JOB_STATE_FINISHED] +
 			presv->ri_qp->qu_njstate[JOB_STATE_EXPIRED]);
 	}
 
 	if (num_jobs == 0) {
-		log_eventf(PBSEVENT_RESV, PBS_EVENTCLASS_RESV, LOG_DEBUG, presv->ri_qs.ri_resvID, 
+		log_eventf(PBSEVENT_RESV, PBS_EVENTCLASS_RESV, LOG_DEBUG, presv->ri_qs.ri_resvID,
 			"Deleting reservation after being idle for %d seconds",
 			presv->ri_wattr[(int) RESV_ATR_del_idle_time].at_val.at_long);
 		gen_future_deleteResv(presv, 1);
@@ -137,7 +137,7 @@ set_idle_delete_task(resc_resv *presv)
 	long retry_time;
 	int num_jobs;
 
-	if (presv == NULL) 
+	if (presv == NULL)
 		return;
 
 	if (!(presv->ri_wattr[(int) RESV_ATR_del_idle_time].at_flags & ATR_VFLAG_SET))
@@ -301,7 +301,7 @@ remove_node_from_resv(resc_resv *presv, struct pbsnode *pnode)
 
 				resv_attr_def[(int)RESV_ATR_resv_nodes].at_free(&tmpatr);
 
-				/* Note: We do not want to set presv->ri_giveback to 0 here. 
+				/* Note: We do not want to set presv->ri_giveback to 0 here.
 				 * The resv_nodes may not be empty yet and there could
 				 * be server resources assigned - it will be handled later.
 				 */
@@ -354,7 +354,7 @@ remove_node_from_resv(resc_resv *presv, struct pbsnode *pnode)
 			break;
 		}
 	}
-	
+
 	free(tmp_buf);
 }
 
@@ -548,7 +548,7 @@ req_confirmresv(struct batch_request *preq)
 		return;
 	}
 
-	presv = find_resv(preq->rq_ind.rq_run.rq_jid);
+	presv = find_resv_byid(preq->rq_ind.rq_run.rq_jid);
 	if (presv == NULL) {
 		req_reject(PBSE_UNKRESVID, 0, preq);
 		return;
@@ -871,7 +871,7 @@ req_confirmresv(struct batch_request *preq)
 	 * is moving from state UNCONFIRMED to CONFIRMED
 	 */
 	if (presv->ri_brp) {
-		presv = find_resv(presv->ri_qs.ri_resvID);
+		presv = find_resv_byid(presv->ri_qs.ri_resvID);
 		if (presv->ri_wattr[(int) RESV_ATR_convert].at_val.at_str != NULL) {
 			rc = cnvrt_qmove(presv);
 			if (rc != 0) {
@@ -1015,7 +1015,7 @@ resv_revert_alter_times(resc_resv *presv)
 			presv->ri_alter_stime = 0;
 		}
 	}
-	
+
 	presv->ri_qs.ri_duration = presv->ri_qs.ri_etime - presv->ri_qs.ri_stime;
 	presv->ri_wattr[RESV_ATR_duration].at_val.at_long = presv->ri_qs.ri_duration;
 	presv->ri_wattr[RESV_ATR_duration].at_flags
@@ -1025,4 +1025,3 @@ resv_revert_alter_times(resc_resv *presv)
 	/* While requesting alter, substate was retained, so we use the same here. */
 	(void)resv_setResvState(presv, state, presv->ri_qs.ri_substate);
 }
-

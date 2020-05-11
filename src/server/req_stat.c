@@ -924,7 +924,7 @@ req_stat_resv(struct batch_request * preq)
 	if ((*name == '\0') || (*name =='@'))
 		type = 1;
 	else {
-		presv = find_resv(name);
+		presv = find_resv_byid(name);
 		if (presv == NULL) {
 			req_reject(PBSE_UNKRESVID, 0, preq);
 			return;
@@ -1166,4 +1166,3 @@ req_stat_resc(struct batch_request *preq)
 		(void)reply_send(preq);
 	}
 }
-

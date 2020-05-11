@@ -3400,6 +3400,7 @@ im_request(int stream, int version)
 			if (mom_do_poll(pjob))
 				append_link(&mom_polljobs, &pjob->ji_jobque, pjob);
 			append_link(&svr_alljobs, &pjob->ji_alljobs, pjob);
+			tree_add_del(AVL_jobs, (void *)pjob->ji_qs.ji_jobid, (void *)pjob, TREE_OP_ADD);
 
 			/*
 			 ** At this point, we have done all the job setup.

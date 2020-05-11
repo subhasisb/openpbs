@@ -190,7 +190,7 @@ find_job(char *jobid)
 }
 
 resc_resv *
-find_resv(char *resvid)
+find_resv_byid(char *resvid)
 {
 	return NULL;
 }

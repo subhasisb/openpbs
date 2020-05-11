@@ -10,7 +10,7 @@
  *
  *	Taken from NetBSD avltree-1.1.tar.gz.
  */
-/* 
+/*
  * Copyright (C) 1994-2020 Altair Engineering, Inc.
  * For more information, contact Altair at www.altair.com.
  *
@@ -100,6 +100,7 @@ extern int	avl_find_exact(AVL_IX_REC *pe, AVL_IX_DESC *pix);
 int tree_add_del(AVL_IX_DESC *root, void *key, void *data, int op);
 void *find_tree(AVL_IX_DESC *root, void *key);
 AVL_IX_DESC *create_tree(int dups, int keylen);
+void destroy_tree(AVL_IX_DESC *tree);
 AVL_IX_REC *avlkey_create(AVL_IX_DESC *tree, void *key);
 
 /* Operation types for addition/deletion from AVL tree */
@@ -111,4 +112,3 @@ AVL_IX_REC *avlkey_create(AVL_IX_DESC *tree, void *key);
 }
 #endif
 #endif  /* _AVLTREE_H */
-

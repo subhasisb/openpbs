@@ -756,7 +756,7 @@ req_modifyReservation(struct batch_request *preq)
 		return;
 
 	rid = preq->rq_ind.rq_modify.rq_objname;
-	if ((presv = find_resv(rid)) == NULL) {
+	if ((presv = find_resv_byid(rid)) == NULL) {
 		/* Not on "all_resvs" list try "new_resvs" list */
 		presv = (resc_resv *)GET_NEXT(svr_newresvs);
 		while (presv) {
@@ -887,7 +887,7 @@ req_modifyReservation(struct batch_request *preq)
 		psatl = (svrattrl *)GET_NEXT(psatl->al_link);
 	}
 
-	
+
 	if (presv->ri_wattr[RESV_ATR_state].at_val.at_long == RESV_RUNNING && num_jobs) {
 		if ((presv->ri_alter_flags & RESV_DURATION_MODIFIED) && (presv->ri_alter_flags & RESV_END_TIME_MODIFIED)) {
 			resv_revert_alter_times(presv);

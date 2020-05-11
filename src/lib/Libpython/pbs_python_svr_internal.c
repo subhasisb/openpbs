@@ -3696,7 +3696,7 @@ ERROR_EXIT:
  * @return	PyObject *
  * @retval	This returns a Python object that maps
  * 		to a resc_resv struct taken directly from presv_o if non-NULL,
- * 		or to the struct returned by find_resv(<resvid>).
+ * 		or to the struct returned by find_resv_byid(<resvid>).
  */
 static PyObject *
 _pps_helper_get_resv(resc_resv *presv_o, const char *resvid, char *perf_label)
@@ -3730,7 +3730,7 @@ _pps_helper_get_resv(resc_resv *presv_o, const char *resvid, char *perf_label)
 			log_err(PBSE_INTERNAL, __func__, log_buffer);
 			return NULL;
 		}
-		presv = find_resv((char *)resvid_out);
+		presv = find_resv_byid((char *)resvid_out);
 	}
 
 	if (presv == NULL) {
@@ -5092,7 +5092,7 @@ _pbs_python_event_set(unsigned int hook_event, char *req_user, char *req_host,
 	PyObject *py_vnodelist = NULL;
 	PyObject *py_vnodelist_fail = NULL;
 	PyObject *py_joblist = NULL;
-	PyObject *py_resvlist = NULL;	
+	PyObject *py_resvlist = NULL;
 	PyObject *py_exec_vnode = NULL;
 	PyObject *py_vnode	   = NULL;
 	PyObject *py_aoe	   = NULL;
@@ -5899,7 +5899,7 @@ _pbs_python_event_set(unsigned int hook_event, char *req_user, char *req_host,
 					PY_TYPE_EVENT, PY_EVENT_PARAM_VNODELIST,
 					(pbs_list_head *)req_params->vns_list,
 					perf_label, HOOK_PERF_POPULATE_VNODELIST);
-					
+
 		if (py_vnodelist == NULL) {
 			rc = -1;
 			goto event_set_exit;
@@ -5910,7 +5910,7 @@ _pbs_python_event_set(unsigned int hook_event, char *req_user, char *req_host,
 			py_vnodelist_fail = create_hook_vnode_list_param(py_event_param,
 						PY_TYPE_EVENT, PY_EVENT_PARAM_VNODELIST_FAIL,
 			    			(pbs_list_head *)req_params->vns_list_fail, perf_label, HOOK_PERF_POPULATE_VNODELIST_FAIL);
-					
+
 			if (py_vnodelist_fail == NULL) {
 				rc = -1;
 				goto event_set_exit;
@@ -5994,7 +5994,7 @@ _pbs_python_event_set(unsigned int hook_event, char *req_user, char *req_host,
 			   create_hook_vnode_list_param(py_event_param,
 					PY_TYPE_EVENT, PY_EVENT_PARAM_VNODELIST,
 					(pbs_list_head *)req_params->vns_list, perf_label, HOOK_PERF_POPULATE_VNODELIST);
-					
+
 		if (py_vnodelist == NULL) {
 			rc = -1;
 			goto event_set_exit;
@@ -6004,7 +6004,7 @@ _pbs_python_event_set(unsigned int hook_event, char *req_user, char *req_host,
 			   create_hook_vnode_list_param(py_event_param,
 				PY_TYPE_EVENT, PY_EVENT_PARAM_VNODELIST_FAIL,
 			    	(pbs_list_head *)req_params->vns_list_fail, perf_label, HOOK_PERF_POPULATE_VNODELIST_FAIL);
-					
+
 		if (py_vnodelist_fail == NULL) {
 			rc = -1;
 			goto event_set_exit;
@@ -6236,7 +6236,7 @@ _pbs_python_event_set(unsigned int hook_event, char *req_user, char *req_host,
 				PY_EVENT_PARAM_VNODELIST,
 			    (pbs_list_head *)req_params->vns_list,
 			    perf_label, HOOK_PERF_POPULATE_VNODELIST);
-					
+
 		if (py_vnodelist == NULL) {
 			rc = -1;
 			goto event_set_exit;
@@ -6324,7 +6324,7 @@ _pbs_python_event_unset(void)
  */
 static int
 populate_svrattrl_from_vnodelist_param(char *vnodelist_name,
-					pbs_list_head *vnlist) 
+					pbs_list_head *vnlist)
 {
 	PyObject *py_vnlist = NULL;
 	PyObject *py_attr_keys = NULL;
@@ -6447,7 +6447,7 @@ _pbs_python_event_to_request(unsigned int hook_event, hook_output_param_t *req_p
 	PyObject 		*py_vnode = NULL;
 	PyObject 		*py_vnodelist = NULL;
 	PyObject 		*py_joblist = NULL;
-	PyObject 		*py_resvlist = NULL;	
+	PyObject 		*py_resvlist = NULL;
 	PyObject 		*py_job_o = NULL;
 	PyObject 		*py_resv = NULL;
 	char			*queue;
@@ -12192,7 +12192,7 @@ pbsv1mod_meth_release_nodes(PyObject *self, PyObject *args, PyObject *kwds)
 	char	*new_exec_host = NULL;
 	char	*new_exec_host2 = NULL;
 	char	*new_schedselect = NULL;
-	char	*tmpstr = NULL;	
+	char	*tmpstr = NULL;
 	PyObject *py_return = Py_None;
 	int	hook_set_mode_orig;
 	char	*jobid = NULL;
@@ -12240,7 +12240,7 @@ pbsv1mod_meth_release_nodes(PyObject *self, PyObject *args, PyObject *kwds)
 			log_err(errno, __func__, "malloc failure");
 			goto release_nodes_exit;
 		}
-	
+
 		vnodelist[0] = '\0';
 
 		num_attrs = PyList_Size(py_attr_keys);
@@ -12259,7 +12259,7 @@ pbsv1mod_meth_release_nodes(PyObject *self, PyObject *args, PyObject *kwds)
 					goto release_nodes_exit;
 				}
 			}
-		
+
 			if (pbs_strcat(&vnodelist, &vnodelist_sz, vn_name) == NULL) {
 				log_err(errno, __func__, "pbs_strcat failure");
 				free(vn_name);
@@ -12281,7 +12281,7 @@ pbsv1mod_meth_release_nodes(PyObject *self, PyObject *args, PyObject *kwds)
 			log_err(-1, __func__, "strdup keep_select failed");
 			goto release_nodes_exit;
 		}
-	
+
 		/* populate failed_mom_list used to decide which nodes to release */
 		if (PyObject_HasAttrString(py_job, PY_JOB_FAILED_MOM_LIST)) {
 			py_nodes = PyObject_GetAttrString(py_job, PY_JOB_FAILED_MOM_LIST);
@@ -12300,7 +12300,7 @@ pbsv1mod_meth_release_nodes(PyObject *self, PyObject *args, PyObject *kwds)
 		/* populate succeeded_mom_list used to decide which nodes to keep */
 		if (PyObject_HasAttrString(py_job, PY_JOB_SUCCEEDED_MOM_LIST)) {
 			py_nodes = PyObject_GetAttrString(py_job, PY_JOB_SUCCEEDED_MOM_LIST); /* NEW */
-	
+
 			if (py_nodes != NULL) {
 				if (PyList_Check(py_nodes)) {
 					if (py_strlist_to_reliable_job_node_list(py_nodes, &succeeded_mom_list) == -1) {

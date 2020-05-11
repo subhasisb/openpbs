@@ -489,7 +489,7 @@ chk_rescResv_request(char *resvID, struct batch_request *preq)
 {
 	resc_resv	*presv;
 
-	if ((presv = find_resv(resvID)) == NULL) {
+	if ((presv = find_resv_byid(resvID)) == NULL) {
 		log_event(PBSEVENT_DEBUG, PBS_EVENTCLASS_RESV, LOG_INFO,
 			resvID, msg_unkresvID);
 		req_reject(PBSE_UNKRESVID, 0, preq);

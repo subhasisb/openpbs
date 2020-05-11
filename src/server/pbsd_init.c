@@ -687,7 +687,7 @@ pbsd_init(int type)
 	(void)svr_attr_def[(int)SRV_ATR_version].at_decode(
 		&server.sv_attr[(int)SRV_ATR_version], 0, 0,
 		PBS_VERSION);
-	
+
 	if ((pbs_licensing_license_location == NULL) && (licenses.lb_aval_floating == 0)) {
 		printf("%s\n", badlicense);
 		log_event(PBSEVENT_ADMIN, PBS_EVENTCLASS_SERVER, LOG_ALERT,
@@ -700,7 +700,7 @@ pbsd_init(int type)
 		log_event(PBSEVENT_ADMIN, PBS_EVENTCLASS_SERVER, LOG_NOTICE,
 			msg_daemonname, log_buffer);
 		printf("%s\n", log_buffer);
-	} 
+	}
 	if (licenses.lb_aval_floating > 0) {
 		sprintf(log_buffer,
 			"Licenses valid for %d Floating hosts",
@@ -739,7 +739,10 @@ pbsd_init(int type)
 	 * 8A. If not a "create" initialization, recover queues.
 	 *    If a create, remove any queues that might be there.
 	 */
-
+	if ((AVL_queues = create_tree(AVL_NO_DUP_KEYS, 0)) == NULL) {
+		log_err(-1, __func__, "Creating AVL tree for queue-lookup failed!");
+		return (-1);
+	}
 	had = server.sv_qs.sv_numque;
 	server.sv_qs.sv_numque = 0;
 
@@ -818,6 +821,14 @@ pbsd_init(int type)
 		return (-1);
 
 	/* load reservations */
+	if ((AVL_resvs_byid = create_tree(AVL_NO_DUP_KEYS, 0)) == NULL) {
+		log_err(-1, __func__, "Creating AVL tree for resv-lookup by resv id failed!");
+		return (-1);
+	}
+	if ((AVL_resvs_byqn = create_tree(AVL_NO_DUP_KEYS, 0)) == NULL) {
+		log_err(-1, __func__, "Creating AVL tree for resv-lookup by quename failed!");
+		return (-1);
+	}
 	obj.pbs_db_obj_type = PBS_DB_RESV;
 	obj.pbs_db_un.pbs_db_resv = &dbresv;
 	state = pbs_db_cursor_init(conn, &obj, NULL);
@@ -838,21 +849,15 @@ pbsd_init(int type)
 			set_old_subUniverse(presv);
 
 			append_link(&svr_allresvs, &presv->ri_allresvs, presv);
+			tree_add_del(AVL_resvs_byid, (void *)presv->ri_qs.ri_resvID, (void *)presv, TREE_OP_ADD);
 			if (attach_queue_to_reservation(presv)) {
-
 				/* reservation needed queue; failed to find it */
-				sprintf(log_buffer, msg_init_resvNOq,
-					presv->ri_qs.ri_queue, presv->ri_qs.ri_resvID);
-				log_event(PBSEVENT_SYSTEM | PBSEVENT_ADMIN |
-					PBSEVENT_DEBUG, PBS_EVENTCLASS_RESV,
-					LOG_NOTICE, msg_daemonname, log_buffer);
+				log_eventf(PBSEVENT_SYSTEM | PBSEVENT_ADMIN | PBSEVENT_DEBUG, PBS_EVENTCLASS_RESV, LOG_NOTICE,
+						msg_daemonname, msg_init_resvNOq, presv->ri_qs.ri_queue, presv->ri_qs.ri_resvID);
 			} else {
-
-				sprintf(log_buffer, msg_init_recovresv,
-					presv->ri_qs.ri_resvID);
-				log_event(PBSEVENT_SYSTEM | PBSEVENT_ADMIN |
-					PBSEVENT_DEBUG, PBS_EVENTCLASS_SERVER,
-					LOG_INFO, msg_daemonname, log_buffer);
+				tree_add_del(AVL_resvs_byqn, (void *)presv->ri_qs.ri_queue, (void *)presv, TREE_OP_ADD);
+				log_eventf(PBSEVENT_SYSTEM | PBSEVENT_ADMIN | PBSEVENT_DEBUG, PBS_EVENTCLASS_SERVER, LOG_INFO,
+						msg_daemonname, msg_init_recovresv, presv->ri_qs.ri_resvID);
 			}
 		}
 		pbs_db_reset_obj(&obj);
@@ -864,12 +869,10 @@ pbsd_init(int type)
 	 *    If a create or clean recovery, delete any jobs.
 	 *    Before job creation/recovery, create the AVL tree.
 	 */
-	AVL_jctx = (AVL_IX_DESC *) malloc(sizeof(AVL_IX_DESC));
-	if (AVL_jctx == NULL) {
+	if ((AVL_jobs = create_tree(AVL_NO_DUP_KEYS, 0)) == NULL) {
 		log_err(-1, __func__, "Creating AVL tree for job-lookup failed!");
 		return (-1);
 	}
-	avl_create_index(AVL_jctx, AVL_NO_DUP_KEYS, 0);
 
 	server.sv_qs.sv_numjobs = 0;
 
@@ -2004,7 +2007,7 @@ Rmv_if_resv_not_possible(job *pjob)
 		 *resc_resv structure exists and, if so, rejoin
 		 */
 
-		presv = find_resv(pjob->ji_qs.ji_jobid);
+		presv = find_resv_byid(pjob->ji_qs.ji_jobid);
 		if (presv == NULL ||
 			pjob->ji_wattr[JOB_ATR_reserve_end]
 			.at_val.at_long < time_now)

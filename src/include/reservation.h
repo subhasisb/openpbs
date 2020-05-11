@@ -40,22 +40,9 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
-/*
- * reservation.h - structure definations for reservation objects
- *
- * Include Files Required:
- *	<sys/types.h>
- *	"list_link.h"
- *	"attribute.h"
- *	"server_limits.h"
- *	"batch_request.h"
- *	"pbs_nodes.h"
- *	"job.h"
- */
 
-#ifndef	_RESV_NODE_H
+#include "avltree.h"
 #include "resv_node.h"
-#endif
 
 #define	JOB_OBJECT		1
 #define	RESC_RESV_OBJECT	2
@@ -330,10 +317,13 @@ struct resc_resv {
 #define	Q_CHNG_ENABLE		0
 #define	Q_CHNG_START		1
 
-extern resc_resv  *find_resv(char *);
-extern resc_resv  *resc_resv_alloc(void);
-extern void  resv_purge(resc_resv *);
-extern int   start_end_dur_wall(void *, int);
+extern AVL_IX_DESC *AVL_resvs_byid;
+extern AVL_IX_DESC *AVL_resvs_byqn;
+extern resc_resv *find_resv_byid(char *);
+extern resc_resv *find_resv_by_quename(char *quename);
+extern resc_resv *resc_resv_alloc(void);
+extern void resv_purge(resc_resv *);
+extern int start_end_dur_wall(void *, int);
 
 #ifdef	_PBS_JOB_H
 extern void*  job_or_resv_recov(char *, int);
