@@ -1368,21 +1368,38 @@ send_resc_used(int cmd, int count, struct resc_used_update *rud)
 	int svr_inst_stream = -1;
 	static int num_of_max_servers = 0;
 	static int *svr_indexes = NULL;
+	static int *svr_counts = NULL;
 	int i = 0;
 	int svr_index = -1;
+	struct resc_used_update * tmp = NULL;
 
 	if (count == 0 || rud == NULL || server_stream < 0)
 		return;
 	DBPRT(("send_resc_used update to server on stream %d\n", server_stream))
 	
 	if (!svr_indexes) {
-	num_of_max_servers = get_max_servers();
-	if (!(svr_indexes = (int *)malloc(num_of_max_servers * sizeof(int))))
-		goto err;
+		num_of_max_servers = get_max_servers();
+		if (!(svr_indexes = (int *)malloc(num_of_max_servers * sizeof(int))))
+			goto err;
+		if (!(svr_counts = (int *)malloc(num_of_max_servers * sizeof(int))))
+			goto err;
 	}
 	
 	memset(svr_indexes, -1, num_of_max_servers * sizeof(int));
+	memset(svr_counts, 0, num_of_max_servers * sizeof(int));
 	
+	/* Segregation of the counts for each multiple servers */
+	tmp = rud;
+	while(rud) {
+		if(get_svr_instance(NULL, default_server_port, rud->ru_pjobid, &svr_index) != -1) {
+			if (svr_index == -1)
+				goto err;
+			svr_counts[svr_index]++;
+		}
+		rud = rud->ru_next;
+	}
+	
+	rud = tmp;
 	while (rud) {
 		svr_inst_stream = get_svr_instance(NULL, default_server_port, rud->ru_pjobid, &svr_index);
 		if ((svr_inst_stream == -1) || (svr_index == -1))
@@ -1394,7 +1411,7 @@ send_resc_used(int cmd, int count, struct resc_used_update *rud)
 			if (ret != DIS_SUCCESS)
 				goto err;
 
-			ret = diswui(svr_inst_stream, count);
+			ret = diswui(svr_inst_stream, svr_counts[svr_index]);
 			if (ret != DIS_SUCCESS)
 				goto err;
 		}

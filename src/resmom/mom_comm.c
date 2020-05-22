@@ -2350,7 +2350,7 @@ term_job(job *pjob)
 
 /**
  * @brief
- * find_server_stream - search the given stream in shard connection table 
+ * Search the given stream in shard connection table 
  * and returns its index
  *
  * @param[in] stream - server index's stream to search
