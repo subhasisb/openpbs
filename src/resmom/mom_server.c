@@ -472,16 +472,36 @@ process_IS_CMD(int stream)
 void
 send_hook_job_action(struct hook_job_action *phjba)
 {
-	struct hook_job_action *pka;
-	unsigned int            count;
-	int			ret;
+	struct hook_job_action *pka = NULL;
+	unsigned int count = 0;
+	int	ret = 0;
 	int svr_inst_stream = -1;
 	int svr_index = -1;
+	static int num_of_max_servers = 0;
+	static int *svr_indexes = NULL;
+	static int *svr_counts = NULL;
+	int i = 0;
+	
+	if (!svr_indexes) {
+		num_of_max_servers = get_max_servers();
+		if (!(svr_indexes = (int *)malloc(num_of_max_servers * sizeof(int))))
+			goto err;
+		if (!(svr_counts = (int *)malloc(num_of_max_servers * sizeof(int))))
+			goto err;
+	}
+	
+	memset(svr_indexes, -1, num_of_max_servers * sizeof(int));
+	memset(svr_counts, 0, num_of_max_servers * sizeof(int));
 
 	if (phjba != NULL) {
 		/* single new item to send */
 		pka = phjba;
 		count = 1;
+		if (get_svr_instance(NULL, default_server_port, pka->hja_jid, &svr_index) != -1) {
+			if (svr_index == -1)
+				goto err;
+			svr_counts[svr_index]++;
+		}
 	} else {
 		/* resend queued up list of items */
 		pka = GET_NEXT(svr_hook_job_actions);
@@ -491,25 +511,34 @@ send_hook_job_action(struct hook_job_action *phjba)
 		while (pka) {
 			++count;
 			pka = GET_NEXT(pka->hja_link);
+			if (get_svr_instance(NULL, default_server_port, pka->hja_jid, &svr_index) != -1) {
+				if (svr_index == -1)
+					goto err;
+				svr_counts[svr_index]++;
+			}
 		}
 		pka = GET_NEXT(svr_hook_job_actions);
 	}
 
-	if (pka)
-		svr_inst_stream = get_svr_instance(NULL, default_server_port, pka->hja_jid, &svr_index);
-
-	if (svr_inst_stream == -1) {
-		/* no stream to server, ok as item already queued to resend */
-		return;
-	}
-
-	if ((ret = is_compose(svr_inst_stream, IS_HOOK_JOB_ACTION)) != DIS_SUCCESS)
-		goto err;
-
-	ret = diswui(svr_inst_stream, count);
-	if (ret != DIS_SUCCESS)
-		goto err;
 	while (count--) {
+		if (pka)
+			svr_inst_stream = get_svr_instance(NULL, default_server_port, pka->hja_jid, &svr_index);
+
+		if ((svr_inst_stream == -1) || (svr_index == -1)) {
+			/* no stream to server, ok as item already queued to resend */
+			return;
+		}
+
+		if (svr_indexes[svr_index] == -1) {
+			svr_indexes[svr_index] = svr_inst_stream;
+			if ((ret = is_compose(svr_inst_stream, IS_HOOK_JOB_ACTION)) != DIS_SUCCESS)
+				goto err;
+
+			ret = diswui(svr_inst_stream, svr_counts[svr_index]);
+			if (ret != DIS_SUCCESS)
+				goto err;
+		}
+
 		ret = diswst(svr_inst_stream, pka->hja_jid);
 		if (ret != DIS_SUCCESS)
 			goto err;
@@ -527,7 +556,10 @@ send_hook_job_action(struct hook_job_action *phjba)
 			goto err;
 		pka = GET_NEXT(pka->hja_link);
 	}
-	dis_flush(svr_inst_stream);
+	for(i = 0; i < num_of_max_servers; i++) {
+		if (svr_indexes[i] != -1)
+			dis_flush(svr_indexes[i]);	
+	}
 	return;
 
 err:
@@ -1391,7 +1423,7 @@ send_resc_used(int cmd, int count, struct resc_used_update *rud)
 	/* Segregation of the counts for each multiple servers */
 	tmp = rud;
 	while(rud) {
-		if(get_svr_instance(NULL, default_server_port, rud->ru_pjobid, &svr_index) != -1) {
+		if (get_svr_instance(NULL, default_server_port, rud->ru_pjobid, &svr_index) != -1) {
 			if (svr_index == -1)
 				goto err;
 			svr_counts[svr_index]++;
