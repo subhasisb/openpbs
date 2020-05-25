@@ -76,7 +76,7 @@ pbs_stagein(int c, char *jobid, char *location, char *extend)
 	if (location == NULL)
 		location = "";
 
-	sock = get_svr_shard_connection(c, -1, NULL, &index);
+	sock = get_svr_shard_connection(c, SHARD_UNKNOWN, NULL, &index);
 	if (sock == -1) {
 		return (pbs_errno = PBSE_NOCONNECTION);
 	}

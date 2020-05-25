@@ -78,7 +78,7 @@ PBSD_hookbuf(int c, int reqtype, int seq, char *buf, int len, char *hook_filenam
 	int index;
 
 	if (prot == PROT_TCP) {
-		sock = get_svr_shard_connection(c, -1, NULL, &index);
+		sock = get_svr_shard_connection(c, SHARD_UNKNOWN, NULL, &index);
 		if (sock == -1) {
 			return (pbs_errno = PBSE_NOCONNECTION);
 		}
@@ -201,7 +201,7 @@ PBSD_delhookfile(int c, char *hook_filename, int prot, char **msgid)
 	int index;
 
 	if (prot == PROT_TCP) {
-		sock = get_svr_shard_connection(c, -1, NULL, &index);
+		sock = get_svr_shard_connection(c, SHARD_UNKNOWN, NULL, &index);
 		if (sock == -1) {
 			return (pbs_errno = PBSE_NOCONNECTION);
 		}

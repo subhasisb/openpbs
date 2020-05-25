@@ -567,7 +567,7 @@ enum resv_states { RESV_NONE, RESV_UNCONFIRMED, RESV_CONFIRMED, RESV_WAIT,
 	RESV_BEING_DELETED, RESV_DELETED, RESV_DELETING_JOBS, RESV_DEGRADED,
 	RESV_BEING_ALTERED, RESV_IN_CONFLICT };
 
-enum pbs_obj_type {JOB, RESERVATION, NODE};  /* For the purpose of sharding logic */
+enum pbs_obj_type {SHARD_UNKNOWN = -1, SHARD_JOB, SHARD_RESERVATION, SHARD_NODE};  /* For the purpose of sharding logic */
 
 #ifdef _USRDLL		/* This is only for building Windows DLLs
 			 * and not their static libraries

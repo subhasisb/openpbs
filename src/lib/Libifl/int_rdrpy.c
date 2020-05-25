@@ -123,7 +123,7 @@ PBSD_rdrpy(int c)
 		return NULL;
 	}
 
-	sock = get_svr_shard_connection(c, -1, NULL, &index);
+	sock = get_svr_shard_connection(c, SHARD_UNKNOWN, NULL, &index);
 	if (sock == -1) {
 		pbs_errno = PBSE_NOCONNECTION;
 		return NULL;

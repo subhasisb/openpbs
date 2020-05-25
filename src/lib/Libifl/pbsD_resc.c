@@ -143,7 +143,7 @@ PBS_resc(int c, int reqtype, char **rescl, int ct, pbs_resource_t rh)
 	int sock;
 	int index;
 
-	sock = get_svr_shard_connection(c, -1, NULL, &index);
+	sock = get_svr_shard_connection(c, SHARD_UNKNOWN, NULL, &index);
 	if (sock == -1) {
 		pbs_errno = PBSE_NOCONNECTION;
 		return pbs_errno;
