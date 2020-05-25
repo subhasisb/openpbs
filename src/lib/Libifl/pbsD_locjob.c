@@ -77,7 +77,7 @@ __pbs_locjob(int c, char *jobid, char *extend)
 		return (ploc);
 	}
 
-	sock = get_svr_shard_connection(c, SHARD_JOB, jobid, &index);
+	sock = get_svr_shard_connection(c, JOB, jobid, &index);
 	if (sock == -1) {
 		if (set_conn_errtxt(c, pbse_to_txt(PBSE_NOCONNECTION)) != 0) {
 			pbs_errno = PBSE_SYSTEM;

@@ -190,7 +190,7 @@ PBSD_rdytocmt(int c, char *jobid, int prot, char **msgid)
 	int index;
 
 	if (prot == PROT_TCP) {
-		sock = get_svr_shard_connection(c, SHARD_UNKNOWN, NULL, &index);
+		sock = get_svr_shard_connection(c, OTHERS, NULL, &index);
 		if (sock == -1) {
 			return (pbs_errno = PBSE_NOCONNECTION);
 		}
@@ -252,7 +252,7 @@ PBSD_commit(int c, char *jobid, int prot, char **msgid)
 	int index;
 
 	if (prot == PROT_TCP) {
-		sock = get_svr_shard_connection(c, SHARD_UNKNOWN, NULL, &index);
+		sock = get_svr_shard_connection(c, OTHERS, NULL, &index);
 		if (sock == -1) {
 			return (pbs_errno = PBSE_NOCONNECTION);
 		}
@@ -321,7 +321,7 @@ PBSD_scbuf(int c, int reqtype, int seq, char *buf, int len, char *jobid, enum jo
 
 	if (prot == PROT_TCP) {
 		DIS_tcp_funcs();
-		sock = get_svr_shard_connection(c, SHARD_UNKNOWN, NULL, &index);
+		sock = get_svr_shard_connection(c, OTHERS, NULL, &index);
 		if (sock == -1)
 			return (pbs_errno = PBSE_NOCONNECTION);
 	} else {
@@ -535,7 +535,7 @@ PBSD_queuejob(int c, char *jobid, char *destin, struct attropl *attrib, char *ex
 
 	if (prot == PROT_TCP) {
 		DIS_tcp_funcs();
-		sock = get_svr_shard_connection(c, SHARD_UNKNOWN, NULL, &index);
+		sock = get_svr_shard_connection(c, OTHERS, NULL, &index);
 		if (sock == -1) {
 			if (set_conn_errtxt(c, pbse_to_txt(PBSE_NOCONNECTION)) != 0) {
 				pbs_errno = PBSE_SYSTEM;

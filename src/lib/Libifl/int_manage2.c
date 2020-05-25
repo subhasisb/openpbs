@@ -80,14 +80,14 @@ PBSD_mgr_put(int c, int function, int command, int objtype, char *objname, struc
 	int index;
 
 	if (prot == PROT_TCP) {
-		int shardtype = SHARD_UNKNOWN;
+		int shardtype = OTHERS;
 		char *shardhint = NULL;
 		if (objtype == MGR_OBJ_JOB) {
-			shardtype = SHARD_JOB;
+			shardtype = JOB;
 			shardhint = objname;
 		}
 		else if (objtype == MGR_OBJ_RESV) {
-			shardtype = SHARD_RESERVATION;
+			shardtype = RESERVATION;
 			shardhint = objname;
 		}
 

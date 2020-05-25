@@ -92,7 +92,7 @@ pbs_defschreply(int c, int cmd, char *id, int err, char *txt, char *extend)
 
 	/* Below reset would force the connection to execute the sharding logic afresh */	
 	set_new_shard_context(c);
-	sock = get_svr_shard_connection(c, SHARD_JOB, id, &index);
+	sock = get_svr_shard_connection(c, JOB, id, &index);
 	if (sock == -1) {
 		if (set_conn_errtxt(c, pbse_to_txt(PBSE_NOCONNECTION)) != 0)
 			return (pbs_errno = PBSE_SYSTEM);

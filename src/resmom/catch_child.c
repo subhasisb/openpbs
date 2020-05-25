@@ -1926,7 +1926,7 @@ get_svr_instance(char *svr, unsigned int port, char *jobid, int *svr_index)
 	if (get_max_servers() > 1) {
 		pfn_connect = internal_connect_mom;
 		set_new_shard_context(virtual_sock);
-		stream = get_svr_shard_connection(virtual_sock, SHARD_JOB, jobid, svr_index);	
+		stream = get_svr_shard_connection(virtual_sock, JOB, jobid, svr_index);	
 	} else {
 		*svr_index = 0;
 		if (server_stream == -1) {

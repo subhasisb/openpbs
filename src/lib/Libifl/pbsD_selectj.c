@@ -182,7 +182,7 @@ PBSD_select_put(int c, int type, struct attropl *attrib,
 	int sock;
 	int index;
 
-	sock = get_svr_shard_connection(c, SHARD_UNKNOWN, NULL, &index);
+	sock = get_svr_shard_connection(c, OTHERS, NULL, &index);
 	if (sock == -1) {
 		if (set_conn_errtxt(c, pbse_to_txt(PBSE_NOCONNECTION)) != 0)
 			return (pbs_errno = PBSE_SYSTEM);

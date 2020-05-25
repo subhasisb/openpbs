@@ -81,7 +81,7 @@ PBSD_jcred(int c, int type, char *buf, int len, int prot, char **msgid)
 	int index;
 
 	if (prot == PROT_TCP) {
-		sock = get_svr_shard_connection(c, SHARD_UNKNOWN, NULL, &index);
+		sock = get_svr_shard_connection(c, OTHERS, NULL, &index);
 		if (sock == -1) {
 			return (pbs_errno = PBSE_NOCONNECTION);
 		}
