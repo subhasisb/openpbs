@@ -331,7 +331,7 @@ load_svinst_last_jobid(int sv_index)
 			sprintf(log_buffer, "unable to open lastjobid file %s", last_jobidfile);
 			log_err(errno, msg_daemonname, log_buffer);
 		}
-		return (0);
+		return (sv_index);
 	}
 	fscanf(fp, "%lld", &last_jobid);
 	fclose(fp);

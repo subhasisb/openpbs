@@ -324,21 +324,21 @@ exit 0
         self.submit_resv(resv_id='R2')
         # kill the server forcefully
         self.stop_and_restart_svr('kill')
-        self.submit_job(job_id='1000')
-        self.submit_job(lower=1, upper=2, job_id='1001[]')
-        self.submit_resv(resv_id='R1002')
+        self.submit_job(job_id='1001')
+        self.submit_job(lower=1, upper=2, job_id='1002[]')
+        self.submit_resv(resv_id='R1003')
         # if server gets killed again abruptly then next jobid would be 2000
         self.stop_and_restart_svr('kill')
-        self.submit_job(job_id='2000')
-        self.submit_job(lower=1, upper=2, job_id='2001[]')
-        self.submit_resv(resv_id='R2002')
+        self.submit_job(job_id='2001')
+        self.submit_job(lower=1, upper=2, job_id='2002[]')
+        self.submit_resv(resv_id='R2003')
 
         # Gracefully stop the server so jobid's will continue from the last
         # jobid
         self.stop_and_restart_svr('normal')
-        self.submit_job(job_id='2003')
-        self.submit_job(lower=1, upper=2, job_id='2004[]')
-        self.submit_resv(resv_id='R2005')
+        self.submit_job(job_id='2004')
+        self.submit_job(lower=1, upper=2, job_id='2005[]')
+        self.submit_resv(resv_id='R2006')
 
         # Verify the sequence window, incase of submitting more than 1001 jobs
         # and all jobs should submit successfully without any duplication error
@@ -394,7 +394,7 @@ exit 0
         self.stop_and_restart_svr('kill')
         self.stop_and_restart_svr('kill')
         # Starting at 1000 in current jobid for the sequence window buffer
-        curr_id = 1000
+        curr_id = 1001
         self.submit_job(job_id='%s' % str(curr_id))
         self.submit_job(lower=1, upper=2, job_id='%s[]' % str(curr_id + 1))
         self.submit_resv(resv_id='R%s' % str(curr_id + 2))

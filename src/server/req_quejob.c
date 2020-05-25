@@ -3298,13 +3298,13 @@ get_next_svr_sequence_id(void)
 	server.sv_qs.sv_jobidnumber = 
 		pbs_shard_get_next_seqid(server.sv_qs.sv_jobidnumber, svr_max_job_sequence_id, myindex);
 	
-	if (server.sv_qs.sv_jobidnumber == 0) {
+	if (server.sv_qs.sv_jobidnumber == myindex) {
 		lastid = -1;
 	}
 
 	/* check if we should save jobid increments now */
 	if (lastid == -1 ||  server.sv_qs.sv_jobidnumber == lastid) {
-		lastid = ((server.sv_qs.sv_jobidnumber / 1000)+1)*1000;
+		lastid = pbs_shard_get_next_seqid(((server.sv_qs.sv_jobidnumber / 1000)+1)*1000, svr_max_job_sequence_id, myindex);
 		save_svinst_last_jobid(myindex, lastid);
 	}
 	return next;
@@ -3320,7 +3320,7 @@ get_next_svr_sequence_id(void)
  */
 void reset_svr_sequence_window(void)
 {
-	server.sv_qs.sv_jobidnumber = 0;
+	server.sv_qs.sv_jobidnumber = myindex;
 }
 
 /**
