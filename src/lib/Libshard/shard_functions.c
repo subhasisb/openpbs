@@ -68,7 +68,7 @@
 static int max_num_of_servers = 0;
 static server_instance_t **configured_servers = NULL;
 static int configured_num_servers = 0;
-enum shard_obj_type {JOB, RESERVATION, NODE};
+enum shard_obj_type {OTHERS = -1, JOB, RESERVATION, NODE};
 
 #ifdef WIN32
 int gettimeofday(struct timeval * tp, struct timezone * tzp)
