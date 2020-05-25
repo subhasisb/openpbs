@@ -71,6 +71,7 @@ __pbs_orderjob(int c, char *job1, char *job2, char *extend)
 	struct batch_reply *reply;
 	int rc;
 	int sock;
+	int index;
 
 
 	if ((job1 == NULL) || (*job1 == '\0') ||
@@ -88,7 +89,7 @@ __pbs_orderjob(int c, char *job1, char *job2, char *extend)
 
 	/* Below reset would force the connection to execute the sharding logic afresh */
 	set_new_shard_context(c);
-	sock = get_svr_shard_connection(c, JOB, job1);
+	sock = get_svr_shard_connection(c, JOB, job1, &index);
 	if (sock == -1) {
 		if (set_conn_errtxt(c, pbse_to_txt(PBSE_NOCONNECTION)) != 0)
 			return (pbs_errno = PBSE_SYSTEM);

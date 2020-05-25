@@ -75,6 +75,7 @@ __pbs_msgjob(int c, char *jobid, int fileopt, char *msg, char *extend)
 	struct batch_reply *reply;
 	int	rc;
 	int sock;
+	int index;
 
 	if ((jobid == NULL) || (*jobid == '\0') ||
 		(msg == NULL) || (*msg == '\0'))
@@ -91,7 +92,7 @@ __pbs_msgjob(int c, char *jobid, int fileopt, char *msg, char *extend)
 
 	/* Below reset would force the connection to execute the sharding logic afresh */
 	set_new_shard_context(c);
-	sock = get_svr_shard_connection(c, JOB, jobid);
+	sock = get_svr_shard_connection(c, JOB, jobid, &index);
 	if (sock == -1) {
 		if (set_conn_errtxt(c, pbse_to_txt(PBSE_NOCONNECTION)) != 0)
 			return (pbs_errno = PBSE_SYSTEM);
@@ -220,6 +221,7 @@ char *extend;
 	struct batch_reply *reply;
 	int	rc;
 	int sock;
+	int index;
 
 	if ((jobid == NULL) || (*jobid == '\0') ||
 					(node_list == NULL))
@@ -285,7 +287,7 @@ char *extend;
 
 	/* Below reset would force the connection to execute the sharding logic afresh */
 	set_new_shard_context(c);
-	sock = get_svr_shard_connection(c, JOB, jobid);
+	sock = get_svr_shard_connection(c, JOB, jobid, &index);
 	if (sock == -1) {
 		if (set_conn_errtxt(c, pbse_to_txt(PBSE_NOCONNECTION)) != 0)
 			return (pbs_errno = PBSE_SYSTEM);

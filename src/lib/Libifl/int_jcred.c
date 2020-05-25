@@ -80,9 +80,10 @@ PBSD_jcred(int c, int type, char *buf, int len, int prot, char **msgid)
 	int			rc;
 	struct batch_reply	*reply = NULL;
 	int	sock;
+	int index;
 
 	if (prot == PROT_TCP) {
-		sock = get_svr_shard_connection(c, -1, NULL);
+		sock = get_svr_shard_connection(c, OTHERS, NULL, &index);
 		if (sock == -1) {
 			return (pbs_errno = PBSE_NOCONNECTION);
 		}

@@ -71,13 +71,14 @@ pbs_stagein(int c, char *jobid, char *location, char *extend)
 	int	rc;
 	struct batch_reply   *reply;
 	int	sock;
+	int index;
 
 	if ((jobid == NULL) || (*jobid == '\0'))
 		return (pbs_errno = PBSE_IVALREQ);
 	if (location == NULL)
 		location = "";
 
-	sock = get_svr_shard_connection(c, -1, NULL);
+	sock = get_svr_shard_connection(c, OTHERS, NULL, &index);
 	if (sock == -1) {
 		return (pbs_errno = PBSE_NOCONNECTION);
 	}

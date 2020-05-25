@@ -83,8 +83,9 @@ PBSD_ucred(int c, char *user, int type, char *buf, int len)
 	int			rc;
 	struct batch_reply	*reply = NULL;
 	int	sock;
+	int index;
 
-	sock = get_svr_shard_connection(c, -1, NULL);
+	sock = get_svr_shard_connection(c, OTHERS, NULL, &index);
 	if (sock == -1) {
 		if (set_conn_errtxt(c, pbse_to_txt(PBSE_NOCONNECTION)) != 0)
 			return (pbs_errno = PBSE_SYSTEM);

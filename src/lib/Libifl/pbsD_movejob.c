@@ -71,6 +71,7 @@ __pbs_movejob(int c, char *jobid, char *destin, char *extend)
 	int		    rc;
 	struct batch_reply *reply;
 	int		    sock;
+	int 	index;
 
 
 	if ((jobid == NULL) || (*jobid == '\0'))
@@ -80,7 +81,7 @@ __pbs_movejob(int c, char *jobid, char *destin, char *extend)
 
 	/* Below reset would force the connection to execute the sharding logic afresh */
 	set_new_shard_context(c);
-	sock = get_svr_shard_connection(c, -1, NULL);
+	sock = get_svr_shard_connection(c, OTHERS, NULL, &index);
 	if (sock == -1) {
 		if (set_conn_errtxt(c, pbse_to_txt(PBSE_NOCONNECTION)) != 0)
 			return (pbs_errno = PBSE_SYSTEM);

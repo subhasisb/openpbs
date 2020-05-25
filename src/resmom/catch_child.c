@@ -60,6 +60,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <netdb.h>
 #include "dis.h"
 #include "libpbs.h"
 #include "list_link.h"
@@ -120,6 +121,7 @@ extern useconds_t	alps_release_jitter;
 #endif
 
 extern char		*path_hooks_workdir;
+extern int		virtual_sock;
 
 #ifndef WIN32
 /**
@@ -1889,6 +1891,59 @@ end_loop:
 
 /**
  * @brief
+ * 	Internal function to open TPP stream to given server info.
+ *
+ * @param[in]	server  - name of Server to which to send the restart
+ * @param[in]	port - port Server would be expecting to receive IM messages
+ * @param[in]	channel - not used 
+ * @param[in]	extend_data - not used
+ * 
+ * @return	int
+ * @retval	-1	 -	If an error occurs.
+ * @retval	!=-1 -  Success, the fd for the APP to use is returned
+ */
+int 
+internal_connect_mom(int channel, char *server, int port, char *extend_data)
+{
+	return tpp_open(server, port);
+}
+
+/**
+ * @brief
+ * 	Initialise the shard connection table and utilize the 
+ *  get_svr_shard_connection() to choose the sharded server.
+ *
+ * @param[in]	svr  - name of Server to which to send the restart
+ * @param[in]	port - port Server would be expecting to receive IM messages
+ * @param[out]	svr_index - server's index
+ *
+ * @return	int
+ * @retval	-1	 -	If an error occurs.
+ * @retval	!=-1 -  Success, the fd for the APP to use is returned
+ */
+int
+get_svr_instance(char *svr, unsigned int port, char *jobid, int *svr_index)
+{
+	int	stream = -1;
+	if (get_max_servers() > 1) {
+		pfn_connect = internal_connect_mom;
+		set_new_shard_context(virtual_sock);
+		stream = get_svr_shard_connection(virtual_sock, JOB, jobid, svr_index);	
+	} else {
+		*svr_index = 0;
+		if (server_stream == -1) {
+			if (svr == NULL)
+				svr = get_servername(&port);
+			stream = tpp_open(svr, port);
+		} else
+			return server_stream;
+	}
+	return stream;
+}
+
+
+/**
+ * @brief
  * 		choosing one server in random if a failover server is already set up.
  *
  * @param[out] port - Passed through to parse_servername(), not modified here.
@@ -1932,6 +1987,8 @@ send_hellosvr(int stream)
 	int		rc = 0;
 	char		*svr = NULL;
 	unsigned int	port = default_server_port;
+	struct	sockaddr_in	*addr;
+	int svr_index;
 
 	DBPRT(("Sending hellosvr"))
 
@@ -1941,12 +1998,14 @@ send_hellosvr(int stream)
 			return;
 		}
 
-		stream = tpp_open(svr, port);
+		stream = get_svr_instance(svr, port, NULL, &svr_index);
 		if (stream < 0) {
 			sprintf(log_buffer, "tpp_open(%s, %d) failed", svr, port);
 			log_err(errno, msg_daemonname, log_buffer);
 			return;
 		}
+		addr = tpp_getaddr(stream);
+		port = ntohs((unsigned short)addr->sin_port);
 	}
 
 	if ((rc = is_compose(stream, IS_HELLOSVR)) != DIS_SUCCESS)

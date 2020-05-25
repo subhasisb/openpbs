@@ -79,13 +79,21 @@ PBSD_mgr_put(int c, int function, int command, int objtype, char *objname, struc
 {
 	int rc;
 	int sock;
+	int index;
 
 	if (prot == PROT_TCP) {
+		int shardtype = OTHERS;
 		char *shardhint = NULL;
-		if (objtype == MGR_OBJ_JOB || objtype == MGR_OBJ_RESV)
+		if (objtype == MGR_OBJ_JOB) {
+			shardtype = JOB;
 			shardhint = objname;
+		}
+		else if (objtype == MGR_OBJ_RESV) {
+			shardtype = RESERVATION;
+			shardhint = objname;
+		}
 
-		sock = get_svr_shard_connection(c, JOB, shardhint);
+		sock = get_svr_shard_connection(c, shardtype, shardhint, &index);
 		if (sock == -1) {
 			if (set_conn_errtxt(c, pbse_to_txt(PBSE_NOCONNECTION)) != 0)
 				return (pbs_errno = PBSE_SYSTEM);

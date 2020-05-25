@@ -74,9 +74,10 @@ PBSD_sig_put(int c, char *jobid, char *signal, char *extend, int prot, char **ms
 {
 	int rc = 0;
 	int sock;
+	int index;
 
 	if (prot == PROT_TCP) {
-		sock = get_svr_shard_connection(c, JOB, jobid);
+		sock = get_svr_shard_connection(c, JOB, jobid, &index);
 		if (sock == -1) {
 			if (set_conn_errtxt(c, pbse_to_txt(PBSE_NOCONNECTION)) != 0)
 				return (pbs_errno = PBSE_SYSTEM);

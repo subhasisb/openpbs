@@ -570,7 +570,7 @@ enum resv_states { RESV_NONE, RESV_UNCONFIRMED, RESV_CONFIRMED, RESV_WAIT,
 	RESV_BEING_DELETED, RESV_DELETED, RESV_DELETING_JOBS, RESV_DEGRADED,
 	RESV_BEING_ALTERED, RESV_IN_CONFLICT };
 
-enum pbs_obj_type {JOB, RESERVATION, NODE};  /* For the purpose of sharding logic */
+enum pbs_obj_type {OTHERS = -1, JOB, RESERVATION, NODE};
 
 #ifdef _USRDLL		/* This is only for building Windows DLLs
 			 * and not their static libraries
@@ -817,7 +817,6 @@ extern char *(*pfn_pbs_submit_resv)(int, struct attropl *, char *);
 extern int (*pfn_pbs_delresv)(int, char *, char *);
 extern int (*pfn_pbs_terminate)(int, int, char *);
 extern preempt_job_info *(*pfn_pbs_preempt_jobs)(int, char**);
-
 #ifdef	__cplusplus
 }
 #endif

@@ -72,13 +72,14 @@ __pbs_locjob(int c, char *jobid, char *extend)
 	struct batch_reply *reply;
 	char       *ploc = NULL;
 	int sock;
+	int index;
 
 	if ((jobid == NULL) || (*jobid == '\0')) {
 		pbs_errno = PBSE_IVALREQ;
 		return (ploc);
 	}
 
-	sock = get_svr_shard_connection(c, JOB, jobid);
+	sock = get_svr_shard_connection(c, JOB, jobid, &index);
 	if (sock == -1) {
 		if (set_conn_errtxt(c, pbse_to_txt(PBSE_NOCONNECTION)) != 0) {
 			pbs_errno = PBSE_SYSTEM;

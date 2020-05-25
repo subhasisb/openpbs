@@ -127,6 +127,7 @@ extern  char		*msg_request;
 extern void req_commit(struct batch_request *preq);
 extern void req_quejob(struct batch_request *preq);
 extern void req_jobscript(struct batch_request *preq);
+extern int get_svr_instance(char *svr, unsigned int port, char *jobidint, int *svr_index);
 
 extern void	mom_vnlp_report(vnl_t *vnl, char *header);
 extern	char	*path_hooks;
@@ -473,19 +474,36 @@ process_IS_CMD(int stream)
 void
 send_hook_job_action(struct hook_job_action *phjba)
 {
-	struct hook_job_action *pka;
-	unsigned int            count;
-	int			ret;
-
-	if (server_stream == -1) {
-		/* no stream to server, ok as item already queued to resend */
-		return;
+	struct hook_job_action *pka = NULL;
+	unsigned int count = 0;
+	int	ret = 0;
+	int svr_inst_stream = -1;
+	int svr_index = -1;
+	static int num_of_max_servers = 0;
+	static int *svr_indexes = NULL;
+	static int *svr_counts = NULL;
+	int i = 0;
+	
+	if (!svr_indexes) {
+		num_of_max_servers = get_max_servers();
+		if (!(svr_indexes = (int *)malloc(num_of_max_servers * sizeof(int))))
+			goto err;
+		if (!(svr_counts = (int *)malloc(num_of_max_servers * sizeof(int))))
+			goto err;
 	}
+	
+	memset(svr_indexes, -1, num_of_max_servers * sizeof(int));
+	memset(svr_counts, 0, num_of_max_servers * sizeof(int));
 
 	if (phjba != NULL) {
 		/* single new item to send */
 		pka = phjba;
 		count = 1;
+		if (get_svr_instance(NULL, default_server_port, pka->hja_jid, &svr_index) != -1) {
+			if (svr_index == -1)
+				goto err;
+			svr_counts[svr_index]++;
+		}
 	} else {
 		/* resend queued up list of items */
 		pka = GET_NEXT(svr_hook_job_actions);
@@ -495,35 +513,55 @@ send_hook_job_action(struct hook_job_action *phjba)
 		while (pka) {
 			++count;
 			pka = GET_NEXT(pka->hja_link);
+			if (get_svr_instance(NULL, default_server_port, pka->hja_jid, &svr_index) != -1) {
+				if (svr_index == -1)
+					goto err;
+				svr_counts[svr_index]++;
+			}
 		}
 		pka = GET_NEXT(svr_hook_job_actions);
 	}
 
-	if ((ret=is_compose(server_stream, IS_HOOK_JOB_ACTION)) != DIS_SUCCESS)
-		goto err;
-
-	ret = diswui(server_stream, count);
-	if (ret != DIS_SUCCESS)
-		goto err;
 	while (count--) {
-		ret = diswst(server_stream, pka->hja_jid);
+		if (pka)
+			svr_inst_stream = get_svr_instance(NULL, default_server_port, pka->hja_jid, &svr_index);
+
+		if ((svr_inst_stream == -1) || (svr_index == -1)) {
+			/* no stream to server, ok as item already queued to resend */
+			return;
+		}
+
+		if (svr_indexes[svr_index] == -1) {
+			svr_indexes[svr_index] = svr_inst_stream;
+			if ((ret = is_compose(svr_inst_stream, IS_HOOK_JOB_ACTION)) != DIS_SUCCESS)
+				goto err;
+
+			ret = diswui(svr_inst_stream, svr_counts[svr_index]);
+			if (ret != DIS_SUCCESS)
+				goto err;
+		}
+
+		ret = diswst(svr_inst_stream, pka->hja_jid);
 		if (ret != DIS_SUCCESS)
 			goto err;
-		ret = diswul(server_stream, pka->hja_actid);
+		ret = diswul(svr_inst_stream, pka->hja_actid);
 		if (ret != DIS_SUCCESS)
 			goto err;
-		ret = diswsi(server_stream, pka->hja_runct);
+		ret = diswsi(svr_inst_stream, pka->hja_runct);
 		if (ret != DIS_SUCCESS)
 			goto err;
-		ret = diswsi(server_stream, pka->hja_action);
+		ret = diswsi(svr_inst_stream, pka->hja_action);
 		if (ret != DIS_SUCCESS)
 			goto err;
-		ret = diswui(server_stream, pka->hja_huser);
+		ret = diswui(svr_inst_stream, pka->hja_huser);
 		if (ret != DIS_SUCCESS)
 			goto err;
 		pka = GET_NEXT(pka->hja_link);
 	}
-	dis_flush(server_stream);
+	for(i = 0; i < num_of_max_servers; i++) {
+		if (svr_indexes[i] != -1)
+			dis_flush(svr_indexes[i]);	
+	}
 	return;
 
 err:
@@ -781,8 +819,8 @@ is_request(int stream, int version)
 	void			init_addrs();
 	job			*pjob;
 	FILE		 	*filen = 0;
-	extern vnl_t		*vnlp;        		/* vnode list */
-	extern vnl_t		*vnlp_from_hook;        /* vnode list updates from hook */
+	extern vnl_t		*vnlp;			/* vnode list */
+	extern vnl_t		*vnlp_from_hook;	/* vnode list updates from hook */
 	int			hktype;
 	unsigned long		hkseq;
 	struct hook_job_action *phjba;
@@ -807,6 +845,7 @@ is_request(int stream, int version)
 		tpp_close(stream);
 		return;
 	}
+
 	ipaddr = ntohl(addr->sin_addr.s_addr);
 
 	if (!addrfind(ipaddr)) {
@@ -1002,21 +1041,21 @@ is_request(int stream, int version)
 					free(phook_input);
 				}
 			}
-			if ((ret=is_compose(server_stream, IS_DISCARD_DONE)) != DIS_SUCCESS) {
+			if ((ret = is_compose(stream, IS_DISCARD_DONE)) != DIS_SUCCESS) {
 				free(jobid);
 				jobid = NULL;
 				goto err;
 			}
-			if ((ret=diswst(server_stream, jobid)) != DIS_SUCCESS) {
+			if ((ret = diswst(stream, jobid)) != DIS_SUCCESS) {
 				free(jobid);
 				jobid = NULL;
 				goto err;
 			}
 			free(jobid);	/* can be freed now */
 			jobid = NULL;
-			if ((ret=diswsi(server_stream, n)) != DIS_SUCCESS)
+			if ((ret = diswsi(stream, n)) != DIS_SUCCESS)
 				goto err;
-			dis_flush(server_stream);
+			dis_flush(stream);
 			break;
 
 		case IS_CMD:
@@ -1359,55 +1398,97 @@ err:
 void
 send_resc_used(int cmd, int count, struct resc_used_update *rud)
 {
-	int	ret;
+	int	ret = 0;
+	int svr_inst_stream = -1;
+	static int num_of_max_servers = 0;
+	static int *svr_indexes = NULL;
+	static int *svr_counts = NULL;
+	int i = 0;
+	int svr_index = -1;
+	struct resc_used_update * tmp = NULL;
 
 	if (count == 0 || rud == NULL || server_stream < 0)
 		return;
 	DBPRT(("send_resc_used update to server on stream %d\n", server_stream))
-
-	ret = is_compose(server_stream, cmd);
-	if (ret != DIS_SUCCESS)
-		goto err;
-
-	ret = diswui(server_stream, count);
-	if (ret != DIS_SUCCESS)
-		goto err;
-
+	
+	if (!svr_indexes) {
+		num_of_max_servers = get_max_servers();
+		if (!(svr_indexes = (int *)malloc(num_of_max_servers * sizeof(int))))
+			goto err;
+		if (!(svr_counts = (int *)malloc(num_of_max_servers * sizeof(int))))
+			goto err;
+	}
+	
+	memset(svr_indexes, -1, num_of_max_servers * sizeof(int));
+	memset(svr_counts, 0, num_of_max_servers * sizeof(int));
+	
+	/* Segregation of the counts for each multiple servers */
+	tmp = rud;
+	while(rud) {
+		if (get_svr_instance(NULL, default_server_port, rud->ru_pjobid, &svr_index) != -1) {
+			if (svr_index == -1)
+				goto err;
+			svr_counts[svr_index]++;
+		}
+		rud = rud->ru_next;
+	}
+	
+	rud = tmp;
 	while (rud) {
-		ret = diswst(server_stream, rud->ru_pjobid);
+		svr_inst_stream = get_svr_instance(NULL, default_server_port, rud->ru_pjobid, &svr_index);
+		if ((svr_inst_stream == -1) || (svr_index == -1))
+			goto err;
+			
+		if (svr_indexes[svr_index] == -1) {
+			svr_indexes[svr_index] = svr_inst_stream;
+			ret = is_compose(svr_inst_stream, cmd);
+			if (ret != DIS_SUCCESS)
+				goto err;
+
+			ret = diswui(svr_inst_stream, svr_counts[svr_index]);
+			if (ret != DIS_SUCCESS)
+				goto err;
+		}
+
+		ret = diswst(svr_inst_stream, rud->ru_pjobid);
 		if (ret != DIS_SUCCESS)
 			goto err;
 
 		if (rud->ru_comment) {
 			/* non-null comment: send "1" followed by comment */
-			ret = diswsi(server_stream, 1);
+			ret = diswsi(svr_inst_stream, 1);
 			if (ret != DIS_SUCCESS)
 				goto err;
-			ret = diswst(server_stream, rud->ru_comment);
+			ret = diswst(svr_inst_stream, rud->ru_comment);
 			if (ret != DIS_SUCCESS)
 				goto err;
 		} else {
 			/* null comment: send "0" */
-			ret = diswsi(server_stream, 0);
+			ret = diswsi(svr_inst_stream, 0);
 			if (ret != DIS_SUCCESS)
 				goto err;
 		}
-		ret =diswsi(server_stream, rud->ru_status);
+		ret = diswsi(svr_inst_stream, rud->ru_status);
 		if (ret != DIS_SUCCESS)
 			goto err;
 
-		ret = diswsi(server_stream, rud->ru_hop);
+		ret = diswsi(svr_inst_stream, rud->ru_hop);
 		if (ret != DIS_SUCCESS)
 			goto err;
 
-		ret = encode_DIS_svrattrl(server_stream,
+		ret = encode_DIS_svrattrl(svr_inst_stream,
 			(svrattrl *)GET_NEXT(rud->ru_attr));
 		if (ret != DIS_SUCCESS)
 			goto err;
 
 		rud = rud->ru_next;
+		
 	}
-	dis_flush(server_stream);
+	
+	for(i = 0; i < num_of_max_servers; i++) {
+		if (svr_indexes[i] != -1)
+			dis_flush(svr_indexes[i]);	
+	}
 	return;
 
 err:
@@ -1415,10 +1496,10 @@ err:
 #ifdef WIN32
 	if (errno != 10054)
 #endif
-		log_err(errno, "send_resc_used", log_buffer);
+		log_err(errno, __func__, log_buffer);
 
 	if (cmd != IS_RESCUSED_FROM_HOOK) {
-		tpp_close(server_stream);
+		tpp_close(svr_inst_stream);
 		server_stream = -1;
 	}
 	return;
@@ -1438,28 +1519,27 @@ err:
 void
 send_wk_job_idle(char *jobid, int idle)
 {
-	int	ret;
+	int	ret = 0;
+	int svr_index = -1;
+	int svr_inst_stream = get_svr_instance(NULL, default_server_port, jobid, &svr_index);
 
-	if (server_stream < 0)
-		return;
-
-	ret = is_compose(server_stream, IS_IDLE);
+	ret = is_compose(svr_inst_stream, IS_IDLE);
 	if (ret != DIS_SUCCESS)
 		goto err;
 
-	ret = diswui(server_stream, idle);
+	ret = diswui(svr_inst_stream, idle);
 	if (ret != DIS_SUCCESS)
 		goto err;
-	ret = diswst(server_stream, jobid);
+	ret = diswst(svr_inst_stream, jobid);
 	if (ret != DIS_SUCCESS)
 		goto err;
-	dis_flush(server_stream);
+	dis_flush(svr_inst_stream);
 	return;
 
 err:
 	sprintf(log_buffer, "%s for %d", dis_emsg[ret], idle);
 	log_err(errno, "send_wk_job_idle", log_buffer);
-	tpp_close(server_stream);
+	tpp_close(svr_inst_stream);
 	server_stream = -1;
 	return;
 }

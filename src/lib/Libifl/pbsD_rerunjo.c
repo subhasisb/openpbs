@@ -73,6 +73,7 @@ __pbs_rerunjob(int c, char *jobid, char *extend)
 	struct batch_reply *reply;
 	time_t  old_tcp_timeout;
 	int	sock;
+	int index;
 
 	if ((jobid == NULL) || (*jobid == '\0'))
 		return (pbs_errno = PBSE_IVALREQ);
@@ -88,7 +89,7 @@ __pbs_rerunjob(int c, char *jobid, char *extend)
 
 	/* Below reset would force the connection to execute the sharding logic afresh */
 	set_new_shard_context(c);
-	sock = get_svr_shard_connection(c, JOB, jobid);
+	sock = get_svr_shard_connection(c, JOB, jobid, &index);
 	if (sock == -1) {
 		if (set_conn_errtxt(c, pbse_to_txt(PBSE_NOCONNECTION)) != 0)
 			return (pbs_errno = PBSE_SYSTEM);

@@ -74,9 +74,10 @@ PBSD_msg_put(int c, char *jobid, int fileopt, char *msg, char *extend, int prot,
 {
 	int rc = 0;
 	int sock;
+	int index;
 
 	if (prot == PROT_TCP) {
-		sock = get_svr_shard_connection(c, -1, NULL);
+		sock = get_svr_shard_connection(c, OTHERS, NULL, &index);
 		if (sock == -1) {
 			if (set_conn_errtxt(c, pbse_to_txt(PBSE_NOCONNECTION)) != 0)
 				return (pbs_errno = PBSE_SYSTEM);
@@ -123,9 +124,10 @@ PBSD_py_spawn_put(int c, char *jobid, char **argv, char **envp, int prot, char *
 {
 	int rc = 0;
 	int sock;
+	int index;
 
 	if (prot == PROT_TCP) {
-		sock = get_svr_shard_connection(c, -1, NULL);
+		sock = get_svr_shard_connection(c, OTHERS, NULL, &index);
 		if (sock == -1) {
 			if (set_conn_errtxt(c, pbse_to_txt(PBSE_NOCONNECTION)) != 0)
 				return (pbs_errno = PBSE_SYSTEM);
@@ -162,9 +164,10 @@ PBSD_relnodes_put(int c, char *jobid, char *node_list, char *extend, int prot, c
 {
 	int rc = 0;
 	int sock;
+	int index;
 
 	if (prot == PROT_TCP) {
-		sock = get_svr_shard_connection(c, -1, NULL);
+		sock = get_svr_shard_connection(c, OTHERS, NULL, &index);
 		if (sock == -1) {
 			if (set_conn_errtxt(c, pbse_to_txt(PBSE_NOCONNECTION)) != 0)
 				return (pbs_errno = PBSE_SYSTEM);
