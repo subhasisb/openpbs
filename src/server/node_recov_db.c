@@ -418,7 +418,7 @@ node_delete_db(struct pbsnode *pnode)
  *
  */
 struct pbsnode *
-refresh_node(pbs_db_node_info_t	*dbnode, int *refreshed)
+refresh_node(pbs_db_node_info_t *dbnode, int *refreshed)
 {
 	char		*pslash;
 	char 		*nodename = NULL;

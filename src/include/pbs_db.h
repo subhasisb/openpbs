@@ -79,7 +79,6 @@ extern "C" {
 #define MAX_SCHEMA_VERSION_LEN 9
 
 #define DB_TIMESTAMP_LEN 50
-#define UNIQUE_KEY_VIOLATION 23505 /* postgres throws this error code in case of primary key violation */
 
 /* type of saves bit wise flags - see savetype */
 #define OBJ_SAVE_NEW    1   /* object is new, so whole object should be saved */

@@ -1443,8 +1443,7 @@ pbsd_init_job(job *pjob, int type)
 					* receiving sock number though
 					*/
 				pjob->ji_qs.ji_un.ji_newt.ji_fromsock = -1;
-				append_link(&svr_newjobs,
-					&pjob->ji_alljobs, pjob);
+				append_link(&svr_newjobs, &pjob->ji_alljobs, pjob);
 
 			}
 			break;

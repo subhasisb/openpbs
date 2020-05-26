@@ -457,7 +457,6 @@ req_quejob(struct batch_request *preq)
 	*pj->ji_qs.ji_fileprefix = '\0';
 
 #else                /* PBS_MOM mom mom mom mom*/
-	/* TODO_MSVR: convert mom side to also use avl tree in find_job() */
 	if ((pj = find_job(jid)) == NULL) {
 		pj = (job *)GET_NEXT(svr_newjobs);
 		while (pj) {
@@ -1830,7 +1829,7 @@ retry:
 	if ((rc = svr_enquejob(pj)) != 0) {
 		if (rc == PBSE_JOBEXIST) {
 			job *pj_exist = NULL;
-			if ((svr_chk_history_conf()) && (pj_exist = find_job_avl(pj->ji_qs.ji_jobid))) {
+			if ((svr_chk_history_conf()) && ((pj_exist = find_job_avl(pj->ji_qs.ji_jobid)) != NULL)) {
 				/*
 				* Check if the server is configured for history job info. If yes and
 				* server has the history job with same job id, then don't reject the
@@ -1929,8 +1928,7 @@ retry:
 
 	/* acknowledge the request with the job id */
 	if ((rc = reply_jobid(preq, pj->ji_qs.ji_jobid, BATCH_REPLY_CHOICE_Commit))) {
-		(void)snprintf(log_buffer, sizeof(log_buffer), "Failed to reply with Job Id, error %d", rc);
-		log_event(PBSEVENT_JOB, PBS_EVENTCLASS_JOB, LOG_ERR, pj->ji_qs.ji_jobid, log_buffer);
+		log_eventf(PBSEVENT_JOB, PBS_EVENTCLASS_JOB, LOG_ERR, pj->ji_qs.ji_jobid, "Failed to reply with Job Id, error %d", rc);
 		job_purge(pj);
 		return;
 	}
@@ -1944,11 +1942,11 @@ retry:
 
 /**
  * @brief
- *		locate job and call req_commitnow()
+ *		locate job and call req_commit_now()
  * @par Functionality:
- *		Most commit functionality is now in req_commitnow()
+ *		Most commit functionality is now in req_commit_now()
  *
- *  @param[in]	preq	-	The batch request structure
+ *  @param[in]	preq - The batch request structure
  *
  */
 void

@@ -136,8 +136,7 @@ job_2_db(job *pjob, pbs_db_job_info_t *dbjob)
 		pjob->ji_wattr[JOB_ATR_server_index].at_flags = ATR_VFLAG_SET | ATR_VFLAG_MODIFY;
 
 	} else if (!(pjob->ji_wattr[JOB_ATR_server_index].at_flags & ATR_VFLAG_SET) || (pjob->ji_wattr[JOB_ATR_server_index].at_val.at_long != myindex)) {
-		sprintf(log_buffer, "Job %s does not belong to me, can't save", pjob->ji_qs.ji_jobid);
-		log_err(-1, __func__, log_buffer);
+		log_eventf(PBSEVENT_JOB, PBS_EVENTCLASS_JOB, LOG_ERR, pjob->ji_qs.ji_jobid, "Job does not belong to me, can't save");
 		return -1;
 	}
 
@@ -416,8 +415,7 @@ resv_2_db(resc_resv *presv,  pbs_db_resv_info_t *dbresv)
 		presv->ri_wattr[RESV_ATR_server_index].at_flags = ATR_VFLAG_SET | ATR_VFLAG_MODIFY;
 
 	} else if (!(presv->ri_wattr[RESV_ATR_server_index].at_flags & ATR_VFLAG_SET) || (presv->ri_wattr[RESV_ATR_server_index].at_val.at_long != myindex)) {
-		sprintf(log_buffer, "Resv %s does not belong to me, can't save", presv->ri_qs.ri_resvID);
-		log_err(-1, __func__, log_buffer);
+		log_eventf(PBSEVENT_RESV, PBS_EVENTCLASS_RESV, LOG_ERR, presv->ri_qs.ri_resvID, "Resv does not belong to me, can't save");
 		return -1;
 	}
 
@@ -623,9 +621,8 @@ resv_recov_db(char *resvid, resc_resv *presv)
 	if (rc == -2)
 		return presv; /* no change in resv */
 
-	if (rc == 0) {
+	if (rc == 0)
 		presv = resv_recov_db_spl(presv, &dbresv);
-	}
 
 	free_db_attr_list(&dbresv.db_attr_list);
 	free_db_attr_list(&dbresv.cache_attr_list);
@@ -638,7 +635,7 @@ resv_recov_db(char *resvid, resc_resv *presv)
  * @brief
  *	Refresh/retrieve job from database and add it into AVL tree if not present
  *
- *	@param[in]	dbjob - The pointer to the wrapper job object of type pbs_db_job_info_t
+ *	@param[in]  dbjob     - The pointer to the wrapper job object of type pbs_db_job_info_t
  *  @param[in]  refreshed - To count the no. of jobs refreshed
  *
  * @return	The recovered job

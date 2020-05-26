@@ -163,6 +163,7 @@ extern "C" {
 #define STMT_REMOVE_SCHEDATTRS "remove_schedattrs"
 
 #define POSTGRES_QUERY_MAX_PARAMS 30
+#define UNIQUE_KEY_VIOLATION 23505 /* postgres throws this error code in case of primary key violation */
 
 /**
  * @brief

@@ -1792,7 +1792,7 @@ try_db_again:
 		if ((last_obj_autorefresh_tm == -1) || ((time(0) - last_obj_autorefresh_tm) > OBJ_AUTOREFRESH_INTERVAL)) {
 			psvr = svr_recov_db(psvr); /* refresh server information */
 
-			/* load scheduler here as well */
+			/* TODO_MSVR: load scheduler here as well */
 
 			/* refresh the queue list from db */
 			if (get_all_db_queues()) {

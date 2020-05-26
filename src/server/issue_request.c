@@ -146,8 +146,7 @@ relay_to_mom2(job *pjob, struct batch_request *request,
 
 	conn = svr_connect(momaddr, momport, process_Dreply, ToServerDIS, prot);
 	if (conn < 0) {
-		sprintf(log_buffer, "svr_connect to mom failed trying to connect to host=%s", pmom->mi_host);
-		log_err(-1, __func__, log_buffer);
+		log_eventf(PBSEVENT_ERROR, PBS_EVENTCLASS_REQUEST, LOG_ERR, pmom->mi_host, "svr_connect to mom failed trying to connect to mom host");
 		log_event(PBSEVENT_ERROR, PBS_EVENTCLASS_REQUEST, LOG_WARNING, "", msg_norelytomom);
 		return (PBSE_NORELYMOM);
 	}

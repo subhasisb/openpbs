@@ -1198,8 +1198,7 @@ find_job(char *jobid)
 				/* oops, I am not the owner of this job looks like
 				 * initiate job migration check and steps
 				 */
-				sprintf(log_buffer, "Job %s does not belong to this server, checking for original instance failure", pj->ji_qs.ji_jobid);
-				log_err(-1, __func__, log_buffer);
+				log_eventf(PBSEVENT_JOB, PBS_EVENTCLASS_JOB, LOG_ERR, pj->ji_qs.ji_jobid, "Job does not belong to this server, checking for original instance failure");
 			}
 		}
 	}

@@ -306,9 +306,10 @@ svr_enquejob(job *pjob)
 	/* add job to server's all job list and update server counts */
 
 #ifndef NDEBUG
-	(void)sprintf(log_buffer, "enqueuing into %s, state %x hop %ld",
-		pque->qu_qs.qu_name, pjob->ji_qs.ji_state, pjob->ji_wattr[(int)JOB_ATR_hopcount].at_val.at_long);
-	log_event(PBSEVENT_DEBUG2, PBS_EVENTCLASS_JOB, LOG_DEBUG, pjob->ji_qs.ji_jobid, log_buffer);
+	log_eventf(PBSEVENT_DEBUG2, PBS_EVENTCLASS_JOB, LOG_DEBUG, pjob->ji_qs.ji_jobid, 
+		"enqueuing into %s, state %x hop %ld",
+		pque->qu_qs.qu_name, pjob->ji_qs.ji_state, 
+		pjob->ji_wattr[(int)JOB_ATR_hopcount].at_val.at_long);
 #endif	/* NDEBUG */
 
 	/* 
@@ -5639,8 +5640,8 @@ svr_avlkey_create(const char *keystr)
  * @see	svr_enquejob()
  *		svr_dequejob()
  *
- * @return	error code
- * @retval	0 - success
+ * @return  error code
+ * @retval  0 - success
  * @retval  1 - PBSE_xxx error code
  *
  * @par	Reentrancy:
