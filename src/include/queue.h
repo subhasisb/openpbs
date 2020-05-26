@@ -165,6 +165,7 @@ struct pbs_queue {
 
 	attribute	qu_attr[QA_ATR_LAST];
 	char    	qu_savetm[DB_TIMESTAMP_LEN + 1];
+	int     	ld_trx_id; /* record the server iteration id of when this record was loaded */
 };
 typedef struct pbs_queue pbs_queue;
 
@@ -175,8 +176,10 @@ extern pbs_queue *find_resvqueuebyname(char *);
 extern pbs_queue *get_dfltque(void);
 extern pbs_queue *que_alloc(char *name);
 extern pbs_queue *que_recov_db(char *, pbs_queue	*pq);
+extern pbs_queue *qu_recov_db_spl(pbs_queue *pq, pbs_db_que_info_t *dbque);
 extern void      que_free(pbs_queue *);
 extern int       que_save_db(pbs_queue *);
+extern int    get_all_db_queues();
 
 #define QUE_SAVE_FULL 0
 #define QUE_SAVE_NEW  1

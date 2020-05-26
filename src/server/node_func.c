@@ -889,10 +889,6 @@ save_nodes_db(int changemodtime, void *p)
 		return (-1);
 	}
 
-	/* begin transaction */
-	if (pbs_db_begin_trx(svr_db_conn, 0, 0) !=0)
-		goto db_err;
-
 	/* insert/update the mominfo_time to db */
 	mom_tm.mit_time = mominfo_time.mit_time;
 	mom_tm.mit_gen = mominfo_time.mit_gen;
@@ -911,9 +907,6 @@ save_nodes_db(int changemodtime, void *p)
 		if (save_nodes_db_inner() == -1)
 			goto db_err;
 	}
-
-	if (pbs_db_end_trx(svr_db_conn, PBS_DB_COMMIT) != 0)
-		goto db_err;
 
 	/*
 	 * Clear the ATR_VFLAG_MODIFY bit on each node attribute
@@ -957,7 +950,6 @@ db_err:
 	if (svr_db_conn->conn_db_err != NULL)
 		strncat(log_buffer, svr_db_conn->conn_db_err, LOG_BUF_SIZE - strlen(log_buffer) - 1);
 	log_err(-1, __func__, log_buffer);
-	(void) pbs_db_end_trx(svr_db_conn, PBS_DB_ROLLBACK);
 	panic_stop_db(log_buffer);
 	return (-1);
 }
@@ -1072,10 +1064,6 @@ setup_nodes()
 
 	svr_totnodes = 0;
 
-	/* start a transaction */
-	if (pbs_db_begin_trx(conn, 0, 0) != 0)
-		return (-1);
-
 	/* Load  the mominfo_time from the db */
 	obj.pbs_db_obj_type = PBS_DB_MOMINFO_TIME;
 	obj.pbs_db_un.pbs_db_mominfo_tm = &mom_tm;
@@ -1138,13 +1126,10 @@ setup_nodes()
 	}
 
 	pbs_db_cursor_close(conn, state);
-	if (pbs_db_end_trx(conn, PBS_DB_COMMIT) !=0)
-		goto db_err;
 
 	return (0);
 db_err:
 	log_err(-1, __func__, log_buffer);
-	(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
 	return (-1);
 }
 

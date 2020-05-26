@@ -178,6 +178,13 @@ int pg_db_cmd(pbs_db_conn_t *conn, char *stmt, int num_vars)
 	if (!(res_rc == PGRES_COMMAND_OK || res_rc == PGRES_TUPLES_OK)) {
 		char *sql_error = PQresultErrorField(res, PG_DIAG_SQLSTATE);
 		pg_set_error(conn, "Execution of Prepared statement", stmt, sql_error);
+		/* if sql_error returns value "23505" this means PBS is violating the unique key rule.
+		 * To fix this, try to delete the existing record and insert a new one */
+		if (UNIQUE_KEY_VIOLATION == atoi(sql_error)) {
+			PQclear(res);
+			return UNIQUE_KEY_VIOLATION;
+		}
+		
 		PQclear(res);
 		return -1;
 	}

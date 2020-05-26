@@ -195,6 +195,40 @@ find_assoc_sched_jid(char *jid, pbs_sched **target_sched)
 
 /**
  * @brief
+ * 		find_assoc_sched_pjob - find the corresponding scheduler which is responsible
+ * 		for handling this job.
+ *
+ * @param[in]	pj - job pointer
+ * @param[out]	target_sched - pointer to the corresponding scheduler to which the job belongs to
+ *
+ * @retval - 1  if success
+ * 	   - 0 if fail
+ */
+int
+find_assoc_sched_pjob(job *pj, pbs_sched **target_sched)
+{
+	int t;
+	char *jid;
+
+	*target_sched = NULL;
+
+	if (!pj)
+		return 0;
+
+	jid = pj->ji_qs.ji_jobid;
+
+	t = is_job_array(jid);
+	if (!((t == IS_ARRAY_NO) || (t == IS_ARRAY_ArrayJob)))
+		pj = find_arrayparent(jid); /* subjob(s) */
+
+	if (pj == NULL)
+		return 0;
+
+	return find_assoc_sched_pque(pj->ji_qhdr, target_sched);
+}
+
+/**
+ * @brief
  * 		find_assoc_sched_pque - find the corresponding scheduler which is responsible
  * 		for handling this job.
  *

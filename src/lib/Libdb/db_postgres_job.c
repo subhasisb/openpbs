@@ -202,10 +202,40 @@ pg_db_prepare_job_sqls(pbs_db_conn_t *conn)
 		"ji_credtype,"
 		"ji_qrank,"
 		"to_char(ji_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as ji_savetm, "
-		"to_char(ji_creattm, 'YYYY-MM-DD HH24:MI:SS.US') as ji_creattm, "
 		"hstore_to_array(attributes) as attributes "
 		"from pbs.job where ji_jobid = $1");
 	if (pg_prepare_stmt(conn, STMT_SELECT_JOB, conn->conn_sql, 1) != 0)
+		return -1;
+
+	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select "
+		"ji_jobid,"
+		"ji_state,"
+		"ji_substate,"
+		"ji_svrflags,"
+		"ji_numattr,"
+		"ji_ordering,"
+		"ji_priority,"
+		"ji_stime,"
+		"ji_endtBdry,"
+		"ji_queue,"
+		"ji_destin,"
+		"ji_un_type,"
+		"ji_momaddr,"
+		"ji_momport,"
+		"ji_exitstat,"
+		"ji_quetime,"
+		"ji_rteretry,"
+		"ji_fromsock,"
+		"ji_fromaddr,"
+		"ji_4jid,"
+		"ji_4ash,"
+		"ji_credtype,"
+		"ji_qrank,"
+		"to_char(ji_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as ji_savetm, "
+		"hstore_to_array(attributes) as attributes "
+		"from pbs.job where ji_savetm > to_timestamp($1, 'YYYY-MM-DD HH24:MI:SS.US') "
+		"order by ji_savetm ");
+	if (pg_prepare_stmt(conn, STMT_FINDJOBS_FROM_TIME, conn->conn_sql, 1) != 0)
 		return -1;
 
 	/*
@@ -261,7 +291,6 @@ pg_db_prepare_job_sqls(pbs_db_conn_t *conn)
 		"ji_credtype,"
 		"ji_qrank,"
 		"to_char(ji_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as ji_savetm, "
-		"to_char(ji_creattm, 'YYYY-MM-DD HH24:MI:SS.US') as ji_creattm, "
 		"hstore_to_array(attributes) as attributes "
 		"from pbs.job order by ji_qrank");
 	if (pg_prepare_stmt(conn, STMT_FINDJOBS_ORDBY_QRANK, conn->conn_sql, 0) != 0)
@@ -292,7 +321,6 @@ pg_db_prepare_job_sqls(pbs_db_conn_t *conn)
 		"ji_credtype,"
 		"ji_qrank,"
 		"to_char(ji_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as ji_savetm, "
-		"to_char(ji_creattm, 'YYYY-MM-DD HH24:MI:SS.US') as ji_creattm, "
 		"hstore_to_array(attributes) as attributes "
 		"from pbs.job where ji_queue = $1"
 		" order by ji_qrank");
@@ -332,7 +360,7 @@ load_job(const  PGresult *res, pbs_db_job_info_t *pj, int row)
 	ji_ordering_fnum, ji_priority_fnum, ji_stime_fnum, ji_endtBdry_fnum, ji_queue_fnum, ji_destin_fnum,
 	ji_un_type_fnum, ji_momaddr_fnum, ji_momport_fnum, ji_exitstat_fnum, ji_quetime_fnum, ji_rteretry_fnum,
 	ji_fromsock_fnum, ji_fromaddr_fnum, ji_4jid_fnum, ji_4ash_fnum, ji_credtype_fnum, ji_qrank_fnum,
-	ji_savetm_fnum, ji_creattm_fnum, attributes_fnum;
+	ji_savetm_fnum, attributes_fnum;
 
 	static int fnums_inited = 0;
 
@@ -362,7 +390,6 @@ load_job(const  PGresult *res, pbs_db_job_info_t *pj, int row)
 		ji_qrank_fnum = PQfnumber(res, "ji_qrank");
 		ji_credtype_fnum = PQfnumber(res, "ji_credtype");
 		ji_savetm_fnum = PQfnumber(res, "ji_savetm");
-		ji_creattm_fnum = PQfnumber(res, "ji_creattm");
 		attributes_fnum = PQfnumber(res, "attributes");
 		fnums_inited = 1;
 	}
@@ -391,7 +418,6 @@ load_job(const  PGresult *res, pbs_db_job_info_t *pj, int row)
 	GET_PARAM_INTEGER(res, row, pj->ji_credtype, ji_credtype_fnum);
 	GET_PARAM_INTEGER(res, row, pj->ji_qrank, ji_qrank_fnum);
 	GET_PARAM_STR(res, row, pj->ji_savetm, ji_savetm_fnum);
-	GET_PARAM_STR(res, row, pj->ji_creattm, ji_creattm_fnum);
 	GET_PARAM_BIN(res, row, raw_array, attributes_fnum);
 
 	/* convert attributes from postgres raw array format */
@@ -567,6 +593,10 @@ pg_db_find_job(pbs_db_conn_t *conn, void *st, pbs_db_obj_info_t *obj,
 		SET_PARAM_STR(conn, pdjob->ji_queue, 0);
 		params=1;
 		strcpy(conn->conn_sql, STMT_FINDJOBS_BYQUE_ORDBY_QRANK);
+	} else if (opts != NULL && opts->timestamp){
+		SET_PARAM_STR(conn, opts->timestamp, 0);
+		params=1;
+		strcpy(conn->conn_sql, STMT_FINDJOBS_FROM_TIME);
 	} else {
 		strcpy(conn->conn_sql, STMT_FINDJOBS_ORDBY_QRANK);
 		params=0;
@@ -625,22 +655,14 @@ pg_db_delete_job(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj)
 
 	SET_PARAM_STR(conn, pj->ji_jobid, 0);
 
-	if (pbs_db_begin_trx(conn, 0, 0) != 0)
-		goto err;
-
 	if ((rc = pg_db_cmd(conn, STMT_DELETE_JOB, 1)) == -1)
 		goto err;
 
 	if (pg_db_cmd(conn, STMT_DELETE_JOBSCR, 1) == -1)
 		goto err;
 
-
-	if (pbs_db_end_trx(conn, PBS_DB_COMMIT) != 0)
-		goto err;
-
 	return rc;
 err:
-	(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
 	return -1;
 }
 

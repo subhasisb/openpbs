@@ -156,7 +156,7 @@ static void running_jobs_count(struct work_task *);
 
 
 /** For faster job lookup through AVL tree */
-static void svr_avljob_oper(job *pjob, int delkey);
+static int svr_avljob_oper(job *pjob, int delkey);
 
 /* Global Data Items: */
 extern char *msg_noloopbackif;
@@ -275,16 +275,18 @@ svr_enquejob(job *pjob)
 		 * 0 (SUCCESS). INFO: The job is not associated with any
 		 * queue as the queue has been already purged.
 		 */
-		if ((pjob->ji_qs.ji_state == JOB_STATE_MOVED) ||
-			(pjob->ji_qs.ji_state == JOB_STATE_FINISHED)) {
+		if ((pjob->ji_qs.ji_state == JOB_STATE_MOVED) || (pjob->ji_qs.ji_state == JOB_STATE_FINISHED)) {
 
 			if (is_linked(&svr_alljobs, &pjob->ji_alljobs) == 0) {
-				append_link(&svr_alljobs, &pjob->ji_alljobs, pjob);
-				/**
-				 * Add to AVL tree so that find_job() can return
-				 * faster compared to linked list traverse.
+				/* 
+				 * try to add to the tree before other operations like 
+				 * adding links or updating counts, so that if this fails
+				 * we can cleanly return without needing to undo anything else
 				 */
-				svr_avljob_oper(pjob, 0);
+				if ((rc = svr_avljob_oper(pjob, 0)) != 0)
+					return (rc);
+
+				append_link(&svr_alljobs, &pjob->ji_alljobs, pjob);
 			}
 			server.sv_qs.sv_numjobs++;
 			server.sv_jobstates[pjob->ji_qs.ji_state]++;
@@ -306,37 +308,34 @@ svr_enquejob(job *pjob)
 	/* add job to server's all job list and update server counts */
 
 #ifndef NDEBUG
-	(void)sprintf(log_buffer, "enqueuing into %s, state %x hop %ld",
-		pque->qu_qs.qu_name, pjob->ji_qs.ji_state,
+	log_eventf(PBSEVENT_DEBUG2, PBS_EVENTCLASS_JOB, LOG_DEBUG, pjob->ji_qs.ji_jobid, 
+		"enqueuing into %s, state %x hop %ld",
+		pque->qu_qs.qu_name, pjob->ji_qs.ji_state, 
 		pjob->ji_wattr[(int)JOB_ATR_hopcount].at_val.at_long);
-	log_event(PBSEVENT_DEBUG2, PBS_EVENTCLASS_JOB, LOG_DEBUG,
-		pjob->ji_qs.ji_jobid, log_buffer);
 #endif	/* NDEBUG */
+
+	/* 
+	 * try to add to the tree before other operations like 
+	 * adding links or updating counts, so that if this fails
+	 * we can cleanly return without needing to undo anything else
+	 */
+	if ((rc = svr_avljob_oper(pjob, 0)) != 0)
+		return (rc);
 
 	pjcur = (job *)GET_PRIOR(svr_alljobs);
 	while (pjcur) {
-		if ((unsigned long)pjob->ji_wattr[(int)JOB_ATR_qrank].
-			at_val.at_long >=
-			(unsigned long)pjcur->ji_wattr[(int)JOB_ATR_qrank].
-			at_val.at_long)
+		if ((unsigned long)pjob->ji_wattr[(int)JOB_ATR_qrank].at_val.at_long >=
+			(unsigned long)pjcur->ji_wattr[(int)JOB_ATR_qrank].at_val.at_long)
 			break;
 		pjcur = (job *)GET_PRIOR(pjcur->ji_alljobs);
 	}
 	if (pjcur == 0) {
 		/* link first in server's list */
-		insert_link(&svr_alljobs, &pjob->ji_alljobs, pjob,
-			LINK_INSET_AFTER);
+		insert_link(&svr_alljobs, &pjob->ji_alljobs, pjob, LINK_INSET_AFTER);
 	} else {
 		/* link after 'current' job in server's list */
-		insert_link(&pjcur->ji_alljobs, &pjob->ji_alljobs, pjob,
-			LINK_INSET_AFTER);
+		insert_link(&pjcur->ji_alljobs, &pjob->ji_alljobs, pjob, LINK_INSET_AFTER);
 	}
-
-	/**
-	 * Add to AVL tree so that find_job() can return
-	 * faster compared to linked list traverse.
-	 */
-	svr_avljob_oper(pjob, 0);
 
 	server.sv_qs.sv_numjobs++;
 	server.sv_jobstates[pjob->ji_qs.ji_state]++;
@@ -480,7 +479,7 @@ svr_enquejob(job *pjob)
 
 			/* better notify the Scheduler we have a new job */
 
-			if (find_assoc_sched_jid(pjob->ji_qs.ji_jobid, &psched))
+			if (find_assoc_sched_pjob(pjob, &psched))
 				set_scheduler_flag(SCH_SCHEDULE_NEW, psched);
 			else {
 				sprintf(log_buffer, "Unable to reach scheduler associated with job %s", pjob->ji_qs.ji_jobid);
@@ -491,7 +490,7 @@ svr_enquejob(job *pjob)
 
 			/* notify the Scheduler we have moved a job here */
 
-			if (find_assoc_sched_jid(pjob->ji_qs.ji_jobid, &psched))
+			if (find_assoc_sched_pjob(pjob, &psched))
 				set_scheduler_flag(SCH_SCHEDULE_MVLOCAL, psched);
 			else {
 				sprintf(log_buffer, "Unable to reach scheduler associated with job %s", pjob->ji_qs.ji_jobid);
@@ -631,7 +630,7 @@ svr_setjobstate(job *pjob, int newstate, int newsubstate)
 					(newstate == JOB_STATE_QUEUED)) {
 					attribute *etime = &pjob->ji_wattr[(int)JOB_ATR_etime];
 
-					if (find_assoc_sched_jid(pjob->ji_qs.ji_jobid, &psched))
+					if (find_assoc_sched_pjob(pjob, &psched))
 						set_scheduler_flag(SCH_SCHEDULE_NEW, psched);
 					else {
 						sprintf(log_buffer, "Unable to reach scheduler associated with job %s", pjob->ji_qs.ji_jobid);
@@ -5336,63 +5335,57 @@ svr_avlkey_create(const char *keystr)
  * @see	svr_enquejob()
  *		svr_dequejob()
  *
- * @return	void
+ * @return  error code
+ * @retval  0 - success
+ * @retval  1 - PBSE_xxx error code
  *
  * @par	Reentrancy:
  *		MT-unsafe
  *
  */
-static void
+static int
 svr_avljob_oper(job *pjob, int delkey)
 {
-	int rc = AVL_IX_OK;
-	AVL_IX_REC *pkey;
+	int rc = 0;
+	int avl_rc = AVL_IX_OK;
+	AVL_IX_REC *pkey = NULL;
 
-	if ((AVL_jctx == NULL) || (pjob == NULL))
-		return;
+	if ((AVL_jctx == NULL) || (pjob == NULL)) {
+		rc = PBSE_SYSTEM;
+		goto done;
+	}
 
 	/** create the avl key using jobid */
 	pkey = svr_avlkey_create(pjob->ji_qs.ji_jobid);
 	if (pkey == NULL) { /** key creation failed */
-		(void) sprintf(log_buffer, "AVL: failed to create job key.");
-		log_event(PBSEVENT_DEBUG4, PBS_EVENTCLASS_JOB, LOG_DEBUG,
-			pjob->ji_qs.ji_jobid, log_buffer);
-		goto AVL_OP_FAIL;
+		sprintf(log_buffer, "AVL: failed to create job key for jobid=%s", pjob->ji_qs.ji_jobid);
+		log_err(-1, __func__, log_buffer);
+		rc = PBSE_SYSTEM;
+		goto done;
 	}
 
 	/** call avl interface based on the delkey */
 	if (delkey == 0) {
 		pkey->recptr = pjob;
-		rc = avl_add_key(pkey, AVL_jctx);
+		if ((avl_rc = avl_add_key(pkey, AVL_jctx)) != AVL_IX_OK) {
+			if (find_job_avl(pjob->ji_qs.ji_jobid)) {
+				sprintf(log_buffer, "AVL: jobid %s already exists, ret=%d", pjob->ji_qs.ji_jobid, avl_rc);
+				log_err(-1, __func__, log_buffer);
+				rc = PBSE_JOBEXIST;
+			} else {
+				sprintf(log_buffer, "AVL: add failed for jobid %s, ret=%d", pjob->ji_qs.ji_jobid, avl_rc);
+				log_err(-1, __func__, log_buffer);
+				rc = PBSE_SYSTEM;
+			}
+		}
 	} else {
-		rc = avl_delete_key(pkey, AVL_jctx);
+		if (avl_delete_key(pkey, AVL_jctx) != AVL_IX_OK)
+			rc = PBSE_SYSTEM;
 	}
-	if (rc != AVL_IX_OK) /** avl operation failed */
-		goto AVL_OP_FAIL;
-
-	/** everything went fine, free() the pkey and return */
+	
+done:
 	free(pkey);
-	return;
-
-AVL_OP_FAIL:
-	if (pkey) /** free the pkey if valid */
-		free(pkey);
-	/**
-	 * AVL operation failed, free the AVL tree context which was created
-	 * by avl_create_index(), and turn off the AVL context i.e. AVL_jctx
-	 * [global switch] so that SERVER will fall back to use linked list
-	 * for job lookup.
-	 */
-	if (AVL_jctx != NULL) {
-		(void) sprintf(log_buffer,
-			"AVL: %s failed, using LinkedList.",
-			delkey ? "delete" : "insert");
-		log_event(PBSEVENT_DEBUG4, PBS_EVENTCLASS_SERVER, LOG_DEBUG,
-			msg_daemonname, log_buffer);
-		avl_destroy_index(AVL_jctx);
-		free(AVL_jctx);
-		AVL_jctx = NULL;
-	}
+	return rc;
 }
 
 /**

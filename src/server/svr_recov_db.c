@@ -216,13 +216,11 @@ db_2_sched(struct pbs_sched *ps, pbs_db_sched_info_t *pdbsched)
  * @brief
  *		Recover server information and attributes from server database
  *
- * @return	Error code
- * @retval	0	: On successful recovery and creation of server structure
- * @retval	-1	: On failure
+ * @return	server struct pointer or NULL on failure
  *
  */
-int
-svr_recov_db(void)
+struct server *
+svr_recov_db(struct server *sv)
 {
 	pbs_db_conn_t *conn = (pbs_db_conn_t *) svr_db_conn;
 	pbs_db_svr_info_t dbsvr = {{0}};
@@ -232,17 +230,26 @@ svr_recov_db(void)
 	obj.pbs_db_obj_type = PBS_DB_SVR;
 	obj.pbs_db_un.pbs_db_svr = &dbsvr;
 	
-	strcpy(dbsvr.sv_savetm, server.sv_savetm);
+	if (sv) {
+		CHECK_ALREADY_LOADED(sv);
+		strcpy(dbsvr.sv_savetm, sv->sv_savetm);
+	} else {
+		sv = &server;
+		dbsvr.sv_savetm[0] = '\0';
+	}
 
 	if (pbs_db_load_obj(conn, &obj) == 0) {
-		if (db_2_svr(&server, &dbsvr) == 0)
+		if (db_2_svr(sv, &dbsvr) == 0)
 			rc = 0;
 	}
 
 	free_db_attr_list(&dbsvr.db_attr_list);
 	free_db_attr_list(&dbsvr.cache_attr_list);
 
-	return rc;
+	if (rc == 0)
+		return sv;
+
+	return NULL;
 }
 
 /**
@@ -320,9 +327,10 @@ sched_recov_db(char *sname, pbs_sched *ps)
 	pbs_db_conn_t		*conn = (pbs_db_conn_t *) svr_db_conn;
 	int rc = -1;
 
-	if (ps)
+	if (ps) {
+		CHECK_ALREADY_LOADED(ps);
 		strcpy(dbsched.sched_savetm, ps->sc_savetm);
-	else {
+	} else {
 		dbsched.sched_savetm[0] = '\0';
 		if ((ps = sched_alloc(sname)) == NULL) {
 			log_err(-1, __func__, "sched_alloc failed");

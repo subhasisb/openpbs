@@ -192,6 +192,7 @@ struct server {
 	} sv_qs;
 	attribute sv_attr[SRV_ATR_LAST]; /* the server attributes 	    */
 	char	  sv_savetm[DB_TIMESTAMP_LEN + 1];
+	int		  ld_trx_id; /* record the server iteration id of when this record was loaded */
 	time_t	  sv_started;		/* time server started */
 	time_t	  sv_hotcycle;		/* if RECOV_HOT,time of last restart */
 	time_t	  sv_next_schedule;	/* when to next run scheduler cycle */
@@ -222,6 +223,9 @@ extern  int myindex;
 
 /* degraded reservations globals */
 extern	long	resv_retry_time;
+
+/* index of myself (server) in the array of server instances configured */
+extern int myindex;
 
 
 /*
@@ -280,7 +284,7 @@ enum failover_state {
 
 /* function prototypes */
 
-extern int			svr_recov_db();
+extern struct server *svr_recov_db(struct server *);
 extern int			svr_save_db(struct server *);
 extern pbs_sched *	sched_recov_db(char *, pbs_sched *ps);
 extern int			sched_save_db(pbs_sched *);

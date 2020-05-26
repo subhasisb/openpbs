@@ -96,7 +96,6 @@ pg_db_prepare_sched_sqls(pbs_db_conn_t *conn)
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select "
 		"sched_name, "
 		"to_char(sched_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as sched_savetm, "
-		"to_char(sched_creattm, 'YYYY-MM-DD HH24:MI:SS.US') as sched_creattm, "
 		"hstore_to_array(attributes) as attributes "
 		"from "
 		"pbs.scheduler "
@@ -107,7 +106,6 @@ pg_db_prepare_sched_sqls(pbs_db_conn_t *conn)
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select "
 		"sched_name, "
 		"to_char(sched_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as sched_savetm, "
-		"to_char(sched_creattm, 'YYYY-MM-DD HH24:MI:SS.US') as sched_creattm, "
 		"hstore_to_array(attributes) as attributes "
 		"from "
 		"pbs.scheduler ");
@@ -200,20 +198,18 @@ static int
 load_sched(PGresult *res, pbs_db_sched_info_t *psch, int row)
 {
 	char *raw_array;
-	static int sched_name_fnum, sched_savetm_fnum, sched_creattm_fnum, attributes_fnum;
+	static int sched_name_fnum, sched_savetm_fnum, attributes_fnum;
 	static int fnums_inited = 0;
 
 	if (fnums_inited == 0) {
 		sched_name_fnum = PQfnumber(res, "sched_name");
 		sched_savetm_fnum = PQfnumber(res, "sched_savetm");
-		sched_creattm_fnum = PQfnumber(res, "sched_creattm");
 		attributes_fnum = PQfnumber(res, "attributes");
 		fnums_inited = 1;
 	}
 
 	GET_PARAM_STR(res, row, psch->sched_name, sched_name_fnum);
 	GET_PARAM_STR(res, row, psch->sched_savetm, sched_savetm_fnum);
-	GET_PARAM_STR(res, row, psch->sched_creattm, sched_creattm_fnum);
 	GET_PARAM_BIN(res, row, raw_array, attributes_fnum);
 
 	/* convert attributes from postgres raw array format */

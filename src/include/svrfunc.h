@@ -54,6 +54,26 @@ extern "C" {
 #include "pbs_sched.h"
 #include "pbs_entlim.h"
 
+extern int svr_trx_id;
+#define UPDATE_SVR_TRX() \
+	do { \
+		svr_trx_id++; \
+		if (svr_trx_id > 10) \
+			svr_trx_id = 0; \
+	} while(0)
+
+#define CHECK_ALREADY_LOADED(x) \
+	do { \
+		if (get_max_servers() == 1) { \
+			return (x); \
+		} \
+		if ((x)->ld_trx_id == svr_trx_id) { \
+			return (x); \
+		} else { \
+			(x)->ld_trx_id = svr_trx_id; \
+		} \
+	} while(0)
+
 extern int check_num_cpus(void);
 extern int chk_hold_priv(long, int);
 extern void close_client(int);
@@ -254,6 +274,7 @@ extern void req_usercredential(struct batch_request *);
 extern void req_jobscript(struct batch_request *);
 extern void req_rdytocommit(struct batch_request *);
 extern void req_commit(struct batch_request *);
+extern void req_commit_now(struct batch_request *, job *); 
 extern void req_deletejob(struct batch_request *);
 extern void req_holdjob(struct batch_request *);
 extern void req_messagejob(struct batch_request *);
@@ -342,6 +363,9 @@ extern void node_unreserve(pbs_resource_t);
 extern int node_spec(struct spec_and_context *, int);
 extern void notify_scheds_about_resv(int, resc_resv *);
 #endif /* _RESERVATION_H */
+
+/* after every 30 seconds, common objects will be refreshed */
+#define OBJ_AUTOREFRESH_INTERVAL 30
 
 #ifdef _LIST_LINK_H
 /*

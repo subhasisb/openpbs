@@ -94,7 +94,6 @@ pg_db_prepare_svr_sqls(pbs_db_conn_t *conn)
 
 	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select "
 		"to_char(sv_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as sv_savetm, "
-		"to_char(sv_creattm, 'YYYY-MM-DD HH24:MI:SS.US') as sv_creattm, "
 		"hstore_to_array(attributes) as attributes "
 		"from "
 		"pbs.server ");
@@ -221,7 +220,7 @@ pg_db_load_svr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj)
 	int rc;
 	char *raw_array;
 	pbs_db_svr_info_t *ps = obj->pbs_db_un.pbs_db_svr;
-	static int sv_savetm_fnum, sv_creattm_fnum, attributes_fnum;
+	static int sv_savetm_fnum, attributes_fnum;
 	static int fnums_inited = 0;
 
 	if ((rc = pg_db_query(conn, STMT_SELECT_SVR, 0, &res)) != 0)
@@ -229,13 +228,11 @@ pg_db_load_svr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj)
 
 	if (fnums_inited == 0) {
 		sv_savetm_fnum = PQfnumber(res, "sv_savetm");
-		sv_creattm_fnum = PQfnumber(res, "sv_creattm");
 		attributes_fnum = PQfnumber(res, "attributes");
 		fnums_inited = 1;
 	}
 
 	GET_PARAM_STR(res, 0, ps->sv_savetm, sv_savetm_fnum);
-	GET_PARAM_STR(res, 0, ps->sv_creattm, sv_creattm_fnum);
 	GET_PARAM_BIN(res, 0, raw_array, attributes_fnum);
 
 	/* convert attributes from postgres raw array format */

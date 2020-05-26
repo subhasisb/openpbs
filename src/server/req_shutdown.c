@@ -195,7 +195,6 @@ svr_shutdown(int type)
 
 	if (type == SHUT_QUICK) /* quick, leave jobs as are */
 		return;
-	svr_save_db(&server);
 
 	pnxt = (job *)GET_NEXT(svr_alljobs);
 	while ((pjob = pnxt) != NULL) {

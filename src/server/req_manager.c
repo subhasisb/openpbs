@@ -1271,6 +1271,13 @@ mgr_queue_delete(struct batch_request *preq)
 	int             rc;
 	int             type=0;
 	struct pbs_queue **problem_queues = NULL;
+	extern int get_all_db_jobs();
+
+	rc = get_all_db_jobs();
+	if (rc) {
+		req_reject(rc, 0, preq);
+		return;
+	}
 
 	name = preq->rq_ind.rq_manager.rq_objname;
 

@@ -141,12 +141,14 @@ relay_to_mom2(job *pjob, struct batch_request *request,
 
 	pmom = tfind2((unsigned long) momaddr, momport, &ipaddrs);
 	if (!pmom || ((((mom_svrinfo_t *) (pmom->mi_data))->msr_state & INUSE_DOWN) && open_momstream(pmom) < 0)) {
+		log_err(-1, __func__, "Could not connect to Mom as pmom null or not able to open tpp stream to it");
 		return (PBSE_NORELYMOM);
 	}
 	mom_tasklist_ptr = &(((mom_svrinfo_t *) (pmom->mi_data))->msr_deferred_cmds);
 
 	conn = svr_connect(momaddr, momport, process_Dreply, ToServerDIS, prot);
 	if (conn < 0) {
+		log_eventf(PBSEVENT_ERROR, PBS_EVENTCLASS_REQUEST, LOG_ERR, pmom->mi_host, "svr_connect to mom failed trying to connect to mom host");
 		log_event(PBSEVENT_ERROR, PBS_EVENTCLASS_REQUEST, LOG_WARNING, "", msg_norelytomom);
 		return (PBSE_NORELYMOM);
 	}

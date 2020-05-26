@@ -638,7 +638,7 @@ rel_resc(job *pjob)
 
 	/* Mark that scheduler should be called */
 
-	if (find_assoc_sched_jid(pjob->ji_qs.ji_jobid, &psched))
+	if (find_assoc_sched_pjob(pjob, &psched))
 		set_scheduler_flag(SCH_SCHEDULE_TERM, psched);
 	else {
 		pbs_queue *pq;

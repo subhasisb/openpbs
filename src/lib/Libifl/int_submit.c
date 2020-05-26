@@ -286,6 +286,15 @@ PBSD_commit(int c, char *jobid, int prot, char **msgid)
 	}
 
 	reply = PBSD_rdrpy(c);
+	if (reply == NULL) {
+		pbs_errno = PBSE_PROTOCOL;
+	} else if (reply->brp_choice &&
+		reply->brp_choice != BATCH_REPLY_CHOICE_Text &&
+		reply->brp_choice != BATCH_REPLY_CHOICE_Commit) {
+		pbs_errno = PBSE_PROTOCOL;
+	} else if (get_conn_errno(c) == 0) {
+		strcpy(jobid, reply->brp_un.brp_jid);
+	}
 
 	PBSD_FreeReply(reply);
 
@@ -527,13 +536,15 @@ PBSD_jobfile(int c, int req_type, char *path, char *jobid, enum job_file which, 
  * @retval      pbs_error(!0)   error
  */
 char *
-PBSD_queuejob(int c, char *jobid, char *destin, struct attropl *attrib, char *extend, int prot, char **msgid)
+PBSD_queuejob(int c, char *jobid, char *destin, struct attropl *attrib, char *extend, int prot, char **msgid, int *commit_done)
 {
 	struct batch_reply *reply;
 	char *return_jobid = NULL;
 	int rc;
 	int sock;
 	int index;
+
+	*commit_done = 0;
 
 	if (prot == PROT_TCP) {
 		DIS_tcp_funcs();
@@ -588,13 +599,18 @@ PBSD_queuejob(int c, char *jobid, char *destin, struct attropl *attrib, char *ex
 		pbs_errno = PBSE_PROTOCOL;
 	} else if (reply->brp_choice &&
 		reply->brp_choice != BATCH_REPLY_CHOICE_Text &&
-		reply->brp_choice != BATCH_REPLY_CHOICE_Queue) {
+		reply->brp_choice != BATCH_REPLY_CHOICE_Queue &&
+		reply->brp_choice != BATCH_REPLY_CHOICE_Commit) {
 		pbs_errno = PBSE_PROTOCOL;
 	} else if (get_conn_errno(c) == 0) {
-		return_jobid = strdup(reply->brp_un.brp_jid);
-		if (return_jobid == NULL) {
+		return_jobid = malloc(PBS_MAXSVRJOBID + 1);
+		if (return_jobid == NULL)
 			pbs_errno = PBSE_SYSTEM;
-		}
+		else
+			strcpy(return_jobid, reply->brp_un.brp_jid);
+		
+		if (reply->brp_choice == BATCH_REPLY_CHOICE_Commit)
+			*commit_done = 1;
 	}
 
 	PBSD_FreeReply(reply);

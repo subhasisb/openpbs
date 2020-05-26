@@ -502,6 +502,7 @@ send_job_exec(job *jobp, pbs_net_t hostaddr, int port, struct batch_request *req
 	char *dup_msgid = NULL;
 	struct work_task *ptask = NULL;
 	int save_resc_access_perm;
+	int commit_done = 0;
 
 	/* saving resc_access_perm global variable as backup */
 	save_resc_access_perm = resc_access_perm;
@@ -545,7 +546,7 @@ send_job_exec(job *jobp, pbs_net_t hostaddr, int port, struct batch_request *req
 	(void) strcpy(job_id, jobp->ji_qs.ji_jobid);
 
 	pqjatr = &((svrattrl *) GET_NEXT(attrl))->al_atopl;
-	jobid = PBSD_queuejob(stream, jobp->ji_qs.ji_jobid, destin, pqjatr, NULL, PROT_TPP, &msgid);
+	jobid = PBSD_queuejob(stream, jobp->ji_qs.ji_jobid, destin, pqjatr, NULL, PROT_TPP, &msgid, &commit_done);
 	free_attrlist(&attrl);
 	if (jobid == NULL)
 		goto send_err;
@@ -561,6 +562,9 @@ send_job_exec(job *jobp, pbs_net_t hostaddr, int port, struct batch_request *req
 
 	/* add to pjob->svrtask list so its automatically cleared when job is purged */
 	append_link(&jobp->ji_svrtask, &ptask->wt_linkobj, ptask);
+
+	if (commit_done)
+		goto done;
 
 	/* we cannot use the same msgid, since it is not part of the preq,
 	 * make a dup of it, and we can freely free it
@@ -604,6 +608,7 @@ send_job_exec(job *jobp, pbs_net_t hostaddr, int port, struct batch_request *req
 	if (PBSD_commit(stream, job_id, PROT_TPP, &dup_msgid) != 0)
 		goto send_err;
 
+done:
 	free(dup_msgid); /* free this as it is not part of any work task */
 	resc_access_perm = save_resc_access_perm; /* reset back to it's old value */
 	return 2;
@@ -675,7 +680,8 @@ send_job(job *jobp, pbs_net_t hostaddr, int port, int move_type,
 	struct work_task *ptask;
 	struct  hostent *hp;
 	struct in_addr   addr;
-	long		 tempval;
+	long tempval;
+	int commit_done = 0;
 
 	/* if job has a script read it from database */
 	if (jobp->ji_qs.ji_svrflags & JOB_SVFLG_SCRIPT) {
@@ -855,7 +861,7 @@ send_job(job *jobp, pbs_net_t hostaddr, int port, int move_type,
 			}
 
 			pqjatr = &((svrattrl *)GET_NEXT(attrl))->al_atopl;
-			if (PBSD_queuejob(con, jobp->ji_qs.ji_jobid, destin, pqjatr, NULL, PROT_TCP, NULL) == 0) {
+			if (PBSD_queuejob(con, jobp->ji_qs.ji_jobid, destin, pqjatr, NULL, PROT_TCP, NULL, &commit_done) == 0) {
 				if (pbs_errno == PBSE_JOBEXIST &&
 					move_type == MOVE_TYPE_Exec) {
 					/* already running, mark it so */

@@ -157,26 +157,25 @@ pbs_submit_with_cred(int c, struct attropl  *attrib, char *script,
 char *
 __pbs_submit(int c, struct attropl  *attrib, char *script, char *destination, char *extend)
 {
-	struct attropl		*pal;
-	char			*return_jobid = NULL;
-	int			rc;
+	struct attropl *pal;
+	char *return_jobid = NULL;
+	int rc;
 	struct pbs_client_thread_context *ptr;
 	struct cred_info	*cred_info = NULL;
+	int commit_done = 0;
 
 	/* initialize the thread context data, if not already initialized */
 	if (pbs_client_thread_init_thread_context() != 0)
 		return return_jobid;
 
-	ptr = (struct pbs_client_thread_context *)
-		pbs_client_thread_get_context_data();
+	ptr = (struct pbs_client_thread_context *) pbs_client_thread_get_context_data();
 	if (!ptr) {
 		pbs_errno = PBSE_INTERNAL;
 		return return_jobid;
 	}
 
 	/* first verify the attributes, if verification is enabled */
-	rc = pbs_verify_attributes(c, PBS_BATCH_QueueJob,
-		MGR_OBJ_JOB, MGR_CMD_NONE, attrib);
+	rc = pbs_verify_attributes(c, PBS_BATCH_QueueJob, MGR_OBJ_JOB, MGR_CMD_NONE, attrib);
 	if (rc)
 		return return_jobid;
 
@@ -203,10 +202,14 @@ __pbs_submit(int c, struct attropl  *attrib, char *script, char *destination, ch
 
 	/* Below reset would force the connection to execute the sharding logic afresh */
 	set_new_shard_context(c);
+
 	/* Queue job with null string for job id */
-	return_jobid = PBSD_queuejob(c, "", destination, attrib, extend, PROT_TCP, NULL);
+	return_jobid = PBSD_queuejob(c, "", destination, attrib, extend, PROT_TCP, NULL, &commit_done);
 	if (return_jobid == NULL)
 		goto error;
+
+	if (commit_done)
+		goto done;
 
 	/* send script across */
 
@@ -235,15 +238,18 @@ __pbs_submit(int c, struct attropl  *attrib, char *script, char *destination, ch
 		}
 	}
 
-	if (PBSD_commit(c, return_jobid, 0, NULL) != 0)
+	if ((PBSD_commit(c, return_jobid, 0, NULL)) != 0)
 		goto error;
 
+done:
 	/* unlock the thread lock and update the thread context data */
 	if (pbs_client_thread_unlock_connection(c) != 0)
 		return NULL;
 
 	return return_jobid;
 error:
+	free(return_jobid);
 	(void)pbs_client_thread_unlock_connection(c);
 	return NULL;
 }
+

@@ -124,7 +124,8 @@ typedef struct pbs_sched {
 	int sched_cycle_started;
 	/* sched object's attributes  */
 	attribute sch_attr[SCHED_ATR_LAST];
-	char	  sc_savetm[DB_TIMESTAMP_LEN + 1];
+	char     sc_savetm[DB_TIMESTAMP_LEN + 1];
+	int      ld_trx_id; /* record the server iteration id of when this record was loaded */
 } pbs_sched;
 
 
@@ -132,6 +133,7 @@ extern pbs_sched *dflt_scheduler;
 extern	pbs_list_head	svr_allscheds;
 extern void set_scheduler_flag(int flag, pbs_sched *psched);
 extern int find_assoc_sched_jid(char *jid, pbs_sched **target_sched);
+extern int find_assoc_sched_pjob(job *pj, pbs_sched **target_sched);
 extern int find_assoc_sched_pque(pbs_queue *pq, pbs_sched **target_sched);
 extern pbs_sched *find_sched_from_sock(int sock);
 extern pbs_sched *find_sched(char *sched_name);

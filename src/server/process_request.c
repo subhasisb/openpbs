@@ -1601,4 +1601,3 @@ get_servername(unsigned int *port)
 
 	return name;
 }
-

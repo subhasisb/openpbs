@@ -77,8 +77,6 @@ extern "C" {
 #define PBS_MAXATTRNAME 64
 #define PBS_MAXATTRRESC 64
 #define MAX_SQL_LENGTH 8192
-#define PBS_DB_COMMIT   0
-#define PBS_DB_ROLLBACK 1
 #define PBS_MAX_DB_CONN_INIT_ERR  500
 #define MAX_SCHEMA_VERSION_LEN 9
 
@@ -151,7 +149,6 @@ typedef struct pbs_db_attr_list pbs_db_attr_list_t;
  *
  */
 struct pbs_db_svr_info {
-	char  sv_creattm[DB_TIMESTAMP_LEN + 1];
 	char  sv_savetm[DB_TIMESTAMP_LEN + 1];
 	pbs_db_attr_list_t cache_attr_list; /* list of attributes */
 	pbs_db_attr_list_t db_attr_list; /* list of attributes */
@@ -165,7 +162,6 @@ typedef struct pbs_db_svr_info pbs_db_svr_info_t;
  */
 struct pbs_db_sched_info {
 	char    sched_name[PBS_MAXSCHEDNAME+1];
-	char    sched_creattm[DB_TIMESTAMP_LEN + 1];
 	char    sched_savetm[DB_TIMESTAMP_LEN + 1];
 	pbs_db_attr_list_t cache_attr_list; /* list of attributes */
 	pbs_db_attr_list_t db_attr_list; /* list of attributes */
@@ -180,7 +176,6 @@ typedef struct pbs_db_sched_info pbs_db_sched_info_t;
 struct pbs_db_que_info {
 	char    qu_name[PBS_MAXQUEUENAME +1];
 	INTEGER qu_type;
-	char    qu_creattm[DB_TIMESTAMP_LEN + 1];
 	char    qu_savetm[DB_TIMESTAMP_LEN + 1];
 	pbs_db_attr_list_t cache_attr_list; /* list of attributes */
 	pbs_db_attr_list_t db_attr_list; /* list of attributes */
@@ -200,7 +195,6 @@ struct pbs_db_node_info {
 	INTEGER nd_state;
 	INTEGER nd_ntype;
 	char	nd_pque[PBS_MAXSERVERNAME+1];
-	char    nd_creattm[DB_TIMESTAMP_LEN + 1];
 	char    nd_savetm[DB_TIMESTAMP_LEN + 1];
 	pbs_db_attr_list_t cache_attr_list; /* list of attributes */
 	pbs_db_attr_list_t db_attr_list; /* list of attributes */
@@ -248,7 +242,6 @@ struct pbs_db_job_info {
 	INTEGER  ji_credtype;
 	INTEGER  ji_qrank;
 	char     ji_savetm[DB_TIMESTAMP_LEN + 1];
-	char     ji_creattm[DB_TIMESTAMP_LEN + 1];
 	pbs_db_attr_list_t db_attr_list; /* list of attributes for database */
 	pbs_db_attr_list_t cache_attr_list; /* list of attributes to save in cache */
 };
@@ -285,7 +278,6 @@ struct pbs_db_resv_info {
 	INTEGER ri_un_type;
 	INTEGER ri_fromsock;
 	BIGINT  ri_fromaddr;
-	char    ri_creattm[DB_TIMESTAMP_LEN + 1];
 	char    ri_savetm[DB_TIMESTAMP_LEN + 1];
 	pbs_db_attr_list_t cache_attr_list; /* list of attributes */
 	pbs_db_attr_list_t db_attr_list; /* list of attributes */
@@ -304,7 +296,8 @@ typedef struct pbs_db_resv_info pbs_db_resv_info_t;
  */
 struct pbs_db_query_options {
 	int	flags;
-	time_t	timestamp;
+	char *timestamp;
+	char *hostname;
 };
 typedef struct pbs_db_query_options pbs_db_query_options_t;
 
@@ -487,42 +480,6 @@ void pbs_db_disconnect(pbs_db_conn_t *conn);
  *
  */
 int pbs_db_prepare_sqls(pbs_db_conn_t *conn);
-
-/**
- * @brief
- *	Start a database transaction
- *	If a transaction is already on, just increment the transactioin nest
- *	count in the database handle object
- *
- * @param[in]	conn - Connected database handle
- * @param[in]	isolation_level - Isolation level to set for the transaction
- * @param[in]	async - Set synchronous/asynchronous commit behavior
- *
- * @return      int
- * @retval       0  - success
- * @retval      -1  - Failure
- *
- */
-int pbs_db_begin_trx(pbs_db_conn_t *conn, int isolation_level, int async);
-
-/**
- * @brief
- *	End a database transaction
- *	Decrement the transaction nest count in the connection object. If the
- *	count reaches zero, then end the database transaction.
- *
- * @param[in]	conn - Connected database handle
- * @param[in]	commit - If commit is PBS_DB_COMMIT, then the transaction is
- *			    commited. If commi tis PBS_DB_ROLLBACK, then the
- *			    transaction is rolled back.
- *
- * @return      int
- * @retval       0  - success
- * @retval      -1  - Failure
- *
- */
-int pbs_db_end_trx(pbs_db_conn_t *conn, int commit);
-
 
 /**
  * @brief

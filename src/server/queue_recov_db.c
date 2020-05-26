@@ -184,6 +184,44 @@ done:
 	return rc;
 }
 
+
+/**
+ * @brief
+ *	Utility function called to allocate and decode queue structure
+ *
+ * @param[in]	pq    - If pq exists in heap, pointer to that, else NULL
+ * @param[in]	dbque - Pointer to the database structure of a job
+ *
+ * @retval	 NULL - Failure
+ * @retval	!NULL - Success, pointer to que structure recovered
+ *
+ */
+pbs_queue *
+que_recov_db_spl(pbs_queue *pq, pbs_db_que_info_t *dbque)
+{
+	pbs_queue *pqt = NULL;
+
+	if (!pq) {
+		pqt = que_alloc(dbque->qu_name);
+		pq = pqt;
+	}
+	
+	if (pq) {
+		if (db_2_que(pq, dbque) == 0)
+			return (pq);
+	}
+
+	/* error case */
+	if (pqt)
+		que_free(pqt); /* free if we allocated here */
+
+	snprintf(log_buffer, LOG_BUF_SIZE, "Failed to decode queue %s", dbque->qu_name);
+	log_err(-1, __func__, log_buffer);
+
+	return (NULL);
+}
+
+
 /**
  * @brief
  *		Recover a queue from the database
@@ -199,22 +237,16 @@ done:
 pbs_queue *
 que_recov_db(char *qname, pbs_queue	*pq)
 {
-	pbs_queue *pque = NULL;
 	pbs_db_que_info_t	dbque = {{0}};
 	pbs_db_obj_info_t	obj;
 	pbs_db_conn_t		*conn = (pbs_db_conn_t *) svr_db_conn;
 	int rc = -1;
 
-	if (pq)
+	if (pq) {
+		CHECK_ALREADY_LOADED(pq);
 		strcpy(dbque.qu_savetm, pq->qu_savetm);
-	else {
+	} else
 		dbque.qu_savetm[0] = '\0';
-		if ((pque = que_alloc(qname)) == NULL) {
-			log_err(-1, __func__, "que_alloc failed");
-			return NULL;
-		}
-		pq = pque;
-	}
 
 	strcpy(dbque.qu_name, qname);
 	obj.pbs_db_obj_type = PBS_DB_QUEUE;
@@ -225,18 +257,70 @@ que_recov_db(char *qname, pbs_queue	*pq)
 		return pq; /* no change in que, return the same pq */
 
 	if (rc == 0) {
-		rc = db_2_que(pq, &dbque);
+		pq = que_recov_db_spl(pq, &dbque);
 	}
 	
 	free_db_attr_list(&dbque.db_attr_list);
 	free_db_attr_list(&dbque.cache_attr_list);
 
-	if (rc != 0) {
-		pq = NULL; /* so we return NULL */
-
-		if (pque)
-			que_free(pque); /* free if we allocated here */
-		
-	}
 	return pq;
+}
+
+/**
+ * @brief
+ *	Refresh/retrieve queue from database and add it into AVL tree if not present
+ *
+ *	@param[in]	dbque - The pointer to the wrapper queue object of type pbs_db_que_info_t
+ *  @param[in]  refreshed - To count the no. of queues refreshed
+ *
+ * @return	The recovered queue
+ * @retval	NULL - Failure
+ * @retval	!NULL - Success, pointer to queue structure recovered
+ *
+ */
+pbs_queue *
+refresh_queue(pbs_db_que_info_t *dbque, int *refreshed) 
+{
+	char  *pc;
+	pbs_queue *pque = NULL;
+	char   qname[PBS_MAXDEST + 1];
+	extern pbs_list_head	svr_queues; 
+
+	*refreshed = 0;
+	
+	(void)strncpy(qname, dbque->qu_name, PBS_MAXDEST);
+	qname[PBS_MAXDEST] ='\0';
+	pc = strchr(qname, (int)'@');	/* strip off server (fragment) */
+	if (pc)
+		*pc = '\0';
+	/* get the old pointer of the queue, if queue is already in memory */
+	pque = (pbs_queue *)GET_NEXT(svr_queues);
+	while (pque != NULL) {
+		if (strcmp(qname, pque->qu_qs.qu_name) == 0)
+			break;
+		pque = (pbs_queue *)GET_NEXT(pque->qu_link);
+	}
+	if (pc)
+		*pc = '@';	/* restore '@' server portion */
+
+	if (pque) {
+		if (strcmp(dbque->qu_savetm, pque->qu_savetm) != 0) {
+			if (db_2_que(pque, dbque) != 0)
+				goto err;
+
+			*refreshed = 1;
+		}
+	} else {
+		if ((pque = que_recov_db_spl(pque, dbque)) == NULL) /* if job is not in AVL tree, load the job from database */
+			goto err;	
+	
+		append_link(&svr_queues, &pque->qu_link, pque);
+		*refreshed = 1;
+	}
+	return pque;
+
+err:
+	snprintf(log_buffer, LOG_BUF_SIZE, "Failed to refresh queue %s", dbque->qu_name);
+	log_err(-1, __func__, log_buffer);
+	return NULL;
 }

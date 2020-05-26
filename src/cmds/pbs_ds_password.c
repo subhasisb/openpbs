@@ -552,13 +552,6 @@ main(int argc, char *argv[])
 
 	if (update_db == 1) {
 		/* change password only if this config option is not set */
-
-		if (pbs_db_begin_trx(conn, 0, 0) != 0) {
-			fprintf(stderr, "%s: Could not start transaction\n", prog);
-			unlink(pwd_file_new);
-			return -1;
-		}
-
 		if (change_user == 1) {
 			/* check whether user exists */
 			snprintf(sqlbuff, sizeof(sqlbuff),
@@ -580,7 +573,6 @@ main(int argc, char *argv[])
 			memset(pquoted, 0, (sizeof(char) * strlen(pquoted)));
 			if (pbs_db_execute_str(conn, sqlbuff) == -1) {
 				fprintf(stderr, "%s: Failed to create/alter user id %s\n", prog, userid);
-				(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
 				return -1;
 			}
 		} else {
@@ -593,7 +585,6 @@ main(int argc, char *argv[])
 			memset(pquoted, 0, (sizeof(char) * strlen(pquoted)));
 			if (pbs_db_execute_str(conn, sqlbuff) == -1) {
 				fprintf(stderr, "%s: Failed to create/alter user id %s\n", prog, userid);
-				(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
 				return -1;
 			}
 		}
@@ -602,25 +593,17 @@ main(int argc, char *argv[])
 	if (write(fd, cred_buf, cred_len) != cred_len) {
 		perror("write failed");
 		fprintf(stderr, "%s: Unable to write to file %s\n", prog, pwd_file_new);
-		if (update_db == 1) {
-			(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
-		}
 		return -1;
 	}
 	close(fd);
 	free(cred_buf);
 
 	if (rename(pwd_file_new, pwd_file) != 0) {
-		if (update_db == 1) {
-			(void) pbs_db_end_trx(conn, PBS_DB_ROLLBACK);
-		}
 		return (-1);
 	}
 
 
 	if (update_db == 1) {
-		/* commit  to database */
-		(void) pbs_db_end_trx(conn, PBS_DB_COMMIT);
 		cleanup(); /* cleanup will disconnect and delete tmp file too */
 	}
 

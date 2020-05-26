@@ -291,6 +291,7 @@ struct	pbsnode {
 	struct 				devices device;
 	attribute		 	nd_attr[ND_ATR_LAST];
 	char    			nd_savetm[DB_TIMESTAMP_LEN + 1];
+	int     			ld_trx_id; /* record the server iteration id of when this record was loaded */
 };
 
 enum	warn_codes { WARN_none, WARN_ngrp_init, WARN_ngrp_ck, WARN_ngrp };
@@ -476,7 +477,8 @@ extern char *msg_daemonname;
 
 #ifndef PBS_MOM
 extern int node_save_db(struct pbsnode *pnode);
-struct pbsnode *node_recov_db(char *nd_name, struct pbsnode *pnode);
+extern struct pbsnode *node_recov_db(char *nd_name, struct pbsnode *pnode);
+extern struct pbsnode *node_recov_db_spl(struct pbsnode *pnode, pbs_db_node_info_t *dbnode);
 extern int add_mom_to_pool(mominfo_t *);
 extern void remove_mom_from_pool(mominfo_t *);
 extern void reset_pool_inventory_mom(mominfo_t *);

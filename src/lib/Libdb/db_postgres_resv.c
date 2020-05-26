@@ -163,7 +163,6 @@ pg_db_prepare_resv_sqls(pbs_db_conn_t *conn)
 		"ri_fromsock, "
 		"ri_fromaddr, "
 		"to_char(ri_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as ri_savetm, "
-		"to_char(ri_creattm, 'YYYY-MM-DD HH24:MI:SS.US') as ri_creattm, "
 		"hstore_to_array(attributes) as attributes "
 		"from pbs.resv where ri_resvid = $1");
 	if (pg_prepare_stmt(conn, STMT_SELECT_RESV, conn->conn_sql, 1) != 0)
@@ -185,7 +184,29 @@ pg_db_prepare_resv_sqls(pbs_db_conn_t *conn)
 		"ri_fromsock, "
 		"ri_fromaddr, "
 		"to_char(ri_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as ri_savetm, "
-		"to_char(ri_creattm, 'YYYY-MM-DD HH24:MI:SS.US') as ri_creattm, "
+		"hstore_to_array(attributes) as attributes "
+		"from pbs.resv where ri_savetm > to_timestamp($1, 'YYYY-MM-DD HH24:MI:SS:US') "
+		"order by ri_savetm ");
+	if (pg_prepare_stmt(conn, STMT_FINDRESVS_FROM_TIME_ORDBY_SAVETM, conn->conn_sql, 1) != 0)
+		return -1;
+
+	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select "
+		"ri_resvID, "
+		"ri_queue, "
+		"ri_state, "
+		"ri_substate, "
+		"ri_type, "
+		"ri_stime, "
+		"ri_etime, "
+		"ri_duration, "
+		"ri_tactive, "
+		"ri_svrflags, "
+		"ri_numattr, "
+		"ri_resvTag, "
+		"ri_un_type, "
+		"ri_fromsock, "
+		"ri_fromaddr, "
+		"to_char(ri_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as ri_savetm, "
 		"hstore_to_array(attributes) as attributes "
 		"from pbs.resv "
 		"order by ri_creattm");
@@ -219,7 +240,7 @@ load_resv(PGresult *res, pbs_db_resv_info_t *presv, int row)
 	char *raw_array;
 	static int ri_resvid_fnum, ri_queue_fnum, ri_state_fnum, ri_substate_fnum, ri_stime_fnum,
 	ri_etime_fnum, ri_duration_fnum, ri_tactive_fnum, ri_svrflags_fnum, ri_numattr_fnum, ri_resvTag_fnum,
-	ri_un_type_fnum, ri_fromsock_fnum, ri_fromaddr_fnum, ri_savetm_fnum, ri_creattm_fnum,
+	ri_un_type_fnum, ri_fromsock_fnum, ri_fromaddr_fnum, ri_savetm_fnum,
 	attributes_fnum;
 
 	static int fnums_inited = 0;
@@ -240,7 +261,6 @@ load_resv(PGresult *res, pbs_db_resv_info_t *presv, int row)
 		ri_fromsock_fnum = PQfnumber(res, "ri_fromsock");
 		ri_fromaddr_fnum = PQfnumber(res, "ri_fromaddr");
 		ri_savetm_fnum = PQfnumber(res, "ri_savetm");
-		ri_creattm_fnum = PQfnumber(res, "ri_creattm");
 		attributes_fnum = PQfnumber(res, "attributes");
 		fnums_inited = 1;
 	}
@@ -260,7 +280,6 @@ load_resv(PGresult *res, pbs_db_resv_info_t *presv, int row)
 	GET_PARAM_INTEGER(res, row, presv->ri_fromsock, ri_fromsock_fnum);
 	GET_PARAM_BIGINT(res, row, presv->ri_fromaddr, ri_fromaddr_fnum);
 	GET_PARAM_STR(res, row, presv->ri_savetm, ri_savetm_fnum);
-	GET_PARAM_STR(res, row, presv->ri_creattm, ri_creattm_fnum);
 	GET_PARAM_BIN(res, row, raw_array, attributes_fnum);
 
 	/* convert attributes from postgres raw array format */
@@ -413,14 +432,19 @@ pg_db_find_resv(pbs_db_conn_t *conn, void *st, pbs_db_obj_info_t *obj,
 	PGresult *res;
 	int rc;
 	int params;
-
 	pg_query_state_t *state = (pg_query_state_t *) st;
 
 	if (!state)
 		return -1;
 
-	params=0;
-	strcpy(conn->conn_sql, STMT_FINDRESVS_ORDBY_CREATTM);
+	if (opts != NULL && opts->timestamp) {
+		SET_PARAM_STR(conn, opts->timestamp, 0);
+		params = 1;
+		strcpy(conn->conn_sql, STMT_FINDRESVS_FROM_TIME_ORDBY_SAVETM);
+	} else {
+		params = 0;
+		strcpy(conn->conn_sql, STMT_FINDRESVS_ORDBY_CREATTM);
+	}
 
 	if ((rc = pg_db_query(conn, conn->conn_sql, params, &res)) != 0)
 		return rc;

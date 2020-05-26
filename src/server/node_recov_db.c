@@ -128,6 +128,43 @@ db_2_node(struct pbsnode *pnode, pbs_db_node_info_t *pdbnd)
 	return 0;
 }
 
+/**
+ * @brief
+ *	Utility function called to allocate and decode pbsnode structure
+ *
+ * @param[in]	pnode  - pointer to node structure in heap, if exists, else NULL
+ * @param[in]	dbnode - Pointer to the database structure of a node
+ *
+ * @retval	 NULL - Failure
+ * @retval	!NULL - Success, pointer to job structure recovered
+ *
+ */
+struct pbsnode *
+node_recov_db_spl(struct pbsnode *pnode, pbs_db_node_info_t *dbnode)
+{
+	struct pbsnode *pnd = NULL;
+
+	if (!pnode) {
+		if ((pnd = malloc(sizeof(struct pbsnode)))) {
+			pnode = pnd;
+			initialize_pbsnode(pnode, strdup(dbnode->nd_name), NTYPE_PBS);
+		}
+	}
+	
+	if (pnode) {
+		if (db_2_node(pnode, dbnode) == 0)
+			return (pnode);
+	}
+
+	/* error case */
+	if (pnd)
+		free(pnd); /* free if we allocated here */
+
+	snprintf(log_buffer, LOG_BUF_SIZE, "Failed to allocate/decode node %s", dbnode->nd_name);
+	log_err(-1, __func__, log_buffer);
+
+	return (NULL);
+}
 
 /**
  * @brief
@@ -147,20 +184,12 @@ node_recov_db(char *nd_name, struct pbsnode *pnode)
 	pbs_db_conn_t *conn = (pbs_db_conn_t *) svr_db_conn;
 	pbs_db_node_info_t dbnode = {{0}};
 	int rc = 0;
-	struct pbsnode *pnd = NULL;
 
-	if (pnode)
+	if (pnode) {
+		CHECK_ALREADY_LOADED(pnode);
 		strcpy(dbnode.nd_savetm, pnode->nd_savetm);
-	else {
+	} else
 		dbnode.nd_savetm[0] = '\0';
-		if ((pnd = malloc(sizeof(struct pbsnode)))) {
-			pnode = pnd;
-			initialize_pbsnode(pnode, strdup(nd_name), NTYPE_PBS);
-		} else {
-			log_err(-1, __func__, "node_alloc failed");
-			return NULL;
-		}
-	}
 
 	strcpy(dbnode.nd_name, nd_name);
 	obj.pbs_db_obj_type = PBS_DB_NODE;
@@ -171,16 +200,11 @@ node_recov_db(char *nd_name, struct pbsnode *pnode)
 		return pnode; /* no change in node, return the same pnode */
 
 	if (rc == 0)
-		rc = db_2_node(pnode, &dbnode);
+		pnode = node_recov_db_spl(pnode, &dbnode);
 	
 	free_db_attr_list(&dbnode.db_attr_list);
 	free_db_attr_list(&dbnode.cache_attr_list);
 
-	if (rc != 0) {
-		pnode = NULL; /* so we return NULL */
-		if (pnd)
-			free(pnd); /* free if we allocated here */
-	}
 	return pnode;
 }
 
@@ -381,4 +405,60 @@ node_delete_db(struct pbsnode *pnode)
 		return (-1);
 	else
 		return (0);	/* "success" or "success but rows deleted" */
+}
+
+/**
+ * @brief
+ *	Refresh/retrieve node from database and add it into node list if not present
+ *
+ *	@param[in]	dbque - The pointer to the wrapper queue object of type pbs_db_node_info_t
+ *  @param[in]  refreshed - To count the no. of nodes refreshed
+ *
+ * @return	The recovered queue
+ * @retval	NULL - Failure
+ * @retval	!NULL - Success, pointer to queue structure recovered
+ *
+ */
+struct pbsnode *
+refresh_node(pbs_db_node_info_t *dbnode, int *refreshed)
+{
+	char		*pslash;
+	char 		*nodename = NULL;
+	struct pbsnode *pnode = NULL;
+	extern AVL_IX_DESC *node_tree;
+
+	if (dbnode == NULL || dbnode->nd_name == NULL)
+		return NULL;
+
+	if ((nodename = strdup(dbnode->nd_name)) == NULL)
+		return NULL;
+
+	if (*nodename == '(')
+		nodename++;	/* skip over leading paren */
+
+	if ((pslash = strchr(nodename, (int)'/')) != NULL)
+		*pslash = '\0';
+
+	if (!node_tree || (pnode = find_tree(node_tree, nodename)) == NULL) {
+		if ((pnode = node_recov_db(nodename, pnode)) == NULL)
+			goto err;
+		
+		*refreshed = 1;
+
+	} else if (strcmp(dbnode->nd_savetm, pnode->nd_savetm) != 0) {
+		/* if node had changed in db */
+		if ((pnode = node_recov_db_spl(pnode, dbnode)) == NULL)
+			goto err;
+
+		*refreshed = 1;
+	}
+
+	free(nodename);
+	return pnode;
+
+err:
+	free(nodename);
+	sprintf(log_buffer, "Failed to load node %s", dbnode->nd_name);
+	log_err(-1, __func__, log_buffer);
+	return NULL;
 }
