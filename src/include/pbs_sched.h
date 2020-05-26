@@ -68,6 +68,10 @@ extern "C" {
 
 #define SC_STATUS_LEN 	10
 
+#define	SCHED_CYCLE_END 0
+#define LISTEN_BACKLOG 100
+#define TCP_TIMEOUT 50000
+
 /*
  * Attributes for the server's sched object
  * Must be the same order as listed in sched_attr_def (master_sched_attr_def.xml)
@@ -108,8 +112,8 @@ extern attribute_def sched_attr_def[];
 
 typedef struct pbs_sched {
 	pbs_list_link	sc_link;		/* forward/backward links */
-	int scheduler_sock;
-	int scheduler_sock2;
+	/* 0 - primary socket, 1 - secondary socket */
+	int scheduler_sock[2];
 	int svr_do_schedule;
 	int svr_do_sched_high;
 	pbs_net_t pbs_scheduler_addr;
@@ -117,6 +121,7 @@ typedef struct pbs_sched {
 	time_t sch_next_schedule;		/* when to next run scheduler cycle */
 	char sc_name[PBS_MAXSCHEDNAME + 1];
 	struct preempt_ordering preempt_order[PREEMPT_ORDER_MAX + 1];
+	int sched_cycle_started;
 	/* sched object's attributes  */
 	attribute sch_attr[SCHED_ATR_LAST];
 	char	  sc_savetm[DB_TIMESTAMP_LEN + 1];
@@ -132,6 +137,9 @@ extern pbs_sched *find_sched_from_sock(int sock);
 extern pbs_sched *find_sched(char *sched_name);
 extern int validate_job_formula(attribute *pattr, void *pobject, int actmode);
 extern pbs_sched *find_sched_from_partition(char *partition);
+extern int get_sched_cmd(int sock, int *val, char **identifier);
+extern int recv_cycle_end(int sock);
+extern void handle_deferred_cycle_close();
 
 #ifdef	__cplusplus
 }

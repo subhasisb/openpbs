@@ -2188,7 +2188,7 @@ get_current_servers()
  * @brief
  *	get_svr_index - function to find the server index from its server_instance.
  *
-  * @param[in]	instance - pbs_server_instance object.
+ * @param[in]	instance - pbs_server_instance object.
  *
  * @return int
  * @retval	!-1 server's index

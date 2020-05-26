@@ -488,6 +488,8 @@ extern int pbs_connect_noblk(char *, int);
 
 extern int pbs_connection_set_nodelay(int);
 
+extern void close_tcp_connection(int);
+
 extern int pbs_geterrno(void);
 
 extern int pbs_py_spawn(int, char *, char **, char **);
@@ -536,6 +538,7 @@ extern int usepool(int, int);
 extern enum vnode_sharing place_sharing_type(char *, enum vnode_sharing);
 
 extern int get_svr_shard_connection(int, enum pbs_obj_type, void *, int *);
+extern int initialise_shard_conn(int);
 extern void set_new_shard_context(int);
 extern int tcp_connect(int, char *, int, char *);
 extern int initialise_shard_conn(int);
@@ -577,6 +580,8 @@ extern struct batch_status *bs_find(struct batch_status *, const char *);
 #endif /* _USRDLL */
 
 extern const char pbs_parse_err_msges[][PBS_PARSE_ERR_MSG_LEN_MAX + 1];
+
+extern int shard_init_done;
 
 #ifdef	__cplusplus
 }

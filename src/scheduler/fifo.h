@@ -45,7 +45,6 @@ extern "C" {
 
 #include  <limits.h>
 #include "data_types.h"
-int connector;
 
 /*
  *      schedinit - initialize conf struct and parse conf files

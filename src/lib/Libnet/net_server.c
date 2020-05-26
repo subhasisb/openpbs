@@ -774,6 +774,7 @@ add_conn_priority(int sd, enum conn_type type, pbs_net_t addr, unsigned int port
 	conn->cn_authen = 0;
 	conn->cn_prio_flag = 0;
 	conn->cn_auth_config = NULL;
+	conn->conn_origin = CONN_UNKNOWN;
 
 	num_connections++;
 

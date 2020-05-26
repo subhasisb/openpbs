@@ -183,3 +183,4 @@ char *logfile = NULL;
 char path_log[_POSIX_PATH_MAX];
 int dflt_sched = 0;
 int server_dyn_res_alarm = 0;
+pbs_svr_sock_pair_t svr_sock_pair;

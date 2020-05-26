@@ -111,6 +111,7 @@
 #include "svrfunc.h"
 #include "pbs_sched.h"
 #include "auth.h"
+#include "libutil.h"
 
 /* global data items */
 
@@ -306,6 +307,14 @@ process_request(int sfds)
 		return;
 	}
 
+#ifndef PBS_MOM
+	if (conn->conn_origin == CONN_SCHED_SECONDARY) {
+		if (recv_cycle_end(sfds) == -1)
+			close_conn(sfds);
+		return;
+	}
+#endif
+
 	if ((request = alloc_br(0)) == NULL) {
 		log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_REQUEST, LOG_ERR, __func__, "Unable to allocate request structure");
 		close_conn(sfds);
@@ -362,7 +371,7 @@ process_request(int sfds)
 		strcpy(conn->cn_username, request->rq_user);
 	if (conn->cn_hostname[0] == '\0')
 		strcpy(conn->cn_hostname, request->rq_host);
-	if ((conn->cn_authen & PBS_NET_CONN_TO_SCHED) != 0) {
+	if (conn->conn_origin == CONN_SCHED_PRIMARY) {
 		/*
 		 * If the request is coming on the socket we opened to the
 		 * scheduler, change the "user" from "root" to "Scheduler"
@@ -379,7 +388,7 @@ process_request(int sfds)
 	}
 
 #ifndef PBS_MOM
-	if ((conn->cn_authen & PBS_NET_CONN_TO_SCHED) == 0 && request->rq_type != PBS_BATCH_Connect) {
+	if (!(conn->conn_origin == CONN_SCHED_PRIMARY) && request->rq_type != PBS_BATCH_Connect) {
 		if (transport_chan_get_ctx_status(sfds, FOR_AUTH) != AUTH_STATUS_CTX_READY &&
 			(conn->cn_authen & PBS_NET_CONN_AUTHENTICATED) == 0) {
 			req_reject(PBSE_BADCRED, 0, request);
@@ -440,7 +449,7 @@ process_request(int sfds)
 	/* FIXME: Do we need realm check for all auth ? */
 #if defined(PBS_SECURITY) && (PBS_SECURITY == KRB5)
 	if (conn->cn_credid != NULL &&
-		(conn->cn_authen & PBS_NET_CONN_TO_SCHED) == 0 &&
+		!(conn->conn_origin == CONN_SCHED_PRIMARY) &&
 		conn->cn_auth_config != NULL &&
 		conn->cn_auth_config->auth_method != NULL &&
 		strcmp(conn->cn_auth_config->auth_method, AUTH_GSS_NAME) == 0) {

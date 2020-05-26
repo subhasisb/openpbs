@@ -78,6 +78,8 @@
 
 
 int (*pfn_connect)(int, char *, int , char *) = NULL;
+int shard_init_done = 0;
+
 /**
  * @brief
  *	-returns the default server name.
@@ -440,6 +442,32 @@ int internal_client_connect(int vsock, char *server, int port, char *extend_data
 
 /**
  * @brief
+ * 	initialise_inact_svr_indexes - To initialize inactive server indexes
+ *
+ *
+ * @return int
+ * @retval	pointer to inactive server indexes array created if success
+ * @retval	NULL if fails
+ */
+static int *
+initialise_inact_svr_indexes()
+{
+	int *inact_svr_indexes;
+	int i;
+	int num_cfg_svrs = get_current_servers();
+
+	if (!(inact_svr_indexes = malloc(num_cfg_svrs * sizeof(int))))
+		return NULL;
+
+	for (i = 0; i < num_cfg_svrs; i++)
+		inact_svr_indexes[i] = -1;
+
+	return inact_svr_indexes;
+
+}
+
+/**
+ * @brief
  *  This function chooses the respective server among multiple servers by 
  *  using internal sharding logic and return the connected socket to it
  * 
@@ -458,9 +486,7 @@ int
 get_svr_shard_connection(int vsock, enum pbs_obj_type obj_type, void *obj_id, int *index)
 {
 	int sd = -1;
-	int i = 0;
 	int inact_servers = 0;
-	static int shard_init_flag = -1;
 	int *inact_svr_indexes = NULL; 
 	shard_conn_t **shard_connection;
 	int num_of_conf_servers;
@@ -468,25 +494,29 @@ get_svr_shard_connection(int vsock, enum pbs_obj_type obj_type, void *obj_id, in
 	int srv_index;
 	int done = 0;
 	max_num_servers = get_max_servers();
+
 	if (max_num_servers == 1)
 		return vsock;
-		
-	/* below code only for multi-server case */
+
 	num_of_conf_servers = get_current_servers();
-	if (shard_init_flag == -1) {
+	if (!shard_init_done) {
 		if (pbs_shard_init(max_num_servers, (server_instance_t **)pbs_conf.psi, num_of_conf_servers) == -1) {
 			pbs_errno = PBSE_NOCONNECTION;
 			goto err;
 		}
-		shard_init_flag = 1;
+		shard_init_done = 1;
 	}
+
 	if (!(shard_connection = (shard_conn_t **) get_conn_shards(vsock))) {
 		pbs_errno = PBSE_INTERNAL;
 		goto err;
 	}
+
 	if (pfn_connect == NULL)
 		pfn_connect = internal_client_connect;
+
 	srv_index = get_conn_shard_context(vsock);
+
 	do {
 		if (srv_index == -1) {
 			srv_index = pbs_shard_get_server_byindex(obj_type, obj_id, inact_svr_indexes);
@@ -526,12 +556,12 @@ get_svr_shard_connection(int vsock, enum pbs_obj_type obj_type, void *obj_id, in
 					/* we need to add the server index to the list of inactive servers */
 					if (!inact_svr_indexes) {
 						inact_servers = 0;
-						if (!(inact_svr_indexes = (int *)malloc(num_of_conf_servers * sizeof(int)))) {
+						inact_svr_indexes = initialise_inact_svr_indexes();
+
+						if (inact_svr_indexes == NULL ) {
 							pbs_errno = PBSE_SYSTEM;
 							goto err;
 						}
-						for (; i < num_of_conf_servers; i++)
-							inact_svr_indexes[i] = -1;
 					}
 					inact_svr_indexes[inact_servers++] = srv_index;
 				}
@@ -548,9 +578,6 @@ err:
 	set_conn_shard_context(vsock, -1);
 	return (-1);
 }
-
-
-
 
 /**
  * @brief
@@ -589,7 +616,6 @@ initialise_shard_conn(int vfd)
 		return -1;
 	return 0;
 }
-
 
 /**
  * @brief

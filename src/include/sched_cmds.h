@@ -59,6 +59,7 @@
 #define SCH_SCHEDULE_RESV_RECONFIRM 16		/* Reconfirm a reservation */
 #define SCH_SCHEDULE_RESTART_CYCLE 17		/* Restart a scheduling cycle */
 #define SCH_ATTRS_CONFIGURE 18
+#define SCH_SVR_IDENTIFIER 19		/* Used to send server id */
 
 
 extern int schedule(int cmd, int sd, char *runjid);

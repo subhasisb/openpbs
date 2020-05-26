@@ -66,10 +66,11 @@
  * @brief
  * 		Gets the Scheduler Command sent by the Server
  *
- * @param[in]	sock	-	socket endpoint to the server
- * @param[in]	val	-	pointer to the value of the scheduler command sent.
- * @param[in]	jid	-	if 'val' obtained is SCH_SCHEDULE_AJOB, then '*jid'
- *						holds the jobid of the job to be scheduled.
+ * @param[in]	sock	- socket endpoint to the server
+ * @param[in]	val	- pointer to the value of the scheduler command sent.
+ * @param[in]	identifier	- if 'val' obtained is SCH_SCHEDULE_AJOB, then "*identifier" is  job id.
+ *				  holds the jobid of the job to be scheduled.
+ *				  else if 'val' obtained is SCH_SVR_IDENTIFIER then '*identifier" is index of the Server.
  * @return	int
  * @retval	0	: for EOF,
  * @retval	+1	: for success
@@ -81,24 +82,25 @@
  */
 
 int
-get_sched_cmd(int sock, int *val, char **jid)
+get_sched_cmd(int sock, int *val, char **identifier)
 {
 	int	i;
 	int     rc = 0;
-	char	*jobid = NULL;
+	char	*id = NULL;
 
 	DIS_tcp_funcs();
 
 	i = disrsi(sock, &rc);
 	if (rc != 0)
 		goto err;
-	if (i == SCH_SCHEDULE_AJOB) {
-		jobid = disrst(sock, &rc);
+	if (i == SCH_SCHEDULE_AJOB || i == SCH_SVR_IDENTIFIER) {
+		id = disrst(sock, &rc);
 		if (rc != 0)
 			goto err;
-		*jid = jobid;
+		*identifier = id;
 	} else {
-		*jid = NULL;
+		if (identifier != NULL)
+			*identifier = NULL;
 	}
 	*val = i;
 	return 1;

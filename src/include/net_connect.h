@@ -69,7 +69,7 @@ typedef unsigned long pbs_net_t;        /* for holding host addresses */
 #define PBS_NET_CONN_FROM_QSUB_DAEMON	0x08
 #define PBS_NET_CONN_FORCE_QSUB_UPDATE	0x10
 /* Unused - #define PBS_NET_CONN_GSSAPIAUTH 0x20 */
-#define PBS_NET_CONN_TO_SCHED	0x40
+/* #define PBS_NET_CONN_TO_SCHED	0x40 */
 
 #define	QSUB_DAEMON	"qsub-daemon"
 
@@ -174,6 +174,15 @@ enum conn_type {
 	Idle
 };
 
+/* This is used to know where the connection is originated from.
+ * This can be extended to have MOM and other clients of Server in future.
+ */
+typedef enum conn_origin {
+	CONN_UNKNOWN = -1,
+	CONN_SCHED_PRIMARY,
+	CONN_SCHED_SECONDARY
+} conn_origin_t;
+
 /* functions available in libnet.a */
 
 conn_t *add_conn(int sock, enum conn_type, pbs_net_t, unsigned int port, int (*ready_func)(conn_t *), void (*func)(int));
@@ -223,6 +232,7 @@ struct connection {
 	void            *cn_data;         /* pointer to some data for cn_func */
 	char            cn_username[PBS_MAXUSER + 1];
 	char            cn_hostname[PBS_MAXHOSTNAME + 1];
+	conn_origin_t	conn_origin; /* used to know the origin of the connection i.e. Scheduler , MOM etc. */
 	char            *cn_credid;
 	char            cn_physhost[PBS_MAXHOSTNAME + 1];
 	pbs_auth_config_t   *cn_auth_config;

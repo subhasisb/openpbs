@@ -438,7 +438,7 @@ req_runjob(struct batch_request *preq)
 
 		/* if runjob request is from the Scheduler, */
 		/* it must have a destination specified     */
-		if (preq->rq_conn == psched->scheduler_sock) {
+		if (preq->rq_conn == psched->scheduler_sock[0]) {
 			sprintf(log_buffer,
 				"runjob request from scheduler with null destination");
 			log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_JOB, LOG_INFO,
