@@ -84,6 +84,8 @@
 #include "pbs_db.h"
 
 
+struct pbsnode *refresh_node(pbs_db_obj_info_t *dbobj, int *refreshed);
+
 /**
  * @brief
  *		convert from database to node structure
@@ -536,4 +538,56 @@ refresh_err:
 	snprintf(log_buffer, LOG_BUF_SIZE, "Failed to refresh node attribute %s", dbnode->nd_name);
 	log_err(-1, __func__, log_buffer);
 	return NULL;
+}
+
+/**
+ * @brief
+ * 		Get all the nodes from database which are newly added/modified
+ * 		by other servers after the given time interval.
+ * 
+ * @param[in]	hostname: hostname which can be used to filter nodes.
+ *
+ * @return	0 - success
+ * 		1 - fail/error
+ */
+int
+get_all_db_nodes(char *hostname) 
+{
+	pbs_db_node_info_t	dbnode;
+	pbs_db_obj_info_t	dbobj;
+	void *conn = svr_db_conn;
+	pbs_db_query_options_t opts;
+	static char nodes_from_time[DB_TIMESTAMP_LEN + 1] = {0};
+	int count = 0;
+	char *conn_db_err = NULL;
+
+	/* fill in options */
+	if (hostname) {
+		opts.flags = 1;
+		opts.hostname = hostname;
+		opts.timestamp = NULL;
+	} else {
+		opts.flags = 0;
+		opts.timestamp = nodes_from_time;
+	}
+	dbobj.pbs_db_obj_type = PBS_DB_NODE;
+	dbobj.pbs_db_un.pbs_db_node = &dbnode;
+
+	count = pbs_db_search(conn, &dbobj, &opts, (query_cb_t)&refresh_node);
+	if (count == -1) {
+		pbs_db_get_errmsg(PBS_DB_ERR, &conn_db_err);
+		if (conn_db_err != NULL) {
+			sprintf(log_buffer, "%s", conn_db_err);
+			free(conn_db_err);
+		}
+		return (1);
+	}
+
+	/* to save the last job's time save_tm, since we are loading in order */
+	if (opts.timestamp) {
+		if (strncmp(opts.timestamp, nodes_from_time, DB_TIMESTAMP_LEN) > 0)
+			strcpy(nodes_from_time, opts.timestamp);
+	}
+
+	return 0;
 }

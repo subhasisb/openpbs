@@ -76,6 +76,8 @@ extern void	*svr_db_conn;
 extern char	*msg_init_recovque;
 #endif
 
+pbs_queue *refresh_queue(pbs_db_obj_info_t *dbobj, int *refreshed);
+
 /**
  * @brief
  *		convert queue structure to DB format
@@ -322,9 +324,13 @@ refresh_queue(pbs_db_obj_info_t *dbobj, int *refreshed)
 		append_link(&svr_queues, &pque->qu_link, pque);
 		*refreshed = 1;
 	}
+	free_db_attr_list(&dbque->db_attr_list);
+	free_db_attr_list(&dbque->cache_attr_list);
 	return pque;
 
 err:
+	free_db_attr_list(&dbque->db_attr_list);
+	free_db_attr_list(&dbque->cache_attr_list);
 	snprintf(log_buffer, LOG_BUF_SIZE, "Failed to refresh queue %s", dbque->qu_name);
 	log_err(-1, __func__, log_buffer);
 	return NULL;
@@ -362,4 +368,52 @@ recov_queue_cb(pbs_db_obj_info_t *dbobj, int *refreshed)
 	free_db_attr_list(&dbque->cache_attr_list);
 
 	return pque;
+}
+
+/**
+ * @brief
+ * 		Get all the queues from database which are newly added/modified
+ * 		by other servers after the given time interval.
+ *
+ * @return	0 - success
+ * 			1 - fail/error
+ */
+int
+get_all_db_queues() 
+{
+	pbs_db_que_info_t	dbque = {{0}};
+	pbs_db_obj_info_t	dbobj;
+	void *conn = svr_db_conn;
+	pbs_db_query_options_t opts;
+	static char ques_from_time[DB_TIMESTAMP_LEN + 1] = {0};
+	int count = 0;
+	char *conn_db_err = NULL;
+
+	/* fill in options */
+	opts.flags = 0;
+	opts.timestamp = ques_from_time;
+	dbobj.pbs_db_obj_type = PBS_DB_QUEUE;
+	dbobj.pbs_db_un.pbs_db_que = &dbque;
+
+	count = pbs_db_search(conn, &dbobj, &opts, (query_cb_t)&refresh_queue);
+	if (count == -1) {
+		pbs_db_get_errmsg(PBS_DB_ERR, &conn_db_err);
+		if (conn_db_err != NULL) {
+			sprintf(log_buffer, "%s", conn_db_err);
+			log_err(-1, __func__, log_buffer);
+			free(conn_db_err);
+		}
+		return (1);
+	}
+
+	if (count > 0) {
+		sprintf(log_buffer, "Refreshed %d queues", count);
+		log_event(PBSEVENT_DEBUG, PBS_EVENTCLASS_SERVER, LOG_DEBUG, __func__, log_buffer);
+	}
+
+	/* to save the last queue's time save_tm, since we are loading in order */
+	if (strncmp(opts.timestamp, ques_from_time, DB_TIMESTAMP_LEN) > 0)
+		strcpy(ques_from_time, opts.timestamp);
+
+	return 0;
 }

@@ -448,7 +448,7 @@ pbs_db_find_resv(void *conn, void *st, pbs_db_obj_info_t *obj,
 	if (!state)
 		return -1;
 
-	if (opts != NULL && opts->timestamp) {
+	if (opts != NULL && opts->timestamp && opts->timestamp[0] != '\0') {
 		SET_PARAM_STR(conn_data, opts->timestamp, 0);
 		params = 1;
 		strcpy(conn_sql, STMT_FINDRESVS_FROM_TIME_ORDBY_SAVETM);

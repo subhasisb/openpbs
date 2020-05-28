@@ -597,7 +597,7 @@ pbs_db_find_job(void *conn, void *st, pbs_db_obj_info_t *obj,
 		SET_PARAM_STR(conn_data, pdjob->ji_queue, 0);
 		params=1;
 		strcpy(conn_sql, STMT_FINDJOBS_BYQUE_ORDBY_QRANK);
-	} else if (opts != NULL && opts->timestamp){
+	} else if (opts != NULL && opts->timestamp && opts->timestamp[0] != '\0'){
 		SET_PARAM_STR(conn_data, opts->timestamp, 0);
 		params=1;
 		strcpy(conn_sql, STMT_FINDJOBS_FROM_TIME);

@@ -239,7 +239,7 @@ pbs_db_search(void *conn, pbs_db_obj_info_t *obj, pbs_db_query_options_t *opts, 
 			totcount++;
 
 	}
-	if (opts && totcount)
+	if (opts != NULL && totcount)
 		pbs_db_copy_savetm(obj, opts);
 
 	pbs_destroy_state(st);

@@ -109,6 +109,8 @@ void print_backtrace(char *);
 extern time_t time_now;
 
 static int attach_queue_to_reservation(resc_resv *);
+job *refresh_job(pbs_db_obj_info_t *dbobj, int *refreshed);
+resc_resv *refresh_resv(pbs_db_obj_info_t *dbobj, int *refreshed);
 
 #ifndef PBS_MOM
 
@@ -836,6 +838,105 @@ err:
 	snprintf(log_buffer, LOG_BUF_SIZE, "Failed to refresh resv attribute %s", dbresv->ri_resvid);
 	log_err(-1, __func__, log_buffer);
 	return NULL;
+}
+
+/**
+ * @brief
+ * 		Get all the jobs from database which are changed after given time.
+ *
+ * @return	0 - success
+ * 		1 - fail/error
+ */
+
+int
+get_all_db_jobs() 
+{
+	pbs_db_job_info_t dbjob = {{0}};
+	pbs_db_obj_info_t obj = {0};
+	void *conn = svr_db_conn;
+	pbs_db_query_options_t opts;
+	int count = 0;
+	static char jobs_from_time[DB_TIMESTAMP_LEN + 1] = {0};
+	char *conn_db_err = NULL;
+
+	/* fill in options */
+	opts.flags = 0;
+	opts.timestamp = jobs_from_time;
+
+	obj.pbs_db_obj_type = PBS_DB_JOB;
+	obj.pbs_db_un.pbs_db_job = &dbjob;
+	
+	/* get jobs from DB */
+	obj.pbs_db_obj_type = PBS_DB_JOB;
+	obj.pbs_db_un.pbs_db_job = &dbjob;
+	count = pbs_db_search(conn, &obj, &opts, (query_cb_t)&refresh_job);
+	if (count == -1) {
+		pbs_db_get_errmsg(PBS_DB_ERR, &conn_db_err);
+		if (conn_db_err != NULL) {
+			sprintf(log_buffer, "%s", conn_db_err);
+			log_err(-1, __func__, log_buffer);
+			free(conn_db_err);
+		}
+		return (1);
+	}
+
+	if (count > 0) {
+		sprintf(log_buffer, "Refreshed %d jobs", count);
+		log_event(PBSEVENT_DEBUG, PBS_EVENTCLASS_SERVER, LOG_DEBUG, __func__, log_buffer);
+	}
+
+	/* to save the last job's time save_tm, since we are loading in order */
+	if (strncmp(opts.timestamp, jobs_from_time, DB_TIMESTAMP_LEN) > 0)
+		strcpy(jobs_from_time, opts.timestamp);
+
+	return 0;
+}
+
+/**
+ * @brief
+ * 		Get all the reservations from database which are newly added/modified
+ * 		by other servers after the given time interval.
+ *
+ * @return	0 - success
+ * 			1 - fail/error
+ */
+int
+get_all_db_resvs() 
+{
+	pbs_db_resv_info_t dbresv= {{0}};
+	pbs_db_obj_info_t dbobj;
+	void *conn = svr_db_conn;
+	pbs_db_query_options_t opts;
+	static char resvs_from_time[DB_TIMESTAMP_LEN + 1] = {0};
+	int count = 0;
+	char *conn_db_err = NULL;
+
+	/* fill in options */
+	opts.flags = 0;
+	opts.timestamp = resvs_from_time;
+	dbobj.pbs_db_obj_type = PBS_DB_RESV;
+	dbobj.pbs_db_un.pbs_db_resv = &dbresv;
+	
+	count = pbs_db_search(conn, &dbobj, &opts, (query_cb_t)&refresh_resv);
+	if (count == -1) {
+		pbs_db_get_errmsg(PBS_DB_ERR, &conn_db_err);
+		if (conn_db_err != NULL) {
+			sprintf(log_buffer, "%s", conn_db_err);
+			free(conn_db_err);
+		}
+		return (1);
+	}
+
+	if (count > 0) {
+		sprintf(log_buffer, "Refreshed %d reservations", count);
+		log_event(PBSEVENT_DEBUG, PBS_EVENTCLASS_SERVER, LOG_DEBUG, __func__, log_buffer);
+	}
+
+	/* to save the last job's time save_tm, since we are loading in order */
+	if (strncmp(opts.timestamp, resvs_from_time, DB_TIMESTAMP_LEN) > 0)
+		strcpy(resvs_from_time, opts.timestamp);
+
+	return 0;
 }
 
 #endif /* ifndef PBS_MOM */

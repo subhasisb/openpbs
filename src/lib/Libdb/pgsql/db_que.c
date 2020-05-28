@@ -326,7 +326,7 @@ pbs_db_find_que(void *conn, void *st, pbs_db_obj_info_t *obj, pbs_db_query_optio
 	if (!state)
 		return -1;
 
-	if (opts != NULL && opts->timestamp) {
+	if (opts != NULL && opts->timestamp && opts->timestamp[0] != '\0') {
 		SET_PARAM_STR(conn_data, opts->timestamp, 0);
 		params = 1;
 		strcpy(conn_sql, STMT_FIND_QUES_FROM_TIME_ORDBY_SAVETM);
