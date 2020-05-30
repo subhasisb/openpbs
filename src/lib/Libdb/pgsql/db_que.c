@@ -77,7 +77,7 @@ pbs_db_prepare_que_sqls(void *conn)
 		"values "
 		"($1, $2,  localtimestamp, localtimestamp, hstore($3::text[])) "
 		"returning to_char(qu_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as qu_savetm");
-	if (pbs_prepare_stmt(conn, STMT_INSERT_QUE, conn_sql, 3) != 0)
+	if (db_prepare_stmt(conn, STMT_INSERT_QUE, conn_sql, 3) != 0)
 		return -1;
 
 	/* rewrite all attributes for FULL update */
@@ -87,7 +87,7 @@ pbs_db_prepare_que_sqls(void *conn)
 		"attributes = attributes || hstore($3::text[]) "
 		"where qu_name = $1 "
 		"returning to_char(qu_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as qu_savetm");
-	if (pbs_prepare_stmt(conn, STMT_UPDATE_QUE, conn_sql, 3) != 0)
+	if (db_prepare_stmt(conn, STMT_UPDATE_QUE, conn_sql, 3) != 0)
 		return -1;
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "update pbs.queue set "
@@ -95,7 +95,7 @@ pbs_db_prepare_que_sqls(void *conn)
 		"qu_savetm = localtimestamp "
 		"where qu_name = $1 "
 		"returning to_char(qu_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as qu_savetm");
-	if (pbs_prepare_stmt(conn, STMT_UPDATE_QUE_QUICK, conn_sql, 2) != 0)
+	if (db_prepare_stmt(conn, STMT_UPDATE_QUE_QUICK, conn_sql, 2) != 0)
 		return -1;
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "update pbs.queue set "
@@ -103,7 +103,7 @@ pbs_db_prepare_que_sqls(void *conn)
 		"attributes = attributes || hstore($2::text[]) "
 		"where qu_name = $1 "
 		"returning to_char(qu_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as qu_savetm");
-	if (pbs_prepare_stmt(conn, STMT_UPDATE_QUE_ATTRSONLY, conn_sql, 2) != 0)
+	if (db_prepare_stmt(conn, STMT_UPDATE_QUE_ATTRSONLY, conn_sql, 2) != 0)
 		return -1;
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "update pbs.queue set "
@@ -111,7 +111,7 @@ pbs_db_prepare_que_sqls(void *conn)
 		"attributes = attributes - $2::text[] "
 		"where qu_name = $1 "
 		"returning to_char(qu_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as qu_savetm");
-	if (pbs_prepare_stmt(conn, STMT_REMOVE_QUEATTRS, conn_sql, 2) != 0)
+	if (db_prepare_stmt(conn, STMT_REMOVE_QUEATTRS, conn_sql, 2) != 0)
 		return -1;
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "select qu_name, "
@@ -120,7 +120,7 @@ pbs_db_prepare_que_sqls(void *conn)
 			"hstore_to_array(attributes) as attributes "
 			"from pbs.queue "
 			"where qu_name = $1");
-	if (pbs_prepare_stmt(conn, STMT_SELECT_QUE, conn_sql, 1) != 0)
+	if (db_prepare_stmt(conn, STMT_SELECT_QUE, conn_sql, 1) != 0)
 		return -1;
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "select qu_name, "
@@ -130,7 +130,7 @@ pbs_db_prepare_que_sqls(void *conn)
 			"from pbs.queue "
 			"where qu_savetm > to_timestamp($1, 'YYYY-MM-DD HH24:MI:SS:US') "
 			"order by qu_savetm ");
-	if (pbs_prepare_stmt(conn, STMT_FIND_QUES_FROM_TIME_ORDBY_SAVETM, conn_sql, 1) != 0)
+	if (db_prepare_stmt(conn, STMT_FIND_QUES_FROM_TIME_ORDBY_SAVETM, conn_sql, 1) != 0)
 		return -1;
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "select "
@@ -139,11 +139,11 @@ pbs_db_prepare_que_sqls(void *conn)
 			"to_char(qu_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as qu_savetm, "
 			"hstore_to_array(attributes) as attributes "
 			"from pbs.queue order by qu_creattm");
-	if (pbs_prepare_stmt(conn, STMT_FIND_QUES_ORDBY_CREATTM, conn_sql, 0) != 0)
+	if (db_prepare_stmt(conn, STMT_FIND_QUES_ORDBY_CREATTM, conn_sql, 0) != 0)
 		return -1;
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "delete from pbs.queue where qu_name = $1");
-	if (pbs_prepare_stmt(conn, STMT_DELETE_QUE, conn_sql, 1) != 0)
+	if (db_prepare_stmt(conn, STMT_DELETE_QUE, conn_sql, 1) != 0)
 		return -1;
 
 	return 0;
@@ -243,7 +243,7 @@ pbs_db_save_que(void *conn, pbs_db_obj_info_t *obj, int savetype)
 		stmt = STMT_INSERT_QUE;
 
 	if (stmt != NULL) {
-		if (pbs_db_cmd(conn, stmt, params, &res) != 0) {
+		if (db_cmd(conn, stmt, params, &res) != 0) {
 			free(raw_array);
 			return -1;
 		}
@@ -281,7 +281,7 @@ pbs_db_load_que(void *conn, pbs_db_obj_info_t *obj)
 
 	SET_PARAM_STR(conn_data, pq->qu_name, 0);
 
-	if ((rc = pbs_db_query(conn, STMT_SELECT_QUE, 1, &res)) != 0)
+	if ((rc = db_query(conn, STMT_SELECT_QUE, 1, &res)) != 0)
 		return rc;
 
 	rc = load_que(res, pq, 0);
@@ -334,7 +334,7 @@ pbs_db_find_que(void *conn, void *st, pbs_db_obj_info_t *obj, pbs_db_query_optio
 		strcpy(conn_sql, STMT_FIND_QUES_ORDBY_CREATTM);
 		params = 0;
 	}
-	if ((rc = pbs_db_query(conn, conn_sql, params, &res)) != 0)
+	if ((rc = db_query(conn, conn_sql, params, &res)) != 0)
 		return rc;
 
 	state->row = 0;
@@ -385,7 +385,7 @@ pbs_db_delete_que(void *conn, pbs_db_obj_info_t *obj)
 {
 	pbs_db_que_info_t *pq = obj->pbs_db_un.pbs_db_que;
 	SET_PARAM_STR(conn_data, pq->qu_name, 0);
-	return (pbs_db_cmd(conn, STMT_DELETE_QUE, 1, NULL));
+	return (db_cmd(conn, STMT_DELETE_QUE, 1, NULL));
 }
 
 
@@ -418,7 +418,7 @@ pbs_db_del_attr_que(void *conn, void *obj_id, char *sv_time, pbs_db_attr_list_t 
 	SET_PARAM_STR(conn_data, obj_id, 0);
 	SET_PARAM_BIN(conn_data, raw_array, len, 1);
 
-	if (pbs_db_cmd(conn, STMT_REMOVE_QUEATTRS, 2, &res) != 0) {
+	if (db_cmd(conn, STMT_REMOVE_QUEATTRS, 2, &res) != 0) {
 		free(raw_array);
 		return -1;
 	}

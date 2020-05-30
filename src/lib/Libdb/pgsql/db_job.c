@@ -101,7 +101,7 @@ pbs_db_prepare_job_sqls(void *conn)
 		"hstore($24::text[])) "
 		"returning to_char(ji_savetm, 'YYYY-MM-DD HH24:MI:SS.US')  as ji_savetm");
 
-	if (pbs_prepare_stmt(conn, STMT_INSERT_JOB, conn_sql, 24) != 0)
+	if (db_prepare_stmt(conn, STMT_INSERT_JOB, conn_sql, 24) != 0)
 		return -1;
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "update pbs.job set "
@@ -131,7 +131,7 @@ pbs_db_prepare_job_sqls(void *conn)
 		"attributes = attributes || hstore($24::text[]) "
 		"where ji_jobid = $1 "
 		"returning to_char(ji_savetm, 'YYYY-MM-DD HH24:MI:SS.US')  as ji_savetm");
-	if (pbs_prepare_stmt(conn, STMT_UPDATE_JOB, conn_sql, 24) != 0)
+	if (db_prepare_stmt(conn, STMT_UPDATE_JOB, conn_sql, 24) != 0)
 		return -1;
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "update pbs.job set "
@@ -139,7 +139,7 @@ pbs_db_prepare_job_sqls(void *conn)
 		"attributes = attributes || hstore($2::text[]) "
 		"where ji_jobid = $1 "
 		"returning to_char(ji_savetm, 'YYYY-MM-DD HH24:MI:SS.US')  as ji_savetm");
-	if (pbs_prepare_stmt(conn, STMT_UPDATE_JOB_ATTRSONLY, conn_sql, 2) != 0)
+	if (db_prepare_stmt(conn, STMT_UPDATE_JOB_ATTRSONLY, conn_sql, 2) != 0)
 		return -1;
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "update pbs.job set "
@@ -147,7 +147,7 @@ pbs_db_prepare_job_sqls(void *conn)
 		"attributes = attributes - hstore($2::text[]) "
 		"where ji_jobid = $1 "
 		"returning to_char(ji_savetm, 'YYYY-MM-DD HH24:MI:SS.US')  as ji_savetm");
-	if (pbs_prepare_stmt(conn, STMT_REMOVE_JOBATTRS, conn_sql, 2) != 0)
+	if (db_prepare_stmt(conn, STMT_REMOVE_JOBATTRS, conn_sql, 2) != 0)
 		return -1;
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "update pbs.job set "
@@ -176,7 +176,7 @@ pbs_db_prepare_job_sqls(void *conn)
 		"ji_savetm = localtimestamp "
 		"where ji_jobid = $1 "
 		"returning to_char(ji_savetm, 'YYYY-MM-DD HH24:MI:SS.US')  as ji_savetm");
-	if (pbs_prepare_stmt(conn, STMT_UPDATE_JOB_QUICK, conn_sql, 23) != 0)
+	if (db_prepare_stmt(conn, STMT_UPDATE_JOB_QUICK, conn_sql, 23) != 0)
 		return -1;
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "select "
@@ -206,7 +206,7 @@ pbs_db_prepare_job_sqls(void *conn)
 		"to_char(ji_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as ji_savetm, "
 		"hstore_to_array(attributes) as attributes "
 		"from pbs.job where ji_jobid = $1");
-	if (pbs_prepare_stmt(conn, STMT_SELECT_JOB, conn_sql, 1) != 0)
+	if (db_prepare_stmt(conn, STMT_SELECT_JOB, conn_sql, 1) != 0)
 		return -1;
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "select "
@@ -237,7 +237,7 @@ pbs_db_prepare_job_sqls(void *conn)
 		"hstore_to_array(attributes) as attributes "
 		"from pbs.job where ji_savetm > to_timestamp($1, 'YYYY-MM-DD HH24:MI:SS.US') "
 		"order by ji_savetm ");
-	if (pbs_prepare_stmt(conn, STMT_FINDJOBS_FROM_TIME, conn_sql, 1) != 0)
+	if (db_prepare_stmt(conn, STMT_FINDJOBS_FROM_TIME, conn_sql, 1) != 0)
 		return -1;
 
 	/*
@@ -251,7 +251,7 @@ pbs_db_prepare_job_sqls(void *conn)
 		"pbs.job_scr (ji_jobid, script) "
 		"values "
 		"($1, encode($2, 'escape'))");
-	if (pbs_prepare_stmt(conn, STMT_INSERT_JOBSCR, conn_sql, 2) != 0)
+	if (db_prepare_stmt(conn, STMT_INSERT_JOBSCR, conn_sql, 2) != 0)
 		return -1;
 
 	/*
@@ -265,7 +265,7 @@ pbs_db_prepare_job_sqls(void *conn)
 	snprintf(conn_sql, MAX_SQL_LENGTH, "select decode(script, 'escape')::bytea as script "
 		"from pbs.job_scr "
 		"where ji_jobid = $1");
-	if (pbs_prepare_stmt(conn, STMT_SELECT_JOBSCR, conn_sql, 1) != 0)
+	if (db_prepare_stmt(conn, STMT_SELECT_JOBSCR, conn_sql, 1) != 0)
 		return -1;
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "select "
@@ -295,7 +295,7 @@ pbs_db_prepare_job_sqls(void *conn)
 		"to_char(ji_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as ji_savetm, "
 		"hstore_to_array(attributes) as attributes "
 		"from pbs.job order by ji_qrank");
-	if (pbs_prepare_stmt(conn, STMT_FINDJOBS_ORDBY_QRANK, conn_sql, 0) != 0)
+	if (db_prepare_stmt(conn, STMT_FINDJOBS_ORDBY_QRANK, conn_sql, 0) != 0)
 		return -1;
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "select "
@@ -326,16 +326,16 @@ pbs_db_prepare_job_sqls(void *conn)
 		"hstore_to_array(attributes) as attributes "
 		"from pbs.job where ji_queue = $1"
 		" order by ji_qrank");
-	if (pbs_prepare_stmt(conn, STMT_FINDJOBS_BYQUE_ORDBY_QRANK,
+	if (db_prepare_stmt(conn, STMT_FINDJOBS_BYQUE_ORDBY_QRANK,
 		conn_sql, 1) != 0)
 		return -1;
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "delete from pbs.job where ji_jobid = $1");
-	if (pbs_prepare_stmt(conn, STMT_DELETE_JOB, conn_sql, 1) != 0)
+	if (db_prepare_stmt(conn, STMT_DELETE_JOB, conn_sql, 1) != 0)
 		return -1;
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "delete from pbs.job_scr where ji_jobid = $1");
-	if (pbs_prepare_stmt(conn, STMT_DELETE_JOBSCR, conn_sql, 1) != 0)
+	if (db_prepare_stmt(conn, STMT_DELETE_JOBSCR, conn_sql, 1) != 0)
 		return -1;
 
 	return 0;
@@ -507,7 +507,7 @@ pbs_db_save_job(void *conn, pbs_db_obj_info_t *obj, int savetype)
 		stmt = STMT_INSERT_JOB;
 
 	if (stmt != NULL) {
-		if (pbs_db_cmd(conn, stmt, params, &res) != 0) {
+		if (db_cmd(conn, stmt, params, &res) != 0) {
 			free(raw_array);
 			return -1;
 		}
@@ -546,7 +546,7 @@ pbs_db_load_job(void *conn, pbs_db_obj_info_t *obj)
 
 	SET_PARAM_STR(conn_data, pj->ji_jobid, 0);
 
-	if ((rc = pbs_db_query(conn, STMT_SELECT_JOB, 1, &res)) != 0)
+	if ((rc = db_query(conn, STMT_SELECT_JOB, 1, &res)) != 0)
 		return rc;
 
 	rc = load_job(res, pj, 0);
@@ -606,7 +606,7 @@ pbs_db_find_job(void *conn, void *st, pbs_db_obj_info_t *obj,
 		params=0;
 	}
 
-	if ((rc = pbs_db_query(conn, conn_sql, params, &res)) != 0)
+	if ((rc = db_query(conn, conn_sql, params, &res)) != 0)
 		return rc;
 
 	state->row = 0;
@@ -659,10 +659,10 @@ pbs_db_delete_job(void *conn, pbs_db_obj_info_t *obj)
 
 	SET_PARAM_STR(conn_data, pj->ji_jobid, 0);
 
-	if ((rc = pbs_db_cmd(conn, STMT_DELETE_JOB, 1, NULL)) == -1)
+	if ((rc = db_cmd(conn, STMT_DELETE_JOB, 1, NULL)) == -1)
 		goto err;
 
-	if (pbs_db_cmd(conn, STMT_DELETE_JOBSCR, 1, NULL) == -1)
+	if (db_cmd(conn, STMT_DELETE_JOBSCR, 1, NULL) == -1)
 		goto err;
 
 	return rc;
@@ -700,7 +700,7 @@ pbs_db_save_jobscr(void *conn, pbs_db_obj_info_t *obj, int savetype)
 	 */
 	SET_PARAM_BIN(conn_data, pscr->script, (pscr->script)?strlen(pscr->script):0, 1);
 
-	if ((pbs_db_cmd(conn, STMT_INSERT_JOBSCR, 2, NULL)) == -1)
+	if ((db_cmd(conn, STMT_INSERT_JOBSCR, 2, NULL)) == -1)
 		return -1;
 
 	return 0;
@@ -736,7 +736,7 @@ pbs_db_load_jobscr(void *conn, pbs_db_obj_info_t *obj)
 	 * auto-reset switch which resets to 0 (TEXT) mode after each execution
 	 * of pbs_db_query.
 	 */
-	if (pbs_db_query(conn, STMT_SELECT_JOBSCR, 1, &res) != 0)
+	if (db_query(conn, STMT_SELECT_JOBSCR, 1, &res) != 0)
 		return -1;
 
 	if (script_fnum == -1)
@@ -782,7 +782,7 @@ pbs_db_del_attr_job(void *conn, void *obj_id, char *sv_time, pbs_db_attr_list_t 
 	SET_PARAM_STR(conn_data, obj_id, 0);
 	SET_PARAM_BIN(conn_data, raw_array, len, 1);
 
-	if (pbs_db_cmd(conn, STMT_REMOVE_JOBATTRS, 2, &res) == -1) {
+	if (db_cmd(conn, STMT_REMOVE_JOBATTRS, 2, &res) == -1) {
 		free(raw_array);
 		return -1;
 	}

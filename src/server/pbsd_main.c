@@ -146,7 +146,6 @@ char	       daemonname[PBS_MAXHOSTNAME+8];
 int		       used_unix_licenses  = 0;
 int		       used_linix_licenses = 0;
 char	       *log_file  = NULL;
-char	       *path_svrdb;
 char	       *path_acct;
 char           *path_usedlicenses;
 char	        path_log[MAXPATHLEN+1];
@@ -223,7 +222,6 @@ long		new_log_event_mask = 0;
 int		server_init_type = RECOV_WARM;
 int		svr_delay_entry = 0;
 int             svr_ping_rate = SVR_DEFAULT_PING_RATE;    /* time between sets of node pings */
-int             ping_nodes_rate = SVR_DEFAULT_PING_RATE; /* time between ping nodes as determined from server_init_type */
 pbs_list_head	svr_deferred_req;
 pbs_list_head	svr_queues;            /* list of queues                   */
 pbs_list_head	svr_alljobs;           /* list of all jobs in server       */
@@ -1069,7 +1067,6 @@ main(int argc, char **argv)
 		suffix_slash);
 	path_spool      = build_path(pbs_conf.pbs_home_path, PBS_SPOOLDIR,
 		suffix_slash);
-	path_svrdb      = build_path(path_priv, PBS_SERVERDB, NULL);
 	path_jobs       = build_path(path_priv, PBS_JOBDIR, suffix_slash);
 	path_users      = build_path(path_priv, PBS_USERDIR, suffix_slash);
 	path_rescdef	= build_path(path_priv, PBS_RESCDEF, NULL);
@@ -1231,22 +1228,12 @@ main(int argc, char **argv)
 	prctl(PR_SET_FPEMU, PR_FPEMU_NOPRINT, 0, 0, 0);
 #endif
 
-	/* determine the rate of calling the ping_nodes functionality based on server_init_type */
-	if (server_init_type == RECOV_HOT) {
-			/* rapid ping rate while hot restart */
-			ping_nodes_rate = HOT_START_PING_RATE < svr_ping_rate ? HOT_START_PING_RATE : svr_ping_rate;
-	} else
-			ping_nodes_rate = svr_ping_rate; /* normal ping rate for normal run */
-
 	/* Setup db connection here */
-	if (server_init_type != RECOV_UPDATEDB &&
-		    server_init_type != RECOV_CREATE && 
-			stalone == 0 &&	already_forked == 0)
+	if (server_init_type != RECOV_CREATE && stalone == 0 && already_forked == 0)
 		background = 1;
 	rc = connect_to_db(background);
-	if (rc != 0) {
+	if (rc != 0)
 		return rc;
-	}
 
 	/* database connection code end */
 

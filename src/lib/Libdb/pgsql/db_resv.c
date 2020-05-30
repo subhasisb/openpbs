@@ -89,7 +89,7 @@ pbs_db_prepare_resv_sqls(void *conn)
 		"($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, "
 		"$14, $15, localtimestamp, localtimestamp, hstore($16::text[])) "
 		"returning to_char(ri_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as ri_savetm");
-	if (pbs_prepare_stmt(conn, STMT_INSERT_RESV, conn_sql, 16) != 0)
+	if (db_prepare_stmt(conn, STMT_INSERT_RESV, conn_sql, 16) != 0)
 		return -1;
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "update pbs.resv set "
@@ -111,7 +111,7 @@ pbs_db_prepare_resv_sqls(void *conn)
 		"attributes = attributes || hstore($16::text[]) "
 		"where ri_resvID = $1 "
 		"returning to_char(ri_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as ri_savetm");
-	if (pbs_prepare_stmt(conn, STMT_UPDATE_RESV, conn_sql, 16) != 0)
+	if (db_prepare_stmt(conn, STMT_UPDATE_RESV, conn_sql, 16) != 0)
 		return -1;
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "update pbs.resv set "
@@ -132,7 +132,7 @@ pbs_db_prepare_resv_sqls(void *conn)
 		"ri_savetm = localtimestamp "
 		"where ri_resvID = $1 "
 		"returning to_char(ri_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as ri_savetm");
-	if (pbs_prepare_stmt(conn, STMT_UPDATE_RESV_QUICK, conn_sql, 15) != 0)
+	if (db_prepare_stmt(conn, STMT_UPDATE_RESV_QUICK, conn_sql, 15) != 0)
 		return -1;
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "update pbs.resv set "
@@ -140,7 +140,7 @@ pbs_db_prepare_resv_sqls(void *conn)
 		"attributes = attributes || hstore($2::text[]) "
 		"where ri_resvID = $1 "
 		"returning to_char(ri_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as ri_savetm");
-	if (pbs_prepare_stmt(conn, STMT_UPDATE_RESV_ATTRSONLY, conn_sql, 2) != 0)
+	if (db_prepare_stmt(conn, STMT_UPDATE_RESV_ATTRSONLY, conn_sql, 2) != 0)
 		return -1;
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "update pbs.resv set "
@@ -148,7 +148,7 @@ pbs_db_prepare_resv_sqls(void *conn)
 		"attributes = attributes - $2::text[] "
 		"where ri_resvID = $1 "
 		"returning to_char(ri_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as ri_savetm");
-	if (pbs_prepare_stmt(conn, STMT_REMOVE_RESVATTRS, conn_sql, 2) != 0)
+	if (db_prepare_stmt(conn, STMT_REMOVE_RESVATTRS, conn_sql, 2) != 0)
 		return -1;
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "select "
@@ -170,7 +170,7 @@ pbs_db_prepare_resv_sqls(void *conn)
 		"to_char(ri_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as ri_savetm, "
 		"hstore_to_array(attributes) as attributes "
 		"from pbs.resv where ri_resvid = $1");
-	if (pbs_prepare_stmt(conn, STMT_SELECT_RESV, conn_sql, 1) != 0)
+	if (db_prepare_stmt(conn, STMT_SELECT_RESV, conn_sql, 1) != 0)
 		return -1;
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "select "
@@ -193,7 +193,7 @@ pbs_db_prepare_resv_sqls(void *conn)
 		"hstore_to_array(attributes) as attributes "
 		"from pbs.resv where ri_savetm > to_timestamp($1, 'YYYY-MM-DD HH24:MI:SS:US') "
 		"order by ri_savetm ");
-	if (pbs_prepare_stmt(conn, STMT_FINDRESVS_FROM_TIME_ORDBY_SAVETM, conn_sql, 1) != 0)
+	if (db_prepare_stmt(conn, STMT_FINDRESVS_FROM_TIME_ORDBY_SAVETM, conn_sql, 1) != 0)
 		return -1;
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "select "
@@ -216,12 +216,12 @@ pbs_db_prepare_resv_sqls(void *conn)
 		"hstore_to_array(attributes) as attributes "
 		"from pbs.resv "
 		"order by ri_creattm");
-	if (pbs_prepare_stmt(conn, STMT_FINDRESVS_ORDBY_CREATTM,
+	if (db_prepare_stmt(conn, STMT_FINDRESVS_ORDBY_CREATTM,
 		conn_sql, 0) != 0)
 		return -1;
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "delete from pbs.resv where ri_resvid = $1");
-	if (pbs_prepare_stmt(conn, STMT_DELETE_RESV, conn_sql, 1) != 0)
+	if (db_prepare_stmt(conn, STMT_DELETE_RESV, conn_sql, 1) != 0)
 		return -1;
 
 	return 0;
@@ -364,7 +364,7 @@ pbs_db_save_resv(void *conn, pbs_db_obj_info_t *obj, int savetype)
 		stmt = STMT_INSERT_RESV;
 
 	if (stmt != NULL) {
-		if (pbs_db_cmd(conn, stmt, params, &res) != 0) {
+		if (db_cmd(conn, stmt, params, &res) != 0) {
 			free(raw_array);
 			return -1;
 		}
@@ -402,7 +402,7 @@ pbs_db_load_resv(void *conn, pbs_db_obj_info_t *obj)
 
 	SET_PARAM_STR(conn_data, presv->ri_resvid, 0);
 
-	if ((rc = pbs_db_query(conn, STMT_SELECT_RESV, 1, &res)) != 0)
+	if ((rc = db_query(conn, STMT_SELECT_RESV, 1, &res)) != 0)
 		return rc;
 
 	rc = load_resv(res, presv, 0);
@@ -457,7 +457,7 @@ pbs_db_find_resv(void *conn, void *st, pbs_db_obj_info_t *obj,
 		strcpy(conn_sql, STMT_FINDRESVS_ORDBY_CREATTM);
 	}
 
-	if ((rc = pbs_db_query(conn, conn_sql, params, &res)) != 0)
+	if ((rc = db_query(conn, conn_sql, params, &res)) != 0)
 		return rc;
 
 	state->row = 0;
@@ -507,7 +507,7 @@ pbs_db_delete_resv(void *conn, pbs_db_obj_info_t* obj)
 {
 	pbs_db_resv_info_t *presv = obj->pbs_db_un.pbs_db_resv;
 	SET_PARAM_STR(conn_data, presv->ri_resvid, 0);
-	return (pbs_db_cmd(conn, STMT_DELETE_RESV, 1, NULL));
+	return (db_cmd(conn, STMT_DELETE_RESV, 1, NULL));
 }
 
 
@@ -540,7 +540,7 @@ pbs_db_del_attr_resv(void *conn, void *obj_id, char *sv_time, pbs_db_attr_list_t
 
 	SET_PARAM_BIN(conn_data, raw_array, len, 1);
 
-	if (pbs_db_cmd(conn, STMT_REMOVE_RESVATTRS, 2, &res) != 0) {
+	if (db_cmd(conn, STMT_REMOVE_RESVATTRS, 2, &res) != 0) {
 		free(raw_array);
 		return -1;
 	}

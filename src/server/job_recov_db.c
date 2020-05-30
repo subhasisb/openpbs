@@ -109,8 +109,8 @@ void print_backtrace(char *);
 extern time_t time_now;
 
 static int attach_queue_to_reservation(resc_resv *);
-job *refresh_job(pbs_db_obj_info_t *dbobj, int *refreshed);
-resc_resv *refresh_resv(pbs_db_obj_info_t *dbobj, int *refreshed);
+job *recov_job_cb(pbs_db_obj_info_t *dbobj, int *refreshed);
+resc_resv *recov_resv_cb(pbs_db_obj_info_t *dbobj, int *refreshed);
 
 #ifndef PBS_MOM
 
@@ -656,7 +656,7 @@ resv_recov_db(char *resvid, resc_resv *presv)
  *	Refresh/retrieve job from database and add it into AVL tree if not present
  *
  *	@param[in]  dbobj     - The pointer to the wrapper job object of type pbs_db_job_info_t
- * 	@param[out]  refreshed - To count the no. of jobs refreshed
+ * 	@param[out]  refreshed - To check if job is refreshed
  *
  * @return	The recovered job
  * @retval	NULL - Failure
@@ -664,12 +664,13 @@ resv_recov_db(char *resvid, resc_resv *presv)
  *
  */
 job *
-refresh_job(pbs_db_obj_info_t *dbobj, int *refreshed) 
+recov_job_cb(pbs_db_obj_info_t *dbobj, int *refreshed)
 {
 	job *pj = NULL;
 	int load_type = 0;
 	pbs_db_job_info_t *dbjob = dbobj->pbs_db_un.pbs_db_job;
 
+	*refreshed = 0;
 	if ((pj = find_job_avl(dbjob->ji_jobid)) == NULL) {
 		if ((pj = job_recov_db_spl(pj, dbjob)) == NULL) /* if job is not in AVL tree, load the job from database */
 			goto err;
@@ -682,21 +683,21 @@ refresh_job(pbs_db_obj_info_t *dbobj, int *refreshed)
 		*refreshed = 1;
 		
 	} else if (strcmp(dbjob->ji_savetm, pj->ji_savetm) != 0) { /* if the job had really changed in the DB */
-		if (db_2_job(pj, dbjob) != 0)
+		if (db_2_job(pj, dbjob) != 0) {
+			pj = NULL;
 			goto err;
-
+		}
 		*refreshed = 1;
 	}
 
+err:
 	free_db_attr_list(&dbjob->db_attr_list);
 	free_db_attr_list(&dbjob->cache_attr_list);
-
+	if (pj == NULL) {
+		snprintf(log_buffer, LOG_BUF_SIZE, "Failed to recover job %s", dbjob->ji_jobid);
+		log_err(-1, __func__, log_buffer);
+	}
 	return pj;
-
-err:
-	snprintf(log_buffer, LOG_BUF_SIZE, "Failed to refresh job %s", dbjob->ji_jobid);
-	log_err(-1, __func__, log_buffer);
-	return NULL;
 }
 
 /**
@@ -741,62 +742,12 @@ attach_queue_to_reservation(resc_resv *presv)
 resc_resv *
 recov_resv_cb(pbs_db_obj_info_t *dbobj, int *refreshed)
 {
-	pbs_db_resv_info_t	*dbresv;
-	dbresv = dbobj->pbs_db_un.pbs_db_resv;
-	resc_resv *presv;
-
-	/* recover reservation */
-	presv = resv_recov_db(dbresv->ri_resvid, NULL);
-	if (presv != NULL) {
-		is_resv_window_in_future(presv);
-		set_old_subUniverse(presv);
-
-		append_link(&svr_allresvs, &presv->ri_allresvs, presv);
-		if (attach_queue_to_reservation(presv)) {
-
-			/* reservation needed queue; failed to find it */
-			sprintf(log_buffer, msg_init_resvNOq,
-				presv->ri_qs.ri_queue, presv->ri_qs.ri_resvID);
-			log_event(PBSEVENT_SYSTEM | PBSEVENT_ADMIN |
-				PBSEVENT_DEBUG, PBS_EVENTCLASS_RESV,
-				LOG_NOTICE, msg_daemonname, log_buffer);
-		} else {
-
-			sprintf(log_buffer, msg_init_recovresv,
-				presv->ri_qs.ri_resvID);
-			log_event(PBSEVENT_SYSTEM | PBSEVENT_ADMIN |
-				PBSEVENT_DEBUG, PBS_EVENTCLASS_SERVER,
-				LOG_INFO, msg_daemonname, log_buffer);
-		}
-		*refreshed = 1;
-	}
-
-	free_db_attr_list(&dbresv->db_attr_list);
-	free_db_attr_list(&dbresv->cache_attr_list);
-
-	return presv;
-}
-
-/**
- * @brief
- *	Refresh/retrieve reservation from database and add it into list if not present
- *
- *	@param[in]	dbobj - The pointer to the wrapper resv object of type pbs_db_resv_info_t
- *	@param[out]	refreshed - To check if reservation refreshed
- *
- * @return	The recovered reservation
- * @retval	NULL - Failure
- * @retval	!NULL - Success, pointer to reservation structure recovered
- *
- */
-resc_resv *
-refresh_resv(pbs_db_obj_info_t *dbobj, int *refreshed) 
-{
 	extern pbs_list_head	svr_allresvs; 
 	resc_resv *presv = NULL;
 	char *at;
 	pbs_db_resv_info_t *dbresv = dbobj->pbs_db_un.pbs_db_resv;
-	
+
+	*refreshed = 0;
 	if ((at = strchr(dbresv->ri_resvid, (int)'@')) != 0)
 		*at = '\0';	/* strip of @server_name */
 
@@ -816,28 +767,38 @@ refresh_resv(pbs_db_obj_info_t *dbobj, int *refreshed)
 
 		/* add resv to server list */
 		append_link(&svr_allresvs, &presv->ri_allresvs, presv);
-		
-		*refreshed = 1;
 
+		is_resv_window_in_future(presv);
+		set_old_subUniverse(presv);
+
+		if (attach_queue_to_reservation(presv)) {
+			/* reservation needed queue; failed to find it */
+			sprintf(log_buffer, msg_init_resvNOq, presv->ri_qs.ri_queue, presv->ri_qs.ri_resvID);
+			log_event(PBSEVENT_SYSTEM | PBSEVENT_ADMIN |
+				PBSEVENT_DEBUG, PBS_EVENTCLASS_RESV,
+				LOG_NOTICE, msg_daemonname, log_buffer);
+		} else {
+			sprintf(log_buffer, msg_init_recovresv, presv->ri_qs.ri_resvID);
+			log_event(PBSEVENT_SYSTEM | PBSEVENT_ADMIN |
+				PBSEVENT_DEBUG, PBS_EVENTCLASS_SERVER,
+				LOG_INFO, msg_daemonname, log_buffer);
+		}
+		*refreshed = 1;
 	} else if (strcmp(dbresv->ri_savetm, presv->ri_savetm) != 0) { /* if the job had really changed in the DB */
-		if (db_2_resv(presv, dbresv) != 0)
+		if (db_2_resv(presv, dbresv) != 0) {
+			presv = NULL;
 			goto err;
-		
+		}
 		*refreshed = 1;
 	}
-
-	free_db_attr_list(&dbresv->db_attr_list);
-	free_db_attr_list(&dbresv->cache_attr_list);
-
-	return presv;
-
 err:
 	free_db_attr_list(&dbresv->db_attr_list);
 	free_db_attr_list(&dbresv->cache_attr_list);
-
-	snprintf(log_buffer, LOG_BUF_SIZE, "Failed to refresh resv attribute %s", dbresv->ri_resvid);
-	log_err(-1, __func__, log_buffer);
-	return NULL;
+	if (presv == NULL) {
+		snprintf(log_buffer, LOG_BUF_SIZE, "Failed to recover resv %s", dbresv->ri_resvid);
+		log_err(-1, __func__, log_buffer);
+	}
+	return presv;
 }
 
 /**
@@ -869,7 +830,7 @@ get_all_db_jobs()
 	/* get jobs from DB */
 	obj.pbs_db_obj_type = PBS_DB_JOB;
 	obj.pbs_db_un.pbs_db_job = &dbjob;
-	count = pbs_db_search(conn, &obj, &opts, (query_cb_t)&refresh_job);
+	count = pbs_db_search(conn, &obj, &opts, (query_cb_t)&recov_job_cb);
 	if (count == -1) {
 		pbs_db_get_errmsg(PBS_DB_ERR, &conn_db_err);
 		if (conn_db_err != NULL) {
@@ -881,12 +842,12 @@ get_all_db_jobs()
 	}
 
 	if (count > 0) {
-		sprintf(log_buffer, "Refreshed %d jobs", count);
+		sprintf(log_buffer, "Recovered %d jobs", count);
 		log_event(PBSEVENT_DEBUG, PBS_EVENTCLASS_SERVER, LOG_DEBUG, __func__, log_buffer);
 	}
 
 	/* to save the last job's time save_tm, since we are loading in order */
-	if (strncmp(opts.timestamp, jobs_from_time, DB_TIMESTAMP_LEN) > 0)
+	if (opts.timestamp && opts.timestamp[0] != '\0')
 		strcpy(jobs_from_time, opts.timestamp);
 
 	return 0;
@@ -917,7 +878,7 @@ get_all_db_resvs()
 	dbobj.pbs_db_obj_type = PBS_DB_RESV;
 	dbobj.pbs_db_un.pbs_db_resv = &dbresv;
 	
-	count = pbs_db_search(conn, &dbobj, &opts, (query_cb_t)&refresh_resv);
+	count = pbs_db_search(conn, &dbobj, &opts, (query_cb_t)&recov_resv_cb);
 	if (count == -1) {
 		pbs_db_get_errmsg(PBS_DB_ERR, &conn_db_err);
 		if (conn_db_err != NULL) {
@@ -928,12 +889,12 @@ get_all_db_resvs()
 	}
 
 	if (count > 0) {
-		sprintf(log_buffer, "Refreshed %d reservations", count);
+		sprintf(log_buffer, "Recovered %d reservations", count);
 		log_event(PBSEVENT_DEBUG, PBS_EVENTCLASS_SERVER, LOG_DEBUG, __func__, log_buffer);
 	}
 
 	/* to save the last job's time save_tm, since we are loading in order */
-	if (strncmp(opts.timestamp, resvs_from_time, DB_TIMESTAMP_LEN) > 0)
+	if (opts.timestamp && opts.timestamp[0] != '\0')	
 		strcpy(resvs_from_time, opts.timestamp);
 
 	return 0;

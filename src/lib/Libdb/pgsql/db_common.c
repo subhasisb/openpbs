@@ -160,7 +160,7 @@ pg_db_fn_t db_fn_arr[PBS_DB_NUM_TYPES] = {
  *
  */
 static void *
-pbs_initialize_state(void *conn, query_cb_t query_cb)
+db_initialize_state(void *conn, query_cb_t query_cb)
 {
 	db_query_state_t *state = malloc(sizeof(db_query_state_t));
 	if (!state)
@@ -183,7 +183,7 @@ pbs_initialize_state(void *conn, query_cb_t query_cb)
  * @return void
  */
 static void
-pbs_destroy_state(void *st)
+db_destroy_state(void *st)
 {
 	db_query_state_t *state = st;
 	if (state) {
@@ -221,28 +221,27 @@ pbs_db_search(void *conn, pbs_db_obj_info_t *obj, pbs_db_query_options_t *opts, 
 	int refreshed;
 	int rc;
 
-	st = pbs_initialize_state(conn, query_cb);
+	st = db_initialize_state(conn, query_cb);
 	if (!st)
 		return -1;
 
 	ret = db_fn_arr[obj->pbs_db_obj_type].pbs_db_find_obj(conn, st, obj, opts);
 	if (ret == -1) {
 		/* error in executing the sql */
-		pbs_destroy_state(st);
+		db_destroy_state(st);
 		return -1;
 	}
 	totcount = 0;
-	while ((rc = pbs_db_cursor_next(conn, st, obj)) == 0) {
-		refreshed = 0;
+	while ((rc = db_cursor_next(conn, st, obj)) == 0) {
 		query_cb(obj, &refreshed);
 		if (refreshed)
 			totcount++;
-
 	}
-	if (opts != NULL && totcount)
-		pbs_db_copy_savetm(obj, opts);
 
-	pbs_destroy_state(st);
+	if (opts != NULL && totcount)
+		db_copy_savetm(obj, opts);
+
+	db_destroy_state(st);
 	return totcount;
 }
 
@@ -264,7 +263,7 @@ pbs_db_search(void *conn, pbs_db_obj_info_t *obj, pbs_db_query_options_t *opts, 
  *
  */
 int
-pbs_db_cursor_next(void *conn, void *st, pbs_db_obj_info_t *obj)
+db_cursor_next(void *conn, void *st, pbs_db_obj_info_t *obj)
 {
 	db_query_state_t *state = (db_query_state_t *)st;
 	int ret;
@@ -291,7 +290,7 @@ pbs_db_cursor_next(void *conn, void *st, pbs_db_obj_info_t *obj)
  *
  */
 void
-pbs_db_copy_savetm(pbs_db_obj_info_t *obj, pbs_db_query_options_t *opts)
+db_copy_savetm(pbs_db_obj_info_t *obj, pbs_db_query_options_t *opts)
 {
 	switch (obj->pbs_db_obj_type) {
 		case PBS_DB_NODE:
@@ -306,6 +305,11 @@ pbs_db_copy_savetm(pbs_db_obj_info_t *obj, pbs_db_query_options_t *opts)
 		case PBS_DB_QUEUE:
 			strcpy(opts->timestamp, ((pbs_db_que_info_t *) obj->pbs_db_un.pbs_db_que)->qu_savetm);
 			break;
+		case PBS_DB_SVR:
+			strcpy(opts->timestamp,((pbs_db_svr_info_t *) obj->pbs_db_un.pbs_db_svr)->sv_savetm);
+			break;
+		case PBS_DB_SCHED:
+			strcpy(opts->timestamp, ((pbs_db_sched_info_t *) obj->pbs_db_un.pbs_db_sched)->sched_savetm);			
 	}
 }
 
@@ -363,7 +367,7 @@ pbs_db_load_obj(void *conn, pbs_db_obj_info_t *obj)
  *
  */
 int
-pbs_db_prepare_sqls(void *conn)
+db_prepare_sqls(void *conn)
 {
 	if (pbs_db_prepare_job_sqls(conn) != 0)
 		return -1;
@@ -394,7 +398,7 @@ pbs_db_prepare_sqls(void *conn)
  *
  */
 int
-pbs_db_execute_str(void *conn, char *sql)
+db_execute_str(void *conn, char *sql)
 {
 	PGresult *res;
 	char *rows_affected = NULL;
@@ -404,7 +408,7 @@ pbs_db_execute_str(void *conn, char *sql)
 	status = PQresultStatus(res);
 	if (status != PGRES_COMMAND_OK && status != PGRES_TUPLES_OK) {
 		char *sql_error = PQresultErrorField(res, PG_DIAG_SQLSTATE);
-		pbs_set_error(conn, &errmsg_cache, "Execution of string statement\n", sql, sql_error);
+		db_set_error(conn, &errmsg_cache, "Execution of string statement\n", sql, sql_error);
 		PQclear(res);
 		return -1;
 	}
@@ -710,7 +714,7 @@ pbs_db_password(void *conn, char *userid, char *password, char *olduser)
 	}
 
 	/* escape password to use in sql strings later */
-	if ((pquoted = pbs_db_escape_str(conn, password)) == NULL) {
+	if ((pquoted = db_escape_str(conn, password)) == NULL) {
 		fprintf(stderr, "%s: Out of memory\n", prog);
 		return -1;
 	}
@@ -718,7 +722,7 @@ pbs_db_password(void *conn, char *userid, char *password, char *olduser)
 	if (change_user == 1) {
 		/* check whether user exists */
 		snprintf(sqlbuff, sizeof(sqlbuff), "select usename from pg_user where usename = '%s'", userid);
-		if (pbs_db_execute_str(conn, sqlbuff) == 1) {
+		if (db_execute_str(conn, sqlbuff) == 1) {
 			/* now attempt to create new user & set the database passwd to the un-encrypted password */
 			snprintf(sqlbuff, sizeof(sqlbuff), "create user \"%s\" SUPERUSER ENCRYPTED PASSWORD '%s'", userid, pquoted);
 		} else {
@@ -730,12 +734,12 @@ pbs_db_password(void *conn, char *userid, char *password, char *olduser)
 		/* alter user ${user} SUPERUSER ENCRYPTED PASSWORD '${passwd}' */
 		sprintf(sqlbuff, "alter user \"%s\" SUPERUSER ENCRYPTED PASSWORD '%s'", olduser, pquoted);
 	}
-	if (pbs_db_execute_str(conn, sqlbuff) == -1)
+	if (db_execute_str(conn, sqlbuff) == -1)
 		return -1;
 	if (change_user) {
 		/* delete the old user from the database */
 		sprintf(sqlbuff, "drop user \"%s\"", olduser);
-		if (pbs_db_execute_str(conn, sqlbuff) == -1)
+		if (db_execute_str(conn, sqlbuff) == -1)
 			return -1;
 	}
 	return 0;
@@ -760,7 +764,7 @@ is_conn_error(void *conn, int *failcode)
 	/* Check to see that the backend connection was successfully made */
 	if (conn == NULL || PQstatus(conn) == CONNECTION_BAD) {
 		if (conn) {
-			pbs_set_error(conn, &errmsg_cache, "Connection:", "", "");
+			db_set_error(conn, &errmsg_cache, "Connection:", "", "");
 			if (strstr((char *) errmsg_cache, "Connection refused") || strstr((char *) errmsg_cache, "No such file or directory"))
 				*failcode = PBS_DB_CONNREFUSED;
 			else if (strstr((char *) errmsg_cache, "authentication"))
@@ -815,7 +819,7 @@ pbs_db_connect(void **db_conn, char *host, int port, int timeout)
 		return failcode;
 	}
 
-	conn_info = pbs_get_connect_string(host, timeout, &failcode, db_sys_msg, len);
+	conn_info = get_db_connect_string(host, timeout, &failcode, db_sys_msg, len);
 	if (!conn_info) {
 		free(conn_data);
 		free(conn_trx);
@@ -835,7 +839,7 @@ pbs_db_connect(void **db_conn, char *host, int port, int timeout)
 
 	/* Check to see that the backend connection was successfully made */
 	if (!(is_conn_error(*db_conn, &failcode))) {
-		if (pbs_db_prepare_sqls(*db_conn) != 0) {
+		if (db_prepare_sqls(*db_conn) != 0) {
 			fprintf(stderr, "connection is null");
 			/* this means there is programmatic/unrecoverable error, so we quit */
 			failcode = PBS_DB_INIT_FAIL;
@@ -990,7 +994,7 @@ dist_cache_del_attrs(char *id, pbs_db_attr_list_t *attr_list)
  *			used to provide a failure message.
  */
 void
-pbs_set_error(void *conn, char **conn_db_err, char *fnc, char *msg, char *msg2)
+db_set_error(void *conn, char **conn_db_err, char *fnc, char *msg, char *msg2)
 {
 	char *str;
 	char *p;
@@ -1040,13 +1044,13 @@ pbs_set_error(void *conn, char **conn_db_err, char *fnc, char *msg, char *msg2)
  *
  */
 int
-pbs_prepare_stmt(void *conn, char *stmt, char *sql, int num_vars)
+db_prepare_stmt(void *conn, char *stmt, char *sql, int num_vars)
 {
 	PGresult *res;
 	res = PQprepare((PGconn *)conn, stmt, sql, num_vars, NULL);
 	if (PQresultStatus(res) != PGRES_COMMAND_OK) {
 		char *sql_error = PQresultErrorField(res, PG_DIAG_SQLSTATE);
-		pbs_set_error(conn, &errmsg_cache, "Prepare of statement", stmt, sql_error);
+		db_set_error(conn, &errmsg_cache, "Prepare of statement", stmt, sql_error);
 		PQclear(res);
 		return -1;
 	}
@@ -1071,7 +1075,7 @@ pbs_prepare_stmt(void *conn, char *stmt, char *sql, int num_vars)
  *
  */
 int
-pbs_db_cmd(void *conn, char *stmt, int num_vars, PGresult **res_out)
+db_cmd(void *conn, char *stmt, int num_vars, PGresult **res_out)
 {
 	PGresult *res;
 	char *rows_affected = NULL;
@@ -1084,7 +1088,7 @@ pbs_db_cmd(void *conn, char *stmt, int num_vars, PGresult **res_out)
 	res_rc = PQresultStatus(res);
 	if (!(res_rc == PGRES_COMMAND_OK || res_rc == PGRES_TUPLES_OK)) {
 		char *sql_error = PQresultErrorField(res, PG_DIAG_SQLSTATE);
-		pbs_set_error(conn, &errmsg_cache, "Execution of Prepared statement", stmt, sql_error);
+		db_set_error(conn, &errmsg_cache, "Execution of Prepared statement", stmt, sql_error);
 		/* if sql_error returns value "23505" this means PBS is violating the unique key rule.
 		 * To fix this, try to delete the existing record and insert a new one */
 		if (UNIQUE_KEY_VIOLATION == atoi(sql_error)) {
@@ -1134,7 +1138,7 @@ pbs_db_cmd(void *conn, char *stmt, int num_vars, PGresult **res_out)
  *
  */
 int
-pbs_db_query(void *conn, char *stmt, int num_vars, PGresult **res)
+db_query(void *conn, char *stmt, int num_vars, PGresult **res)
 {
 	int conn_result_format = 1;
 	*res = PQexecPrepared((PGconn *)conn, stmt, num_vars,
@@ -1143,7 +1147,7 @@ pbs_db_query(void *conn, char *stmt, int num_vars, PGresult **res)
 
 	if (PQresultStatus(*res) != PGRES_TUPLES_OK) {
 		char *sql_error = PQresultErrorField(*res, PG_DIAG_SQLSTATE);
-		pbs_set_error(conn, &errmsg_cache, "Execution of Prepared statement", stmt, sql_error);
+		db_set_error(conn, &errmsg_cache, "Execution of Prepared statement", stmt, sql_error);
 		PQclear(*res);
 		return -1;
 	}
@@ -1176,7 +1180,7 @@ pbs_db_query(void *conn, char *stmt, int num_vars, PGresult **res)
  *
  */
 char *
-pbs_get_dataservice_password(char *user, char *errmsg, int len)
+get_dataservice_password(char *user, char *errmsg, int len)
 {
 	char pwd_file[MAXPATHLEN + 1];
 	int fd;
@@ -1268,7 +1272,7 @@ escape_passwd(char *dest, char *src, int len)
  *
  */
 char *
-pbs_get_connect_string(char *host, int timeout, int *err_code, char *errmsg, int len)
+get_db_connect_string(char *host, int timeout, int *err_code, char *errmsg, int len)
 {
 	char *svr_conn_info;
 	int pquoted_len = 0;
@@ -1287,7 +1291,7 @@ pbs_get_connect_string(char *host, int timeout, int *err_code, char *errmsg, int
 		return NULL;
 	}
 
-	p = pbs_get_dataservice_password(usr, errmsg, len);
+	p = get_dataservice_password(usr, errmsg, len);
 	if (p == NULL) {
 		free(usr);
 		*err_code = PBS_DB_AUTH_FAILED;
@@ -1385,7 +1389,7 @@ pbs_get_connect_string(char *host, int timeout, int *err_code, char *errmsg, int
  *
  */
 char *
-pbs_db_escape_str(void *conn, char *str)
+db_escape_str(void *conn, char *str)
 {
 	char *val_escaped;
 	int error;
@@ -1471,7 +1475,7 @@ pbs_db_get_errmsg(int err_code, char **err_msg)
  * value if network and host byte order are identical.
  */
 unsigned long long
-pbs_ntohll(unsigned long long x)
+db_ntohll(unsigned long long x)
 {
 	if (ntohl(1) == 1)
 		return x;

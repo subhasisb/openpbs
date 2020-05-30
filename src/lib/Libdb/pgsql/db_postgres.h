@@ -71,7 +71,7 @@ extern "C" {
  * Conversion macros for long long type
  */
 #if !defined(ntohll)
-#define ntohll(x) pbs_ntohll(x)
+#define ntohll(x) db_ntohll(x)
 #endif
 #if !defined(htonll)
 #define htonll(x) ntohll(x)
@@ -329,11 +329,11 @@ int pbs_db_prepare_node_sqls(void *conn);
 int pbs_db_prepare_sched_sqls(void *conn);
 int pbs_db_prepare_que_sqls(void *conn);
 
-void pbs_set_error(void *conn, char **conn_db_err, char *fnc, char *msg, char *msg2);
-int pbs_prepare_stmt(void *conn, char *stmt, char *sql, int num_vars);
-int pbs_db_cmd(void *conn, char *stmt, int num_vars, PGresult **res);
-int pbs_db_query(void *conn, char *stmt, int num_vars, PGresult **res);
-unsigned long long pbs_ntohll(unsigned long long);
+void db_set_error(void *conn, char **conn_db_err, char *fnc, char *msg, char *msg2);
+int db_prepare_stmt(void *conn, char *stmt, char *sql, int num_vars);
+int db_cmd(void *conn, char *stmt, int num_vars, PGresult **res);
+int db_query(void *conn, char *stmt, int num_vars, PGresult **res);
+unsigned long long db_ntohll(unsigned long long);
 int dbarray_2_attrlist(char *raw_array, pbs_db_attr_list_t *attr_list);
 int attrlist_2_dbarray(char **raw_array, pbs_db_attr_list_t *attr_list);
 int attrlist_2_dbarray_ex(char **raw_array, pbs_db_attr_list_t *attr_list, int keys_only);
@@ -406,7 +406,7 @@ int pbs_db_del_attr_node(void *conn, void *obj_id, char *sv_time, pbs_db_attr_li
  *                       caller needs to free
  *
  */
-char *pbs_db_escape_str(void *conn, char *str);
+char *db_escape_str(void *conn, char *str);
 
 /**
  * @brief
@@ -422,7 +422,7 @@ char *pbs_db_escape_str(void *conn, char *str);
  * @retval      -1  - Failure
  *
  */
-char *pbs_get_dataservice_password(char *user, char *errmsg, int len);
+char *get_dataservice_password(char *user, char *errmsg, int len);
 
 /**
  * @brief
@@ -441,7 +441,7 @@ char *pbs_get_dataservice_password(char *user, char *errmsg, int len);
  * @retval      !NULL - Success
  *
  */
-char *pbs_get_connect_string(char *host, int timeout, int *err_code, char *errmsg, int len);
+char *get_db_connect_string(char *host, int timeout, int *err_code, char *errmsg, int len);
 
 /**
  * @brief
@@ -454,7 +454,7 @@ char *pbs_get_connect_string(char *host, int timeout, int *err_code, char *errms
  * @retval      -1  - Failure
  *
  */
-int pbs_db_prepare_sqls(void *conn);
+int db_prepare_sqls(void *conn);
 
 /**
  * @brief
@@ -473,7 +473,7 @@ int pbs_db_prepare_sqls(void *conn);
  * @retval       1  -  Success but no more rows
  *
  */
-int pbs_db_cursor_next(void *conn, void *state, pbs_db_obj_info_t *obj);
+int db_cursor_next(void *conn, void *state, pbs_db_obj_info_t *obj);
 
 /**
  * @brief
@@ -489,7 +489,7 @@ int pbs_db_cursor_next(void *conn, void *state, pbs_db_obj_info_t *obj);
  *
  */
 void
-pbs_db_copy_savetm(pbs_db_obj_info_t *obj, pbs_db_query_options_t *opts);
+db_copy_savetm(pbs_db_obj_info_t *obj, pbs_db_query_options_t *opts);
 
 /**
  * @brief
@@ -504,7 +504,7 @@ pbs_db_copy_savetm(pbs_db_obj_info_t *obj, pbs_db_query_options_t *opts);
  * @retval       1  - Execution succeeded but statement did not return any rows
  *
  */
-int pbs_db_execute_str(void *conn, char *sql);
+int db_execute_str(void *conn, char *sql);
 
 /**
  * @brief

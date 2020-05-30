@@ -82,7 +82,7 @@ pbs_db_prepare_node_sqls(void *conn)
 		"($1, $2, $3, $4, $5, $6, $7, localtimestamp, localtimestamp, hstore($8::text[])) "
 		"returning to_char(nd_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as nd_savetm");
 
-	if (pbs_prepare_stmt(conn, STMT_INSERT_NODE, conn_sql, 8) != 0)
+	if (db_prepare_stmt(conn, STMT_INSERT_NODE, conn_sql, 8) != 0)
 		return -1;
 
 	/* in case of nodes do not use || with existing attributes, since we re-write all attributes */
@@ -97,7 +97,7 @@ pbs_db_prepare_node_sqls(void *conn)
 		"attributes = attributes || hstore($8::text[]) "
 		"where nd_name = $1 "
 		"returning to_char(nd_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as nd_savetm");
-	if (pbs_prepare_stmt(conn, STMT_UPDATE_NODE, conn_sql, 8) != 0)
+	if (db_prepare_stmt(conn, STMT_UPDATE_NODE, conn_sql, 8) != 0)
 		return -1;
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "update pbs.node set "
@@ -110,7 +110,7 @@ pbs_db_prepare_node_sqls(void *conn)
 		"nd_savetm = localtimestamp "
 		"where nd_name = $1 "
 		"returning to_char(nd_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as nd_savetm");
-	if (pbs_prepare_stmt(conn, STMT_UPDATE_NODE_QUICK, conn_sql, 7) != 0)
+	if (db_prepare_stmt(conn, STMT_UPDATE_NODE_QUICK, conn_sql, 7) != 0)
 		return -1;
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "update pbs.node set "
@@ -118,7 +118,7 @@ pbs_db_prepare_node_sqls(void *conn)
 		"attributes = attributes || hstore($2::text[]) "
 		"where nd_name = $1 "
 		"returning to_char(nd_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as nd_savetm");
-	if (pbs_prepare_stmt(conn, STMT_UPDATE_NODE_ATTRSONLY, conn_sql, 2) != 0)
+	if (db_prepare_stmt(conn, STMT_UPDATE_NODE_ATTRSONLY, conn_sql, 2) != 0)
 		return -1;
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "update pbs.node set "
@@ -126,7 +126,7 @@ pbs_db_prepare_node_sqls(void *conn)
 		"attributes = attributes - $2::text[] "
 		"where nd_name = $1 "
 		"returning to_char(nd_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as nd_savetm");
-	if (pbs_prepare_stmt(conn, STMT_REMOVE_NODEATTRS, conn_sql, 2) != 0)
+	if (db_prepare_stmt(conn, STMT_REMOVE_NODEATTRS, conn_sql, 2) != 0)
 		return -1;
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "select "
@@ -140,7 +140,7 @@ pbs_db_prepare_node_sqls(void *conn)
 		"hstore_to_array(attributes) as attributes "
 		"from pbs.node "
 		"where nd_name = $1");
-	if (pbs_prepare_stmt(conn, STMT_SELECT_NODE, conn_sql, 1) != 0)
+	if (db_prepare_stmt(conn, STMT_SELECT_NODE, conn_sql, 1) != 0)
 		return -1;
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "select "
@@ -153,7 +153,7 @@ pbs_db_prepare_node_sqls(void *conn)
 		"nd_pque, "
 		"hstore_to_array(attributes) as attributes "
 		"from pbs.node order by nd_creattm");
-	if (pbs_prepare_stmt(conn, STMT_FIND_NODES_ORDBY_CREATTM, conn_sql, 0) != 0)
+	if (db_prepare_stmt(conn, STMT_FIND_NODES_ORDBY_CREATTM, conn_sql, 0) != 0)
 		return -1;
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "select "
@@ -176,18 +176,18 @@ pbs_db_prepare_node_sqls(void *conn)
 		"hstore_to_array(attributes) as attributes "
 		"from pbs.node order by nd_index, nd_creattm");
 #endif /* localmod 079 */
-	if (pbs_prepare_stmt(conn, STMT_FIND_NODES_ORDBY_INDEX, conn_sql, 0) != 0)
+	if (db_prepare_stmt(conn, STMT_FIND_NODES_ORDBY_INDEX, conn_sql, 0) != 0)
 		return -1;
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "delete from pbs.node where nd_name = $1");
-	if (pbs_prepare_stmt(conn, STMT_DELETE_NODE, conn_sql, 1) != 0)
+	if (db_prepare_stmt(conn, STMT_DELETE_NODE, conn_sql, 1) != 0)
 		return -1;
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "select "
 		"mit_time, "
 		"mit_gen "
 		"from pbs.mominfo_time ");
-	if (pbs_prepare_stmt(conn, STMT_SELECT_MOMINFO_TIME, conn_sql, 0) != 0)
+	if (db_prepare_stmt(conn, STMT_SELECT_MOMINFO_TIME, conn_sql, 0) != 0)
 		return -1;
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "insert into pbs.mominfo_time("
@@ -195,13 +195,13 @@ pbs_db_prepare_node_sqls(void *conn)
 		"mit_gen) "
 		"values "
 		"($1, $2)");
-	if (pbs_prepare_stmt(conn, STMT_INSERT_MOMINFO_TIME, conn_sql, 2) != 0)
+	if (db_prepare_stmt(conn, STMT_INSERT_MOMINFO_TIME, conn_sql, 2) != 0)
 		return -1;
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "update pbs.mominfo_time set "
 		"mit_time = $1, "
 		"mit_gen = $2 ");
-	if (pbs_prepare_stmt(conn, STMT_UPDATE_MOMINFO_TIME, conn_sql, 2) != 0)
+	if (db_prepare_stmt(conn, STMT_UPDATE_MOMINFO_TIME, conn_sql, 2) != 0)
 		return -1;
 
 	return 0;
@@ -314,7 +314,7 @@ pbs_db_save_node(void *conn, pbs_db_obj_info_t *obj, int savetype)
 		stmt = STMT_INSERT_NODE;
 
 	if (stmt != NULL) {
-		if (pbs_db_cmd(conn, stmt, params, &res) != 0) {
+		if (db_cmd(conn, stmt, params, &res) != 0) {
 			free(raw_array);
 			return -1;
 		}
@@ -352,7 +352,7 @@ pbs_db_load_node(void *conn, pbs_db_obj_info_t *obj)
 
 	SET_PARAM_STR(conn_data, pnd->nd_name, 0);
 
-	if ((rc = pbs_db_query(conn, STMT_SELECT_NODE, 1, &res)) != 0)
+	if ((rc = db_query(conn, STMT_SELECT_NODE, 1, &res)) != 0)
 		return rc;
 
 	rc = load_node(res, pnd, 0);
@@ -396,7 +396,7 @@ pbs_db_find_node(void *conn, void *st, pbs_db_obj_info_t *obj,
 	if (!state)
 		return -1;
 
-	if ((rc = pbs_db_query(conn, STMT_FIND_NODES_ORDBY_INDEX, 0, &res)) != 0)
+	if ((rc = db_query(conn, STMT_FIND_NODES_ORDBY_INDEX, 0, &res)) != 0)
 		return rc;
 
 	state->row = 0;
@@ -446,7 +446,7 @@ pbs_db_delete_node(void *conn, pbs_db_obj_info_t *obj)
 {
 	pbs_db_node_info_t *pnd = obj->pbs_db_un.pbs_db_node;
 	SET_PARAM_STR(conn_data, pnd->nd_name, 0);
-	return (pbs_db_cmd(conn, STMT_DELETE_NODE, 1, NULL));
+	return (db_cmd(conn, STMT_DELETE_NODE, 1, NULL));
 }
 
 
@@ -480,7 +480,7 @@ pbs_db_del_attr_node(void *conn, void *obj_id, char *sv_time, pbs_db_attr_list_t
 	SET_PARAM_STR(conn_data, obj_id, 0);
 	SET_PARAM_BIN(conn_data, raw_array, len, 1);
 
-	if (pbs_db_cmd(conn, STMT_REMOVE_NODEATTRS, 2, &res) == -1) {
+	if (db_cmd(conn, STMT_REMOVE_NODEATTRS, 2, &res) == -1) {
 		free(raw_array);
 		return -1;
 	}
@@ -521,7 +521,7 @@ pbs_db_save_mominfo_tm(void *conn, pbs_db_obj_info_t *obj, int savetype)
 	else
 		stmt = STMT_UPDATE_MOMINFO_TIME;
 
-	if (pbs_db_cmd(conn, stmt, 2, NULL) == -1)
+	if (db_cmd(conn, stmt, 2, NULL) == -1)
 		return -1;
 
 	return 0;
@@ -549,7 +549,7 @@ pbs_db_load_mominfo_tm(void *conn, pbs_db_obj_info_t *obj)
 	static int mit_time_fnum = -1;
 	static int mit_gen_fnum = -1;
 
-	if ((rc = pbs_db_query(conn, STMT_SELECT_MOMINFO_TIME, 0, &res)) != 0)
+	if ((rc = db_query(conn, STMT_SELECT_MOMINFO_TIME, 0, &res)) != 0)
 		return rc;
 
 	if (mit_time_fnum == -1 || mit_gen_fnum == -1) {

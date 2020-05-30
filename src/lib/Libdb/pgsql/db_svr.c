@@ -78,7 +78,7 @@ pbs_db_prepare_svr_sqls(void *conn)
 		"values "
 		"(localtimestamp, localtimestamp, hstore($1::text[])) "
 		"returning to_char(sv_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as sv_savetm");
-	if (pbs_prepare_stmt(conn, STMT_INSERT_SVR, conn_sql, 1) != 0)
+	if (db_prepare_stmt(conn, STMT_INSERT_SVR, conn_sql, 1) != 0)
 		return -1;
 
 	/* replace all attributes for a FULL update */
@@ -86,14 +86,14 @@ pbs_db_prepare_svr_sqls(void *conn)
 		"sv_savetm = localtimestamp, "
 		"attributes = attributes || hstore($1::text[]) "
 		"returning to_char(sv_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as sv_savetm");
-	if (pbs_prepare_stmt(conn, STMT_UPDATE_SVR, conn_sql, 1) != 0)
+	if (db_prepare_stmt(conn, STMT_UPDATE_SVR, conn_sql, 1) != 0)
 		return -1;
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "update pbs.server set "
 		"sv_savetm = localtimestamp,"
 		"attributes = attributes - $1::text[] "
 		"returning to_char(sv_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as sv_savetm");
-	if (pbs_prepare_stmt(conn, STMT_REMOVE_SVRATTRS, conn_sql, 1) != 0)
+	if (db_prepare_stmt(conn, STMT_REMOVE_SVRATTRS, conn_sql, 1) != 0)
 		return -1;
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "select "
@@ -101,7 +101,7 @@ pbs_db_prepare_svr_sqls(void *conn)
 		"hstore_to_array(attributes) as attributes "
 		"from "
 		"pbs.server ");
-	if (pbs_prepare_stmt(conn, STMT_SELECT_SVR, conn_sql, 0) != 0)
+	if (db_prepare_stmt(conn, STMT_SELECT_SVR, conn_sql, 0) != 0)
 		return -1;
 
 	return 0;
@@ -132,7 +132,7 @@ pbs_db_truncate_all(void *conn)
 		"pbs.job, "
 		"pbs.server");
 
-	if (pbs_db_execute_str(conn, conn_sql) == -1)
+	if (db_execute_str(conn, conn_sql) == -1)
 		return -1;
 
 	return 0;
@@ -182,13 +182,13 @@ pbs_db_save_svr(void *conn, pbs_db_obj_info_t *obj, int savetype)
 		stmt = STMT_INSERT_SVR;
 		/* reinitialize schema by dropping PBS schema */
 		if (pbs_db_truncate_all(conn) == -1) {
-			pbs_set_error(conn, &errmsg_cache, "Could not truncate PBS data", stmt, "");
+			db_set_error(conn, &errmsg_cache, "Could not truncate PBS data", stmt, "");
 			return -1;
 		}
 	}
 
 	if (stmt != NULL) {
-		if (pbs_db_cmd(conn, stmt, params, &res) != 0) {
+		if (db_cmd(conn, stmt, params, &res) != 0) {
 			free(raw_array);
 			return -1;
 		}
@@ -228,7 +228,7 @@ pbs_db_load_svr(void *conn, pbs_db_obj_info_t *obj)
 	static int sv_savetm_fnum, attributes_fnum;
 	static int fnums_inited = 0;
 
-	if ((rc = pbs_db_query(conn, STMT_SELECT_SVR, 0, &res)) != 0)
+	if ((rc = db_query(conn, STMT_SELECT_SVR, 0, &res)) != 0)
 		return rc;
 
 	if (fnums_inited == 0) {
@@ -284,7 +284,7 @@ pbs_db_del_attr_svr(void *conn, void *obj_id, char *sv_time, pbs_db_attr_list_t 
 
 	SET_PARAM_BIN(conn_data, raw_array, len, 0);
 
-	if (pbs_db_cmd(conn, STMT_REMOVE_SVRATTRS, 1, &res) != 0) {
+	if (db_cmd(conn, STMT_REMOVE_SVRATTRS, 1, &res) != 0) {
 		PQclear(res);
 		return -1;
 	}

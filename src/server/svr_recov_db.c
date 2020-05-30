@@ -442,6 +442,7 @@ recov_sched_cb(pbs_db_obj_info_t *dbobj, int *refreshed)
 	pbs_sched *psched = NULL;
 	pbs_db_sched_info_t *dbsched = dbobj->pbs_db_un.pbs_db_sched;
 
+	*refreshed = 0;
 	/* recover sched */
 	if ((psched = sched_recov_db(dbsched->sched_name, NULL)) != NULL) {
 		if(!strncmp(dbsched->sched_name, PBS_DFLT_SCHED_NAME,

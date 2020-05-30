@@ -246,13 +246,6 @@ upgrade_pbs_schema_from_v1_0_0() {
 		echo "Please check dataservice logs"
 		return $ret
 	fi
-
-	${PBS_EXEC}/sbin/pbs_server -t updatedb > /dev/null
-	ret=$?
-	if [ $ret -ne 0 -o -f ${PBS_HOME}/server_priv/serverdb ] ; then
-		echo "*** Error during overlay upgrade"
-		return $ret
-	fi
 }
 
 upgrade_pbs_schema_from_v1_1_0() {
