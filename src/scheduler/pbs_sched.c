@@ -154,7 +154,7 @@ extern int do_hard_cycle_interrupt;
 
 static int	engage_authentication(int);
 static int	send_cycle_end(int);
-static int	initialise_svr_sock_context();
+static int	initialise_svr_sock_context(int);
 static int	socket_to_conn(int, int);
 static int	schedule_wrapper(int, int, int *, fd_set *, int);
 int		internal_connect_sched(int, char *, int, char *);
