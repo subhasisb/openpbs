@@ -200,6 +200,7 @@ static void  need_y_response(int, char *);
 int   pbsd_init_reque(job *job, int change_state);
 static void  resume_net_move(struct work_task *);
 static void  stop_me(int);
+static int   attach_queue_to_reservation(resc_resv *);
 static void  call_log_license(struct work_task *);
 /* private data */
 
@@ -1301,7 +1302,6 @@ reassign_resc(job *pjob)
 	}
 }
 
-
 /**
  * @brief
  * 		pbsd_init_job - decide what to do with the recovered job structure
@@ -1554,6 +1554,41 @@ pbsd_init_job(job *pjob, int type)
 done:
 	server.sv_attr[(int)SRV_ATR_State].at_val.at_long = svr_state;
 	return rc;
+}
+
+/**
+ * @brief
+ * 		pbsd_init_resv - decide what to do with the recovered reservation structure.
+ *
+ *		The action depends on the type of initialization.
+ *
+ * @param[in,out]	presv	- the reservation.
+ * @param[in]		type	- type of initialization (read-only=0 , or ownership=1)
+ * 					type is unused for now, will be used in later PRs
+ *
+ * @return	int
+ * @retval	0	- success
+ * @retval	-1	- error.
+ */
+int
+pbsd_init_resv(resc_resv *presv, int type)
+{
+	is_resv_window_in_future(presv);
+	set_old_subUniverse(presv);
+
+	if (attach_queue_to_reservation(presv)) {
+		/* reservation needed queue; failed to find it */
+		sprintf(log_buffer, msg_init_resvNOq, presv->ri_qs.ri_queue, presv->ri_qs.ri_resvID);
+		log_event(PBSEVENT_SYSTEM | PBSEVENT_ADMIN |
+			PBSEVENT_DEBUG, PBS_EVENTCLASS_RESV,
+			LOG_NOTICE, msg_daemonname, log_buffer);
+	} else {
+		sprintf(log_buffer, msg_init_recovresv, presv->ri_qs.ri_resvID);
+		log_event(PBSEVENT_SYSTEM | PBSEVENT_ADMIN |
+			PBSEVENT_DEBUG, PBS_EVENTCLASS_SERVER,
+			LOG_INFO, msg_daemonname, log_buffer);
+	}
+	return 0;
 }
 
 /**
@@ -1923,6 +1958,34 @@ Rmv_if_resv_not_possible(job *pjob)
 		}
 	}
 	return  (rc);
+}
+
+/**
+ * @brief
+ *  	attach_queue_to_reservation - if the reservation happens to
+ *		be supported by a pbs_queue, find the queue and attach
+ *		it to the reservation
+ *
+ * @param[in,out]	presv	- reservation.
+ *
+ * @return	int
+ * @retval	0	- success
+ * @retval	-1	- failure
+ */
+static int
+attach_queue_to_reservation(resc_resv *presv)
+{
+	if (presv == NULL || presv->ri_qs.ri_type != RESC_RESV_OBJECT)
+		return (0);
+	presv->ri_qp = find_queuebyname(presv->ri_qs.ri_queue);
+
+	if (presv->ri_qp) {
+		/*resv points to queue and queue points back*/
+		presv->ri_qp->qu_resvp = presv;
+		return (0);
+	}
+	else
+		return (-1);
 }
 
 /**

@@ -368,6 +368,7 @@ extern  long determine_resv_retry(resc_resv *presv);
 
 extern resc_resv *resv_recov_db(char *resvid, resc_resv *presv);
 extern int resv_save_db(resc_resv *presv);
+extern int pbsd_init_resv(resc_resv *presv, int type);
 
 #ifdef	__cplusplus
 }

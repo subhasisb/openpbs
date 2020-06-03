@@ -108,7 +108,6 @@ void print_backtrace(char *);
 /* global data items */
 extern time_t time_now;
 
-static int attach_queue_to_reservation(resc_resv *);
 job *recov_job_cb(pbs_db_obj_info_t *dbobj, int *refreshed);
 resc_resv *recov_resv_cb(pbs_db_obj_info_t *dbobj, int *refreshed);
 
@@ -702,34 +701,6 @@ err:
 
 /**
  * @brief
- *  	attach_queue_to_reservation - if the reservation happens to
- *		be supported by a pbs_queue, find the queue and attach
- *		it to the reservation
- *
- * @param[in,out]	presv	- reservation.
- *
- * @return	int
- * @retval	0	- success
- * @retval	-1	- failure
- */
-static int
-attach_queue_to_reservation(resc_resv *presv)
-{
-	if (presv == NULL || presv->ri_qs.ri_type != RESC_RESV_OBJECT)
-		return (0);
-	presv->ri_qp = find_queuebyname(presv->ri_qs.ri_queue);
-
-	if (presv->ri_qp) {
-		/*resv points to queue and queue points back*/
-		presv->ri_qp->qu_resvp = presv;
-		return (0);
-	}
-	else
-		return (-1);
-}
-
-/**
- * @brief
  * 		recov_resv_cb - callback function to process and load
  * 					  resv database result to pbs structure.
  *
@@ -746,6 +717,7 @@ recov_resv_cb(pbs_db_obj_info_t *dbobj, int *refreshed)
 	resc_resv *presv = NULL;
 	char *at;
 	pbs_db_resv_info_t *dbresv = dbobj->pbs_db_un.pbs_db_resv;
+	int load_type = 0;
 
 	*refreshed = 0;
 	if ((at = strchr(dbresv->ri_resvid, (int)'@')) != 0)
@@ -768,21 +740,9 @@ recov_resv_cb(pbs_db_obj_info_t *dbobj, int *refreshed)
 		/* add resv to server list */
 		append_link(&svr_allresvs, &presv->ri_allresvs, presv);
 
-		is_resv_window_in_future(presv);
-		set_old_subUniverse(presv);
+		/* MSTODO: Decide when to call pbsd_init_resv */
+		pbsd_init_resv(presv, load_type);
 
-		if (attach_queue_to_reservation(presv)) {
-			/* reservation needed queue; failed to find it */
-			sprintf(log_buffer, msg_init_resvNOq, presv->ri_qs.ri_queue, presv->ri_qs.ri_resvID);
-			log_event(PBSEVENT_SYSTEM | PBSEVENT_ADMIN |
-				PBSEVENT_DEBUG, PBS_EVENTCLASS_RESV,
-				LOG_NOTICE, msg_daemonname, log_buffer);
-		} else {
-			sprintf(log_buffer, msg_init_recovresv, presv->ri_qs.ri_resvID);
-			log_event(PBSEVENT_SYSTEM | PBSEVENT_ADMIN |
-				PBSEVENT_DEBUG, PBS_EVENTCLASS_SERVER,
-				LOG_INFO, msg_daemonname, log_buffer);
-		}
 		*refreshed = 1;
 	} else if (strcmp(dbresv->ri_savetm, presv->ri_savetm) != 0) { /* if the job had really changed in the DB */
 		if (db_2_resv(presv, dbresv) != 0) {
