@@ -84,6 +84,9 @@
 #include "pbs_db.h"
 
 
+struct pbsnode *recov_node_cb(pbs_db_obj_info_t *dbobj, int *refreshed);
+struct pbsnode *pbsd_init_node(pbs_db_node_info_t *dbnode, int type);
+
 /**
  * @brief
  *		convert from database to node structure
@@ -181,7 +184,7 @@ struct pbsnode *
 node_recov_db(char *nd_name, struct pbsnode *pnode)
 {
 	pbs_db_obj_info_t obj;
-	pbs_db_conn_t *conn = (pbs_db_conn_t *) svr_db_conn;
+	void *conn = (void *) svr_db_conn;
 	pbs_db_node_info_t dbnode = {{0}};
 	int rc = 0;
 
@@ -346,7 +349,8 @@ node_save_db(struct pbsnode *pnode)
 {
 	pbs_db_node_info_t dbnode = {{0}};
 	pbs_db_obj_info_t obj;
-	pbs_db_conn_t *conn = (pbs_db_conn_t *) svr_db_conn;
+	void *conn = (void *) svr_db_conn;
+	char *conn_db_err = NULL;
 	int savetype;
 	int rc = -1;
 
@@ -369,8 +373,12 @@ done:
 	
 	if (rc != 0) {
 		strcpy(log_buffer, "node_save failed ");
-		if (conn->conn_db_err != NULL)
-			strncat(log_buffer, conn->conn_db_err, LOG_BUF_SIZE - strlen(log_buffer) - 1);
+		pbs_db_get_errmsg(PBS_DB_ERR, &conn_db_err);
+		if (conn_db_err != NULL) {
+			strcat(log_buffer, ", DB_ERR: ");
+			strncat(log_buffer, conn_db_err, LOG_BUF_SIZE - strlen(log_buffer) - 1);
+			free(conn_db_err);
+		}
 		log_err(-1, __func__, log_buffer);
 		panic_stop_db(log_buffer);
 	}
@@ -395,7 +403,7 @@ node_delete_db(struct pbsnode *pnode)
 {
 	pbs_db_node_info_t dbnode;
 	pbs_db_obj_info_t obj;
-	pbs_db_conn_t *conn = (pbs_db_conn_t *) svr_db_conn;
+	void *conn = (void *) svr_db_conn;
 
 	strcpy(dbnode.nd_name, pnode->nd_name);
 	obj.pbs_db_obj_type = PBS_DB_NODE;
@@ -411,27 +419,30 @@ node_delete_db(struct pbsnode *pnode)
  * @brief
  *	Refresh/retrieve node from database and add it into node list if not present
  *
- *	@param[in]	dbque - The pointer to the wrapper queue object of type pbs_db_node_info_t
- *  @param[in]  refreshed - To count the no. of nodes refreshed
+ *	@param[in]	dbobj - The pointer to the wrapper node object of type pbs_db_node_info_t
+ *	@param[in]	refreshed - To check if node refreshed
  *
- * @return	The recovered queue
+ * @return	The recovered node
  * @retval	NULL - Failure
- * @retval	!NULL - Success, pointer to queue structure recovered
+ * @retval	!NULL - Success, pointer to node structure recovered
  *
  */
 struct pbsnode *
-refresh_node(pbs_db_node_info_t *dbnode, int *refreshed)
+recov_node_cb(pbs_db_obj_info_t *dbobj, int *refreshed)
 {
-	char		*pslash;
-	char 		*nodename = NULL;
+	char *pslash;
+	char *nodename = NULL;
 	struct pbsnode *pnode = NULL;
 	extern AVL_IX_DESC *node_tree;
+	pbs_db_node_info_t *dbnode = dbobj->pbs_db_un.pbs_db_node;
+	int load_type = 0;
 
+	*refreshed = 0;
 	if (dbnode == NULL || dbnode->nd_name == NULL)
 		return NULL;
 
 	if ((nodename = strdup(dbnode->nd_name)) == NULL)
-		return NULL;
+		goto err;
 
 	if (*nodename == '(')
 		nodename++;	/* skip over leading paren */
@@ -440,11 +451,11 @@ refresh_node(pbs_db_node_info_t *dbnode, int *refreshed)
 		*pslash = '\0';
 
 	if (!node_tree || (pnode = find_tree(node_tree, nodename)) == NULL) {
-		if ((pnode = node_recov_db(nodename, pnode)) == NULL)
+		/* MSTODO: decide on when to call init_node */		
+		if ((pnode = pbsd_init_node(dbnode, load_type)) == NULL)
 			goto err;
-		
-		*refreshed = 1;
 
+		*refreshed = 1;
 	} else if (strcmp(dbnode->nd_savetm, pnode->nd_savetm) != 0) {
 		/* if node had changed in db */
 		if ((pnode = node_recov_db_spl(pnode, dbnode)) == NULL)
@@ -452,13 +463,64 @@ refresh_node(pbs_db_node_info_t *dbnode, int *refreshed)
 
 		*refreshed = 1;
 	}
-
-	free(nodename);
-	return pnode;
-
 err:
+	free_db_attr_list(&dbnode->db_attr_list);
+	free_db_attr_list(&dbnode->cache_attr_list);
 	free(nodename);
-	sprintf(log_buffer, "Failed to load node %s", dbnode->nd_name);
-	log_err(-1, __func__, log_buffer);
-	return NULL;
+	if (pnode == NULL) {
+		sprintf(log_buffer, "Failed to load node %s", dbnode->nd_name);
+		log_err(-1, __func__, log_buffer);
+	}
+	return pnode;
+}
+
+
+/**
+ * @brief
+ * 		Get all the nodes from database which are newly added/modified
+ * 		by other servers after the given time interval.
+ * 
+ * @param[in]	hostname: hostname which can be used to filter nodes.
+ *
+ * @return	0 - success
+ * 		1 - fail/error
+ */
+int
+get_all_db_nodes(char *hostname) 
+{
+	pbs_db_node_info_t	dbnode;
+	pbs_db_obj_info_t	dbobj;
+	void *conn = svr_db_conn;
+	pbs_db_query_options_t opts;
+	static char nodes_from_time[DB_TIMESTAMP_LEN + 1] = {0};
+	int count = 0;
+	char *conn_db_err = NULL;
+
+	/* fill in options */
+	if (hostname) {
+		opts.flags = 1;
+		opts.hostname = hostname;
+		opts.timestamp = NULL;
+	} else {
+		opts.flags = 0;
+		opts.timestamp = nodes_from_time;
+	}
+	dbobj.pbs_db_obj_type = PBS_DB_NODE;
+	dbobj.pbs_db_un.pbs_db_node = &dbnode;
+
+	count = pbs_db_search(conn, &dbobj, &opts, (query_cb_t)&recov_node_cb);
+	if (count == -1) {
+		pbs_db_get_errmsg(PBS_DB_ERR, &conn_db_err);
+		if (conn_db_err != NULL) {
+			sprintf(log_buffer, "%s", conn_db_err);
+			free(conn_db_err);
+		}
+		return (1);
+	}
+
+	/* to save the last job's time save_tm, since we are loading in order */
+	if (opts.timestamp && opts.timestamp[0] != '\0')
+		strcpy(nodes_from_time, opts.timestamp);
+
+	return 0;
 }

@@ -340,7 +340,7 @@ req_runjob(struct batch_request *preq)
 	}
 
 #ifndef NAS /* localmod 133 */
-	if ((psched->scheduler_sock != -1) && was_job_alteredmoved(parent)) {
+	if ((psched->sched_cycle_started == 1) && was_job_alteredmoved(parent)) {
 		/* Reject run request for altered/moved jobs if job_run_wait is set to "execjob_hook" */
 		if (!(psched->sch_attr[SCHED_ATR_job_run_wait].at_flags & ATR_VFLAG_SET) ||
 				(!strcmp(psched->sch_attr[SCHED_ATR_job_run_wait].at_val.at_str, RUN_WAIT_EXECJOB_HOOK))) {

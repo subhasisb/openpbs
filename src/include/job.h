@@ -1126,6 +1126,8 @@ extern int   state_char2int(char);
 extern int   uniq_nameANDfile(char*, char*, char*);
 extern long  determine_accruetype(job *);
 extern int   update_eligible_time(long, job *);
+extern int   Rmv_if_resv_not_possible(job *);
+extern int   pbsd_init_job(job *pjob, int type);
 
 #define	TOLERATE_NODE_FAILURES_ALL	"all"
 #define	TOLERATE_NODE_FAILURES_JOB_START	"job_start"
@@ -1199,8 +1201,6 @@ extern int   get_softwall(job*);
 extern int   get_used_wall(job*);
 extern int   get_used_cput(job*);
 extern int   get_cput(job*);
-extern int Rmv_if_resv_not_possible(job *pjob);
-extern int pbsd_init_job(job *pjob, int type);
 
 extern void del_job_related_file(job *pjob, char *fsuffix);
 #ifdef PBS_MOM

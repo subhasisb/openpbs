@@ -161,6 +161,7 @@ extern int write_single_node_mom_attr(struct pbsnode *np);
 extern struct python_interpreter_data  svr_interp_data;
 extern int node_delete_db(struct pbsnode *pnode);
 static void	remove_node_topology(char *);
+extern pbsnode *recov_node_cb(pbs_db_obj_info_t *, int *);
 
 /**
  * @brief
@@ -171,8 +172,8 @@ static void	remove_node_topology(char *);
  * @retval	NULL	- failure
  */
 
-struct pbsnode	  *find_nodebyname(nodename)
-char *nodename;
+struct pbsnode *
+find_nodebyname(char *nodename)
 {
 	char		*pslash;
 
@@ -198,8 +199,8 @@ char *nodename;
  * @retval	NULL	- failure
  */
 
-struct pbsnode	  *find_nodebyaddr(addr)
-pbs_net_t addr;
+struct pbsnode *
+find_nodebyaddr(pbs_net_t addr)
 {
 	int i, j;
 	mom_svrinfo_t *psvrmom;
@@ -870,6 +871,7 @@ save_nodes_db(int changemodtime, void *p)
 	resource_def *rscdef;
 	int	i;
 	mominfo_t    *pmom = (mominfo_t *) p;
+	char *conn_db_err = NULL;
 
 	DBPRT(("%s: entered\n", __func__))
 
@@ -947,8 +949,12 @@ save_nodes_db(int changemodtime, void *p)
 
 db_err:
 	strcpy(log_buffer, "Unable to save node data base ");
-	if (svr_db_conn->conn_db_err != NULL)
-		strncat(log_buffer, svr_db_conn->conn_db_err, LOG_BUF_SIZE - strlen(log_buffer) - 1);
+	pbs_db_get_errmsg(PBS_DB_ERR, &conn_db_err);
+	if (conn_db_err != NULL) {
+		strcat(log_buffer, ", DB_ERR: ");
+		strncat(log_buffer, conn_db_err, LOG_BUF_SIZE - strlen(log_buffer) - 1);
+		free(conn_db_err);
+	}
 	log_err(-1, __func__, log_buffer);
 	panic_stop_db(log_buffer);
 	return (-1);
@@ -1042,22 +1048,14 @@ struct pbssubn *create_subnode(struct pbsnode *pnode, struct pbssubn *lstsn)
 int
 setup_nodes()
 {
-	int	  err;
-	int       perm = ATR_DFLAG_ACCESS | ATR_PERM_ALLOW_INDIRECT;
 	pbs_db_obj_info_t   obj;
 	pbs_db_node_info_t dbnode = {{0}};
 	pbs_db_mominfo_time_t mom_tm;
-	void *state;
 	int rc;
-	time_t	  mom_modtime = 0;
-	struct pbsnode *np;
-	pbs_list_head atrlist;
-	pbs_db_conn_t *conn = (pbs_db_conn_t *) svr_db_conn;
-	svrattrl *pal;
-	int bad;
+	void *conn = (void *) svr_db_conn;
+	char *conn_db_err = NULL;
 
 	DBPRT(("%s: entered\n", __func__))
-	CLEAR_HEAD(atrlist);
 
 	tfree2(&streams);
 	tfree2(&ipaddrs);
@@ -1076,56 +1074,16 @@ setup_nodes()
 
 	obj.pbs_db_obj_type = PBS_DB_NODE;
 	obj.pbs_db_un.pbs_db_node = &dbnode;
-	state = pbs_db_cursor_init(conn, &obj, NULL);
-	if (state == NULL) {
-		sprintf(log_buffer, "%s", (char *) conn->conn_db_err);
+	
+	rc = pbs_db_search(conn, &obj, NULL, (query_cb_t)&recov_node_cb);
+	if (rc == -1) {
+		pbs_db_get_errmsg(PBS_DB_ERR, &conn_db_err);
+		if (conn_db_err != NULL) {
+			sprintf(log_buffer, "%s", conn_db_err);
+			free(conn_db_err);
+		}
 		goto db_err;
 	}
-
-	while ((rc = pbs_db_cursor_next(conn, state, &obj)) == 0) {
-		mom_modtime = dbnode.mom_modtime;
-
-		/* now create node and subnodes */
-		pal = GET_NEXT(dbnode.db_attr_list.attrs);
-		
-		/* MSTODO: Add attributes from dist cache to the pal list */
-
-		err = create_pbs_node2(dbnode.nd_name, pal, perm, &bad, &np, FALSE, TRUE);	/* allow unknown resources */
-		free_attrlist(&atrlist);
-		if (err) {
-			if (err == PBSE_NODEEXIST) {
-				sprintf(log_buffer, "duplicate node \"%s\"",
-					dbnode.nd_name);
-			} else {
-				sprintf(log_buffer,
-					"could not create node \"%s\", "
-					"error = %d",
-					dbnode.nd_name, err);
-			}
-			log_err(-1, __func__, log_buffer);
-			continue; /* continue recovering other nodes */
-		}
-		if (mom_modtime) {
-			/* a vnode pointer will be returned */
-			if (np)
-				np->nd_moms[0]->mi_modtime = mom_modtime;
-		}
-		if (np) {
-			if ((np->nd_attr[(int)ND_ATR_vnode_pool].at_flags & ATR_VFLAG_SET) &&
-			    (np->nd_attr[(int)ND_ATR_vnode_pool].at_val.at_long > 0)) {
-				mominfo_t *pmom = np->nd_moms[0];
-				if (pmom &&
-				    (np == ((mom_svrinfo_t *)(pmom->mi_data))->msr_children[0])) {
-					/* natural vnode being recovered, add to pool */
-					(void)add_mom_to_pool(np->nd_moms[0]);
-				}
-			}
-		}
-		free_db_attr_list(&dbnode.db_attr_list);
-		free_db_attr_list(&dbnode.cache_attr_list);
-	}
-
-	pbs_db_cursor_close(conn, state);
 
 	return (0);
 db_err:

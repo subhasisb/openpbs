@@ -93,7 +93,12 @@
 #define MAX_SAVE_TRIES 3
 
 #ifndef PBS_MOM
-extern pbs_db_conn_t	*svr_db_conn;
+extern void *svr_db_conn;
+extern int server_init_type;
+extern char *msg_init_abt;
+extern char *msg_init_resvNOq;
+extern char *msg_init_recovresv;
+extern pbs_list_head svr_allresvs;
 #ifndef WIN32
 #define BACKTRACE_BUF_SIZE 50
 void print_backtrace(char *);
@@ -102,6 +107,9 @@ void print_backtrace(char *);
 
 /* global data items */
 extern time_t time_now;
+
+job *recov_job_cb(pbs_db_obj_info_t *dbobj, int *refreshed);
+resc_resv *recov_resv_cb(pbs_db_obj_info_t *dbobj, int *refreshed);
 
 #ifndef PBS_MOM
 
@@ -269,9 +277,10 @@ job_save_db(job *pjob)
 {
 	pbs_db_job_info_t dbjob= {{0}};
 	pbs_db_obj_info_t obj;
-	pbs_db_conn_t *conn = svr_db_conn;
+	void *conn = svr_db_conn;
 	int savetype;
 	int rc = -1;
+	char *conn_db_err = NULL;
 
 	if ((savetype = job_2_db(pjob, &dbjob)) == -1)
 		goto done;
@@ -292,14 +301,18 @@ done:
 	free_db_attr_list(&dbjob.cache_attr_list);
 
 	if (rc != 0) {
-		if (conn->conn_db_err) {
-			if ((savetype & OBJ_SAVE_NEW) && strstr(conn->conn_db_err, "duplicate key"))
+		sprintf(log_buffer, "Failed to save job %s ", pjob->ji_qs.ji_jobid);
+		pbs_db_get_errmsg(PBS_DB_ERR, &conn_db_err);
+		if (conn_db_err != NULL) {
+			strcat(log_buffer, ", DB_ERR: ");
+			strncat(log_buffer, conn_db_err, LOG_BUF_SIZE - strlen(log_buffer) - 1);
+		}
+		log_err(-1, __func__, log_buffer);
+
+		if (conn_db_err) {
+			if (savetype == OBJ_SAVE_NEW && strstr(conn_db_err, "duplicate key value"))
 				rc = 1;
-		} else {
-			sprintf(log_buffer, "Failed to save job %s ", pjob->ji_qs.ji_jobid);
-			if (conn->conn_db_err != NULL)
-				strncat(log_buffer, conn->conn_db_err, LOG_BUF_SIZE - strlen(log_buffer) - 1);
-			log_err(-1, __func__, log_buffer);
+			free(conn_db_err);
 		}
 		
 		if (rc == -1)
@@ -363,7 +376,7 @@ job_recov_db(char *jid, job *pjob)
 	pbs_db_job_info_t dbjob = {{0}};
 	pbs_db_obj_info_t obj;
 	int rc = -1;
-	pbs_db_conn_t *conn = svr_db_conn;
+	void *conn = svr_db_conn;
 
 	if (pjob) {
 		CHECK_ALREADY_LOADED(pjob);
@@ -378,10 +391,9 @@ job_recov_db(char *jid, job *pjob)
 	if (rc == -2)
 		return pjob; /* no change in job, return the same job */
 
-	if (rc == 0) {
+	if (rc == 0)
 		pjob = job_recov_db_spl(pjob, &dbjob);
-	}
-		
+
 	free_db_attr_list(&dbjob.db_attr_list);
 	free_db_attr_list(&dbjob.cache_attr_list);
 
@@ -510,9 +522,10 @@ resv_save_db(resc_resv *presv)
 {
 	pbs_db_resv_info_t dbresv = {{0}};
 	pbs_db_obj_info_t obj;
-	pbs_db_conn_t *conn = svr_db_conn;
+	void *conn = svr_db_conn;
 	int savetype;
 	int rc = -1;
+	char *conn_db_err = NULL;
 
 	if ((savetype = resv_2_db(presv, &dbresv)) == -1)
 		goto done;	
@@ -536,13 +549,17 @@ done:
 
 	if (rc != 0) {
 		sprintf(log_buffer, "Failed to save resv %s ", presv->ri_qs.ri_resvID);
-		if (conn->conn_db_err != NULL)
-			strncat(log_buffer, conn->conn_db_err, LOG_BUF_SIZE - strlen(log_buffer) - 1);
+		pbs_db_get_errmsg(PBS_DB_ERR, &conn_db_err);
+		if (conn_db_err != NULL) {
+			strcat(log_buffer, ", DB_ERR: ");
+			strncat(log_buffer, conn_db_err, LOG_BUF_SIZE - strlen(log_buffer) - 1);
+		}
 		log_err(-1, __func__, log_buffer);
 
-		if(conn->conn_db_err) {
-			if (savetype == OBJ_SAVE_NEW && strstr(conn->conn_db_err, "duplicate key value"))
+		if(conn_db_err) {
+			if (savetype == OBJ_SAVE_NEW && strstr(conn_db_err, "duplicate key value"))
 				rc = 1;
+			free(conn_db_err);
 		}
 		
 		if (rc == -1)
@@ -605,7 +622,7 @@ resv_recov_db(char *resvid, resc_resv *presv)
 {
 	pbs_db_resv_info_t dbresv = {{0}};
 	pbs_db_obj_info_t obj;
-	pbs_db_conn_t *conn = svr_db_conn;
+	void *conn = svr_db_conn;
 	int rc = -1;
 
 	if (presv) {
@@ -635,8 +652,8 @@ resv_recov_db(char *resvid, resc_resv *presv)
  * @brief
  *	Refresh/retrieve job from database and add it into AVL tree if not present
  *
- *	@param[in]  dbjob     - The pointer to the wrapper job object of type pbs_db_job_info_t
- *  @param[in]  refreshed - To count the no. of jobs refreshed
+ *	@param[in]  dbobj     - The pointer to the wrapper job object of type pbs_db_job_info_t
+ * 	@param[out]  refreshed - To check if job is refreshed
  *
  * @return	The recovered job
  * @retval	NULL - Failure
@@ -644,12 +661,13 @@ resv_recov_db(char *resvid, resc_resv *presv)
  *
  */
 job *
-refresh_job(pbs_db_job_info_t *dbjob, int *refreshed) 
+recov_job_cb(pbs_db_obj_info_t *dbobj, int *refreshed)
 {
 	job *pj = NULL;
 	int load_type = 0;
-	*refreshed = 0;
+	pbs_db_job_info_t *dbjob = dbobj->pbs_db_un.pbs_db_job;
 
+	*refreshed = 0;
 	if ((pj = find_job_avl(dbjob->ji_jobid)) == NULL) {
 		if ((pj = job_recov_db_spl(pj, dbjob)) == NULL) /* if job is not in AVL tree, load the job from database */
 			goto err;
@@ -662,42 +680,44 @@ refresh_job(pbs_db_job_info_t *dbjob, int *refreshed)
 		*refreshed = 1;
 		
 	} else if (strcmp(dbjob->ji_savetm, pj->ji_savetm) != 0) { /* if the job had really changed in the DB */
-		if (db_2_job(pj, dbjob) != 0)
+		if (db_2_job(pj, dbjob) != 0) {
+			pj = NULL;
 			goto err;
-
+		}
 		*refreshed = 1;
 	}
 
-	return pj;
-
 err:
-	snprintf(log_buffer, LOG_BUF_SIZE, "Failed to refresh job %s", dbjob->ji_jobid);
-	log_err(-1, __func__, log_buffer);
-	return NULL;
+	free_db_attr_list(&dbjob->db_attr_list);
+	free_db_attr_list(&dbjob->cache_attr_list);
+	if (pj == NULL) {
+		snprintf(log_buffer, LOG_BUF_SIZE, "Failed to recover job %s", dbjob->ji_jobid);
+		log_err(-1, __func__, log_buffer);
+	}
+	return pj;
 }
-
 
 /**
  * @brief
- *	Refresh/retrieve reservation from database and add it into list if not present
+ * 		recov_resv_cb - callback function to process and load
+ * 					  resv database result to pbs structure.
  *
- *	@param[in]	dbresv - The pointer to the wrapper resv object of type pbs_db_resv_info_t
- *  @param[in]  refreshed - To count the no. of reservation refreshed
+ * @param[in]	dbobj	- database resv structure to C.
+ * @param[out]	refreshed - To check if reservation recovered
  *
- * @return	The recovered reservation
- * @retval	NULL - Failure
- * @retval	!NULL - Success, pointer to reservation structure recovered
- *
+ * @return	resv structure - on success
+ * @return 	NULL - on failure
  */
 resc_resv *
-refresh_resv(pbs_db_resv_info_t *dbresv, int *refreshed) 
+recov_resv_cb(pbs_db_obj_info_t *dbobj, int *refreshed)
 {
 	extern pbs_list_head	svr_allresvs; 
 	resc_resv *presv = NULL;
 	char *at;
+	pbs_db_resv_info_t *dbresv = dbobj->pbs_db_un.pbs_db_resv;
+	int load_type = 0;
 
 	*refreshed = 0;
-	
 	if ((at = strchr(dbresv->ri_resvid, (int)'@')) != 0)
 		*at = '\0';	/* strip of @server_name */
 
@@ -717,22 +737,125 @@ refresh_resv(pbs_db_resv_info_t *dbresv, int *refreshed)
 
 		/* add resv to server list */
 		append_link(&svr_allresvs, &presv->ri_allresvs, presv);
-		
-		*refreshed = 1;
 
+		/* MSTODO: Decide when to call pbsd_init_resv */
+		pbsd_init_resv(presv, load_type);
+
+		*refreshed = 1;
 	} else if (strcmp(dbresv->ri_savetm, presv->ri_savetm) != 0) { /* if the job had really changed in the DB */
-		if (db_2_resv(presv, dbresv) != 0)
+		if (db_2_resv(presv, dbresv) != 0) {
+			presv = NULL;
 			goto err;
-		
+		}
 		*refreshed = 1;
 	}
-
-	return presv;
-
 err:
-	snprintf(log_buffer, LOG_BUF_SIZE, "Failed to refresh resv attribute %s", dbresv->ri_resvid);
-	log_err(-1, __func__, log_buffer);
-	return NULL;
+	free_db_attr_list(&dbresv->db_attr_list);
+	free_db_attr_list(&dbresv->cache_attr_list);
+	if (presv == NULL) {
+		snprintf(log_buffer, LOG_BUF_SIZE, "Failed to recover resv %s", dbresv->ri_resvid);
+		log_err(-1, __func__, log_buffer);
+	}
+	return presv;
+}
+
+/**
+ * @brief
+ * 		Get all the jobs from database which are changed after given time.
+ *
+ * @return	0 - success
+ * 		1 - fail/error
+ */
+
+int
+get_all_db_jobs() 
+{
+	pbs_db_job_info_t dbjob = {{0}};
+	pbs_db_obj_info_t obj = {0};
+	void *conn = svr_db_conn;
+	pbs_db_query_options_t opts;
+	int count = 0;
+	static char jobs_from_time[DB_TIMESTAMP_LEN + 1] = {0};
+	char *conn_db_err = NULL;
+
+	/* fill in options */
+	opts.flags = 0;
+	opts.timestamp = jobs_from_time;
+
+	obj.pbs_db_obj_type = PBS_DB_JOB;
+	obj.pbs_db_un.pbs_db_job = &dbjob;
+	
+	/* get jobs from DB */
+	obj.pbs_db_obj_type = PBS_DB_JOB;
+	obj.pbs_db_un.pbs_db_job = &dbjob;
+	count = pbs_db_search(conn, &obj, &opts, (query_cb_t)&recov_job_cb);
+	if (count == -1) {
+		pbs_db_get_errmsg(PBS_DB_ERR, &conn_db_err);
+		if (conn_db_err != NULL) {
+			sprintf(log_buffer, "%s", conn_db_err);
+			log_err(-1, __func__, log_buffer);
+			free(conn_db_err);
+		}
+		return (1);
+	}
+
+	if (count > 0) {
+		sprintf(log_buffer, "Recovered %d jobs", count);
+		log_event(PBSEVENT_DEBUG, PBS_EVENTCLASS_SERVER, LOG_DEBUG, __func__, log_buffer);
+	}
+
+	/* to save the last job's time save_tm, since we are loading in order */
+	if (opts.timestamp && opts.timestamp[0] != '\0')
+		strcpy(jobs_from_time, opts.timestamp);
+
+	return 0;
+}
+
+/**
+ * @brief
+ * 		Get all the reservations from database which are newly added/modified
+ * 		by other servers after the given time interval.
+ *
+ * @return	0 - success
+ * 			1 - fail/error
+ */
+int
+get_all_db_resvs() 
+{
+	pbs_db_resv_info_t dbresv= {{0}};
+	pbs_db_obj_info_t dbobj;
+	void *conn = svr_db_conn;
+	pbs_db_query_options_t opts;
+	static char resvs_from_time[DB_TIMESTAMP_LEN + 1] = {0};
+	int count = 0;
+	char *conn_db_err = NULL;
+
+	/* fill in options */
+	opts.flags = 0;
+	opts.timestamp = resvs_from_time;
+	dbobj.pbs_db_obj_type = PBS_DB_RESV;
+	dbobj.pbs_db_un.pbs_db_resv = &dbresv;
+	
+	count = pbs_db_search(conn, &dbobj, &opts, (query_cb_t)&recov_resv_cb);
+	if (count == -1) {
+		pbs_db_get_errmsg(PBS_DB_ERR, &conn_db_err);
+		if (conn_db_err != NULL) {
+			sprintf(log_buffer, "%s", conn_db_err);
+			free(conn_db_err);
+		}
+		return (1);
+	}
+
+	if (count > 0) {
+		sprintf(log_buffer, "Recovered %d reservations", count);
+		log_event(PBSEVENT_DEBUG, PBS_EVENTCLASS_SERVER, LOG_DEBUG, __func__, log_buffer);
+	}
+
+	/* to save the last job's time save_tm, since we are loading in order */
+	if (opts.timestamp && opts.timestamp[0] != '\0')	
+		strcpy(resvs_from_time, opts.timestamp);
+
+	return 0;
 }
 
 #endif /* ifndef PBS_MOM */

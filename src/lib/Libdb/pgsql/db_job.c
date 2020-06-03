@@ -40,7 +40,7 @@
 
 
 /**
- * @file    db_postgres_job.c
+ * @file    db_job.c
  *
  * @brief
  *      Implementation of the job data access functions for postgres
@@ -63,9 +63,10 @@
  *
  */
 int
-pg_db_prepare_job_sqls(pbs_db_conn_t *conn)
+pbs_db_prepare_job_sqls(void *conn)
 {
-	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "insert into pbs.job ("
+	char    conn_sql[MAX_SQL_LENGTH];
+	snprintf(conn_sql, MAX_SQL_LENGTH, "insert into pbs.job ("
 		"ji_jobid,"
 		"ji_state,"
 		"ji_substate,"
@@ -96,13 +97,14 @@ pg_db_prepare_job_sqls(pbs_db_conn_t *conn)
 		"values ($1, $2, $3, $4, $5, $6, $7, $8, $9, "
 		"$10, $11, $12, $13,"
 		"$14, $15, $16, $17, $18, $19, $20, $21, $22, $23,"
-		"localtimestamp, localtimestamp, "
+		 "localtimestamp, localtimestamp,"
 		"hstore($24::text[])) "
 		"returning to_char(ji_savetm, 'YYYY-MM-DD HH24:MI:SS.US')  as ji_savetm");
-	if (pg_prepare_stmt(conn, STMT_INSERT_JOB, conn->conn_sql, 24) != 0)
+
+	if (db_prepare_stmt(conn, STMT_INSERT_JOB, conn_sql, 24) != 0)
 		return -1;
 
-	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "update pbs.job set "
+	snprintf(conn_sql, MAX_SQL_LENGTH, "update pbs.job set "
 		"ji_state = $2,"
 		"ji_substate = $3,"
 		"ji_svrflags = $4,"
@@ -129,26 +131,26 @@ pg_db_prepare_job_sqls(pbs_db_conn_t *conn)
 		"attributes = attributes || hstore($24::text[]) "
 		"where ji_jobid = $1 "
 		"returning to_char(ji_savetm, 'YYYY-MM-DD HH24:MI:SS.US')  as ji_savetm");
-	if (pg_prepare_stmt(conn, STMT_UPDATE_JOB, conn->conn_sql, 24) != 0)
+	if (db_prepare_stmt(conn, STMT_UPDATE_JOB, conn_sql, 24) != 0)
 		return -1;
 
-	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "update pbs.job set "
+	snprintf(conn_sql, MAX_SQL_LENGTH, "update pbs.job set "
 		"ji_savetm = localtimestamp,"
 		"attributes = attributes || hstore($2::text[]) "
 		"where ji_jobid = $1 "
 		"returning to_char(ji_savetm, 'YYYY-MM-DD HH24:MI:SS.US')  as ji_savetm");
-	if (pg_prepare_stmt(conn, STMT_UPDATE_JOB_ATTRSONLY, conn->conn_sql, 2) != 0)
+	if (db_prepare_stmt(conn, STMT_UPDATE_JOB_ATTRSONLY, conn_sql, 2) != 0)
 		return -1;
 
-	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "update pbs.job set "
+	snprintf(conn_sql, MAX_SQL_LENGTH, "update pbs.job set "
 		"ji_savetm = localtimestamp,"
 		"attributes = attributes - hstore($2::text[]) "
 		"where ji_jobid = $1 "
 		"returning to_char(ji_savetm, 'YYYY-MM-DD HH24:MI:SS.US')  as ji_savetm");
-	if (pg_prepare_stmt(conn, STMT_REMOVE_JOBATTRS, conn->conn_sql, 2) != 0)
+	if (db_prepare_stmt(conn, STMT_REMOVE_JOBATTRS, conn_sql, 2) != 0)
 		return -1;
 
-	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "update pbs.job set "
+	snprintf(conn_sql, MAX_SQL_LENGTH, "update pbs.job set "
 		"ji_state = $2,"
 		"ji_substate = $3,"
 		"ji_svrflags = $4,"
@@ -174,10 +176,10 @@ pg_db_prepare_job_sqls(pbs_db_conn_t *conn)
 		"ji_savetm = localtimestamp "
 		"where ji_jobid = $1 "
 		"returning to_char(ji_savetm, 'YYYY-MM-DD HH24:MI:SS.US')  as ji_savetm");
-	if (pg_prepare_stmt(conn, STMT_UPDATE_JOB_QUICK, conn->conn_sql, 23) != 0)
+	if (db_prepare_stmt(conn, STMT_UPDATE_JOB_QUICK, conn_sql, 23) != 0)
 		return -1;
 
-	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select "
+	snprintf(conn_sql, MAX_SQL_LENGTH, "select "
 		"ji_jobid,"
 		"ji_state,"
 		"ji_substate,"
@@ -204,10 +206,10 @@ pg_db_prepare_job_sqls(pbs_db_conn_t *conn)
 		"to_char(ji_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as ji_savetm, "
 		"hstore_to_array(attributes) as attributes "
 		"from pbs.job where ji_jobid = $1");
-	if (pg_prepare_stmt(conn, STMT_SELECT_JOB, conn->conn_sql, 1) != 0)
+	if (db_prepare_stmt(conn, STMT_SELECT_JOB, conn_sql, 1) != 0)
 		return -1;
 
-	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select "
+	snprintf(conn_sql, MAX_SQL_LENGTH, "select "
 		"ji_jobid,"
 		"ji_state,"
 		"ji_substate,"
@@ -235,7 +237,7 @@ pg_db_prepare_job_sqls(pbs_db_conn_t *conn)
 		"hstore_to_array(attributes) as attributes "
 		"from pbs.job where ji_savetm > to_timestamp($1, 'YYYY-MM-DD HH24:MI:SS.US') "
 		"order by ji_savetm ");
-	if (pg_prepare_stmt(conn, STMT_FINDJOBS_FROM_TIME, conn->conn_sql, 1) != 0)
+	if (db_prepare_stmt(conn, STMT_FINDJOBS_FROM_TIME, conn_sql, 1) != 0)
 		return -1;
 
 	/*
@@ -245,11 +247,11 @@ pg_db_prepare_job_sqls(pbs_db_conn_t *conn)
 	 * for details:
 	 * http://www.postgresql.org/docs/8.3/static/functions-string.html
 	 */
-	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "insert into "
+	snprintf(conn_sql, MAX_SQL_LENGTH, "insert into "
 		"pbs.job_scr (ji_jobid, script) "
 		"values "
 		"($1, encode($2, 'escape'))");
-	if (pg_prepare_stmt(conn, STMT_INSERT_JOBSCR, conn->conn_sql, 2) != 0)
+	if (db_prepare_stmt(conn, STMT_INSERT_JOBSCR, conn_sql, 2) != 0)
 		return -1;
 
 	/*
@@ -260,13 +262,13 @@ pg_db_prepare_job_sqls(pbs_db_conn_t *conn)
 	 * Refer to the following postgres link for details:
 	 * http://www.postgresql.org/docs/8.3/static/functions-string.html
 	 */
-	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select decode(script, 'escape')::bytea as script "
+	snprintf(conn_sql, MAX_SQL_LENGTH, "select decode(script, 'escape')::bytea as script "
 		"from pbs.job_scr "
 		"where ji_jobid = $1");
-	if (pg_prepare_stmt(conn, STMT_SELECT_JOBSCR, conn->conn_sql, 1) != 0)
+	if (db_prepare_stmt(conn, STMT_SELECT_JOBSCR, conn_sql, 1) != 0)
 		return -1;
 
-	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select "
+	snprintf(conn_sql, MAX_SQL_LENGTH, "select "
 		"ji_jobid,"
 		"ji_state,"
 		"ji_substate,"
@@ -293,10 +295,10 @@ pg_db_prepare_job_sqls(pbs_db_conn_t *conn)
 		"to_char(ji_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as ji_savetm, "
 		"hstore_to_array(attributes) as attributes "
 		"from pbs.job order by ji_qrank");
-	if (pg_prepare_stmt(conn, STMT_FINDJOBS_ORDBY_QRANK, conn->conn_sql, 0) != 0)
+	if (db_prepare_stmt(conn, STMT_FINDJOBS_ORDBY_QRANK, conn_sql, 0) != 0)
 		return -1;
 
-	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "select "
+	snprintf(conn_sql, MAX_SQL_LENGTH, "select "
 		"ji_jobid,"
 		"ji_state,"
 		"ji_substate,"
@@ -324,16 +326,16 @@ pg_db_prepare_job_sqls(pbs_db_conn_t *conn)
 		"hstore_to_array(attributes) as attributes "
 		"from pbs.job where ji_queue = $1"
 		" order by ji_qrank");
-	if (pg_prepare_stmt(conn, STMT_FINDJOBS_BYQUE_ORDBY_QRANK,
-		conn->conn_sql, 1) != 0)
+	if (db_prepare_stmt(conn, STMT_FINDJOBS_BYQUE_ORDBY_QRANK,
+		conn_sql, 1) != 0)
 		return -1;
 
-	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "delete from pbs.job where ji_jobid = $1");
-	if (pg_prepare_stmt(conn, STMT_DELETE_JOB, conn->conn_sql, 1) != 0)
+	snprintf(conn_sql, MAX_SQL_LENGTH, "delete from pbs.job where ji_jobid = $1");
+	if (db_prepare_stmt(conn, STMT_DELETE_JOB, conn_sql, 1) != 0)
 		return -1;
 
-	snprintf(conn->conn_sql, MAX_SQL_LENGTH, "delete from pbs.job_scr where ji_jobid = $1");
-	if (pg_prepare_stmt(conn, STMT_DELETE_JOBSCR, conn->conn_sql, 1) != 0)
+	snprintf(conn_sql, MAX_SQL_LENGTH, "delete from pbs.job_scr where ji_jobid = $1");
+	if (db_prepare_stmt(conn, STMT_DELETE_JOBSCR, conn_sql, 1) != 0)
 		return -1;
 
 	return 0;
@@ -439,7 +441,7 @@ load_job(const  PGresult *res, pbs_db_job_info_t *pj, int row)
  *
  */
 int
-pg_db_save_job(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
+pbs_db_save_job(void *conn, pbs_db_obj_info_t *obj, int savetype)
 {
 	char *stmt = NULL;
 	pbs_db_job_info_t *pjob = obj->pbs_db_un.pbs_db_job;
@@ -447,32 +449,33 @@ pg_db_save_job(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
 	char *raw_array = NULL;
 	static int ji_savetm_fnum;
 	static int fnums_inited = 0;
+	PGresult *res;
 
-	SET_PARAM_STR(conn, pjob->ji_jobid, 0);
+	SET_PARAM_STR(conn_data, pjob->ji_jobid, 0);
 
 	if (savetype & OBJ_SAVE_QS) {
-		SET_PARAM_INTEGER(conn, pjob->ji_state, 1);
-		SET_PARAM_INTEGER(conn, pjob->ji_substate, 2);
-		SET_PARAM_INTEGER(conn, pjob->ji_svrflags, 3);
-		SET_PARAM_INTEGER(conn, pjob->ji_numattr, 4);
-		SET_PARAM_INTEGER(conn, pjob->ji_ordering, 5);
-		SET_PARAM_INTEGER(conn, pjob->ji_priority, 6);
-		SET_PARAM_BIGINT(conn, pjob->ji_stime, 7);
-		SET_PARAM_BIGINT(conn, pjob->ji_endtBdry, 8);
-		SET_PARAM_STR(conn, pjob->ji_queue, 9);
-		SET_PARAM_STR(conn, pjob->ji_destin, 10);
-		SET_PARAM_INTEGER(conn, pjob->ji_un_type, 11);
-		SET_PARAM_BIGINT(conn, pjob->ji_momaddr, 12);
-		SET_PARAM_INTEGER(conn, pjob->ji_momport, 13);
-		SET_PARAM_INTEGER(conn, pjob->ji_exitstat, 14);
-		SET_PARAM_BIGINT(conn, pjob->ji_quetime, 15);
-		SET_PARAM_BIGINT(conn, pjob->ji_rteretry, 16);
-		SET_PARAM_INTEGER(conn, pjob->ji_fromsock, 17);
-		SET_PARAM_BIGINT(conn, pjob->ji_fromaddr, 18);
-		SET_PARAM_STR(conn, pjob->ji_4jid, 19);
-		SET_PARAM_STR(conn, pjob->ji_4ash, 20);
-		SET_PARAM_INTEGER(conn, pjob->ji_credtype, 21);
-		SET_PARAM_INTEGER(conn, pjob->ji_qrank, 22);
+		SET_PARAM_INTEGER(conn_data, pjob->ji_state, 1);
+		SET_PARAM_INTEGER(conn_data, pjob->ji_substate, 2);
+		SET_PARAM_INTEGER(conn_data, pjob->ji_svrflags, 3);
+		SET_PARAM_INTEGER(conn_data, pjob->ji_numattr, 4);
+		SET_PARAM_INTEGER(conn_data, pjob->ji_ordering, 5);
+		SET_PARAM_INTEGER(conn_data, pjob->ji_priority, 6);
+		SET_PARAM_BIGINT(conn_data, pjob->ji_stime, 7);
+		SET_PARAM_BIGINT(conn_data, pjob->ji_endtBdry, 8);
+		SET_PARAM_STR(conn_data, pjob->ji_queue, 9);
+		SET_PARAM_STR(conn_data, pjob->ji_destin, 10);
+		SET_PARAM_INTEGER(conn_data, pjob->ji_un_type, 11);
+		SET_PARAM_BIGINT(conn_data, pjob->ji_momaddr, 12);
+		SET_PARAM_INTEGER(conn_data, pjob->ji_momport, 13);
+		SET_PARAM_INTEGER(conn_data, pjob->ji_exitstat, 14);
+		SET_PARAM_BIGINT(conn_data, pjob->ji_quetime, 15);
+		SET_PARAM_BIGINT(conn_data, pjob->ji_rteretry, 16);
+		SET_PARAM_INTEGER(conn_data, pjob->ji_fromsock, 17);
+		SET_PARAM_BIGINT(conn_data, pjob->ji_fromaddr, 18);
+		SET_PARAM_STR(conn_data, pjob->ji_4jid, 19);
+		SET_PARAM_STR(conn_data, pjob->ji_4ash, 20);
+		SET_PARAM_INTEGER(conn_data, pjob->ji_credtype, 21);
+		SET_PARAM_INTEGER(conn_data, pjob->ji_qrank, 22);
 
 		stmt = STMT_UPDATE_JOB_QUICK;
 		params = 23;
@@ -490,11 +493,11 @@ pg_db_save_job(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
 			return -1;
 
 		if (savetype & OBJ_SAVE_QS) {
-			SET_PARAM_BIN(conn, raw_array, len, 23);
+			SET_PARAM_BIN(conn_data, raw_array, len, 23);
 			params = 24;
 			stmt = STMT_UPDATE_JOB;
 		} else {
-			SET_PARAM_BIN(conn, raw_array, len, 1);
+			SET_PARAM_BIN(conn_data, raw_array, len, 1);
 			params = 2;
 			stmt = STMT_UPDATE_JOB_ATTRSONLY;
 		}
@@ -504,16 +507,16 @@ pg_db_save_job(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
 		stmt = STMT_INSERT_JOB;
 
 	if (stmt != NULL) {
-		if (pg_db_cmd(conn, stmt, params) != 0) {
+		if (db_cmd(conn, stmt, params, &res) != 0) {
 			free(raw_array);
 			return -1;
 		}
 		if (fnums_inited == 0) {
-			ji_savetm_fnum = PQfnumber(conn->conn_resultset, "ji_savetm");
+			ji_savetm_fnum = PQfnumber(res, "ji_savetm");
 			fnums_inited = 1;
 		}
-		GET_PARAM_STR(conn->conn_resultset, 0, pjob->ji_savetm, ji_savetm_fnum);
-		PQclear(conn->conn_resultset);
+		GET_PARAM_STR(res, 0, pjob->ji_savetm, ji_savetm_fnum);
+		PQclear(res);
 		free(raw_array);
 	}
 
@@ -535,15 +538,15 @@ pg_db_save_job(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
  *
  */
 int
-pg_db_load_job(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj)
+pbs_db_load_job(void *conn, pbs_db_obj_info_t *obj)
 {
 	PGresult *res;
 	int rc;
 	pbs_db_job_info_t *pj = obj->pbs_db_un.pbs_db_job;
 
-	SET_PARAM_STR(conn, pj->ji_jobid, 0);
+	SET_PARAM_STR(conn_data, pj->ji_jobid, 0);
 
-	if ((rc = pg_db_query(conn, STMT_SELECT_JOB, 1, &res)) != 0)
+	if ((rc = db_query(conn, STMT_SELECT_JOB, 1, &res)) != 0)
 		return rc;
 
 	rc = load_job(res, pj, 0);
@@ -577,11 +580,12 @@ pg_db_load_job(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj)
  *
  */
 int
-pg_db_find_job(pbs_db_conn_t *conn, void *st, pbs_db_obj_info_t *obj,
+pbs_db_find_job(void *conn, void *st, pbs_db_obj_info_t *obj,
 	pbs_db_query_options_t *opts)
 {
 	PGresult *res;
-	pg_query_state_t *state = (pg_query_state_t *) st;
+	char    conn_sql[MAX_SQL_LENGTH];
+	db_query_state_t *state = (db_query_state_t *) st;
 	pbs_db_job_info_t *pdjob = obj->pbs_db_un.pbs_db_job;
 	int rc;
 	int params;
@@ -590,19 +594,19 @@ pg_db_find_job(pbs_db_conn_t *conn, void *st, pbs_db_obj_info_t *obj,
 		return -1;
 
 	if (opts != NULL && opts->flags == FIND_JOBS_BY_QUE) {
-		SET_PARAM_STR(conn, pdjob->ji_queue, 0);
+		SET_PARAM_STR(conn_data, pdjob->ji_queue, 0);
 		params=1;
-		strcpy(conn->conn_sql, STMT_FINDJOBS_BYQUE_ORDBY_QRANK);
-	} else if (opts != NULL && opts->timestamp){
-		SET_PARAM_STR(conn, opts->timestamp, 0);
+		strcpy(conn_sql, STMT_FINDJOBS_BYQUE_ORDBY_QRANK);
+	} else if (opts != NULL && opts->timestamp && opts->timestamp[0] != '\0'){
+		SET_PARAM_STR(conn_data, opts->timestamp, 0);
 		params=1;
-		strcpy(conn->conn_sql, STMT_FINDJOBS_FROM_TIME);
+		strcpy(conn_sql, STMT_FINDJOBS_FROM_TIME);
 	} else {
-		strcpy(conn->conn_sql, STMT_FINDJOBS_ORDBY_QRANK);
+		strcpy(conn_sql, STMT_FINDJOBS_ORDBY_QRANK);
 		params=0;
 	}
 
-	if ((rc = pg_db_query(conn, conn->conn_sql, params, &res)) != 0)
+	if ((rc = db_query(conn, conn_sql, params, &res)) != 0)
 		return rc;
 
 	state->row = 0;
@@ -626,9 +630,9 @@ pg_db_find_job(pbs_db_conn_t *conn, void *st, pbs_db_obj_info_t *obj,
  *
  */
 int
-pg_db_next_job(pbs_db_conn_t *conn, void *st, pbs_db_obj_info_t *obj)
+pbs_db_next_job(void *conn, void *st, pbs_db_obj_info_t *obj)
 {
-	pg_query_state_t *state = (pg_query_state_t *) st;
+	db_query_state_t *state = (db_query_state_t *) st;
 	obj->pbs_db_un.pbs_db_job->ji_savetm[0] = '\0';
 
 	return load_job(state->res, obj->pbs_db_un.pbs_db_job, state->row);
@@ -648,17 +652,17 @@ pg_db_next_job(pbs_db_conn_t *conn, void *st, pbs_db_obj_info_t *obj)
  *
  */
 int
-pg_db_delete_job(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj)
+pbs_db_delete_job(void *conn, pbs_db_obj_info_t *obj)
 {
 	pbs_db_job_info_t *pj = obj->pbs_db_un.pbs_db_job;
 	int rc = 0;
 
-	SET_PARAM_STR(conn, pj->ji_jobid, 0);
+	SET_PARAM_STR(conn_data, pj->ji_jobid, 0);
 
-	if ((rc = pg_db_cmd(conn, STMT_DELETE_JOB, 1)) == -1)
+	if ((rc = db_cmd(conn, STMT_DELETE_JOB, 1, NULL)) == -1)
 		goto err;
 
-	if (pg_db_cmd(conn, STMT_DELETE_JOBSCR, 1) == -1)
+	if (db_cmd(conn, STMT_DELETE_JOBSCR, 1, NULL) == -1)
 		goto err;
 
 	return rc;
@@ -681,11 +685,11 @@ err:
  *
  */
 int
-pg_db_save_jobscr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
+pbs_db_save_jobscr(void *conn, pbs_db_obj_info_t *obj, int savetype)
 {
 	pbs_db_jobscr_info_t *pscr = obj->pbs_db_un.pbs_db_jobscr;
 
-	SET_PARAM_STR(conn, pscr->ji_jobid, 0);
+	SET_PARAM_STR(conn_data, pscr->ji_jobid, 0);
 
 	/*
 	 * The script data could contain non-UTF8 characters. We therefore
@@ -694,9 +698,9 @@ pg_db_save_jobscr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
 	 * and so we use the function "LOAD_BIN" to load the parameter to
 	 * the prepared statement
 	 */
-	SET_PARAM_BIN(conn, pscr->script, (pscr->script)?strlen(pscr->script):0, 1);
+	SET_PARAM_BIN(conn_data, pscr->script, (pscr->script)?strlen(pscr->script):0, 1);
 
-	if ((pg_db_cmd(conn, STMT_INSERT_JOBSCR, 2)) == -1)
+	if ((db_cmd(conn, STMT_INSERT_JOBSCR, 2, NULL)) == -1)
 		return -1;
 
 	return 0;
@@ -715,13 +719,14 @@ pg_db_save_jobscr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj, int savetype)
  *
  */
 int
-pg_db_load_jobscr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj)
+pbs_db_load_jobscr(void *conn, pbs_db_obj_info_t *obj)
 {
 	PGresult *res;
 	pbs_db_jobscr_info_t *pscr = obj->pbs_db_un.pbs_db_jobscr;
+	char *script = NULL;
 	static int script_fnum = -1;
 
-	SET_PARAM_STR(conn, pscr->ji_jobid, 0);
+	SET_PARAM_STR(conn_data, pscr->ji_jobid, 0);
 
 	/*
 	 * The data (script) we stored was a "encoded" binary. We "decode" it
@@ -729,16 +734,19 @@ pg_db_load_jobscr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj)
 	 * result data to be returned in binary, we set conn_result_format
 	 * to 1 to indicate binary result. This setting is a one-time,
 	 * auto-reset switch which resets to 0 (TEXT) mode after each execution
-	 * of pg_db_query.
-	 *
+	 * of pbs_db_query.
 	 */
-	if (pg_db_query(conn, STMT_SELECT_JOBSCR, 1, &res) != 0)
+	if (db_query(conn, STMT_SELECT_JOBSCR, 1, &res) != 0)
 		return -1;
 
 	if (script_fnum == -1)
 		script_fnum = PQfnumber(res, "script");
 
-	GET_PARAM_BIN(res, 0, pscr->script, script_fnum);
+	GET_PARAM_BIN(res, 0, script, script_fnum);
+	pscr->script = strdup(script);
+
+	/* Cleans up memory associated with a resultset */
+	PQclear(res);
 
 	return 0;
 }
@@ -760,29 +768,30 @@ pg_db_load_jobscr(pbs_db_conn_t *conn, pbs_db_obj_info_t *obj)
  *
  */
 int
-pg_db_del_attr_job(pbs_db_conn_t *conn, void *obj_id, char *sv_time, pbs_db_attr_list_t *attr_list)
+pbs_db_del_attr_job(void *conn, void *obj_id, char *sv_time, pbs_db_attr_list_t *attr_list)
 {
 	char *raw_array = NULL;
 	int len = 0;
 	static int ji_savetm_fnum;
 	static int fnums_inited = 0;
+	PGresult *res;
 
 	if ((len = attrlist_2_dbarray_ex(&raw_array, attr_list, 1)) <= 0)
 		return -1;
 
-	SET_PARAM_STR(conn, obj_id, 0);
-	SET_PARAM_BIN(conn, raw_array, len, 1);
+	SET_PARAM_STR(conn_data, obj_id, 0);
+	SET_PARAM_BIN(conn_data, raw_array, len, 1);
 
-	if (pg_db_cmd(conn, STMT_REMOVE_JOBATTRS, 2) == -1) {
+	if (db_cmd(conn, STMT_REMOVE_JOBATTRS, 2, &res) == -1) {
 		free(raw_array);
 		return -1;
 	}
 
 	if (fnums_inited == 0) {
-		ji_savetm_fnum = PQfnumber(conn->conn_resultset, "ji_savetm");
+		ji_savetm_fnum = PQfnumber(res, "ji_savetm");
 	}
-	GET_PARAM_STR(conn->conn_resultset, 0, sv_time, ji_savetm_fnum);
-	PQclear(conn->conn_resultset);
+	GET_PARAM_STR(res, 0, sv_time, ji_savetm_fnum);
+	PQclear(res);
 	free(raw_array);
 
 	return 0;

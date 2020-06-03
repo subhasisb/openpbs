@@ -87,7 +87,7 @@ extern char	*path_svrlive;
 
 #ifndef PBS_MOM
 extern char *pbs_server_name;
-extern pbs_db_conn_t	*svr_db_conn;
+extern void	*svr_db_conn;
 extern void sched_free(pbs_sched *psched);
 #endif
 
@@ -182,7 +182,7 @@ sched_2_db(struct pbs_sched *ps, pbs_db_sched_info_t *pdbsched)
 	strcpy(pdbsched->sched_name, ps->sc_name);
 	strcpy(pdbsched->sched_savetm, ps->sc_savetm);
 
-	if ((encode_attr_db(sched_attr_def, ps->sch_attr, (int)SCHED_ATR_LAST, &pdbsched->cache_attr_list, &pdbsched->db_attr_list, 0)) != 0) 
+	if ((encode_attr_db(sched_attr_def, ps->sch_attr, (int)SCHED_ATR_LAST, &pdbsched->cache_attr_list, &pdbsched->db_attr_list, 0)) != 0)
 		return -1;
 
 	if (ps->sc_savetm[0] == '\0') /* was never loaded or saved before */
@@ -222,7 +222,7 @@ db_2_sched(struct pbs_sched *ps, pbs_db_sched_info_t *pdbsched)
 struct server *
 svr_recov_db(struct server *sv)
 {
-	pbs_db_conn_t *conn = (pbs_db_conn_t *) svr_db_conn;
+	void *conn = (void *) svr_db_conn;
 	pbs_db_svr_info_t dbsvr = {{0}};
 	pbs_db_obj_info_t obj;
 	int rc = -1;
@@ -269,11 +269,12 @@ svr_recov_db(struct server *sv)
 int
 svr_save_db(struct server *ps)
 {
-	pbs_db_conn_t *conn = (pbs_db_conn_t *) svr_db_conn;
+	void *conn = (void *) svr_db_conn;
 	pbs_db_svr_info_t dbsvr = {{0}};
 	pbs_db_obj_info_t obj;
 	int savetype;
 	int rc = -1;
+	char *conn_db_err = NULL;
 
 	/* as part of the server save, update svrlive file now,
 	 * used in failover
@@ -298,8 +299,12 @@ done:
 
 	if (rc != 0) {
 		strcpy(log_buffer, msg_svdbnosv);
-		if (conn->conn_db_err != NULL)
-			strncat(log_buffer, conn->conn_db_err, LOG_BUF_SIZE - strlen(log_buffer) - 1);
+		pbs_db_get_errmsg(PBS_DB_ERR, &conn_db_err);
+		if (conn_db_err != NULL) {
+			strcat(log_buffer, ", DB_ERR: ");
+			strncat(log_buffer, conn_db_err, LOG_BUF_SIZE - strlen(log_buffer) - 1);
+			free(conn_db_err);
+		}
 		log_err(-1, __func__, log_buffer);
 
 		panic_stop_db(log_buffer);
@@ -324,7 +329,7 @@ sched_recov_db(char *sname, pbs_sched *ps)
 {
 	pbs_db_sched_info_t	dbsched = {{0}};
 	pbs_db_obj_info_t	obj;
-	pbs_db_conn_t		*conn = (pbs_db_conn_t *) svr_db_conn;
+	void *conn = (void *) svr_db_conn;
 	int rc = -1;
 
 	if (ps) {
@@ -382,11 +387,12 @@ sched_recov_db(char *sname, pbs_sched *ps)
 int
 sched_save_db(pbs_sched *ps)
 {
-	pbs_db_conn_t *conn = (pbs_db_conn_t *) svr_db_conn;
+	void *conn = (void *) svr_db_conn;
 	pbs_db_sched_info_t dbsched = {{0}};
 	pbs_db_obj_info_t obj;
 	int savetype;
 	int rc = -1;
+	char *conn_db_err = NULL;
 
 	if ((savetype = sched_2_db(ps, &dbsched)) == -1)
 		goto done;
@@ -405,12 +411,52 @@ done:
 
 	if (rc != 0) {
 		sprintf(log_buffer, "Failed to save sched %s ", ps->sc_name);
-		if (conn->conn_db_err != NULL)
-			strncat(log_buffer, conn->conn_db_err, LOG_BUF_SIZE - strlen(log_buffer) - 1);
+		pbs_db_get_errmsg(PBS_DB_ERR, &conn_db_err);
+		if (conn_db_err != NULL) {
+			strcat(log_buffer, ", DB_ERR: ");
+			strncat(log_buffer, conn_db_err, LOG_BUF_SIZE - strlen(log_buffer) - 1);
+			free(conn_db_err);
+		}
 		log_err(-1, __func__, log_buffer);
 
 		panic_stop_db(log_buffer);
 	}
 
 	return rc;
+}
+
+/**
+ * @brief
+* 	recov_sched_cb - callback function to process and load
+* 			sched database result to pbs structure.
+ *
+ * @param[in]	dbobj	- database sched structure to C.
+ * @param[out]	refreshed - if rows processed.
+ *
+ * @return	resv structure - on success
+ * @return 	NULL - on failure
+ */
+pbs_sched *
+recov_sched_cb(pbs_db_obj_info_t *dbobj, int *refreshed)
+{
+	pbs_sched *psched = NULL;
+	pbs_db_sched_info_t *dbsched = dbobj->pbs_db_un.pbs_db_sched;
+
+	*refreshed = 0;
+	/* recover sched */
+	if ((psched = sched_recov_db(dbsched->sched_name, NULL)) != NULL) {
+		if(!strncmp(dbsched->sched_name, PBS_DFLT_SCHED_NAME,
+			strlen(PBS_DFLT_SCHED_NAME))) {
+			dflt_scheduler = psched;
+
+		}
+		psched->pbs_scheduler_port = psched->sch_attr[SCHED_ATR_sched_port].at_val.at_long;
+		psched->pbs_scheduler_addr = get_hostaddr(psched->sch_attr[SCHED_ATR_SchedHost].at_val.at_str);
+	}
+
+	free_db_attr_list(&dbsched->db_attr_list);
+	free_db_attr_list(&dbsched->cache_attr_list);
+
+	*refreshed = 1;
+	return psched;
 }
