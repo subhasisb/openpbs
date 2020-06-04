@@ -85,7 +85,6 @@
 
 
 struct pbsnode *recov_node_cb(pbs_db_obj_info_t *dbobj, int *refreshed);
-struct pbsnode *pbsd_init_node(pbs_db_node_info_t *dbnode, int type);
 
 /**
  * @brief
@@ -106,16 +105,14 @@ db_2_node(struct pbsnode *pnode, pbs_db_node_info_t *pdbnd)
 		pnode->nd_name = strdup(pdbnd->nd_name);
 		if (pnode->nd_name == NULL)
 			return -1;
-	}
-	else
+	} else
 		pnode->nd_name = NULL;
 
 	if (pdbnd->nd_hostname && pdbnd->nd_hostname[0]!=0) {
 		pnode->nd_hostname = strdup(pdbnd->nd_hostname);
 		if (pnode->nd_hostname == NULL)
 			return -1;
-	}
-	else
+	} else
 		pnode->nd_hostname = NULL;
 
 	pnode->nd_ntype = pdbnd->nd_ntype;
@@ -145,27 +142,20 @@ db_2_node(struct pbsnode *pnode, pbs_db_node_info_t *pdbnd)
 struct pbsnode *
 node_recov_db_spl(struct pbsnode *pnode, pbs_db_node_info_t *dbnode)
 {
-	struct pbsnode *pnd = NULL;
-
-	if (!pnode) {
-		if ((pnd = malloc(sizeof(struct pbsnode)))) {
-			pnode = pnd;
-			initialize_pbsnode(pnode, strdup(dbnode->nd_name), NTYPE_PBS);
-		}
-	}
+	if (!pnode)
+		if ((pnode = node_alloc(strdup(dbnode->nd_name), NTYPE_PBS)) == NULL)
+			goto err;
 	
-	if (pnode) {
-		if (db_2_node(pnode, dbnode) == 0)
+	if (pnode)
+		if (db_2_node(pnode, dbnode) == PBSE_NONE)
 			return (pnode);
+
+err:
+	if (pnode) {
+		effective_node_delete(pnode); /* free if we allocated here */
+		pnode = NULL;
 	}
-
-	/* error case */
-	if (pnd)
-		free(pnd); /* free if we allocated here */
-
-	snprintf(log_buffer, LOG_BUF_SIZE, "Failed to allocate/decode node %s", dbnode->nd_name);
-	log_err(-1, __func__, log_buffer);
-
+	log_errf(-1, __func__, "Failed to allocate/decode node %s", dbnode->nd_name);
 	return (NULL);
 }
 
@@ -174,19 +164,21 @@ node_recov_db_spl(struct pbsnode *pnode, pbs_db_node_info_t *dbnode)
  *		Recover a node from the database
  *
  * @param[in]	nd_name	- node name
- * @param[in]	pnode	- node pointer, if any, to be updated
  *
  * @return	The recovered node structure
  * @retval	NULL - Failure
  * @retval	!NULL - Success - address of recovered node returned
  */
 struct pbsnode *
-node_recov_db(char *nd_name, struct pbsnode *pnode)
+node_recov_db(char *nd_name)
 {
+	pbs_node *pnode;
 	pbs_db_obj_info_t obj;
 	void *conn = (void *) svr_db_conn;
 	pbs_db_node_info_t dbnode = {{0}};
 	int rc = 0;
+
+	pnode = find_node_fromcache(nd_name);
 
 	if (pnode) {
 		CHECK_ALREADY_LOADED(pnode);
@@ -430,44 +422,33 @@ node_delete_db(struct pbsnode *pnode)
 struct pbsnode *
 recov_node_cb(pbs_db_obj_info_t *dbobj, int *refreshed)
 {
-	char *pslash;
-	char *nodename = NULL;
-	struct pbsnode *pnode = NULL;
-	extern AVL_IX_DESC *node_tree;
+	pbs_node *pnode;
+	int rc = 0;
 	pbs_db_node_info_t *dbnode = dbobj->pbs_db_un.pbs_db_node;
-	int load_type = 0;
 
 	*refreshed = 0;
-	if (dbnode == NULL || dbnode->nd_name == NULL)
-		return NULL;
+	if ((pnode = find_node_fromcache(dbnode->nd_name)) != NULL) {
+		if (strcmp(dbnode->nd_savetm, pnode->nd_savetm) != 0) {
+			if ((rc = db_2_node(pnode, dbnode)) != 0)
+				goto done;
 
-	if ((nodename = strdup(dbnode->nd_name)) == NULL)
-		goto err;
+			*refreshed = 1;
+		}
 
-	if (*nodename == '(')
-		nodename++;	/* skip over leading paren */
-
-	if ((pslash = strchr(nodename, (int)'/')) != NULL)
-		*pslash = '\0';
-
-	if (!node_tree || (pnode = find_tree(node_tree, nodename)) == NULL) {
-		/* MSTODO: decide on when to call init_node */		
-		if ((pnode = pbsd_init_node(dbnode, load_type)) == NULL)
-			goto err;
-
-		*refreshed = 1;
-	} else if (strcmp(dbnode->nd_savetm, pnode->nd_savetm) != 0) {
-		/* if node had changed in db */
-		if ((pnode = node_recov_db_spl(pnode, dbnode)) == NULL)
-			goto err;
+	} else if ((pnode = node_recov_db_spl(pnode, dbnode)) != NULL) {
+		if ((rc = pbs_init_node(pnode)) != 0) {
+			goto done;
+		}
 
 		*refreshed = 1;
 	}
-err:
+
+done:
 	free_db_attr_list(&dbnode->db_attr_list);
 	free_db_attr_list(&dbnode->cache_attr_list);
-	free(nodename);
-	if (pnode == NULL) {
+	if (rc != 0) {
+		effective_node_delete(pnode);
+		pnode = NULL;
 		sprintf(log_buffer, "Failed to load node %s", dbnode->nd_name);
 		log_err(-1, __func__, log_buffer);
 	}
@@ -488,13 +469,13 @@ err:
 int
 get_all_db_nodes(char *hostname) 
 {
-	pbs_db_node_info_t	dbnode;
 	pbs_db_obj_info_t	dbobj;
 	void *conn = svr_db_conn;
 	pbs_db_query_options_t opts;
 	static char nodes_from_time[DB_TIMESTAMP_LEN + 1] = {0};
 	int count = 0;
 	char *conn_db_err = NULL;
+	pbs_db_node_info_t dbnode = {{0}};
 
 	/* fill in options */
 	if (hostname) {

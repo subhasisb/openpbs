@@ -190,6 +190,8 @@ extern pbs_sched *sched_alloc(char *sched_name);
 extern resc_resv *recov_resv_cb(pbs_db_obj_info_t *, int *);
 extern pbs_queue *recov_queue_cb(pbs_db_obj_info_t *, int *);
 extern pbs_sched *recov_sched_cb(pbs_db_obj_info_t *, int *);
+extern int get_all_db_jobs();
+extern int get_all_db_nodes(char *);
 /* Private functions in this file */
 
 static void  catch_child(int);
@@ -414,7 +416,6 @@ pbsd_init(int type)
 	void	*conn = (void *) svr_db_conn;
 	char *buf = NULL;
 	int buf_len = 0;
-	extern int get_all_db_jobs();
 
 #ifdef  RLIMIT_CORE
 	int      char_in_cname = 0;
@@ -737,12 +738,8 @@ pbsd_init(int type)
 		return (-1);
 	}
 
-	/* Open and read in node list if one exists */
-	if ((rc = setup_nodes()) == -1) {
-		/* log_buffer set in setup_nodes */
-		log_err(-1, __func__, log_buffer);
-		return (-1);
-	}
+	/* NJ_TODO has to be removed for lazy load */
+	get_all_db_nodes(NULL);
 	mark_which_queues_have_nodes();
 	(void) license_sanity_check();
 
@@ -1592,67 +1589,6 @@ pbsd_init_resv(resc_resv *presv, int type)
 			LOG_INFO, msg_daemonname, log_buffer);
 	}
 	return 0;
-}
-
-/**
- * @brief
- * 		pbsd_init_node - decide what to do with the recovered node structure.
- *
- *		The action depends on the type of initialization.
- *
- * @param[in,out]	dbnode	- the node recovered.
- * @param[in]		type	- type of initialization (read-only=0 , or ownership=1)
- * 					type is unused for now, will be used in later PRs
- *
- * @return	ptr to pbsnode
- * @retval	Node structure	- success
- * @retval	NULL	- error.
- */
-struct pbsnode *
-pbsd_init_node(pbs_db_node_info_t *dbnode, int type)
-{
-	time_t mom_modtime = 0;
-	struct pbsnode *np;
-	svrattrl *pal;
-	int bad;
-	int rc = 0;
-	int perm = ATR_DFLAG_ACCESS | ATR_PERM_ALLOW_INDIRECT;
-
-	mom_modtime = dbnode->mom_modtime;
-
-	/* now create node and subnodes */
-	pal = GET_NEXT(dbnode->db_attr_list.attrs);
-
-	/* MSTODO: Add attributes from dist cache to the pal list */
-
-	rc = create_pbs_node2(dbnode->nd_name, pal, perm, &bad, &np, FALSE, TRUE);	/* allow unknown resources */
-	if (rc) {
-		np = NULL;
-		goto init_err;
-	}
-
-	if (np) {
-		if (mom_modtime)
-			np->nd_moms[0]->mi_modtime = mom_modtime;
-
-		if ((np->nd_attr[(int)ND_ATR_vnode_pool].at_flags & ATR_VFLAG_SET) &&
-			(np->nd_attr[(int)ND_ATR_vnode_pool].at_val.at_long > 0)) {
-			mominfo_t *pmom = np->nd_moms[0];
-			if (pmom && (np == ((mom_svrinfo_t *)(pmom->mi_data))->msr_children[0])) {
-				/* natural vnode being recovered, add to pool */
-				(void)add_mom_to_pool(np->nd_moms[0]);
-			}
-		}
-	}
-init_err:
-	if (np == NULL) {
-		if (rc == PBSE_NODEEXIST)
-			sprintf(log_buffer, "duplicate node \"%s\"", dbnode->nd_name);
-		else
-			sprintf(log_buffer, "could not create node \"%s\", error = %d", dbnode->nd_name, rc);
-		log_err(-1, __func__, log_buffer);
-	}
-	return np;
 }
 
 /**

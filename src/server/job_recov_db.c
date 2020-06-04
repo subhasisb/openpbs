@@ -618,12 +618,15 @@ resv_recov_db_spl(resc_resv *presv, pbs_db_resv_info_t *dbresv)
  *
  */
 resc_resv *
-resv_recov_db(char *resvid, resc_resv *presv)
+resv_recov_db(char *resvid)
 {
+	resc_resv *presv;
 	pbs_db_resv_info_t dbresv = {{0}};
 	pbs_db_obj_info_t obj;
 	void *conn = svr_db_conn;
 	int rc = -1;
+
+	presv = find_resv_fromcache(resvid);
 
 	if (presv) {
 		CHECK_ALREADY_LOADED(presv);
@@ -713,22 +716,12 @@ recov_resv_cb(pbs_db_obj_info_t *dbobj, int *refreshed)
 {
 	extern pbs_list_head	svr_allresvs; 
 	resc_resv *presv = NULL;
-	char *at;
 	pbs_db_resv_info_t *dbresv = dbobj->pbs_db_un.pbs_db_resv;
 	int load_type = 0;
 
 	*refreshed = 0;
-	if ((at = strchr(dbresv->ri_resvid, (int)'@')) != 0)
-		*at = '\0';	/* strip of @server_name */
 
-	presv = (resc_resv *)GET_NEXT(svr_allresvs);
-	while (presv != NULL) {
-		if (!strcmp(dbresv->ri_resvid, presv->ri_qs.ri_resvID))
-			break;
-		presv = (resc_resv *)GET_NEXT(presv->ri_allresvs);
-	}
-	if (at)
-		*at = '@';	/* restore @server_name */
+	presv = find_resv_fromcache(dbresv->ri_resvid);
 
 	if (presv == NULL) {
 		/* if resv is not in list, load the resv from database */

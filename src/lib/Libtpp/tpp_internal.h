@@ -50,7 +50,6 @@ extern "C" {
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include "avltree.h"
-#include "log.h"
 
 #include "tpp.h"
 

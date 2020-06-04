@@ -99,6 +99,7 @@
 #include "tpp_internal.h"
 #include "dis.h"
 #include "auth.h"
+#include "log.h"
 
 /*
  *	Global Variables

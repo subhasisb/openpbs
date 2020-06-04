@@ -169,13 +169,15 @@ struct pbs_queue {
 };
 typedef struct pbs_queue pbs_queue;
 
+extern void searchable_qname(char *, char *, int);
+extern pbs_queue *find_queue_fromcache(char *);
 extern pbs_queue *find_queuebyname(char *);
 #ifdef NAS /* localmod 075 */
 extern pbs_queue *find_resvqueuebyname(char *);
 #endif /* localmod 075 */
 extern pbs_queue *get_dfltque(void);
 extern pbs_queue *que_alloc(char *name);
-extern pbs_queue *que_recov_db(char *, pbs_queue	*pq);
+extern pbs_queue *que_recov_db(char *);
 extern pbs_queue *qu_recov_db_spl(pbs_queue *pq, pbs_db_que_info_t *dbque);
 extern void      que_free(pbs_queue *);
 extern int       que_save_db(pbs_queue *);

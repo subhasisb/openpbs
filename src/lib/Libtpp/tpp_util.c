@@ -71,6 +71,7 @@
 #include "pbs_error.h"
 #include "tpp_internal.h"
 #include "dis.h"
+#include "log.h"
 #ifdef PBS_COMPRESSION_ENABLED
 #include <zlib.h>
 #endif

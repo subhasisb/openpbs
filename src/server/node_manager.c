@@ -3245,7 +3245,7 @@ set_no_node_grouping(struct pbsnode *pnode)
  * 		re-strucure and create room for the mom. Add Mom's name to this vnode's Mom attribute
  * 		and set reverse linkage Mom -> node.
  * @see
- * 		update2_to_vnode and create_pbs_node2.
+ * 		update2_to_vnode and create_pbs_node.
  *
  *
  */

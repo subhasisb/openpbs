@@ -72,6 +72,7 @@
 #include <netdb.h>
 #include <signal.h>
 #include "tpp_internal.h"
+#include "log.h"
 #ifdef HAVE_SYS_EVENTFD_H
 #include <sys/eventfd.h>
 #endif

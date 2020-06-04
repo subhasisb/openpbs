@@ -64,6 +64,7 @@
 #include <signal.h>
 #endif
 #include "tpp_internal.h"
+#include "log.h"
 
 #ifdef WIN32
 

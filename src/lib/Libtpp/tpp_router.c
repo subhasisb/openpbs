@@ -81,6 +81,7 @@
 #include "avltree.h"
 #include "tpp_internal.h"
 #include "auth.h"
+#include "log.h"
 
 #define RLIST_INC 100
 #define TPP_MAX_ROUTERS 5000

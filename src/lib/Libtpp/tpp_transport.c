@@ -74,6 +74,7 @@
 #include <signal.h>
 #include "tpp_internal.h"
 #include "auth.h"
+#include "log.h"
 
 #define TPP_CONN_DISCONNECTED   1 /* Channel is disconnected */
 #define TPP_CONN_INITIATING     2 /* Channel is initiating */

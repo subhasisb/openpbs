@@ -107,7 +107,6 @@ extern int   svr_connect(pbs_net_t, unsigned int, void (*)(int), enum conn_type,
 extern void  svr_force_disconnect(int);
 extern void  svr_shutdown(int);
 extern int   svr_get_privilege(char *, char *);
-extern int   setup_nodes(void);
 extern int   setup_resc(int);
 extern void  update_job_node_rassn(job *, attribute *, enum batch_op);
 extern void  mark_node_down(char *, char *);

@@ -293,6 +293,7 @@ struct	pbsnode {
 	char    			nd_savetm[DB_TIMESTAMP_LEN + 1];
 	int     			ld_trx_id; /* record the server iteration id of when this record was loaded */
 };
+typedef struct pbsnode pbs_node;
 
 enum	warn_codes { WARN_none, WARN_ngrp_init, WARN_ngrp_ck, WARN_ngrp };
 enum	nix_flags { NIX_none, NIX_qnodes, NIX_nonconsume };
@@ -419,19 +420,21 @@ extern	void degrade_offlined_nodes_reservations(void);
 extern	void degrade_downed_nodes_reservations(void);
 
 extern	int mod_node_ncpus(struct pbsnode *pnode, long ncpus, int actmode);
-extern	int	initialize_pbsnode(struct pbsnode*, char*, int);
+extern	pbs_node* node_alloc(char*, int);
 extern	void	initialize_pbssubn(struct pbsnode *, struct pbssubn*, struct prop*);
-extern  struct pbssubn *create_subnode(struct pbsnode *, struct pbssubn *lstsn);
+extern	struct pbssubn *create_subnode(struct pbsnode *, struct pbssubn *lstsn);
 extern	void	effective_node_delete(struct pbsnode*);
 extern	void	setup_notification(void);
 extern  struct	pbssubn  *find_subnodebyname(char *);
-extern	struct	pbsnode  *find_nodebyname(char *);
+extern	pbs_node  *find_nodebyname(char *);
+extern	pbs_node  *find_node_fromcache(char *);
+extern	int	pbs_init_node(pbs_node *);
+extern	int	update_node_cache(pbs_node *, int);
 extern	struct	pbsnode  *find_nodebyaddr(pbs_net_t);
 extern	void	free_prop_list(struct prop*);
 extern	void	recompute_ntype_cnts(void);
 extern	int	process_host_name_part(char*, svrattrl*, char**, int*);
 extern  int     create_pbs_node(char *, svrattrl *, int, int *, struct pbsnode **, int);
-extern  int     create_pbs_node2(char *, svrattrl *, int, int *, struct pbsnode **, int, int);
 extern  int     mgr_set_node_attr(struct pbsnode *, attribute_def *, int, svrattrl *, int, int *, void *, int);
 extern	int	node_queue_action(attribute *, void *, int);
 extern	int	node_pcpu_action(attribute *, void *, int);
@@ -451,6 +454,7 @@ extern  void	momptr_clear_offline_by_mom(mominfo_t *, char *);
 extern  void	   delete_mom_entry(mominfo_t *);
 extern  mominfo_t *create_svrmom_entry(char *, unsigned int, unsigned long *);
 extern  void       delete_svrmom_entry(mominfo_t *);
+extern  int	create_svrmom_struct(pbs_node *);
 extern  int	legal_vnode_char(char, int);
 extern 	char	*parse_node_token(char *, int, int *, char *);
 extern  int	cross_link_mom_vnode(struct pbsnode *, mominfo_t *);
@@ -476,9 +480,9 @@ extern char *msg_daemonname;
 
 
 #ifndef PBS_MOM
-extern int node_save_db(struct pbsnode *pnode);
-extern struct pbsnode *node_recov_db(char *nd_name, struct pbsnode *pnode);
-extern struct pbsnode *node_recov_db_spl(struct pbsnode *pnode, pbs_db_node_info_t *dbnode);
+extern int node_save_db(pbs_node *);
+extern struct pbsnode *node_recov_db(char *);
+extern struct pbsnode *node_recov_db_spl(pbs_node *, pbs_db_node_info_t *);
 extern int add_mom_to_pool(mominfo_t *);
 extern void remove_mom_from_pool(mominfo_t *);
 extern void reset_pool_inventory_mom(mominfo_t *);

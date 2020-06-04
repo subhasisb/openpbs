@@ -1669,7 +1669,7 @@ resv_free(resc_resv *presv)
 
 /**
  * @brief
- * 		find_resv() - find resc_resv struct by reservation ID
+ * 		find_resv_fromcache() - find resc_resv struct by reservation ID
  *
  *		Search list of all server resc_resv structs for one with same
  *		reservation ID as input "resvID"
@@ -1681,23 +1681,37 @@ resv_free(resc_resv *presv)
  */
 
 resc_resv *
-find_resv(char *resvID)
+find_resv_fromcache(char *resvID)
 {
-	char *at;
 	resc_resv  *presv;
 
-	if ((at = strchr(resvID, (int)'@')) != 0)
-		*at = '\0';	/* strip of @server_name */
 	presv = (resc_resv *)GET_NEXT(svr_allresvs);
 	while (presv != NULL) {
 		if (!strcmp(resvID, presv->ri_qs.ri_resvID))
 			return (presv);
 		presv = (resc_resv *)GET_NEXT(presv->ri_allresvs);
 	}
-	if (at)
-		*at = '@';	/* restore @server_name */
 
 	return (presv);		/* pointer value is null */
+}
+
+/**
+ * @brief
+ * 		find_resv() - find resc_resv struct by reservation ID from database
+ *
+ * @param[in]	resvID_in - reservation ID
+ *
+ * @return	pointer to resc_resv struct
+ * @retval	NULL	- not found
+ */
+
+resc_resv *
+find_resv(char *resvID_in)
+{
+	char resvID[PBS_MAXSVRRESVID + 1];
+
+	searchable_qname(resvID_in, resvID, PBS_MAXSVRRESVID);
+	return resv_recov_db(resvID);
 }
 
 

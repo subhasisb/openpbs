@@ -45,13 +45,12 @@
  *		 the following global variables:
  *	pbsnlist     -	the server's global node list
  *	svr_totnodes -	total number of pbshost entries
- *	initialize_pbsnode - Initialize a new pbs node structure
  *
  * Included functions are:
  *	find_nodebyname()   	-     given a node host name, search pbsndlist
  * 	status_nodeattrib() 	-    add status of each requested (or all) node-attribute
  *								to the status reply
- * 	initialize_pbsnode() 	-   performs node initialization on a new node
+ * 	node_alloc() 		-   performs node initialization on a new node
  * 	effective_node_delete() -  effectively deletes a node from the server's node
  *								list by setting the node's "deleted" bit
  * 	setup_notification() 	-   sets mechanism for notifying other hosts about a new
@@ -68,7 +67,6 @@
  *	save_nodes_db_inner()	-	Static function to update all the nodes in the db
  *	init_prop()				-	allocate and initialize a prop struct
  *	create_subnode()		-	create a subnode entry and link to parent node
- *	setup_nodes()			-	Read the, "nodes" information from database
  *								containing the list of properties for each node.
  *	delete_a_subnode()		-	mark a (last) single subnode entry as deleted
  *	mod_node_ncpus()		-	when resources_available.ncpus changes, need to update the number of subnodes,
@@ -154,7 +152,6 @@ extern unsigned int pbs_rm_port;
 extern mominfo_time_t  mominfo_time;
 extern char	*resc_in_err;
 extern char	server_host[];
-extern AVL_IX_DESC *node_tree;
 extern time_t	 time_now;
 extern int write_single_node_mom_attr(struct pbsnode *np);
 
@@ -163,30 +160,167 @@ extern int node_delete_db(struct pbsnode *pnode);
 static void	remove_node_topology(char *);
 extern pbsnode *recov_node_cb(pbs_db_obj_info_t *, int *);
 
+static AVL_IX_DESC *node_tree = NULL;
+
+
 /**
  * @brief
- * 		find_nodebyname() - find a node host by its name
+ * 		update_node_cache - Update the node in the internal tree
+ * 					and nodes array.
+ *
+ * @param[in]	pnode  - node struct
+ * @param[in]	op     - TREE_OP_ADD or TREE_OP_DEL
+ *
+ * @return int
+ * @retval 0: success
+ * @retval !0: failure
+ */
+int
+update_node_cache(pbs_node *pnode, int op)
+{
+	struct pbsnode **tmpndlist;
+	static int pbsndlist_sz = 0;
+
+	switch(op) {
+		case TREE_OP_ADD:
+			/* create node tree if not already done */
+			if (node_tree == NULL ) {
+				node_tree = create_tree(AVL_NO_DUP_KEYS, 0);
+				if (node_tree == NULL ) {
+					free_pnode(pnode);
+					return (PBSE_SYSTEM);
+				}
+			}
+
+			if (tree_add_del(node_tree, pnode->nd_name, pnode, TREE_OP_ADD) != 0) {
+				DBPRT(("Addition to node tree has failed"))
+				free_pnode(pnode);
+				return (PBSE_SYSTEM);
+			}
+
+			/* expand pbsndlist array if not sufficient*/
+			if (pbsndlist_sz <= svr_totnodes) {
+				tmpndlist = (struct pbsnode **) realloc(pbsndlist,
+						sizeof(struct pbsnode*) * (svr_totnodes * 2 + 1));
+
+				if (tmpndlist != NULL) {
+					pbsndlist = tmpndlist;
+				} else {
+					free_pnode(pnode);
+					return (PBSE_SYSTEM);
+				}
+				pbsndlist_sz = svr_totnodes * 2 + 1;
+			}
+			/*add in the new entry etc*/
+			pnode->nd_index = svr_totnodes;
+			pnode->nd_arr_index = svr_totnodes; /* this is only in mem, not from db */
+			DBPRT(("pbsndlist_sz: %d, svr_totnodes: %d", pbsndlist_sz, svr_totnodes))
+			pbsndlist[svr_totnodes++] = pnode;
+			break;
+
+		case TREE_OP_DEL:
+			/* delete the node from the node tree as well as the node array */
+			if (node_tree != NULL && find_tree(node_tree, pnode->nd_name)) {
+				int	iht;
+				tree_add_del(node_tree, pnode->nd_name, NULL, TREE_OP_DEL);
+				for (iht = pnode->nd_arr_index + 1; iht < svr_totnodes; iht++) {
+					pbsndlist[iht - 1] = pbsndlist[iht];
+					/* adjust the arr_index since we are coalescing elements */
+					pbsndlist[iht - 1]->nd_arr_index--;
+				}
+				svr_totnodes--;
+			}
+	}
+
+	return 0;
+}
+
+
+/**
+ * @brief
+ * 		pbs_init_node - Initialize a node by adding into tree and
+ * 				creating associated mom structure.
+ *
+ * @param[in]	pnode  - node struct
+ *
+ * @return int
+ * @retval 0: success
+ * @retval !0: failure
+ */
+int
+pbs_init_node(pbs_node *pnode)
+{
+	int rc = 0;
+
+	if ((rc = update_node_cache(pnode, TREE_OP_ADD)) != 0)
+		return rc;
+
+	return create_svrmom_struct(pnode);
+}
+
+/**
+ * @brief
+ * 		searchable_nodename - strip the paranthesis part from node if any.
+ *
+ * @param[in]	name_in  - input name
+ * @param[in]	dest - output name
+ * @param[in]	dest_sz - output buffer size - 1
+ *
+ * @return void
+ */
+void
+searchable_nodename(char *name_in, char *dest, int dest_sz)
+{
+	char *src = name_in;
+
+	if (*src == '\0') {
+		*dest = '\0';
+		return;
+	} else if (*src == '(') {
+		src++;	/* skip over leading paren */
+	}
+
+	while ((src - name_in < dest_sz) && (*src != '\0') && (*src != '/'))
+		*dest++ = *src++;
+	*dest = '\0';
+}
+
+/**
+ * @brief
+ * 		find_node_fromcache() - find a node host by its name from cache
  * @param[in]	nodename	- node being searched
  *
  * @return	pbsnode
  * @retval	NULL	- failure
  */
 
-struct pbsnode *
-find_nodebyname(char *nodename)
+pbs_node *
+find_node_fromcache(char *nodename)
 {
-	char		*pslash;
-
-	if (nodename == NULL)
-		return NULL;
-	if (*nodename == '(')
-		nodename++;	/* skip over leading paren */
-	if ((pslash = strchr(nodename, (int)'/')) != NULL)
-		*pslash = '\0';
 	if (node_tree == NULL)
 		return NULL;
 
 	return ((struct pbsnode *) find_tree(node_tree, nodename));
+}
+
+/**
+ * @brief
+ * 		find_nodebyname() - find a node host by its name
+ *				Recover from database if needed
+
+ * @param[in]	nodename_in	- node being searched
+ *
+ * @return	pbsnode
+ * @retval	NULL	- cannot find!
+ */
+
+struct pbsnode *
+find_nodebyname(char *nodename_in)
+{
+	char nodename[PBS_MAXDEST + 1];
+
+	searchable_nodename(nodename_in, nodename, PBS_MAXDEST);
+	return node_recov_db(nodename);
 }
 
 
@@ -326,26 +460,34 @@ free_prop_list(struct prop *prop)
 
 /**
  * @brief
- *		initialize_pbsnode - carries out initialization on a new
+ *		node_alloc - carries out initialization on a new
  *		pbs node.  The assumption is that all the parameters are valid.
  * @see
- * 		create_pbs_node2
+ * 		create_pbs_node
  * @param[out]	pnode 	- 	new pbs node
  * @param[in]	pname	- 	node name
  * @param[in]	ntype 	- 	time-shared or cluster
  *
- * @return	int
- * @retval	PBSE_NONE	- success
+ * @return	pnode
+ * @retval	!NULL	- new pbs node
+ * @retval	NULL	- failure
  */
 
-int
-initialize_pbsnode(struct pbsnode *pnode, char *pname, int ntype)
+pbs_node *
+node_alloc(char *pname, int ntype)
 {
 	int	      i;
 	attribute    *pat1;
 	attribute    *pat2;
 	resource_def *prd;
 	resource     *presc;
+	pbs_node     *pnode;
+
+	pnode = (struct pbsnode *) malloc(sizeof(struct pbsnode));
+	if (pnode == NULL) {
+		free(pname);
+		return NULL;
+	}
 
 	pnode->nd_name    = pname;
 	pnode->nd_ntype   = ntype;
@@ -363,7 +505,7 @@ initialize_pbsnode(struct pbsnode *pnode, char *pname, int ntype)
 	pnode->device.nsockets = 0;
 	pnode->nd_moms    = (struct mominfo **)calloc(1, sizeof(struct mominfo *));
 	if (pnode->nd_moms == NULL)
-		return (PBSE_SYSTEM);
+		return NULL;
 	pnode->nd_nummslots = 1;
 
 	/* first, clear the attributes */
@@ -424,10 +566,19 @@ initialize_pbsnode(struct pbsnode *pnode, char *pname, int ntype)
 	}
 
 	/* clear the modify flags */
-
 	for (i=0; i<(int)ND_ATR_LAST; i++)
 		pnode->nd_attr[i].at_flags &= ~ATR_VFLAG_MODIFY;
-	return (PBSE_NONE);
+
+	/* create and initialize the first subnode to go with */
+	/* the parent node */
+	if (create_subnode(pnode, NULL) == NULL) {
+		svr_totnodes--;
+		free_pnode(pnode);
+		free(pname);
+		return NULL;
+	}
+
+	return pnode;
 }
 
 /**
@@ -584,7 +735,6 @@ effective_node_delete(struct pbsnode *pnode)
 	struct pbssubn  *psubn;
 	struct pbssubn  *pnxt;
 	mom_svrinfo_t	*psvrmom;
-	int		 iht;
 	int		 lic_released = 0;
 
 	psubn = pnode->nd_psn;
@@ -642,17 +792,7 @@ effective_node_delete(struct pbsnode *pnode)
 
 	remove_node_topology(pnode->nd_name);
 
-	/* delete the node from the node tree as well as the node array */
-	if (node_tree != NULL) {
-		tree_add_del(node_tree, pnode->nd_name, NULL, TREE_OP_DEL);
-	}
-
-	for (iht=pnode->nd_arr_index + 1; iht < svr_totnodes; iht++) {
-		pbsndlist[iht - 1] = pbsndlist[iht];
-		/* adjust the arr_index since we are coalescing elements */
-		pbsndlist[iht - 1]->nd_arr_index--;
-	}
-	svr_totnodes--;
+	update_node_cache(pnode, TREE_OP_DEL);
 	free_pnode(pnode);
 	if (lic_released)
 		license_more_nodes();
@@ -707,7 +847,7 @@ setup_notification()
  *		checks the node type and rechecks agaist the ntype attribute which
  *		may be in the attribute list given by plist
  * @see
- * 		create_pbs_node2
+ * 		create_pbs_node
  *
  * @param[in]		objname	-	node to be's name
  * @param[out]		plist	-	THINGS RETURNED
@@ -988,7 +1128,7 @@ struct prop *init_prop(char *pname)
  * @brief
  * 		create_subnode - create a subnode entry and link to parent node
  * @see
- * 		mod_node_ncpus, set_nodes, create_pbs_node2
+ * 		mod_node_ncpus, set_nodes, create_pbs_node
  * @param[in] - pnode -	parent node.
  * @param[in] - lstsn - Points to the last subnode in the parent node list. This
  *						eliminates the need to find the last node in parent node list.
@@ -1000,7 +1140,7 @@ struct pbssubn *create_subnode(struct pbsnode *pnode, struct pbssubn *lstsn)
 	struct pbssubn  *psubn;
 	struct pbssubn **nxtsn;
 
-	psubn = (struct pbssubn *)malloc(sizeof(struct pbssubn));
+	psubn = (struct pbssubn *) malloc(sizeof(struct pbssubn));
 	if (psubn == NULL) {
 		return NULL;
 	}
@@ -1023,72 +1163,14 @@ struct pbssubn *create_subnode(struct pbsnode *pnode, struct pbssubn *lstsn)
 
 	if(lstsn) /* If not null, then append new subnode directly to the last node */
 		lstsn->next = psubn;
-	else{
+	else {
 		nxtsn = &pnode->nd_psn;	   /* link subnode onto parent node's list */
 		while (*nxtsn)
 			nxtsn = &((*nxtsn)->next);
 		*nxtsn = psubn;
 	}
+
 	return (psubn);
-}
-
-/**
- * @brief
- *		Read the, "nodes" information from database
- *		containing the list of properties for each node.
- *		The list of nodes is formed with pbsndlist as the head.
- * @see
- * 		pbsd_init
- *
- * @return	error code
- * @retval	-1	- Failure
- * @retval	0	- Success
- *
- */
-int
-setup_nodes()
-{
-	pbs_db_obj_info_t   obj;
-	pbs_db_node_info_t dbnode = {{0}};
-	pbs_db_mominfo_time_t mom_tm;
-	int rc;
-	void *conn = (void *) svr_db_conn;
-	char *conn_db_err = NULL;
-
-	DBPRT(("%s: entered\n", __func__))
-
-	tfree2(&streams);
-	tfree2(&ipaddrs);
-
-	svr_totnodes = 0;
-
-	/* Load  the mominfo_time from the db */
-	obj.pbs_db_obj_type = PBS_DB_MOMINFO_TIME;
-	obj.pbs_db_un.pbs_db_mominfo_tm = &mom_tm;
-	if (pbs_db_load_obj(svr_db_conn, &obj) == -1) {
-		sprintf(log_buffer, "Could not load momtime info");
-		goto db_err;
-	}
-	mominfo_time.mit_time = mom_tm.mit_time;
-	mominfo_time.mit_gen = mom_tm.mit_gen;
-
-	obj.pbs_db_obj_type = PBS_DB_NODE;
-	obj.pbs_db_un.pbs_db_node = &dbnode;
-	
-	rc = pbs_db_search(conn, &obj, NULL, (query_cb_t)&recov_node_cb);
-	if (rc == -1) {
-		pbs_db_get_errmsg(PBS_DB_ERR, &conn_db_err);
-		if (conn_db_err != NULL) {
-			sprintf(log_buffer, "%s", conn_db_err);
-			free(conn_db_err);
-		}
-		goto db_err;
-	}
-
-	return (0);
-db_err:
-	log_err(-1, __func__, log_buffer);
-	return (-1);
 }
 
 
@@ -1148,7 +1230,7 @@ mod_node_ncpus(struct pbsnode *pnode, long ncpus, int actmode)
 {
 	long		old_np;
 	struct pbssubn *lst_sn;
-	if ((actmode == ATR_ACTION_NEW) || (actmode == ATR_ACTION_ALTER)) {
+	if ((actmode == ATR_ACTION_NEW) || (actmode == ATR_ACTION_ALTER) || (actmode == ATR_ACTION_RECOV)) {
 
 		if (ncpus < 0)
 			return PBSE_BADATVAL;
@@ -1503,14 +1585,14 @@ node_np_action(attribute *new, void *pobj, int actmode)
 	presc = find_resc_entry(new, prdef);
 	if ((presc != NULL) &&
 		(presc->rs_value.at_flags & ATR_VFLAG_MODIFY)) {
-		if (actmode != ATR_ACTION_NEW)
+		if (!(actmode == ATR_ACTION_NEW || actmode == ATR_ACTION_RECOV))
 			return (PBSE_ATTRRO);
 	}
 	prdef = find_resc_def(svr_resc_def, "vnode", svr_resc_size);
 	presc = find_resc_entry(new, prdef);
 	if ((presc != NULL) &&
 		(presc->rs_value.at_flags & ATR_VFLAG_MODIFY)) {
-		if (actmode != ATR_ACTION_NEW)
+		if (!(actmode == ATR_ACTION_NEW || actmode == ATR_ACTION_RECOV))
 			return (PBSE_ATTRRO);
 	}
 	/* prevent change of "aoe" */
@@ -1706,7 +1788,7 @@ node_queue_action(attribute *pattr, void *pobj, int actmode)
 int
 set_node_host_name(attribute *pattr, void *pobj, int actmode)
 {
-	if (actmode == 1)
+	if (actmode == ATR_ACTION_NEW || actmode == ATR_ACTION_RECOV)
 		return 0;
 	else
 		return PBSE_ATTRRO;
@@ -1718,7 +1800,7 @@ set_node_host_name(attribute *pattr, void *pobj, int actmode)
 int
 set_node_mom_port(attribute *pattr, void *pobj, int actmode)
 {
-	if (actmode == 1)
+	if (actmode == ATR_ACTION_NEW || actmode == ATR_ACTION_RECOV)
 		return 0;
 	else
 		return PBSE_ATTRRO;
