@@ -142,7 +142,7 @@ static time_t last_obj_autorefresh_tm = -1;
 int		svr_trx_id = 0;
 int		stalone = 0;	/* is program running not as a service ? */
 char	       *acct_file = NULL;
-char		daemonname[PBS_MAXHOSTNAME+14];
+char		daemonname[PBS_MAXHOSTNAME+PBS_MAXPORTNUM+9];
 int		       used_unix_licenses  = 0;
 int		       used_linix_licenses = 0;
 char	       *log_file  = NULL;
@@ -832,7 +832,7 @@ main(int argc, char **argv)
 			fprintf(stderr, "pbsconf error: Wrong Multi Server configuration\n");
 			return 1;
 		}
-		snprintf(daemonname, (PBS_MAXHOSTNAME + 13), "Server@%s_%d", server_host, pbs_conf.batch_service_port);
+		snprintf(daemonname, sizeof(daemonname) - 1, "Server@%s_%d", server_host, pbs_conf.batch_service_port);
 	} else {
 		sprintf(daemonname, "Server@%s", server_host);
 		if ((pc = strchr(daemonname, (int)'.')) != NULL)
