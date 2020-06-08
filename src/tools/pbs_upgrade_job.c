@@ -103,7 +103,6 @@ typedef struct jobfix_PRE19
 	int ji_state;		/* internal copy of state */
 	int ji_substate;	/* job sub-state */
 	int ji_svrflags;	/* server flags */
-	int ji_numattr;		/* not used */
 	int ji_ordering;	/* special scheduling ordering */
 	int ji_priority;	/* internal priority */
 	time_t ji_stime;	/* time job started execution */

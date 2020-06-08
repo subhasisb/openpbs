@@ -271,3 +271,4 @@ src/lib/Libpbs/pbs.pc
 *.cpio
 *.rpm
 *.deb
+.clang-format

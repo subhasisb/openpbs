@@ -119,9 +119,3 @@ pbs_mom_CPPFLAGS += -DMOM_ALPS=1 @expat_inc@
 pbs_mom_LDADD += @expat_lib@
 pbs_mom_SOURCES += linux/alps.c
 endif
-
-EXTRA_DIST = \
-	darwin/mom_mach.c \
-	darwin/mom_mach.h \
-	darwin/mom_start.c \
-	darwin/pe_input.c

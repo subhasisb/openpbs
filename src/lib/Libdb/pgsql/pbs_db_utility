@@ -160,11 +160,6 @@ CREATE TABLE pbs.resv (
     ri_duration     BIGINT      NOT NULL,
     ri_tactive      INTEGER     NOT NULL,
     ri_svrflags     INTEGER     NOT NULL,
-    ri_numattr      INTEGER     NOT NULL,
-    ri_resvTag      INTEGER     NOT NULL,
-    ri_un_type      INTEGER     NOT NULL,
-    ri_fromsock     INTEGER     NOT NULL,
-    ri_fromaddr     BIGINT      NOT NULL,
     ri_savetm       TIMESTAMP   NOT NULL,
     ri_creattm      TIMESTAMP   NOT NULL,
     attributes      hstore      NOT NULL default '',
@@ -182,11 +177,7 @@ CREATE TABLE pbs.job (
     ji_state        INTEGER     NOT NULL,
     ji_substate     INTEGER     NOT NULL,
     ji_svrflags     INTEGER     NOT NULL,
-    ji_numattr      INTEGER     NOT NULL,
-    ji_ordering     INTEGER     NOT NULL,
-    ji_priority     INTEGER     NOT NULL,
     ji_stime        BIGINT,
-    ji_endtbdry     BIGINT,
     ji_queue        TEXT        NOT NULL,
     ji_destin       TEXT,
     ji_un_type      INTEGER     NOT NULL,
@@ -198,7 +189,6 @@ CREATE TABLE pbs.job (
     ji_fromsock     INTEGER,
     ji_fromaddr     BIGINT,
     ji_4jid         TEXT,
-    ji_4ash         TEXT,
     ji_credtype     INTEGER,
     ji_qrank        INTEGER     NOT NULL,
     ji_savetm       TIMESTAMP   NOT NULL,
@@ -432,6 +422,16 @@ upgrade_pbs_schema_from_v1_3_0() {
 upgrade_pbs_schema_from_v1_4_0() {
 	${PGSQL_DIR}/bin/psql -p ${PBS_DATA_SERVICE_PORT} -d pbs_datastore -U ${PBS_DATA_SERVICE_USER} <<-EOF > /dev/null
 		ALTER TABLE pbs.resv DROP COLUMN ri_type;
+		ALTER TABLE pbs.resv DROP COLUMN ri_numattr;
+		ALTER TABLE pbs.resv DROP COLUMN ri_resvTag;
+		ALTER TABLE pbs.resv DROP COLUMN ri_un_type;
+		ALTER TABLE pbs.resv DROP COLUMN ri_fromsock;
+		ALTER TABLE pbs.resv DROP COLUMN ri_fromaddr;
+		ALTER TABLE pbs.job DROP COLUMN ji_numattr;
+		ALTER TABLE pbs.job DROP COLUMN ji_ordering;
+		ALTER TABLE pbs.job DROP COLUMN ji_priority;
+		ALTER TABLE pbs.job DROP COLUMN ji_endtbdry;
+		ALTER TABLE pbs.job DROP COLUMN ji_4ash;
 		UPDATE pbs.info SET pbs_schema_version = '1.5.0';
 	EOF
 	ret=$?

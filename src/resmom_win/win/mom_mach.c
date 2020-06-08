@@ -413,6 +413,7 @@ print_profile(PDH_profile *prof,char * hdr)
 		prof->hQuery, prof->hCounter, prof->value);
 	log_event(PBSEVENT_DEBUG3, PBS_EVENTCLASS_SERVER, LOG_INFO, __func__, log_buffer);
 }
+
 /**
  * @brief
  *	Don't need any periodic processing.

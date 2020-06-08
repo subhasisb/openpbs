@@ -117,7 +117,6 @@ extern 	enum vnode_sharing str_to_vnode_sharing(char *sharing_str);
 
 char server_name[PBS_MAXSERVERNAME+1];
 char server_host[PBS_MAXHOSTNAME+1];	   /* host_name of this svr */
-int  have_blue_gene_nodes = 0;
 time_t		time_now = 0;
 struct pbsnode **pbsndlist;
 int		svr_totnodes = 0;

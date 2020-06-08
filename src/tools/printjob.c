@@ -113,8 +113,6 @@ prt_job_struct(job *pjob)
 		pjob->ji_qs.ji_substate);
 	printf("svrflgs:\t0x%x (%d)\n", pjob->ji_qs.ji_svrflags,
 		pjob->ji_qs.ji_svrflags);
-	printf("ordering:\t%d\n", pjob->ji_qs.ji_ordering);
-	printf("inter prior:\t%d\n", pjob->ji_qs.ji_priority);
 	printf("stime:\t\t%ld\n", (long)pjob->ji_qs.ji_stime);
 	printf("file base:\t%s\n", pjob->ji_qs.ji_fileprefix);
 	printf("queue:\t\t%s\n", pjob->ji_qs.ji_queue);
@@ -272,11 +270,7 @@ db_2_job(job *pjob,  pbs_db_job_info_t *pdjob)
 	pjob->ji_qs.ji_state = pdjob->ji_state;
 	pjob->ji_qs.ji_substate = pdjob->ji_substate;
 	pjob->ji_qs.ji_svrflags = pdjob->ji_svrflags;
-	pjob->ji_qs.ji_numattr = pdjob->ji_numattr ;
-	pjob->ji_qs.ji_ordering = pdjob->ji_ordering;
-	pjob->ji_qs.ji_priority = pdjob->ji_priority;
 	pjob->ji_qs.ji_stime = pdjob->ji_stime;
-	pjob->ji_qs.ji_endtBdry = pdjob->ji_endtBdry;
 	pjob->ji_qs.ji_fileprefix[0] = 0;
 	strcpy(pjob->ji_qs.ji_queue, pdjob->ji_queue);
 	strcpy(pjob->ji_qs.ji_destin, pdjob->ji_destin);
@@ -295,7 +289,6 @@ db_2_job(job *pjob,  pbs_db_job_info_t *pdjob)
 
 	/* extended portion */
 	strcpy(pjob->ji_extended.ji_ext.ji_4jid, pdjob->ji_4jid);
-	strcpy(pjob->ji_extended.ji_ext.ji_4ash, pdjob->ji_4ash);
 	pjob->ji_extended.ji_ext.ji_credtype = pdjob->ji_credtype;
 }
 

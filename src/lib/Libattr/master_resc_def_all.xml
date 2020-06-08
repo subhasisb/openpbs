@@ -748,7 +748,7 @@
    </attributes>
    <attributes>
 	/*partition*/
-	<member_name><both>"partition"</both></member_name>       <!-- partition (e.g. Blue Gene)  -->
+	<member_name><both>"partition"</both></member_name>
 	<member_at_decode>decode_str</member_at_decode>
 	<member_at_encode>encode_str</member_at_encode>
 	<member_at_set>set_str</member_at_set>

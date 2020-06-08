@@ -660,15 +660,11 @@ struct job {
 	char qs_hash[DIGEST_LENGTH];
 #endif
 	struct jobfix {
-		int	    ji_jsversion;	/* job structure version - JSVERSION */
-		int	    ji_state;		/* internal copy of state */
-		int	    ji_substate;	/* job sub-state */
-		int	    ji_svrflags;	/* server flags */
-		int	    ji_numattr;		/* not used */
-		int	    ji_ordering;	/* special scheduling ordering */
-		int	    ji_priority;	/* internal priority */
+		int	ji_jsversion;	/* job structure version - JSVERSION */
+		int	ji_state;		/* internal copy of state */
+		int	ji_substate;	/* job sub-state */
+		int	ji_svrflags;	/* server flags */
 		time_t  ji_stime;		/* time job started execution */
-		time_t  ji_endtBdry;	/* estimate upper bound on end time */
 
 		char    ji_jobid[PBS_MAXSVRJOBID+1];   /* job identifier */
 		char    ji_fileprefix[PBS_JOBBASE+1];  /* no longer used */
@@ -708,14 +704,8 @@ struct job {
 	union jobextend {
 		char fill[256];	/* fill to keep same size */
 		struct {
-#if defined(__sgi)
-			jid_t	ji_jid;
-			ash_t	ji_ash;
-#else
 			char	ji_4jid[8];
-			char	ji_4ash[8];
-#endif 	/* sgi */
-			int	   ji_credtype;
+			int	ji_credtype;
 #ifdef PBS_MOM
 			tm_host_id ji_nodeidx;	/* my node id */
 			tm_task_id ji_taskidx;	/* generate task id's for job */

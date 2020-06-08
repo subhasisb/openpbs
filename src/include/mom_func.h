@@ -285,11 +285,7 @@ extern int	dep_attach(pbs_task *ptask);
 extern u_long	gettime(resource *pres);
 extern u_long	getsize(resource *pres);
 extern int   local_gettime(resource *, unsigned long *ret);
-#if (defined(_SYS_RESOURCE_H) || defined(_H_RESOURCE) ) && (defined(__sgi) )
-extern int   local_getsize(resource *, rlim64_t *ret);
-#else
 extern int   local_getsize(resource *, unsigned long *ret);
-#endif	/* __sgi */
 #endif /* _RESOURCE_H */
 
 #ifdef	_BATCH_REQUEST_H

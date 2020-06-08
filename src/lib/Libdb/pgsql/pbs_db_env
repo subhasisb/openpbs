@@ -62,20 +62,11 @@ if [ -d "$PBS_EXEC/pgsql" ]; then
 		echo "\*\*\* $PGSQL_BIN/psql not executable"
 		exit 1
 	fi
-	case `uname` in
-		Linux)
-			[ -d "$PGSQL_DIR/lib" ] && LD_LIBRARY_PATH="$PGSQL_DIR/lib:$LD_LIBRARY_PATH"
-			[ -d "$PGSQL_DIR/lib64" ] && LD_LIBRARY_PATH="$PGSQL_DIR/lib64:$LD_LIBRARY_PATH"
-			export LD_LIBRARY_PATH
-			PGSQL_LIBSTR="LD_LIBRARY_PATH=$LD_LIBRARY_PATH; export LD_LIBRARY_PATH; "
-			export PGSQL_LIBSTR
-			;;
-		Darwin)
-			DYLD_LIBRARY_PATH="$PGSQL_DIR/lib:$DYLD_LIBRARY_PATH"
-			export DYLD_LIBRARY_PATH
-			PGSQL_LIBSTR="DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH; export DYLD_LIBRARY_PATH; "
-			;;
-	esac
+	[ -d "$PGSQL_DIR/lib" ] && LD_LIBRARY_PATH="$PGSQL_DIR/lib:$LD_LIBRARY_PATH"
+	[ -d "$PGSQL_DIR/lib64" ] && LD_LIBRARY_PATH="$PGSQL_DIR/lib64:$LD_LIBRARY_PATH"
+	export LD_LIBRARY_PATH
+	PGSQL_LIBSTR="LD_LIBRARY_PATH=$LD_LIBRARY_PATH; export LD_LIBRARY_PATH; "
+	export PGSQL_LIBSTR
 else
 	# Using system installed PostgreSQL package
 	PGSQL_CMD=`type psql 2>/dev/null | cut -d' ' -f3`

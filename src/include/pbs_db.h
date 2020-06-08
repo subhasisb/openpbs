@@ -182,11 +182,7 @@ struct pbs_db_job_info {
 	INTEGER  ji_state;	/* INTEGERernal copy of state */
 	INTEGER  ji_substate;	/* job sub-state */
 	INTEGER  ji_svrflags;	/* server flags */
-	INTEGER  ji_numattr;	/* not used */
-	INTEGER  ji_ordering;	/* special scheduling ordering */
-	INTEGER  ji_priority;	/* INTEGERernal priority */
 	BIGINT   ji_stime;	/* time job started execution */
-	BIGINT   ji_endtBdry;	/* estimate upper bound on end time */
 	char     ji_queue[PBS_MAXQUEUENAME + 1]; /* name of current queue */
 	char     ji_destin[PBS_MAXROUTEDEST + 1]; /* dest from qmove/route */
 	INTEGER  ji_un_type;	/* job's queue type */
@@ -198,7 +194,6 @@ struct pbs_db_job_info {
 	INTEGER  ji_fromsock;	/* socket job coming over */
 	BIGINT   ji_fromaddr;	/* host job coming from   */
 	char     ji_4jid[8];	/* extended job save data */
-	char     ji_4ash[8];	/* extended job save data */
 	INTEGER  ji_credtype;	/* credential type */
 	INTEGER  ji_qrank;	/* sort key for db query */
 	char     ji_savetm[DB_TIMESTAMP_LEN + 1]; /* job save time */
@@ -233,11 +228,6 @@ struct pbs_db_resv_info {
 	BIGINT  ri_duration;	/* reservation duration */
 	INTEGER ri_tactive;	/* time reservation became active */
 	INTEGER ri_svrflags;	/* server flags */
-	INTEGER ri_numattr;	/* not used */
-	INTEGER ri_resvTag;	/* not used */
-	INTEGER ri_un_type;	/* not used */
-	INTEGER ri_fromsock;	/* resv from sock */
-	BIGINT  ri_fromaddr;	/* resv from sock addr */
 	char    ri_savetm[DB_TIMESTAMP_LEN + 1];	/* resv save time on db */ 
 	pbs_db_attr_list_t cache_attr_list;	/* list of attributes */
 	pbs_db_attr_list_t db_attr_list;	/* list of attributes */

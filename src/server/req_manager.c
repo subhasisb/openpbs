@@ -3380,12 +3380,7 @@ struct batch_request *preq;
 	char		*problem_names;
 	struct pbsnode  **problem_nodes = NULL;
 	svrattrl	*plist;
-	/* following four variables are for BLUE GENE only */
-	attribute	*pattr;
-	resource_def	*prescdef;
-	resource	*presc;
 	mom_svrinfo_t	*psvrmom;
-	extern int	 have_blue_gene_nodes;
 
 	nodename = preq->rq_ind.rq_manager.rq_objname;
 
@@ -3546,34 +3541,15 @@ struct batch_request *preq;
 			}
 		}
 
-		free(problem_nodes);		/*maybe problem malloc failed */
+		free(problem_nodes);		/* maybe problem malloc failed */
 		problem_nodes = NULL;
 
-		if (problem_cnt) {		/*reply has already been sent  */
+		if (problem_cnt) {		/* reply has already been sent */
 			return ;
 		}
 	}
 
-	/* BLUE GENE only - see if any BLUE GENE nodes still exist */
-	rc = 0;
-	prescdef = find_resc_def(svr_resc_def, "arch", svr_resc_size);
-	for (i=0; i<svr_totnodes; i++) {
-
-		pnode = pbsndlist[i];
-		if (pnode->nd_state & INUSE_DELETED)
-			continue;	/* deleted, skip it */
-
-		pattr = &pnode->nd_attr[ND_ATR_ResourceAvail];
-		presc = find_resc_entry(pattr, prescdef);
-		if ((presc != NULL) &&
-			(presc->rs_value.at_flags & ATR_VFLAG_SET)) {
-			if (strcmp(presc->rs_value.at_val.at_str, BLUEGENE) == 0)
-				rc = 1;
-		}
-	}
-	have_blue_gene_nodes = rc;
-
-	reply_ack(preq);		/*request completely successful*/
+	reply_ack(preq);		/* request completely successful */
 }
 
 /**

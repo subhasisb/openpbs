@@ -75,20 +75,15 @@ pbs_db_prepare_resv_sqls(void *conn)
 		"ri_duration, "
 		"ri_tactive, "
 		"ri_svrflags, "
-		"ri_numattr, "
-		"ri_resvTag, "
-		"ri_un_type, "
-		"ri_fromsock, "
-		"ri_fromaddr, "
 		"ri_savetm, "
 		"ri_creattm, "
 		"attributes "
 		") "
 		"values "
-		"($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, "
-		"$14, localtimestamp, localtimestamp, hstore($15::text[])) "
+		"($1, $2, $3, $4, $5, $6, $7, $8, $9, "
+		"localtimestamp, localtimestamp, hstore($10::text[])) "
 		"returning to_char(ri_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as ri_savetm");
-	if (db_prepare_stmt(conn, STMT_INSERT_RESV, conn_sql, 15) != 0)
+	if (db_prepare_stmt(conn, STMT_INSERT_RESV, conn_sql, 10) != 0)
 		return -1;
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "update pbs.resv set "
@@ -100,16 +95,11 @@ pbs_db_prepare_resv_sqls(void *conn)
 		"ri_duration = $7, "
 		"ri_tactive = $8, "
 		"ri_svrflags = $9, "
-		"ri_numattr = $10, "
-		"ri_resvTag = $11, "
-		"ri_un_type = $12, "
-		"ri_fromsock = $13, "
-		"ri_fromaddr = $14, "
 		"ri_savetm = localtimestamp, "
-		"attributes = attributes || hstore($15::text[]) "
+		"attributes = attributes || hstore($10::text[]) "
 		"where ri_resvID = $1 "
 		"returning to_char(ri_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as ri_savetm");
-	if (db_prepare_stmt(conn, STMT_UPDATE_RESV, conn_sql, 15) != 0)
+	if (db_prepare_stmt(conn, STMT_UPDATE_RESV, conn_sql, 10) != 0)
 		return -1;
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "update pbs.resv set "
@@ -121,15 +111,10 @@ pbs_db_prepare_resv_sqls(void *conn)
 		"ri_duration = $7, "
 		"ri_tactive = $8, "
 		"ri_svrflags = $9, "
-		"ri_numattr = $10, "
-		"ri_resvTag = $11, "
-		"ri_un_type = $12, "
-		"ri_fromsock = $13, "
-		"ri_fromaddr = $14, "
 		"ri_savetm = localtimestamp "
 		"where ri_resvID = $1 "
 		"returning to_char(ri_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as ri_savetm");
-	if (db_prepare_stmt(conn, STMT_UPDATE_RESV_QUICK, conn_sql, 14) != 0)
+	if (db_prepare_stmt(conn, STMT_UPDATE_RESV_QUICK, conn_sql, 9) != 0)
 		return -1;
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "update pbs.resv set "
@@ -158,11 +143,6 @@ pbs_db_prepare_resv_sqls(void *conn)
 		"ri_duration, "
 		"ri_tactive, "
 		"ri_svrflags, "
-		"ri_numattr, "
-		"ri_resvTag, "
-		"ri_un_type, "
-		"ri_fromsock, "
-		"ri_fromaddr, "
 		"to_char(ri_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as ri_savetm, "
 		"hstore_to_array(attributes) as attributes "
 		"from pbs.resv where ri_resvid = $1");
@@ -179,11 +159,6 @@ pbs_db_prepare_resv_sqls(void *conn)
 		"ri_duration, "
 		"ri_tactive, "
 		"ri_svrflags, "
-		"ri_numattr, "
-		"ri_resvTag, "
-		"ri_un_type, "
-		"ri_fromsock, "
-		"ri_fromaddr, "
 		"to_char(ri_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as ri_savetm, "
 		"hstore_to_array(attributes) as attributes "
 		"from pbs.resv where ri_savetm > to_timestamp($1, 'YYYY-MM-DD HH24:MI:SS:US') "
@@ -201,11 +176,6 @@ pbs_db_prepare_resv_sqls(void *conn)
 		"ri_duration, "
 		"ri_tactive, "
 		"ri_svrflags, "
-		"ri_numattr, "
-		"ri_resvTag, "
-		"ri_un_type, "
-		"ri_fromsock, "
-		"ri_fromaddr, "
 		"to_char(ri_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as ri_savetm, "
 		"hstore_to_array(attributes) as attributes "
 		"from pbs.resv "
@@ -239,9 +209,7 @@ load_resv(PGresult *res, pbs_db_resv_info_t *presv, int row)
 {
 	char *raw_array;
 	static int ri_resvid_fnum, ri_queue_fnum, ri_state_fnum, ri_substate_fnum, ri_stime_fnum,
-	ri_etime_fnum, ri_duration_fnum, ri_tactive_fnum, ri_svrflags_fnum, ri_numattr_fnum, ri_resvTag_fnum,
-	ri_un_type_fnum, ri_fromsock_fnum, ri_fromaddr_fnum, ri_savetm_fnum,
-	attributes_fnum;
+	ri_etime_fnum, ri_duration_fnum, ri_tactive_fnum, ri_svrflags_fnum, ri_savetm_fnum, attributes_fnum;
 
 	static int fnums_inited = 0;
 
@@ -255,11 +223,6 @@ load_resv(PGresult *res, pbs_db_resv_info_t *presv, int row)
 		ri_duration_fnum = PQfnumber(res, "ri_duration");
 		ri_tactive_fnum = PQfnumber(res, "ri_tactive");
 		ri_svrflags_fnum = PQfnumber(res, "ri_svrflags");
-		ri_numattr_fnum = PQfnumber(res, "ri_numattr");
-		ri_resvTag_fnum = PQfnumber(res, "ri_resvTag");
-		ri_un_type_fnum = PQfnumber(res, "ri_un_type");
-		ri_fromsock_fnum = PQfnumber(res, "ri_fromsock");
-		ri_fromaddr_fnum = PQfnumber(res, "ri_fromaddr");
 		ri_savetm_fnum = PQfnumber(res, "ri_savetm");
 		attributes_fnum = PQfnumber(res, "attributes");
 		fnums_inited = 1;
@@ -274,11 +237,6 @@ load_resv(PGresult *res, pbs_db_resv_info_t *presv, int row)
 	GET_PARAM_BIGINT(res, row, presv->ri_duration, ri_duration_fnum);
 	GET_PARAM_INTEGER(res, row, presv->ri_tactive, ri_tactive_fnum);
 	GET_PARAM_INTEGER(res, row, presv->ri_svrflags, ri_svrflags_fnum);
-	GET_PARAM_INTEGER(res, row, presv->ri_numattr, ri_numattr_fnum);
-	GET_PARAM_INTEGER(res, row, presv->ri_resvTag, ri_resvTag_fnum);
-	GET_PARAM_INTEGER(res, row, presv->ri_un_type, ri_un_type_fnum);
-	GET_PARAM_INTEGER(res, row, presv->ri_fromsock, ri_fromsock_fnum);
-	GET_PARAM_BIGINT(res, row, presv->ri_fromaddr, ri_fromaddr_fnum);
 	GET_PARAM_STR(res, row, presv->ri_savetm, ri_savetm_fnum);
 	GET_PARAM_BIN(res, row, raw_array, attributes_fnum);
 
@@ -320,13 +278,8 @@ pbs_db_save_resv(void *conn, pbs_db_obj_info_t *obj, int savetype)
 		SET_PARAM_BIGINT(conn_data, presv->ri_duration, 6);
 		SET_PARAM_INTEGER(conn_data, presv->ri_tactive, 7);
 		SET_PARAM_INTEGER(conn_data, presv->ri_svrflags, 8);
-		SET_PARAM_INTEGER(conn_data, presv->ri_numattr, 9);
-		SET_PARAM_INTEGER(conn_data, presv->ri_resvTag, 10);
-		SET_PARAM_INTEGER(conn_data, presv->ri_un_type, 11);
-		SET_PARAM_INTEGER(conn_data, presv->ri_fromsock, 12);
-		SET_PARAM_BIGINT(conn_data, presv->ri_fromaddr, 13);
 		stmt = STMT_UPDATE_RESV_QUICK;
-		params = 14;
+		params = 9;
 	}
 
 	/* are there attributes to save to memory or local cache? */
@@ -341,9 +294,9 @@ pbs_db_save_resv(void *conn, pbs_db_obj_info_t *obj, int savetype)
 			return -1;
 
 		if (savetype & OBJ_SAVE_QS) {
-			SET_PARAM_BIN(conn_data, raw_array, len, 14);
+			SET_PARAM_BIN(conn_data, raw_array, len, 9);
 			stmt = STMT_UPDATE_RESV;
-			params = 15;
+			params = 10;
 		} else {
 			SET_PARAM_BIN(conn_data, raw_array, len, 1);
 			params = 2;

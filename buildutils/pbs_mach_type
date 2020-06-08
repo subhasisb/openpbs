@@ -66,8 +66,6 @@ test "$1" = "-v" && verbose=yes
 
 case "$OS" in
 
-  darwin*) mach=darwin ;;
-
   linux*) mach=linux ;;
 
   *)   test -n "$verbose" && \
