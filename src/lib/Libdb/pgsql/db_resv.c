@@ -196,7 +196,6 @@ pbs_db_prepare_resv_sqls(void *conn)
 		"ri_queue, "
 		"ri_state, "
 		"ri_substate, "
-		"ri_type, "
 		"ri_stime, "
 		"ri_etime, "
 		"ri_duration, "
