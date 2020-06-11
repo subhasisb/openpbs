@@ -70,7 +70,7 @@ CREATE TABLE pbs.info (
     pbs_schema_version TEXT    NOT NULL
 );
 
-INSERT INTO pbs.info values('1.4.0'); /* schema version */
+INSERT INTO pbs.info values('1.5.0'); /* schema version */
 
 ---------------------- SERVER ------------------------------
 
@@ -155,7 +155,6 @@ CREATE TABLE pbs.resv (
     ri_queue        TEXT        NOT NULL,
     ri_state        INTEGER     NOT NULL,
     ri_substate     INTEGER     NOT NULL,
-    ri_type         INTEGER     NOT NULL,
     ri_stime        BIGINT      NOT NULL,
     ri_etime        BIGINT      NOT NULL,
     ri_duration     BIGINT      NOT NULL,
@@ -430,11 +429,24 @@ upgrade_pbs_schema_from_v1_3_0() {
 	fi
 }
 
+upgrade_pbs_schema_from_v1_4_0() {
+	${PGSQL_DIR}/bin/psql -p ${PBS_DATA_SERVICE_PORT} -d pbs_datastore -U ${PBS_DATA_SERVICE_USER} <<-EOF > /dev/null
+		ALTER TABLE pbs.resv DROP COLUMN ri_type;
+		UPDATE pbs.info SET pbs_schema_version = '1.5.0';
+	EOF
+	ret=$?
+	if [ $ret -ne 0 ]; then
+		echo "Error deleting ri_type during upgrade"
+		echo "Please check dataservice logs"
+		return $ret
+	fi
+}
+
 pbs_schema_upgrade () {
 	# start of the upgrade schema script
 
 	tmpdir=${PBS_TMPDIR:-${TMPDIR:-"/var/tmp"}}
-	PBS_CURRENT_SCHEMA_VER='1.4.0'
+	PBS_CURRENT_SCHEMA_VER='1.5.0'
 
 	#
 	# pbs_dataservice command now has more diagnostic output.
@@ -540,6 +552,15 @@ pbs_schema_upgrade () {
 			return $ret
 		fi
 		ver="1.4.0"
+	fi
+
+	if [ "$ver" = "1.4.0" ]; then
+		upgrade_pbs_schema_from_v1_4_0
+		ret=$?
+		if [ $ret -ne 0 ]; then
+			exit $ret
+		fi
+		ver="1.5.0"
 	else
 		echo "Cannot upgrade PBS datastore version $ver"
 		ret=$?
@@ -731,7 +752,8 @@ backupdir() {
 
 # DB Upgrade functions
 upgrade_pbs_database() {
-
+	sys_pgsql_ver=$1
+	old_pgsql_ver=$2
 	user="${PBS_DATA_SERVICE_USER}"
 	inst_dir="${PGSQL_DIR}"
 	data_dir="${PBS_HOME}/datastore"
@@ -749,13 +771,6 @@ upgrade_pbs_database() {
 		return 1
 	fi
 
-	if [ ! -f "${data_dir}/PG_VERSION" ]; then
-		echo "Database version file: ${data_dir}/PG_VERSION not found, cannot continue"
-		return 1
-	fi
-	
-	sys_pgsql_ver=$(echo `${PGSQL_BIN}/postgres -V` | awk 'NR==1 {print $NF}' | cut -d '.' -f 1,2)
-	old_pgsql_ver=`cat ${data_dir}/PG_VERSION`
 	# strip the minor version from sys_pgsql_ver if old_pgsql_ver does not have minor version (for comparison).
 	[[ ! $old_pgsql_ver =~ "." ]] && sys_pgsql_ver=$(echo $sys_pgsql_ver | cut -d '.' -f 1)
 
@@ -1209,31 +1224,41 @@ pbs_install_db () {
 if [ "${opt}" = "upgrade_db" ]; then
 	opt_err=0
 	# Store the old PBS VERSION for later use
-	if [ -f "$PBS_HOME/pbs_version" ]; then
-		old_pbs_version=`cat $PBS_HOME/pbs_version`
+	if [ -f "${PBS_HOME}/pbs_version" ]; then
+		old_pbs_version=`cat ${PBS_HOME}/pbs_version`
 	fi
 
-	upgrade_pbs_database
-	ret=$?
-	if [ $ret -ne 0 ]; then
-		if [ $ret -eq 2 ]; then
-			echo "It appears that PostgreSQL has been upgraded independently of PBS Pro."
-			echo "The PBS Pro database must be manually upgraded. Please refer to the"
-			echo "documentation/release notes for details."
-		else 
-			echo "Failed to upgrade PBS Datastore"
-		fi
-		exit $ret
-	else
-		if [ -d "${old_inst_dir}" ]; then
-			backupdir "$old_inst_dir" "$PBS_HOME"
-			if [ $? -ne 0 ]; then
-				echo "Failed to backup $old_inst_dir, please follow the below instructions:"
-				echo "*** Backup "$old_inst_dir" if you need to downgrade pgsql later on."
-				echo "*** For future upgrades to be successful run the below command."
-				echo "*** cp -pr ${PBS_EXEC}/pgsql ${PBS_HOME}/pgsql.forupgrade"
+	data_dir="${PBS_HOME}/datastore"
+	if [ ! -f "${data_dir}/PG_VERSION" ]; then
+		echo "Database version file: ${data_dir}/PG_VERSION not found, cannot continue"
+		exit 1
+	fi
+	sys_pgsql_ver=$(echo `${PGSQL_BIN}/postgres -V` | awk 'NR==1 {print $NF}' | cut -d '.' -f 1,2)
+	old_pgsql_ver=`cat ${data_dir}/PG_VERSION`
+	if [ "${sys_pgsql_ver}" != "${old_pgsql_ver}" ]; then
+		# Upgrade postgres
+		upgrade_pbs_database "${sys_pgsql_ver}" "${old_pgsql_ver}"
+		ret=$?
+		if [ $ret -ne 0 ]; then
+			if [ $ret -eq 2 ]; then
+				echo "It appears that PostgreSQL has been upgraded independently of PBS."
+				echo "The PBS database must be manually upgraded. Please refer to the"
+				echo "documentation/release notes for details."
 			else
-				echo "*** ${PBS_HOME}/$(basename ${old_inst_dir}).pre.${PBS_VERSION} may need to be manually removed if you do not wish to downgrade PBSPro."
+				echo "Failed to upgrade PBS Datastore"
+			fi
+			exit $ret
+		else
+			if [ -d "${old_inst_dir}" ]; then
+				backupdir "$old_inst_dir" "$PBS_HOME"
+				if [ $? -ne 0 ]; then
+					echo "Failed to backup $old_inst_dir, please follow the below instructions:"
+					echo "*** Backup "$old_inst_dir" if you need to downgrade pgsql later on."
+					echo "*** For future upgrades to be successful run the below command."
+					echo "*** cp -pr ${PBS_EXEC}/pgsql ${PBS_HOME}/pgsql.forupgrade"
+				else
+					echo "*** ${PBS_HOME}/$(basename ${old_inst_dir}).pre.${PBS_VERSION} may need to be manually removed if you do not wish to downgrade PBS."
+				fi
 			fi
 		fi
 	fi
@@ -1262,7 +1287,6 @@ if [ "${opt}" = "upgrade_db" ]; then
 		fi
 	fi
 	revoke_db_trust_login "${PBS_HOME}/datastore"
-
 
 elif [ "${opt}" = "install_db" ]; then
 	opt_err=0
