@@ -998,7 +998,8 @@ db_set_error(void *conn, char **conn_db_err, char *fnc, char *msg, char *msg2)
 {
 	char *str;
 	char *p;
-	char fmt[] = "%s %s %s failed: %s";
+	char fmt1[] = "%s %s failed: %s";
+	char fmt2[] = "%s %s %s failed: %s";
 
 	if (*conn_db_err) {
 		free(*conn_db_err);
@@ -1013,15 +1014,15 @@ db_set_error(void *conn, char **conn_db_err, char *fnc, char *msg, char *msg2)
 	while ((p >= str) && (*p == '\r' || *p == '\n'))
 		*p-- = 0; /* supress the last newline */
 	if (msg2)
-		*conn_db_err = malloc(strlen(fnc) + strlen(msg) + strlen(msg2) + strlen(str) + sizeof(fmt) + 1);
+		*conn_db_err = malloc(strlen(fnc) + strlen(msg) + strlen(msg2) + strlen(str) + sizeof(fmt2) + 1);
 	else
-		*conn_db_err = malloc(strlen(fnc) + strlen(msg) + strlen(str) + sizeof(fmt) + 1);
+		*conn_db_err = malloc(strlen(fnc) + strlen(msg) + strlen(str) + sizeof(fmt1) + 1);
 	if (!(*conn_db_err))
 		return;
 	if (msg2)
-		sprintf(*conn_db_err, fmt, fnc, msg, msg2, str);
+		sprintf(*conn_db_err, fmt2, fnc, msg, msg2, str);
 	else
-		sprintf(*conn_db_err, fmt, fnc, msg, str);
+		sprintf(*conn_db_err, fmt1, fnc, msg, str);
 	
 #ifdef DEBUG
 	printf("%s\n", *conn_db_err);

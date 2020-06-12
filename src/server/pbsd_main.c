@@ -142,7 +142,7 @@ static time_t last_obj_autorefresh_tm = -1;
 int		svr_trx_id = 0;
 int		stalone = 0;	/* is program running not as a service ? */
 char	       *acct_file = NULL;
-char	       daemonname[PBS_MAXHOSTNAME+8];
+char		daemonname[PBS_MAXHOSTNAME+PBS_MAXPORTNUM+9];
 int		       used_unix_licenses  = 0;
 int		       used_linix_licenses = 0;
 char	       *log_file  = NULL;
@@ -822,23 +822,21 @@ main(int argc, char **argv)
 		return (-1);
 	}
 
-	sprintf(daemonname, "Server@%s", server_host);
-	if ((pc = strchr(daemonname, (int)'.')) != NULL)
-		*pc = '\0';
-
 	if (!(self.name = strdup(server_host))) {
 		log_err(-1, __func__, "Out of memory\n");
 		return -1;
 	}
 	self.port = pbs_conf.batch_service_port;
 	if (get_max_servers() > 1) {
-		char buf[PBS_MAXHOSTNAME+8];
 		if ((myindex = get_svr_index(&self)) == -1) {
 			fprintf(stderr, "pbsconf error: Wrong Multi Server configuration\n");
 			return 1;
 		}
-		snprintf(buf, sizeof(buf), "%s_%d", daemonname, pbs_conf.batch_service_port);
-		strcpy(daemonname, buf);
+		snprintf(daemonname, sizeof(daemonname) - 1, "Server@%s_%d", server_host, pbs_conf.batch_service_port);
+	} else {
+		sprintf(daemonname, "Server@%s", server_host);
+		if ((pc = strchr(daemonname, (int)'.')) != NULL)
+			*pc = '\0';
 	}
 
 	if (set_msgdaemonname(daemonname)) {
