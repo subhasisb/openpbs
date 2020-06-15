@@ -259,7 +259,6 @@ extern long node_fail_requeue;
  **      Modified by Tom Proett for PBS.
  */
 
-struct	tree	*ipaddrs = NULL;	/* tree of ip addrs */
 struct	tree	*streams = NULL;	/* tree of stream numbers */
 
 extern pntPBS_IP_LIST pbs_iplist;
@@ -4277,7 +4276,7 @@ is_request(int stream, int version)
 
 		DBPRT(("%s: IS_HELLOSVR addr: %s, port %lu\n", __func__, netaddr(addr), port))
 
-		if ((pmom = tfind2(ipaddr, port, &ipaddrs)) == NULL)
+		if ((pmom = find_mombyaddr(ipaddr, port)) == NULL)
 			goto badcon;
 
 		log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_NODE,

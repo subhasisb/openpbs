@@ -65,6 +65,8 @@ int
 pbs_db_prepare_resv_sqls(void *conn)
 {
 	char    conn_sql[MAX_SQL_LENGTH];
+	char    select_sql[SELECT_SQL_LEN];
+
 	snprintf(conn_sql, MAX_SQL_LENGTH, "insert into pbs.resv ("
 		"ri_resvID, "
 		"ri_queue, "
@@ -148,7 +150,7 @@ pbs_db_prepare_resv_sqls(void *conn)
 	if (db_prepare_stmt(conn, STMT_REMOVE_RESVATTRS, conn_sql, 2) != 0)
 		return -1;
 
-	snprintf(conn_sql, MAX_SQL_LENGTH, "select "
+	snprintf(select_sql, MAX_SQL_LENGTH, "select "
 		"ri_resvID, "
 		"ri_queue, "
 		"ri_state, "
@@ -165,53 +167,21 @@ pbs_db_prepare_resv_sqls(void *conn)
 		"ri_fromaddr, "
 		"to_char(ri_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as ri_savetm, "
 		"hstore_to_array(attributes) as attributes "
-		"from pbs.resv where ri_resvid = $1");
+		"from pbs.resv");
+
+	snprintf(conn_sql, MAX_SQL_LENGTH, "%s where ri_resvid = $1", select_sql);
 	if (db_prepare_stmt(conn, STMT_SELECT_RESV, conn_sql, 1) != 0)
 		return -1;
 
-	snprintf(conn_sql, MAX_SQL_LENGTH, "select "
-		"ri_resvID, "
-		"ri_queue, "
-		"ri_state, "
-		"ri_substate, "
-		"ri_stime, "
-		"ri_etime, "
-		"ri_duration, "
-		"ri_tactive, "
-		"ri_svrflags, "
-		"ri_numattr, "
-		"ri_resvTag, "
-		"ri_un_type, "
-		"ri_fromsock, "
-		"ri_fromaddr, "
-		"to_char(ri_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as ri_savetm, "
-		"hstore_to_array(attributes) as attributes "
-		"from pbs.resv where ri_savetm > to_timestamp($1, 'YYYY-MM-DD HH24:MI:SS:US') "
-		"order by ri_savetm ");
+	snprintf(conn_sql, MAX_SQL_LENGTH,
+		"%s where ri_savetm > to_timestamp($1, 'YYYY-MM-DD HH24:MI:SS:US') "
+		"order by ri_savetm ", select_sql);
 	if (db_prepare_stmt(conn, STMT_FINDRESVS_FROM_TIME_ORDBY_SAVETM, conn_sql, 1) != 0)
 		return -1;
 
-	snprintf(conn_sql, MAX_SQL_LENGTH, "select "
-		"ri_resvID, "
-		"ri_queue, "
-		"ri_state, "
-		"ri_substate, "
-		"ri_stime, "
-		"ri_etime, "
-		"ri_duration, "
-		"ri_tactive, "
-		"ri_svrflags, "
-		"ri_numattr, "
-		"ri_resvTag, "
-		"ri_un_type, "
-		"ri_fromsock, "
-		"ri_fromaddr, "
-		"to_char(ri_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as ri_savetm, "
-		"hstore_to_array(attributes) as attributes "
-		"from pbs.resv "
-		"order by ri_creattm");
-	if (db_prepare_stmt(conn, STMT_FINDRESVS_ORDBY_CREATTM,
-		conn_sql, 0) != 0)
+	snprintf(conn_sql, MAX_SQL_LENGTH,
+		"%s order by ri_creattm", select_sql);
+	if (db_prepare_stmt(conn, STMT_FINDRESVS_ORDBY_CREATTM, conn_sql, 0) != 0)
 		return -1;
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "delete from pbs.resv where ri_resvid = $1");
@@ -237,11 +207,12 @@ pbs_db_prepare_resv_sqls(void *conn)
 static int
 load_resv(PGresult *res, pbs_db_resv_info_t *presv, int row)
 {
-	char *raw_array;
-	static int ri_resvid_fnum, ri_queue_fnum, ri_state_fnum, ri_substate_fnum, ri_stime_fnum,
-	ri_etime_fnum, ri_duration_fnum, ri_tactive_fnum, ri_svrflags_fnum, ri_numattr_fnum, ri_resvTag_fnum,
-	ri_un_type_fnum, ri_fromsock_fnum, ri_fromaddr_fnum, ri_savetm_fnum,
-	attributes_fnum;
+	char		*raw_array;
+	static int	ri_resvid_fnum, ri_queue_fnum, ri_state_fnum, ri_substate_fnum, ri_stime_fnum,
+			ri_etime_fnum, ri_duration_fnum, ri_tactive_fnum, ri_svrflags_fnum, ri_numattr_fnum, 
+			ri_resvTag_fnum, ri_un_type_fnum, ri_fromsock_fnum, ri_fromaddr_fnum, ri_savetm_fnum,
+			attributes_fnum;
+	char		db_savetm[DB_TIMESTAMP_LEN + 1];
 
 	static int fnums_inited = 0;
 
@@ -265,6 +236,12 @@ load_resv(PGresult *res, pbs_db_resv_info_t *presv, int row)
 		fnums_inited = 1;
 	}
 
+	GET_PARAM_STR(res, row, db_savetm,  ri_savetm_fnum);
+	if (strcmp(presv->ri_savetm, db_savetm) == 0)
+		return -2;
+
+	strcpy(presv->ri_savetm, db_savetm);
+
 	GET_PARAM_STR(res, row, presv->ri_resvid, ri_resvid_fnum);
 	GET_PARAM_STR(res, row, presv->ri_queue, ri_queue_fnum);
 	GET_PARAM_INTEGER(res, row, presv->ri_state, ri_state_fnum);
@@ -279,7 +256,6 @@ load_resv(PGresult *res, pbs_db_resv_info_t *presv, int row)
 	GET_PARAM_INTEGER(res, row, presv->ri_un_type, ri_un_type_fnum);
 	GET_PARAM_INTEGER(res, row, presv->ri_fromsock, ri_fromsock_fnum);
 	GET_PARAM_BIGINT(res, row, presv->ri_fromaddr, ri_fromaddr_fnum);
-	GET_PARAM_STR(res, row, presv->ri_savetm, ri_savetm_fnum);
 	GET_PARAM_BIN(res, row, raw_array, attributes_fnum);
 
 	/* convert attributes from postgres raw array format */

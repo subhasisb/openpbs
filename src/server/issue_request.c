@@ -139,7 +139,7 @@ relay_to_mom2(job *pjob, struct batch_request *request,
 	momaddr = pjob->ji_qs.ji_un.ji_exect.ji_momaddr;
 	momport = pjob->ji_qs.ji_un.ji_exect.ji_momport;
 
-	pmom = tfind2((unsigned long) momaddr, momport, &ipaddrs);
+	pmom = find_mombyaddr(momaddr, momport);
 	if (!pmom || ((((mom_svrinfo_t *) (pmom->mi_data))->msr_state & INUSE_DOWN) && open_momstream(pmom) < 0)) {
 		log_err(-1, __func__, "Could not connect to Mom as pmom null or not able to open tpp stream to it");
 		return (PBSE_NORELYMOM);

@@ -2755,6 +2755,33 @@ mgr_node_unset(struct batch_request *preq)
 
 /**
  * @brief
+ *		get resolvable hostname from full host name.
+ *
+ * @param[in]	hostname - Name of node
+ * @param[out]	resolvable_hostname	- resolvable host name
+ *
+ * @return void
+ *
+ */
+void
+get_resolvable_hostname(char *hostname, char *resolvable_hostname)
+{
+	struct sockaddr_in sa4;
+	struct sockaddr_in6 sa6;
+	char *pc;
+
+	strncpy(resolvable_hostname, hostname, PBS_MAXHOSTNAME + 1);
+	if ((inet_pton(AF_INET, resolvable_hostname, &(sa4.sin_addr)) != 1) &&
+	    (inet_pton(AF_INET6, resolvable_hostname, &(sa6.sin6_addr)) != 1)) {
+		/* Not an IPv4 or IPv6 address, truncate it. */
+		pc = strchr(resolvable_hostname, '.');
+		if (pc)
+			*pc = '\0';
+	}
+}
+
+/**
+ * @brief
  *		create pbs node structure, i.e. add a node
  *
  * @param[in]	objname	- Name of node
@@ -2774,7 +2801,6 @@ int
 create_pbs_node(char *objname, svrattrl *plist, int perms, int *bad, struct pbsnode **rtnpnode, int nodup) {
 	struct pbsnode	*pnode;
 	int		ntype;		/* node type, always PBS */
-	char		*pc;
 	char		*pname;		/* node name w/o any :ts       */
 	int		 rc;
 	attribute	*pattr;
@@ -2903,19 +2929,7 @@ create_pbs_node(char *objname, svrattrl *plist, int perms, int *bad, struct pbsn
 		/* add the entry */
 		presc = add_resource_entry(pattr, prdef);
 		if (presc) {
-			struct sockaddr_in sa4;
-			struct sockaddr_in6 sa6;
-
-			strncpy(realfirsthost, pnode->nd_attr[(int)ND_ATR_Mom].at_val.at_arst->as_string[0], (sizeof(realfirsthost) - 1));
-			realfirsthost[PBS_MAXHOSTNAME] = '\0';
-
-			if ((inet_pton(AF_INET, realfirsthost, &(sa4.sin_addr)) != 1) &&
-					(inet_pton(AF_INET6, realfirsthost, &(sa6.sin6_addr)) != 1)) {
-				/* Not an IPv4 or IPv6 address, truncate it. */
-				pc = strchr(realfirsthost, '.');
-				if (pc)
-					*pc = '\0';
-			}
+			get_resolvable_hostname(pnode->nd_attr[(int)ND_ATR_Mom].at_val.at_arst->as_string[0], realfirsthost);
 			rc = prdef->rs_decode(&presc->rs_value, "", "host", realfirsthost);
 			presc->rs_value.at_flags |= ATR_VFLAG_DEFLT; /* so not written to nodes file */
 		} else {

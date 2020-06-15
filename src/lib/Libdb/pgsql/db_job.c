@@ -66,6 +66,8 @@ int
 pbs_db_prepare_job_sqls(void *conn)
 {
 	char    conn_sql[MAX_SQL_LENGTH];
+	char    select_sql[SELECT_SQL_LEN];
+
 	snprintf(conn_sql, MAX_SQL_LENGTH, "insert into pbs.job ("
 		"ji_jobid,"
 		"ji_state,"
@@ -179,7 +181,7 @@ pbs_db_prepare_job_sqls(void *conn)
 	if (db_prepare_stmt(conn, STMT_UPDATE_JOB_QUICK, conn_sql, 23) != 0)
 		return -1;
 
-	snprintf(conn_sql, MAX_SQL_LENGTH, "select "
+	snprintf(select_sql, MAX_SQL_LENGTH, "select "
 		"ji_jobid,"
 		"ji_state,"
 		"ji_substate,"
@@ -205,38 +207,14 @@ pbs_db_prepare_job_sqls(void *conn)
 		"ji_qrank,"
 		"to_char(ji_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as ji_savetm, "
 		"hstore_to_array(attributes) as attributes "
-		"from pbs.job where ji_jobid = $1");
+		"from pbs.job");
+	snprintf(conn_sql, MAX_SQL_LENGTH, "%s where ji_jobid = $1", select_sql);
 	if (db_prepare_stmt(conn, STMT_SELECT_JOB, conn_sql, 1) != 0)
 		return -1;
 
-	snprintf(conn_sql, MAX_SQL_LENGTH, "select "
-		"ji_jobid,"
-		"ji_state,"
-		"ji_substate,"
-		"ji_svrflags,"
-		"ji_numattr,"
-		"ji_ordering,"
-		"ji_priority,"
-		"ji_stime,"
-		"ji_endtBdry,"
-		"ji_queue,"
-		"ji_destin,"
-		"ji_un_type,"
-		"ji_momaddr,"
-		"ji_momport,"
-		"ji_exitstat,"
-		"ji_quetime,"
-		"ji_rteretry,"
-		"ji_fromsock,"
-		"ji_fromaddr,"
-		"ji_4jid,"
-		"ji_4ash,"
-		"ji_credtype,"
-		"ji_qrank,"
-		"to_char(ji_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as ji_savetm, "
-		"hstore_to_array(attributes) as attributes "
-		"from pbs.job where ji_savetm > to_timestamp($1, 'YYYY-MM-DD HH24:MI:SS.US') "
-		"order by ji_savetm ");
+	snprintf(conn_sql, MAX_SQL_LENGTH,
+		"%s where ji_savetm > to_timestamp($1, 'YYYY-MM-DD HH24:MI:SS.US') "
+		"order by ji_savetm ", select_sql);
 	if (db_prepare_stmt(conn, STMT_FINDJOBS_FROM_TIME, conn_sql, 1) != 0)
 		return -1;
 
@@ -268,64 +246,13 @@ pbs_db_prepare_job_sqls(void *conn)
 	if (db_prepare_stmt(conn, STMT_SELECT_JOBSCR, conn_sql, 1) != 0)
 		return -1;
 
-	snprintf(conn_sql, MAX_SQL_LENGTH, "select "
-		"ji_jobid,"
-		"ji_state,"
-		"ji_substate,"
-		"ji_svrflags,"
-		"ji_numattr,"
-		"ji_ordering,"
-		"ji_priority,"
-		"ji_stime,"
-		"ji_endtBdry,"
-		"ji_queue,"
-		"ji_destin,"
-		"ji_un_type,"
-		"ji_momaddr,"
-		"ji_momport,"
-		"ji_exitstat,"
-		"ji_quetime,"
-		"ji_rteretry,"
-		"ji_fromsock,"
-		"ji_fromaddr,"
-		"ji_4jid,"
-		"ji_4ash,"
-		"ji_credtype,"
-		"ji_qrank,"
-		"to_char(ji_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as ji_savetm, "
-		"hstore_to_array(attributes) as attributes "
-		"from pbs.job order by ji_qrank");
+	snprintf(conn_sql, MAX_SQL_LENGTH,
+		"%s order by ji_qrank", select_sql);
 	if (db_prepare_stmt(conn, STMT_FINDJOBS_ORDBY_QRANK, conn_sql, 0) != 0)
 		return -1;
 
-	snprintf(conn_sql, MAX_SQL_LENGTH, "select "
-		"ji_jobid,"
-		"ji_state,"
-		"ji_substate,"
-		"ji_svrflags,"
-		"ji_numattr,"
-		"ji_ordering,"
-		"ji_priority,"
-		"ji_stime,"
-		"ji_endtBdry,"
-		"ji_queue,"
-		"ji_destin,"
-		"ji_un_type,"
-		"ji_momaddr,"
-		"ji_momport,"
-		"ji_exitstat,"
-		"ji_quetime,"
-		"ji_rteretry,"
-		"ji_fromsock,"
-		"ji_fromaddr,"
-		"ji_4jid,"
-		"ji_4ash,"
-		"ji_credtype,"
-		"ji_qrank,"
-		"to_char(ji_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as ji_savetm, "
-		"hstore_to_array(attributes) as attributes "
-		"from pbs.job where ji_queue = $1"
-		" order by ji_qrank");
+	snprintf(conn_sql, MAX_SQL_LENGTH,
+		"%s where ji_queue = $1 order by ji_qrank", select_sql);
 	if (db_prepare_stmt(conn, STMT_FINDJOBS_BYQUE_ORDBY_QRANK,
 		conn_sql, 1) != 0)
 		return -1;
@@ -595,15 +522,15 @@ pbs_db_find_job(void *conn, void *st, pbs_db_obj_info_t *obj,
 
 	if (opts != NULL && opts->flags == FIND_JOBS_BY_QUE) {
 		SET_PARAM_STR(conn_data, pdjob->ji_queue, 0);
-		params=1;
+		params = 1;
 		strcpy(conn_sql, STMT_FINDJOBS_BYQUE_ORDBY_QRANK);
-	} else if (opts != NULL && opts->timestamp && opts->timestamp[0] != '\0'){
+	} else if (opts != NULL && opts->timestamp && opts->timestamp[0] != '\0') {
 		SET_PARAM_STR(conn_data, opts->timestamp, 0);
-		params=1;
+		params = 1;
 		strcpy(conn_sql, STMT_FINDJOBS_FROM_TIME);
 	} else {
 		strcpy(conn_sql, STMT_FINDJOBS_ORDBY_QRANK);
-		params=0;
+		params = 0;
 	}
 
 	if ((rc = db_query(conn, conn_sql, params, &res)) != 0)

@@ -66,6 +66,8 @@ int
 pbs_db_prepare_node_sqls(void *conn)
 {
 	char    conn_sql[MAX_SQL_LENGTH];
+	char    select_sql[SELECT_SQL_LEN];
+
 	snprintf(conn_sql, MAX_SQL_LENGTH, "insert into pbs.node("
 		"nd_name, "
 		"nd_index, "
@@ -129,7 +131,7 @@ pbs_db_prepare_node_sqls(void *conn)
 	if (db_prepare_stmt(conn, STMT_REMOVE_NODEATTRS, conn_sql, 2) != 0)
 		return -1;
 
-	snprintf(conn_sql, MAX_SQL_LENGTH, "select "
+	snprintf(select_sql, MAX_SQL_LENGTH, "select "
 		"nd_name, "
 		"nd_index, "
 		"mom_modtime, "
@@ -137,46 +139,30 @@ pbs_db_prepare_node_sqls(void *conn)
 		"nd_state, "
 		"nd_ntype, "
 		"nd_pque, "
+		"to_char(nd_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as nd_savetm, "
 		"hstore_to_array(attributes) as attributes "
-		"from pbs.node "
-		"where nd_name = $1");
+		"from pbs.node");
+
+	snprintf(conn_sql, MAX_SQL_LENGTH, "%s where nd_name = $1", select_sql);
 	if (db_prepare_stmt(conn, STMT_SELECT_NODE, conn_sql, 1) != 0)
 		return -1;
 
-	snprintf(conn_sql, MAX_SQL_LENGTH, "select "
-		"nd_name, "
-		"nd_index, "
-		"mom_modtime, "
-		"nd_hostname, "
-		"nd_state, "
-		"nd_ntype, "
-		"nd_pque, "
-		"hstore_to_array(attributes) as attributes "
-		"from pbs.node order by nd_creattm");
-	if (db_prepare_stmt(conn, STMT_FIND_NODES_ORDBY_CREATTM, conn_sql, 0) != 0)
-		return -1;
-
-	snprintf(conn_sql, MAX_SQL_LENGTH, "select "
 #ifdef NAS /* localmod 079 */
-		"n.nd_name, "
-		"n.mom_modtime, "
-		"n.nd_hostname, "
-		"n.nd_state, "
-		"n.nd_ntype, "
-		"n.nd_pque "
-		"from pbs.node n left outer join pbs.nas_node i on "
-		"n.nd_name=i.nd_name order by i.nd_nasindex");
+	snprintf(conn_sql, MAX_SQL_LENGTH, "%s n left outer join pbs.nas_node i on "
+		"n.nd_name=i.nd_name order by i.nd_nasindex", select_sql);
 #else
-		"nd_name, "
-		"mom_modtime, "
-		"nd_hostname, "
-		"nd_state, "
-		"nd_ntype, "
-		"nd_pque, "
-		"hstore_to_array(attributes) as attributes "
-		"from pbs.node order by nd_index, nd_creattm");
+	snprintf(conn_sql, MAX_SQL_LENGTH, "%s order by nd_index, nd_creattm", select_sql);
 #endif /* localmod 079 */
 	if (db_prepare_stmt(conn, STMT_FIND_NODES_ORDBY_INDEX, conn_sql, 0) != 0)
+		return -1;
+
+	snprintf(conn_sql, MAX_SQL_LENGTH, "%s where nd_savetm > to_timestamp($1, 'YYYY-MM-DD HH24:MI:SS:US') "
+		"order by nd_index, nd_creattm", select_sql);
+	if (db_prepare_stmt(conn, STMT_FIND_NODES_ORDBY_INDEX_FILTERBY_SAVETM, conn_sql, 1) != 0)
+		return -1;
+
+	snprintf(conn_sql, MAX_SQL_LENGTH, "%s where nd_hostname = $1 order by nd_index, nd_creattm", select_sql);
+	if (db_prepare_stmt(conn, STMT_FIND_NODES_ORDBY_INDEX_FILTERBY_HOSTNAME, conn_sql, 1) != 0)
 		return -1;
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "delete from pbs.node where nd_name = $1");
@@ -224,10 +210,11 @@ pbs_db_prepare_node_sqls(void *conn)
 static int
 load_node(PGresult *res, pbs_db_node_info_t *pnd, int row)
 {
-	char *raw_array;
-	static int nd_name_fnum, mom_modtime_fnum, nd_hostname_fnum, nd_state_fnum, nd_ntype_fnum,
-	nd_pque_fnum, attributes_fnum;
-	static int fnums_inited = 0;
+	char		*raw_array;
+	static int	nd_name_fnum, mom_modtime_fnum, nd_hostname_fnum, nd_state_fnum, nd_ntype_fnum,
+			nd_pque_fnum, attributes_fnum, nd_svtime_fnum;
+	char		db_savetm[DB_TIMESTAMP_LEN + 1];
+	static int	fnums_inited = 0;
 
 	if (fnums_inited == 0) {
 		nd_name_fnum = PQfnumber(res, "nd_name");
@@ -236,9 +223,16 @@ load_node(PGresult *res, pbs_db_node_info_t *pnd, int row)
 		nd_state_fnum = PQfnumber(res, "nd_state");
 		nd_ntype_fnum = PQfnumber(res, "nd_ntype");
 		nd_pque_fnum = PQfnumber(res, "nd_pque");
+		nd_svtime_fnum = PQfnumber(res, "nd_savetm");
 		attributes_fnum = PQfnumber(res, "attributes");
 		fnums_inited = 1;
 	}
+
+	GET_PARAM_STR(res, row, db_savetm,  nd_svtime_fnum);
+	if (strcmp(pnd->nd_savetm, db_savetm) == 0)
+		return -2;
+
+	strcpy(pnd->nd_savetm, db_savetm);
 
 	GET_PARAM_STR(res, row, pnd->nd_name, nd_name_fnum);
 	GET_PARAM_BIGINT(res, row, pnd->mom_modtime, mom_modtime_fnum);
@@ -389,14 +383,29 @@ int
 pbs_db_find_node(void *conn, void *st, pbs_db_obj_info_t *obj,
 	pbs_db_query_options_t *opts)
 {
-	PGresult *res;
-	int rc;
+	PGresult         *res;
+	int              rc;
+	int              params;
+	char             conn_sql[MAX_SQL_LENGTH];
 	db_query_state_t *state = (db_query_state_t *) st;
 
 	if (!state)
 		return -1;
+	
+	if (opts && opts->flags == 1 && opts->hostname) {
+		SET_PARAM_STR(conn_data, opts->hostname, 0);
+		strcpy(conn_sql, STMT_FIND_NODES_ORDBY_INDEX_FILTERBY_HOSTNAME);
+		params = 1;
+	} else if (opts && opts->timestamp) {
+		SET_PARAM_STR(conn_data, opts->timestamp, 0);
+		strcpy(conn_sql, STMT_FIND_NODES_ORDBY_INDEX_FILTERBY_SAVETM);
+		params = 1;
+	} else {
+		strcpy(conn_sql, STMT_FIND_NODES_ORDBY_INDEX);
+		params = 0;
+	}
 
-	if ((rc = db_query(conn, STMT_FIND_NODES_ORDBY_INDEX, 0, &res)) != 0)
+	if ((rc = db_query(conn, conn_sql, params, &res)) != 0)
 		return rc;
 
 	state->row = 0;

@@ -831,14 +831,18 @@ main(int argc, char **argv)
 		return -1;
 	}
 	self.port = pbs_conf.batch_service_port;
+	
 	if (get_max_servers() > 1) {
-		char buf[PBS_MAXHOSTNAME+8];
+		char *buf = NULL;
+
 		if ((myindex = get_svr_index(&self)) == -1) {
 			fprintf(stderr, "pbsconf error: Wrong Multi Server configuration\n");
 			return 1;
 		}
-		snprintf(buf, sizeof(buf), "%s_%d", daemonname, pbs_conf.batch_service_port);
+
+		pbs_asprintf(&buf, "%s_%d", daemonname, pbs_conf.batch_service_port);
 		strcpy(daemonname, buf);
+		free(buf);
 	}
 
 	if (set_msgdaemonname(daemonname)) {

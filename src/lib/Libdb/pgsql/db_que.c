@@ -66,6 +66,7 @@ int
 pbs_db_prepare_que_sqls(void *conn)
 {
 	char conn_sql[MAX_SQL_LENGTH];
+	char select_sql[SELECT_SQL_LEN];
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "insert into pbs.queue("
 		"qu_name, "
@@ -114,31 +115,24 @@ pbs_db_prepare_que_sqls(void *conn)
 	if (db_prepare_stmt(conn, STMT_REMOVE_QUEATTRS, conn_sql, 2) != 0)
 		return -1;
 
-	snprintf(conn_sql, MAX_SQL_LENGTH, "select qu_name, "
+	snprintf(select_sql, MAX_SQL_LENGTH, "select qu_name, "
 			"qu_type, "
 			"to_char(qu_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as qu_savetm, "
 			"hstore_to_array(attributes) as attributes "
-			"from pbs.queue "
-			"where qu_name = $1");
+			"from pbs.queue");
+
+	snprintf(conn_sql, MAX_SQL_LENGTH, "%s where qu_name = $1", select_sql);
 	if (db_prepare_stmt(conn, STMT_SELECT_QUE, conn_sql, 1) != 0)
 		return -1;
 
-	snprintf(conn_sql, MAX_SQL_LENGTH, "select qu_name, "
-			"qu_type, "
-			"to_char(qu_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as qu_savetm, "
-			"hstore_to_array(attributes) as attributes "
-			"from pbs.queue "
-			"where qu_savetm > to_timestamp($1, 'YYYY-MM-DD HH24:MI:SS:US') "
-			"order by qu_savetm ");
+	snprintf(conn_sql, MAX_SQL_LENGTH,
+		"%s where qu_savetm > to_timestamp($1, 'YYYY-MM-DD HH24:MI:SS:US') "
+		"order by qu_savetm ", select_sql);
 	if (db_prepare_stmt(conn, STMT_FIND_QUES_FROM_TIME_ORDBY_SAVETM, conn_sql, 1) != 0)
 		return -1;
 
-	snprintf(conn_sql, MAX_SQL_LENGTH, "select "
-			"qu_name, "
-			"qu_type, "
-			"to_char(qu_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as qu_savetm, "
-			"hstore_to_array(attributes) as attributes "
-			"from pbs.queue order by qu_creattm");
+	snprintf(conn_sql, MAX_SQL_LENGTH,
+		"%s order by qu_creattm", select_sql);
 	if (db_prepare_stmt(conn, STMT_FIND_QUES_ORDBY_CREATTM, conn_sql, 0) != 0)
 		return -1;
 
@@ -165,9 +159,10 @@ pbs_db_prepare_que_sqls(void *conn)
 static int
 load_que(PGresult *res, pbs_db_que_info_t *pq, int row)
 {
-	char *raw_array;
-	static int qu_name_fnum, qu_type_fnum, qu_savetm_fnum, attributes_fnum;
-	static int fnums_inited = 0;
+	char		*raw_array;
+	static int	qu_name_fnum, qu_type_fnum, qu_savetm_fnum, attributes_fnum;
+	char		db_savetm[DB_TIMESTAMP_LEN + 1];
+	static int	fnums_inited = 0;
 
 	if (fnums_inited == 0) {
 		qu_name_fnum = PQfnumber(res, "qu_name");
@@ -177,9 +172,14 @@ load_que(PGresult *res, pbs_db_que_info_t *pq, int row)
 		fnums_inited = 1;
 	}
 
+	GET_PARAM_STR(res, row, db_savetm,  qu_savetm_fnum);
+	if (strcmp(pq->qu_savetm, db_savetm) == 0)
+		return -2;
+
+	strcpy(pq->qu_savetm, db_savetm);
+
 	GET_PARAM_STR(res, row, pq->qu_name, qu_name_fnum);
 	GET_PARAM_INTEGER(res, row, pq->qu_type, qu_type_fnum);
-	GET_PARAM_STR(res, row, pq->qu_savetm, qu_savetm_fnum);
 	GET_PARAM_BIN(res, row, raw_array, attributes_fnum);
 
 	/* convert attributes from postgres raw array format */

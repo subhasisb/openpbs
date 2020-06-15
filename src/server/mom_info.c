@@ -97,6 +97,7 @@ mominfo_time_t  mominfo_time = {0, 0};	/* time stamp of mominfo update */
 int	    svr_num_moms = 0;
 pntPBS_IP_LIST pbs_iplist = NULL;
 AVL_IX_DESC *hostaddr_tree = NULL;
+struct	tree	*ipaddrs = NULL;	/* tree of ip addrs */
 
 extern char	*msg_daemonname;
 extern char	*path_hooks_rescdef;
@@ -354,7 +355,6 @@ create_svrmom_entry(char *hostname, unsigned int port, unsigned long *pul)
 {
 	mominfo_t     *pmom;
 	mom_svrinfo_t *psvrmom;
-	extern struct tree  *ipaddrs;
 
 	pmom = create_mom_entry(hostname, port);
 	if (pmom == NULL) {
@@ -442,6 +442,43 @@ open_momstream(mominfo_t *pmom)
 
 /**
  * @brief
+ * 		find_mombyaddr - 
+ * 		Find the mom from ipaddrs tree.
+ * 		Recover from database and return if not found in the tree.
+ *
+ * @param[in]	hostaddr - mom's host IP address
+ * @param[in]	port - mom port
+ *
+ * @return	mominfo struct
+ * @retval	!NULL	- no error
+ * @retval	NULL	- reverse hostname resolution failed / no mom found
+ */
+mominfo_t *
+find_mombyaddr(pbs_net_t hostaddr, uint port)
+{
+	struct    in_addr addr;
+	struct    hostent *hp;
+	char      realfirsthost[PBS_MAXHOSTNAME + 1];
+	mominfo_t *pmom = NULL;
+
+	if ((pmom = tfind2((ulong) hostaddr, port, &ipaddrs)) != NULL)
+		return pmom;
+
+	addr.s_addr = htonl(hostaddr);
+	if ((hp = gethostbyaddr((void *) &addr, sizeof(struct in_addr), AF_INET)) == NULL) {
+		log_errf(PBSE_SYSTEM, __func__, "addr not found, h_errno=%d errno=%d\n", h_errno, errno);
+		return NULL;
+	}
+	DBPRT(("hp->h_name=%s", hp->h_name))
+
+	get_resolvable_hostname(hp->h_name, realfirsthost);
+	DBPRT(("realfirsthost=%s", realfirsthost))
+	get_all_db_nodes(realfirsthost);
+	return tfind2((ulong) hostaddr, port, &ipaddrs);
+}
+
+/**
+ * @brief
  * 		remove the cached ip addresses of a mom from the host tree and the ipaddrs tree
  *
  * @param[in]	pmom - valid ptr to the mom info
@@ -469,7 +506,7 @@ remove_mom_ipaddresses_list(mominfo_t *pmom)
 			free(tpul);
 		}
 	}
-	
+
 	return 0;
 }
 

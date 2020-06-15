@@ -199,9 +199,10 @@ pbs_db_save_sched(void *conn, pbs_db_obj_info_t *obj, int savetype)
 static int
 load_sched(PGresult *res, pbs_db_sched_info_t *psch, int row)
 {
-	char *raw_array;
-	static int sched_name_fnum, sched_savetm_fnum, attributes_fnum;
-	static int fnums_inited = 0;
+	char		*raw_array;
+	static int	sched_name_fnum, sched_savetm_fnum, attributes_fnum;
+	static int	fnums_inited = 0;
+	char		db_savetm[DB_TIMESTAMP_LEN + 1];
 
 	if (fnums_inited == 0) {
 		sched_name_fnum = PQfnumber(res, "sched_name");
@@ -210,8 +211,13 @@ load_sched(PGresult *res, pbs_db_sched_info_t *psch, int row)
 		fnums_inited = 1;
 	}
 
+	GET_PARAM_STR(res, row, db_savetm,  sched_savetm_fnum);
+	if (strcmp(psch->sched_savetm, db_savetm) == 0)
+		return -2;
+
+	strcpy(psch->sched_savetm, db_savetm);
+
 	GET_PARAM_STR(res, row, psch->sched_name, sched_name_fnum);
-	GET_PARAM_STR(res, row, psch->sched_savetm, sched_savetm_fnum);
 	GET_PARAM_BIN(res, row, raw_array, attributes_fnum);
 
 	/* convert attributes from postgres raw array format */

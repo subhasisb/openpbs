@@ -191,7 +191,6 @@ extern resc_resv *recov_resv_cb(pbs_db_obj_info_t *, int *);
 extern pbs_queue *recov_queue_cb(pbs_db_obj_info_t *, int *);
 extern pbs_sched *recov_sched_cb(pbs_db_obj_info_t *, int *);
 extern int get_all_db_jobs();
-extern int get_all_db_nodes(char *);
 /* Private functions in this file */
 
 static void  catch_child(int);

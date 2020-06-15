@@ -216,29 +216,25 @@ int
 pbs_db_search(void *conn, pbs_db_obj_info_t *obj, pbs_db_query_options_t *opts, query_cb_t query_cb)
 {
 	void *st;
-	int ret;
-	int totcount;
 	int refreshed;
-	int rc;
+	int totcount = 0;
 
-	st = db_initialize_state(conn, query_cb);
-	if (!st)
+	if ((st = db_initialize_state(conn, query_cb)) == NULL)
 		return -1;
 
-	ret = db_fn_arr[obj->pbs_db_obj_type].pbs_db_find_obj(conn, st, obj, opts);
-	if (ret == -1) {
+	if (db_fn_arr[obj->pbs_db_obj_type].pbs_db_find_obj(conn, st, obj, opts) == -1) {
 		/* error in executing the sql */
 		db_destroy_state(st);
 		return -1;
 	}
-	totcount = 0;
-	while ((rc = db_cursor_next(conn, st, obj)) == 0) {
+
+	while (db_cursor_next(conn, st, obj) == 0) {
 		query_cb(obj, &refreshed);
 		if (refreshed)
 			totcount++;
 	}
 
-	if (opts != NULL && totcount)
+	if (opts && totcount)
 		db_copy_savetm(obj, opts);
 
 	db_destroy_state(st);
@@ -296,18 +292,23 @@ db_copy_savetm(pbs_db_obj_info_t *obj, pbs_db_query_options_t *opts)
 		case PBS_DB_NODE:
 			strcpy(opts->timestamp, ((pbs_db_node_info_t *) obj->pbs_db_un.pbs_db_node)->nd_savetm);
 			break;
+
 		case PBS_DB_JOB:
 			strcpy(opts->timestamp, ((pbs_db_job_info_t *) obj->pbs_db_un.pbs_db_job)->ji_savetm);
 			break;
+
 		case PBS_DB_RESV:
-			strcpy(opts->timestamp,((pbs_db_resv_info_t *) obj->pbs_db_un.pbs_db_resv)->ri_savetm);
+			strcpy(opts->timestamp, ((pbs_db_resv_info_t *) obj->pbs_db_un.pbs_db_resv)->ri_savetm);
 			break;
+
 		case PBS_DB_QUEUE:
 			strcpy(opts->timestamp, ((pbs_db_que_info_t *) obj->pbs_db_un.pbs_db_que)->qu_savetm);
 			break;
+
 		case PBS_DB_SVR:
-			strcpy(opts->timestamp,((pbs_db_svr_info_t *) obj->pbs_db_un.pbs_db_svr)->sv_savetm);
+			strcpy(opts->timestamp, ((pbs_db_svr_info_t *) obj->pbs_db_un.pbs_db_svr)->sv_savetm);
 			break;
+
 		case PBS_DB_SCHED:
 			strcpy(opts->timestamp, ((pbs_db_sched_info_t *) obj->pbs_db_un.pbs_db_sched)->sched_savetm);			
 	}
