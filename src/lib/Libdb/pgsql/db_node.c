@@ -131,7 +131,7 @@ pbs_db_prepare_node_sqls(void *conn)
 	if (db_prepare_stmt(conn, STMT_REMOVE_NODEATTRS, conn_sql, 2) != 0)
 		return -1;
 
-	snprintf(select_sql, MAX_SQL_LENGTH, "select "
+	snprintf(select_sql, SELECT_SQL_LEN, "select "
 		"nd_name, "
 		"nd_index, "
 		"mom_modtime, "
@@ -167,27 +167,6 @@ pbs_db_prepare_node_sqls(void *conn)
 
 	snprintf(conn_sql, MAX_SQL_LENGTH, "delete from pbs.node where nd_name = $1");
 	if (db_prepare_stmt(conn, STMT_DELETE_NODE, conn_sql, 1) != 0)
-		return -1;
-
-	snprintf(conn_sql, MAX_SQL_LENGTH, "select "
-		"mit_time, "
-		"mit_gen "
-		"from pbs.mominfo_time ");
-	if (db_prepare_stmt(conn, STMT_SELECT_MOMINFO_TIME, conn_sql, 0) != 0)
-		return -1;
-
-	snprintf(conn_sql, MAX_SQL_LENGTH, "insert into pbs.mominfo_time("
-		"mit_time, "
-		"mit_gen) "
-		"values "
-		"($1, $2)");
-	if (db_prepare_stmt(conn, STMT_INSERT_MOMINFO_TIME, conn_sql, 2) != 0)
-		return -1;
-
-	snprintf(conn_sql, MAX_SQL_LENGTH, "update pbs.mominfo_time set "
-		"mit_time = $1, "
-		"mit_gen = $2 ");
-	if (db_prepare_stmt(conn, STMT_UPDATE_MOMINFO_TIME, conn_sql, 2) != 0)
 		return -1;
 
 	return 0;
@@ -500,75 +479,5 @@ pbs_db_del_attr_node(void *conn, void *obj_id, char *sv_time, pbs_db_attr_list_t
 	PQclear(res);
 	free(raw_array);
 
-	return 0;
-}
-
-
-/**
- * @brief
- *	Insert mominfo_time into the database
- *
- * @param[in]	conn - Connection handle
- * @param[in]	obj  - Information of node to be inserted
- *
- * @return      Error code
- * @retval	-1 - Failure
- * @retval	 0 - Success
- *
- */
-int
-pbs_db_save_mominfo_tm(void *conn, pbs_db_obj_info_t *obj, int savetype)
-{
-	char *stmt;
-	pbs_db_mominfo_time_t *pmi = obj->pbs_db_un.pbs_db_mominfo_tm;
-
-	SET_PARAM_BIGINT(conn_data, pmi->mit_time, 0);
-	SET_PARAM_INTEGER(conn_data, pmi->mit_gen, 1);
-
-	if (savetype & OBJ_SAVE_NEW)
-		stmt = STMT_INSERT_MOMINFO_TIME;
-	else
-		stmt = STMT_UPDATE_MOMINFO_TIME;
-
-	if (db_cmd(conn, stmt, 2, NULL) == -1)
-		return -1;
-
-	return 0;
-}
-
-/**
- * @brief
- *	Load node mominfo_time from the database
- *
- * @param[in]	conn - Connection handle
- * @param[in]	obj  - Load node information into this object
- *
- * @return      Error code
- * @retval	-1 - Failure
- * @retval	 0 - Success
- * @retval	 1 -  Success but no rows loaded
- *
- */
-int
-pbs_db_load_mominfo_tm(void *conn, pbs_db_obj_info_t *obj)
-{
-	PGresult *res;
-	int rc;
-	pbs_db_mominfo_time_t *pmi = obj->pbs_db_un.pbs_db_mominfo_tm;
-	static int mit_time_fnum = -1;
-	static int mit_gen_fnum = -1;
-
-	if ((rc = db_query(conn, STMT_SELECT_MOMINFO_TIME, 0, &res)) != 0)
-		return rc;
-
-	if (mit_time_fnum == -1 || mit_gen_fnum == -1) {
-		mit_time_fnum = PQfnumber(res, "mit_time");
-		mit_gen_fnum = PQfnumber(res, "mit_gen");
-	}
-
-	GET_PARAM_BIGINT(res, 0, pmi->mit_time, mit_time_fnum);
-	GET_PARAM_INTEGER(res, 0, pmi->mit_gen, mit_gen_fnum);
-
-	PQclear(res);
 	return 0;
 }

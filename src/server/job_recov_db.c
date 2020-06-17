@@ -797,10 +797,6 @@ get_all_db_jobs()
 		log_event(PBSEVENT_DEBUG, PBS_EVENTCLASS_SERVER, LOG_DEBUG, __func__, log_buffer);
 	}
 
-	/* to save the last job's time save_tm, since we are loading in order */
-	if (opts.timestamp && opts.timestamp[0] != '\0')
-		strcpy(jobs_from_time, opts.timestamp);
-
 	return 0;
 }
 
@@ -843,10 +839,6 @@ get_all_db_resvs()
 		sprintf(log_buffer, "Recovered %d reservations", count);
 		log_event(PBSEVENT_DEBUG, PBS_EVENTCLASS_SERVER, LOG_DEBUG, __func__, log_buffer);
 	}
-
-	/* to save the last job's time save_tm, since we are loading in order */
-	if (opts.timestamp && opts.timestamp[0] != '\0')	
-		strcpy(resvs_from_time, opts.timestamp);
 
 	return 0;
 }

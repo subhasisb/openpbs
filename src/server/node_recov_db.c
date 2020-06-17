@@ -499,9 +499,5 @@ get_all_db_nodes(char *hostname)
 		return (1);
 	}
 
-	/* to save the last job's time save_tm, since we are loading in order */
-	if (opts.timestamp && opts.timestamp[0] != '\0')
-		strcpy(nodes_from_time, opts.timestamp);
-
 	return 0;
 }

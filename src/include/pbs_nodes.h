@@ -208,16 +208,8 @@ struct  mom_vnode_map {
 };
 typedef struct mom_vnode_map momvmap_t;
 
-/* used for generation control on the Host to Vnode mapping */
-struct	mominfo_time {
-	time_t	   mit_time;
-	int	   mit_gen;
-};
-typedef struct mominfo_time mominfo_time_t;
-
 extern momvmap_t **mommap_array;
 extern int	   mommap_array_size;
-extern mominfo_time_t	   mominfo_time;
 
 
 struct	prop {
@@ -492,8 +484,6 @@ extern vnpool_mom_t *find_vnode_pool(mominfo_t *pmom);
 extern void mcast_moms();
 #endif
 
-extern  int	   recover_vmap(void);
-extern  void       delete_momvmap_entry(momvmap_t *);
 extern  momvmap_t *create_mommap_entry(char *, char *hostn, mominfo_t *, int);
 extern struct mominfo   *find_mom_by_vnodename(const char *);
 extern momvmap_t        *find_vmap_entry(const char *);

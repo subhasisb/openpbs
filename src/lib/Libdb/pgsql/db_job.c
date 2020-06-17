@@ -181,7 +181,7 @@ pbs_db_prepare_job_sqls(void *conn)
 	if (db_prepare_stmt(conn, STMT_UPDATE_JOB_QUICK, conn_sql, 23) != 0)
 		return -1;
 
-	snprintf(select_sql, MAX_SQL_LENGTH, "select "
+	snprintf(select_sql, SELECT_SQL_LEN, "select "
 		"ji_jobid,"
 		"ji_state,"
 		"ji_substate,"

@@ -99,15 +99,6 @@ CREATE TABLE pbs.scheduler (
 ---------------------- NODE --------------------------------
 
 /*
- * Table pbs.mominfo_time holds information about the generation and time of 
- * the host to vnode map
- */
-CREATE TABLE pbs.mominfo_time (
-    mit_time    BIGINT,
-    mit_gen     INTEGER
-);
-
-/*
  * Table pbs.node holds information about PBS nodes
  */
 CREATE TABLE pbs.node (

@@ -136,9 +136,6 @@ extern "C" {
 #define STMT_FIND_NODES_ORDBY_INDEX "find_nodes_ordby_index"
 #define STMT_FIND_NODES_ORDBY_INDEX_FILTERBY_HOSTNAME "find_nodes_ordby_index_filterby_hostname"
 #define STMT_FIND_NODES_ORDBY_INDEX_FILTERBY_SAVETM "find_nodes_ordby_index_filterby_savetm"
-#define STMT_SELECT_MOMINFO_TIME "select_mominfo_time"
-#define STMT_INSERT_MOMINFO_TIME "insert_mominfo_time"
-#define STMT_UPDATE_MOMINFO_TIME "update_mominfo_time"
 #define STMT_FIND_NODES_ORDBY_INDEX_FILTERBY_SAVETM "find_nodes_ordby_index_filterby_savetm"
 #define STMT_FIND_NODES_ORDBY_INDEX_FILTERBY_HOSTNAME "find_nodes_ordby_index_filterby_hostname"
 
@@ -366,10 +363,6 @@ int pbs_db_load_node(void *conn, pbs_db_obj_info_t *obj);
 int pbs_db_find_node(void *conn, void *st, pbs_db_obj_info_t *obj, pbs_db_query_options_t *opts);
 int pbs_db_next_node(void *conn, void *st, pbs_db_obj_info_t *obj);
 int pbs_db_delete_node(void *conn, pbs_db_obj_info_t *obj);
-
-/* mominfo_time functions */
-int pbs_db_save_mominfo_tm(void *conn, pbs_db_obj_info_t *obj, int savetype);
-int pbs_db_load_mominfo_tm(void *conn, pbs_db_obj_info_t *obj);
 
 /* queue functions */
 int pbs_db_save_que(void *conn, pbs_db_obj_info_t *obj, int savetype);

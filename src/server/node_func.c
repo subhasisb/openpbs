@@ -146,7 +146,6 @@ extern char	*path_nodestate;
 extern pbs_list_head svr_queues;
 extern unsigned int pbs_mom_port;
 extern unsigned int pbs_rm_port;
-extern mominfo_time_t  mominfo_time;
 extern char	*resc_in_err;
 extern char	server_host[];
 extern time_t	 time_now;

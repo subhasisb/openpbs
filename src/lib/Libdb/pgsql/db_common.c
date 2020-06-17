@@ -113,14 +113,6 @@ pg_db_fn_t db_fn_arr[PBS_DB_NUM_TYPES] = {
 		pbs_db_next_node,
 		pbs_db_del_attr_node
 	},
-	{	/* PBS_DB_MOMINFO_TIME */
-		pbs_db_save_mominfo_tm,
-		NULL,
-		pbs_db_load_mominfo_tm,
-		NULL,
-		NULL,
-		NULL
-	},
 	{	/* PBS_DB_JOB */
 		pbs_db_save_job,
 		pbs_db_delete_job,

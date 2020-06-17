@@ -150,7 +150,7 @@ pbs_db_prepare_resv_sqls(void *conn)
 	if (db_prepare_stmt(conn, STMT_REMOVE_RESVATTRS, conn_sql, 2) != 0)
 		return -1;
 
-	snprintf(select_sql, MAX_SQL_LENGTH, "select "
+	snprintf(select_sql, SELECT_SQL_LEN, "select "
 		"ri_resvID, "
 		"ri_queue, "
 		"ri_state, "

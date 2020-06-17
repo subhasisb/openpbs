@@ -164,17 +164,6 @@ typedef struct pbs_db_node_info pbs_db_node_info_t;
 
 /**
  * @brief
- *  Structure used to map database mominfo_time structure to C
- *
- */
-struct pbs_db_mominfo_time {
-	BIGINT	mit_time; /* time of the host to vnode map */
-	INTEGER mit_gen;  /* generation of the host to vnode map */
-};
-typedef struct pbs_db_mominfo_time pbs_db_mominfo_time_t;
-
-/**
- * @brief
  *  Structure used to map database job structure to C
  *
  */
@@ -268,11 +257,10 @@ typedef struct pbs_db_query_options pbs_db_query_options_t;
 #define PBS_DB_SCHED		1
 #define PBS_DB_QUEUE		2
 #define PBS_DB_NODE		3
-#define PBS_DB_MOMINFO_TIME	4
-#define PBS_DB_JOB		5
-#define PBS_DB_JOBSCR		6
-#define PBS_DB_RESV		7
-#define PBS_DB_NUM_TYPES	8
+#define PBS_DB_JOB		4
+#define PBS_DB_JOBSCR		5
+#define PBS_DB_RESV		6
+#define PBS_DB_NUM_TYPES	7
 
 
 /* connection error code */
@@ -314,7 +302,6 @@ struct pbs_db_obj_info {
 		pbs_db_sched_info_t   *pbs_db_sched;		/* map database scheduler structure to C */
 		pbs_db_que_info_t     *pbs_db_que;		/* map database queue structure to C */
 		pbs_db_node_info_t    *pbs_db_node;		/* map database node structure to C */
-		pbs_db_mominfo_time_t *pbs_db_mominfo_tm;	/* map database mominfo_time structure to C */
 		pbs_db_job_info_t     *pbs_db_job;		/* map database job structure to C */
 		pbs_db_jobscr_info_t  *pbs_db_jobscr;		/* map database job script to C */
 		pbs_db_resv_info_t    *pbs_db_resv;		/* map database resv structure to C */

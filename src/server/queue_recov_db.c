@@ -366,9 +366,5 @@ get_all_db_queues()
 		log_event(PBSEVENT_DEBUG, PBS_EVENTCLASS_SERVER, LOG_DEBUG, __func__, log_buffer);
 	}
 
-	/* to save the last queue's time save_tm, since we are loading in order */
-	if (opts.timestamp && opts.timestamp[0] != '\0')
-		strcpy(ques_from_time, opts.timestamp);
-
 	return 0;
 }

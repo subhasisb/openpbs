@@ -9586,12 +9586,6 @@ main(int argc, char *argv[])
 
 #endif	/* WIN32 */
 
-
-	/* recover vnode to host map from file in case Server is not yet up */
-	if ((c = recover_vmap()) != 0) {
-		log_err(c, msg_daemonname, "unable to recover vnode to host mapping");
-	}
-
 	/* recover & abort Jobs which were under MOM's control */
 	init_abort_jobs(recover);
 

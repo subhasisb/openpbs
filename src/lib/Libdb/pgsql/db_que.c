@@ -115,7 +115,7 @@ pbs_db_prepare_que_sqls(void *conn)
 	if (db_prepare_stmt(conn, STMT_REMOVE_QUEATTRS, conn_sql, 2) != 0)
 		return -1;
 
-	snprintf(select_sql, MAX_SQL_LENGTH, "select qu_name, "
+	snprintf(select_sql, SELECT_SQL_LEN, "select qu_name, "
 			"qu_type, "
 			"to_char(qu_savetm, 'YYYY-MM-DD HH24:MI:SS.US') as qu_savetm, "
 			"hstore_to_array(attributes) as attributes "

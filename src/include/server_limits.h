@@ -94,7 +94,6 @@ extern "C" {
 #define PBS_TRACKING		"tracking"
 #define NODE_DESCRIP		"nodes"
 #define NODE_STATUS		"node_status"
-#define VNODE_MAP		"vnodemap"
 #define PBS_PROV_TRACKING	"prov_tracking"
 #define PBS_SCHEDDB		"scheddb"
 #define PBS_SCHED_PRIVATE	"sched_priv"

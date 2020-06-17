@@ -93,7 +93,6 @@ static char merr[] = "malloc failed";
 
 mominfo_t **mominfo_array = NULL;
 int         mominfo_array_size = 0;     /* num entries in the array */
-mominfo_time_t  mominfo_time = {0, 0};	/* time stamp of mominfo update */
 int	    svr_num_moms = 0;
 pntPBS_IP_LIST pbs_iplist = NULL;
 AVL_IX_DESC *hostaddr_tree = NULL;
