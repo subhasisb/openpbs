@@ -9494,10 +9494,9 @@ _pbs_python_do_vnode_set(void)
 			}
 		}
 
+		node_save_db(pnode);
 		vn_set_req = (vnode_set_req *) GET_NEXT(vn_set_req->all_reqs);
 	}
-
-	save_nodes_db(0, NULL);
 }
 
 const char pbsv1mod_meth_set_python_mode_doc[] =

@@ -235,7 +235,7 @@ svr_chk_history_conf(void)
 }
 
 int
-save_nodes_db(int flag, void *pmom)
+node_save_db(struct pbsnode *pnode)
 {
 	return (0);
 }

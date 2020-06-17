@@ -619,11 +619,10 @@ set_all_state(mominfo_t *pmom, int do_set, unsigned long bits, char *txt,
 	int		nchild;
 	unsigned long	inuse_flag = 0;
 
-	if (do_set) { /* STALE is not meaning in the state of the Mom, don't set it */
+	if (do_set) /* STALE is not meaning in the state of the Mom, don't set it */
 		psvrmom->msr_state |= (bits & ~INUSE_STALE);
-	} else {
+	else
 		psvrmom->msr_state &= ~bits;
-	}
 
 	/* Set the inuse_flag based off the value of setwhen */
 	if (setwhen == Set_ALL_State_All_Down) {
@@ -1198,13 +1197,14 @@ momptr_down(mominfo_t *pmom, char *why)
  * @param[in]	pbsnode	- The vnode
  * @param[in]	state_bits	- the value to set the vnode to
  * @param[in]	type	- The operation on the node
+ * @param[in]	force_save	- force to save into the db.
  *
  * @return	void
  *
  * @par MT-safe: No
  */
 void
-set_vnode_state(struct pbsnode *pnode, unsigned long state_bits, enum vnode_state_op type)
+set_vnode_state_nosave(struct pbsnode *pnode, unsigned long state_bits, enum vnode_state_op type, int force_save)
 {
 	unsigned long nd_prev_state;
 	int time_int_val;
@@ -1249,6 +1249,9 @@ set_vnode_state(struct pbsnode *pnode, unsigned long state_bits, enum vnode_stat
 		snprintf(str_val, sizeof(str_val), "%d", time_int_val);
 		set_attr_svr(&(pnode->nd_attr[(int)ND_ATR_last_state_change_time]),
 			&node_attr_def[(int) ND_ATR_last_state_change_time], str_val);
+
+		if (force_save)
+			node_save_db(pnode);
 	}
 
 	if (pnode->nd_state & INUSE_PROV) {
@@ -1303,6 +1306,24 @@ set_vnode_state(struct pbsnode *pnode, unsigned long state_bits, enum vnode_stat
 		((!(pnode->nd_state & VNODE_UNAVAILABLE)) ||
 		(pnode->nd_state == INUSE_FREE)))
 		(void) vnode_available(pnode);
+}
+
+/**
+ * @brief
+ * 		This function invokes set_vnode_state_nosave with force_save on 
+ *
+ * @param[in]	pbsnode	- The vnode
+ * @param[in]	state_bits	- the value to set the vnode to
+ * @param[in]	type	- The operation on the node
+ *
+ * @return	void
+ *
+ * @par MT-safe: No
+ */
+void
+set_vnode_state(struct pbsnode *pnode, unsigned long state_bits, enum vnode_state_op type)
+{
+	set_vnode_state_nosave(pnode, state_bits, type, 1);
 }
 
 /**
@@ -2618,13 +2639,13 @@ deallocate_job_from_node(job *pjob, struct pbsnode *pnode)
 		/* JOBEXCL */
 		if (pnode->nd_nsnfree > 0) {
 			/* some cpus free, clear "job-busy" state */
-			set_vnode_state(pnode, ~INUSE_JOB, Nd_State_And);
+			set_vnode_state_nosave(pnode, ~INUSE_JOB, Nd_State_And, 0);
 		}
 	} else {
 		/* no jobs at all, clear both JOBEXCL and "job-busy" */
-		set_vnode_state(pnode,
+		set_vnode_state_nosave(pnode,
 			~(INUSE_JOB|INUSE_JOBEXCL),
-			Nd_State_And);
+			Nd_State_And, 0);
 
 		/* call function to check and free the node from the */
 		/* prov list and reset wait_prov flag, if set */
@@ -3918,9 +3939,8 @@ update2_to_vnode(vnal_t *pvnal, int new, mominfo_t *pmom, int *madenew, int from
 		}
 
 		/* clear stale, down, unknown bits in state */
-		set_vnode_state(pnode,
-			~states_to_clear,
-			Nd_State_And);
+		set_vnode_state_nosave(pnode, ~states_to_clear, Nd_State_And, 0);
+		node_save_db(pnode);
 		return 0;
 	} else {
 		snprintf(log_buffer, sizeof(log_buffer),
@@ -4553,6 +4573,7 @@ found:
 						prc->rs_value.at_flags |= (ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE |ATR_VFLAG_DEFLT);
 					}
 				}
+				node_save_db(np);
 			}
 
 			/* UPDATE2 message - multiple vnoded system */
@@ -4775,10 +4796,7 @@ found:
 						ap->at_flags |= ATR_VFLAG_SET;
 					}
 				}
-			}
-
-			if (made_new_vnodes || cr_node) {
-				save_nodes_db(1, pmom); /* update the node database */
+				node_save_db(np);
 			}
 		/* Fall into IS_MOM_READY */
 
@@ -5045,9 +5063,6 @@ found:
 			if (ret != DIS_SUCCESS) {
 				ret = DIS_NOCOMMIT;
 				goto err;
-			}
-			if (made_new_vnodes || cr_node) {
-				save_nodes_db(1, pmom); /* update the node database */
 			}
 			break;
 
@@ -6788,27 +6803,27 @@ set_nodes(void *pobj, int objtype, char *execvnod_in, char **execvnod_out, char 
 			}
 			share_node = pnode->nd_attr[(int)ND_ATR_Sharing].at_val.at_long;
 			if (share_node == (int)VNS_FORCE_EXCL || share_node == (int)VNS_FORCE_EXCLHOST) {
-				set_vnode_state(pnode, INUSE_JOBEXCL, Nd_State_Or);
+				set_vnode_state_nosave(pnode, INUSE_JOBEXCL, Nd_State_Or, 0);
 			} else if (share_node == (int)VNS_IGNORE_EXCL) {
 				if (pnode->nd_nsnfree <= 0)
-					set_vnode_state(pnode, INUSE_JOB, Nd_State_Or);
+					set_vnode_state_nosave(pnode, INUSE_JOB, Nd_State_Or, 0);
 				else
-					set_vnode_state(pnode, ~(INUSE_JOB | INUSE_JOBEXCL), Nd_State_And);
+					set_vnode_state_nosave(pnode, ~(INUSE_JOB | INUSE_JOBEXCL), Nd_State_And, 0);
 			} else if (share_node == (int)VNS_DFLT_EXCL || share_node == (int)VNS_DFLT_EXCLHOST) {
 				if (share_job == (int)VNS_IGNORE_EXCL) {
 					if (pnode->nd_nsnfree <= 0)
-						set_vnode_state(pnode, INUSE_JOB, Nd_State_Or);
+						set_vnode_state_nosave(pnode, INUSE_JOB, Nd_State_Or, 0);
 					else
-						set_vnode_state(pnode, ~(INUSE_JOB | INUSE_JOBEXCL), Nd_State_And);
+						set_vnode_state_nosave(pnode, ~(INUSE_JOB | INUSE_JOBEXCL), Nd_State_And, 0);
 				} else {
-					set_vnode_state(pnode, INUSE_JOBEXCL, Nd_State_Or);
+					set_vnode_state_nosave(pnode, INUSE_JOBEXCL, Nd_State_Or, 0);
 				}
 			} else if (share_job == VNS_FORCE_EXCL) {
-				set_vnode_state(pnode, INUSE_JOBEXCL, Nd_State_Or);
+				set_vnode_state_nosave(pnode, INUSE_JOBEXCL, Nd_State_Or, 0);
 			} else if (pnode->nd_nsnfree <= 0) {
-				set_vnode_state(pnode, INUSE_JOB, Nd_State_Or);
+				set_vnode_state_nosave(pnode, INUSE_JOB, Nd_State_Or, 0);
 			} else {
-				set_vnode_state(pnode, ~(INUSE_JOB | INUSE_JOBEXCL), Nd_State_And);
+				set_vnode_state_nosave(pnode, ~(INUSE_JOB | INUSE_JOBEXCL), Nd_State_And, 0);
 			}
 
 
@@ -7041,9 +7056,7 @@ free_nodes(job *pjob)
 				}
 			} else {
 				/* no jobs at all, clear both JOBEXCL and "job-busy" */
-				set_vnode_state(pnode,
-					~(INUSE_JOB|INUSE_JOBEXCL),
-					Nd_State_And);
+				set_vnode_state_nosave(pnode, ~(INUSE_JOB|INUSE_JOBEXCL), Nd_State_And, 0);
 
 				/* call function to check and free the node from the prov list
 				 and reset wait_prov flag, if set */
@@ -7914,12 +7927,12 @@ set_last_used_time_node(void *pobj, int type)
 		if (last_pn == NULL || (cmp_ret = strcmp(pn, last_pn)) != 0 ) {
 			pnode = find_nodebyname(pn);
 			/* had better be the "natural" vnode with only the one parent */
-			if (pnode != NULL) {
+			if (pnode) {
 				snprintf(str_val, sizeof(str_val), "%d", time_int_val);
 				set_attr_svr(&(pnode->nd_attr[(int)ND_ATR_last_used_time]),
 						&node_attr_def[(int) ND_ATR_last_used_time], str_val);
+				node_save_db(pnode);
 			}
-			node_save_db(pnode);
 		}
 		last_pn = pn;
 		pn = parse_plus_spec(NULL, &rc);

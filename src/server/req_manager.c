@@ -2353,12 +2353,14 @@ mgr_node_set(struct batch_request *preq)
 				warnings_update(WARN_ngrp, warn_nodes, &warn_idx, pnode);
 
 				if ((pnode->nd_nsnfree == 0) && (pnode->nd_state == 0))
-					set_vnode_state(pnode, INUSE_JOB, Nd_State_Or);
+					set_vnode_state_nosave(pnode, INUSE_JOB, Nd_State_Or, 0);
 
 				mgr_log_attr(msg_man_set, plist,
 					PBS_EVENTCLASS_NODE, pnode->nd_name, NULL);
 			}
 		}
+		node_save_db(pnode);
+
 		if (numnodes == 1)
 			break;	/* just the one vnode */
 		else if (preq->rq_ind.rq_manager.rq_objtype == MGR_OBJ_HOST) {
@@ -2398,8 +2400,6 @@ mgr_node_set(struct batch_request *preq)
 	} /*bottom of the while()*/
 
 	warnmsg = warn_msg_build(WARN_ngrp, warn_nodes, warn_idx);
-
-	save_nodes_db(0, NULL);
 
 	if (numnodes > 1) {          /*modification was for multiple vnodes  */
 
@@ -2682,6 +2682,7 @@ mgr_node_unset(struct batch_request *preq)
 						pnode->nd_attr[(int)ND_ATR_Mom].at_flags |= ATR_VFLAG_DEFLT;
 						free_arst(&tmp);
 					}
+					node_save_db(pnode);
 				}
 
 				mgr_log_attr(msg_man_set, plist,
@@ -2702,8 +2703,6 @@ mgr_node_unset(struct batch_request *preq)
 	} /* bottom of the while() */
 
 	warnmsg = warn_msg_build(WARN_ngrp, warn_nodes, warn_idx);
-
-	save_nodes_db(0, NULL);
 
 	if (numnodes > 1) {          /*modification was for all nodes  */
 
@@ -2968,6 +2967,8 @@ create_pbs_node(char *objname, svrattrl *plist, int perms, int *bad, struct pbsn
 	if (pbs_init_node(pnode) != 0)
 		return (PBSE_SYSTEM);
 
+	node_save_db(pnode);
+
 	if (rtnpnode != NULL)
 		*rtnpnode = pnode;
 	return (ret);	    /*create completely successful*/
@@ -3215,8 +3216,6 @@ struct batch_request *preq;
 			break;
 	} /*bottom of the for()*/
 
-	save_nodes_db(1, NULL);
-
 	if (numnodes > 1) {          /*modification was for all nodes  */
 
 		if (problem_cnt) {  /*one or more problems encountered*/
@@ -3433,10 +3432,8 @@ struct batch_request *preq;
 	mgr_log_attr(msg_man_set, plist,
 		PBS_EVENTCLASS_NODE, preq->rq_ind.rq_manager.rq_objname, NULL);
 
-	setup_notification();	    /*set mechanism for notifying */
-	/*other nodes of new member   */
-
-	save_nodes_db(1, NULL);
+	setup_notification();	    
+	/*set mechanism for notifying other nodes of new member   */
 
 	reply_ack(preq);	    /*create completely successful*/
 }

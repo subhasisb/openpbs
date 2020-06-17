@@ -414,6 +414,7 @@ extern	void vnode_available(struct pbsnode *);
 extern	int find_degraded_occurrence(resc_resv *, struct pbsnode *, enum vnode_degraded_op);
 extern	int find_vnode_in_execvnode(char *, char *);
 extern	void set_vnode_state(struct pbsnode *, unsigned long , enum vnode_state_op);
+extern	void set_vnode_state_nosave(struct pbsnode *, unsigned long , enum vnode_state_op, int);
 extern	struct resvinfo *find_vnode_in_resvs(struct pbsnode *, enum vnode_degraded_op);
 extern	void free_rinf_list(struct resvinfo *);
 extern	void degrade_offlined_nodes_reservations(void);
@@ -432,7 +433,7 @@ extern	int	pbs_init_node(pbs_node *);
 extern	int	get_all_db_nodes(char *);
 extern	int	update_node_cache(pbs_node *, int);
 extern	struct	pbsnode  *find_nodebyaddr(pbs_net_t);
-extern void	get_resolvable_hostname(char *, char *);
+extern	void	get_resolvable_hostname(char *, char *);
 extern	void	free_prop_list(struct prop*);
 extern	void	recompute_ntype_cnts(void);
 extern	int	process_host_name_part(char*, svrattrl*, char**, int*);
@@ -463,7 +464,6 @@ extern  int	cross_link_mom_vnode(struct pbsnode *, mominfo_t *);
 extern 	int	fix_indirectness(resource *, struct pbsnode *, int);
 extern	int	chk_vnode_pool(attribute *, void *, int);
 extern	void	free_pnode(struct pbsnode *);
-extern	int	save_nodes_db(int, void *);
 extern void	propagate_socket_licensing(mominfo_t *);
 
 extern char *msg_daemonname;
@@ -503,8 +503,8 @@ extern int		create_vmap(void **);
 extern void		destroy_vmap(void *);
 extern mominfo_t	*find_vmapent_byID(void *, const char *);
 extern int		add_vmapent_byID(void *, const char *, void *);
-extern  int		open_momstream(mominfo_t *);
-extern	mominfo_t *	find_mombyaddr(pbs_net_t, uint);
+extern int		open_momstream(mominfo_t *);
+extern mominfo_t *	find_mombyaddr(pbs_net_t, uint);
 
 #ifdef	__cplusplus
 }

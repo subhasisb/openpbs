@@ -6664,6 +6664,7 @@ get_server_hook_results(char *input_file, int *accept_flag, int *reject_flag, ch
 					}
 				}
 				free_svrattrl(plist);
+				node_save_db(pnode);
 			}
 		}
 		/* TODO: for job objects */
@@ -6679,8 +6680,6 @@ get_server_hook_results(char *input_file, int *accept_flag, int *reject_flag, ch
 		}
 		line_data[0] = '\0';
 	}
-
-	save_nodes_db(0, NULL);
 
 	rc = 0;
 

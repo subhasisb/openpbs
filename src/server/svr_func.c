@@ -5227,9 +5227,6 @@ mark_prov_vnode_offline(pbsnode *pnode, char * comment)
 	set_vnode_state(pnode, INUSE_OFFLINE, Nd_State_Or);
 	set_vnode_state(pnode, ~INUSE_PROV, Nd_State_And);
 
-	/* write the node state and current_aoe */
-	node_save_db(pnode);
-
 	if (comment != NULL) {
 		/* log msg about marking node as offline */
 		snprintf(log_buffer, sizeof(log_buffer), "Vnode %s: %s",
@@ -5241,6 +5238,8 @@ mark_prov_vnode_offline(pbsnode *pnode, char * comment)
 			&pnode->nd_attr[(int)ND_ATR_Comment],
 			ATTR_comment, NULL, comment);
 	}
+
+	node_save_db(pnode);
 
 }
 
@@ -5727,10 +5726,6 @@ prov_request_deferred(struct work_task *wtask)
 		DBPRT(("%s: node:%s current_aoe set: %s\n",
 			__func__, pnode->nd_name, prov_vnode_info->pvnfo_aoe_req))
 
-
-		/* write the node current_aoe */
-		node_save_db(pnode);
-
 		/* if exit_status says app_prov returned success, reset down
 		 * that we set. after setting the state, is_vnode_prov_done()
 		 * is called which would delete the timed work task.
@@ -5740,6 +5735,7 @@ prov_request_deferred(struct work_task *wtask)
 			set_vnode_state(pnode, ~INUSE_DOWN, Nd_State_And);
 
 		is_vnode_prov_done(pnode->nd_name);
+		node_save_db(pnode);
 
 		return;
 	}
@@ -6243,10 +6239,6 @@ start_vnode_provisioning(struct prov_vnode_info * prov_vnode_info)
 	(void)node_attr_def[(int)ND_ATR_current_aoe].at_free(
 		&(pnode->nd_attr[(int)ND_ATR_current_aoe]));
 
-
-	/* write the node current_aoe */
-	node_save_db(pnode);
-
 	/*
 	 * Parent process creates two work tasks
 	 * i.e deferred child work task and timed work task.Deferred child
@@ -6304,10 +6296,11 @@ start_vnode_provisioning(struct prov_vnode_info * prov_vnode_info)
 	}
 
 	/* remove the INUSE_WAIT_PROV flag as it is prov now */
-	set_vnode_state(pnode, ~INUSE_WAIT_PROV, Nd_State_And);
+	set_vnode_state_nosave(pnode, ~INUSE_WAIT_PROV, Nd_State_And, 0);
 
 	/* set prov and down states */
-	set_vnode_state(pnode, INUSE_PROV | INUSE_DOWN, Nd_State_Or);
+	set_vnode_state_nosave(pnode, INUSE_PROV | INUSE_DOWN, Nd_State_Or, 0);
+	node_save_db(pnode);
 
 	return (PBSE_NONE);
 }
