@@ -419,8 +419,11 @@ get_db_connect_information()
 				if (rc == 0 || rc == 1) /* db running locally or db not running */
 					strncpy(conn_db_host, pbs_conf.pbs_secondary, PBS_MAXSERVERNAME);
 
-				if (rc == 2) /* db could be running on primary, don't start, try connecting to primary's */
+				/* db could be running on primary, don't start, try connecting to primary's */
+				if (rc == 2) { 
 					strncpy(conn_db_host, pbs_conf.pbs_primary, PBS_MAXSERVERNAME);
+					conn_db_state = PBS_DB_STARTED;
+				}
 			}
 		} else {
 			/*
