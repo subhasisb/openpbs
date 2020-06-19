@@ -480,7 +480,7 @@ process_request(int sfds)
 		struct pbsnode *isanode = NULL;
 		if ((server.sv_attr[SRV_ATR_acl_host_moms_enable].at_flags & ATR_VFLAG_SET) &&
 			(server.sv_attr[(int)SRV_ATR_acl_host_moms_enable].at_val.at_long == 1)) {
-			isanode = find_nodebyaddr(get_connectaddr(sfds));
+			isanode = find_nodebyfd(sfds);
 
 			if ((isanode != NULL) && (isanode->nd_state & INUSE_DELETED))
 				isanode = NULL;

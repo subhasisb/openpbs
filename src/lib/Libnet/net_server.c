@@ -1054,6 +1054,27 @@ get_connectaddr(int sd)
 
 /**
  * @brief
+ * 	get_connectport - return port of service connected via the socket
+ *
+ * @param[in] sd - socket descriptor
+ *
+ * @return port of fd
+ * @retval !0		success
+ * @retval 0		error
+ *
+ */
+uint
+get_connectport(int sd)
+{
+	int idx = conn_find_actual_index(sd);
+	if (idx == -1)
+		return (0);
+
+	return (svr_conn[idx]->cn_port);
+}
+
+/**
+ * @brief
  * 	get_connecthost - return name of host connected via the socket
  *
  * @param[in] sd - socket descriptor

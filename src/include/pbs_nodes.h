@@ -424,7 +424,7 @@ extern	pbs_node  *find_node_fromcache(char *);
 extern	int	pbs_init_node(pbs_node *);
 extern	int	get_all_db_nodes(char *);
 extern	int	update_node_cache(pbs_node *, int);
-extern	struct	pbsnode  *find_nodebyaddr(pbs_net_t);
+extern	pbs_node  *find_nodebyfd(int);
 extern	void	get_resolvable_hostname(char *, char *);
 extern	void	free_prop_list(struct prop*);
 extern	void	recompute_ntype_cnts(void);

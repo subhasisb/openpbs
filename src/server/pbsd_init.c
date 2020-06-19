@@ -737,7 +737,7 @@ pbsd_init(int type)
 		return (-1);
 	}
 
-	/* NJ_TODO has to be removed for lazy load */
+	/* MS_TODO has to be removed for lazy load */
 	get_all_db_nodes(NULL);
 	mark_which_queues_have_nodes();
 	(void) license_sanity_check();

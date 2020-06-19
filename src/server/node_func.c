@@ -322,27 +322,21 @@ find_nodebyname(char *nodename_in)
 
 /**
  * @brief
- * 		find_nodebyaddr() - find a node host by its addr
- * @param[in]	addr	- addr being searched
+ * 		find_nodebyfd() - find a node host by fd
+ * @param[in]	fd	- fd to be searched
  *
  * @return	pbsnode
  * @retval	NULL	- failure
  */
-
-struct pbsnode *
-find_nodebyaddr(pbs_net_t addr)
+pbs_node *
+find_nodebyfd(int fd)
 {
-	int i, j;
-	mom_svrinfo_t *psvrmom;
+	mominfo_t *pmom;
 
-	for (i=0; i<svr_totnodes; i++) {
-		psvrmom = (mom_svrinfo_t *)pbsndlist[i]->nd_moms[0]->mi_data;
-		for (j = 0; psvrmom->msr_addrs[j]; j++) {
-			if (addr == psvrmom->msr_addrs[j]) {
-				return (pbsndlist[i]);
-			}
-		}
-	}
+	pmom = find_mombyaddr(get_connectaddr(fd), get_connectport(fd));
+	if (pmom)
+		return (mom_svrinfo_t *)(pmom->mi_data)->msr_children[0];
+
 	return NULL;
 }
 
@@ -1156,19 +1150,20 @@ indirect_target_check(struct work_task *ptask)
 	struct pbsnode	*pnode;
 	resource	*presc;
 
-	for (i=0; i<svr_totnodes; i++) {
+	get_all_db_nodes(NULL);
+	for (i = 0; i < svr_totnodes; i++) {
 		pnode = pbsndlist[i];
-		if (pnode->nd_state & INUSE_DELETED ||
-			pnode->nd_state & INUSE_STALE)
+		if (pnode->nd_state & INUSE_DELETED || pnode->nd_state & INUSE_STALE)
 			continue;
-		pattr = &pnode->nd_attr[(int)ND_ATR_ResourceAvail];
+
+		pattr = &pnode->nd_attr[(int) ND_ATR_ResourceAvail];
 		if (pattr->at_flags & ATR_VFLAG_SET) {
-			for (presc = (resource *)GET_NEXT(pattr->at_val.at_list);
-				presc;
-				presc = (resource *)GET_NEXT(presc->rs_link)) {
+			for (presc = (resource *) GET_NEXT(pattr->at_val.at_list);
+			     presc;
+			     presc = (resource *) GET_NEXT(presc->rs_link)) {
 
 				if (presc->rs_value.at_flags & ATR_VFLAG_INDIRECT) {
-					fix_indirect_resc_targets(pnode, presc, (int)ND_ATR_ResourceAvail, 1);
+					fix_indirect_resc_targets(pnode, presc, (int) ND_ATR_ResourceAvail, 1);
 				}
 			}
 		}
@@ -1524,11 +1519,15 @@ mark_which_queues_have_nodes()
 	}
 
 	/* now (re)set flag for those queues that do have nodes */
-
-	for (i=0; i<svr_totnodes; i++) {
+	/* MS_TODO this entire logic has to be replaced. Instead of bool use counter. 
+	Increment the counter when node gets added to queue and decrement when it gets removed.
+	Consumer can still use it like a bool. This is expensive! 
+	*/
+	get_all_db_nodes(NULL);
+	for (i = 0; i < svr_totnodes; i++) {
 		if (pbsndlist[i]->nd_pque) {
-			pbsndlist[i]->nd_pque->qu_attr[(int)QE_ATR_HasNodes].at_val.at_long = 1;
-			pbsndlist[i]->nd_pque->qu_attr[(int)QE_ATR_HasNodes].at_flags = ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
+			pbsndlist[i]->nd_pque->qu_attr[(int) QE_ATR_HasNodes].at_val.at_long = 1;
+			pbsndlist[i]->nd_pque->qu_attr[(int) QE_ATR_HasNodes].at_flags = ATR_VFLAG_SET | ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE;
 			svr_quehasnodes = 1;
 		}
 	}
