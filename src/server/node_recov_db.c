@@ -461,13 +461,13 @@ done:
  * 		Get all the nodes from database which are newly added/modified
  * 		by other servers after the given time interval.
  * 
- * @param[in]	hostname: hostname which can be used to filter nodes.
+ * @param[in]	attribute: attribute val which can be used to filter nodes.
  *
  * @return	0 - success
  * 		1 - fail/error
  */
 int
-get_all_db_nodes(char *hostname) 
+get_all_db_nodes(pbs_db_query_flags_t flags, char *attribute) 
 {
 	pbs_db_obj_info_t	dbobj;
 	void *conn = svr_db_conn;
@@ -478,14 +478,13 @@ get_all_db_nodes(char *hostname)
 	pbs_db_node_info_t dbnode = {{0}};
 
 	/* fill in options */
-	if (hostname) {
-		opts.flags = 1;
-		opts.hostname = hostname;
+	if (attribute) {
+		opts.key = attribute;
 		opts.timestamp = NULL;
 	} else {
-		opts.flags = 0;
 		opts.timestamp = nodes_from_time;
 	}
+	opts.flags = flags;
 	dbobj.pbs_db_obj_type = PBS_DB_NODE;
 	dbobj.pbs_db_un.pbs_db_node = &dbnode;
 

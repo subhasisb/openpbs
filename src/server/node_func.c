@@ -208,6 +208,9 @@ update_node_cache(pbs_node *pnode, int op)
 				pbsndlist_sz = svr_totnodes * 2 + 1;
 			}
 			/*add in the new entry etc*/
+			/* MS_TODO sorting based on nd_index will not be effective
+			as svr_totnodes is different for svr instances
+			*/
 			pnode->nd_index = svr_totnodes;
 			pnode->nd_arr_index = svr_totnodes; /* this is only in mem, not from db */
 			DBPRT(("pbsndlist_sz: %d, svr_totnodes: %d", pbsndlist_sz, svr_totnodes))
@@ -335,7 +338,7 @@ find_nodebyfd(int fd)
 
 	pmom = find_mombyaddr(get_connectaddr(fd), get_connectport(fd));
 	if (pmom)
-		return (mom_svrinfo_t *)(pmom->mi_data)->msr_children[0];
+		return ((mom_svrinfo_t *)(pmom->mi_data))->msr_children[0];
 
 	return NULL;
 }
@@ -1150,7 +1153,24 @@ indirect_target_check(struct work_task *ptask)
 	struct pbsnode	*pnode;
 	resource	*presc;
 
-	get_all_db_nodes(NULL);
+	/* MS_TODO
+	This function is getting invoked in two cases.
+
+	During recovery of node if a node has indirect resource set on it:
+	The following can occur during a node recovery. Target node/resource is not loaded yet. 
+	In this case we need to wait till the recovery of all node happens and trigger indirect_target_check(). 
+	This is no longer relevant after multi server as we load the necessary node when it is required. 
+	It will not lead to a cyclic loop as we dont support multiple hops.
+	When an indirect resource is unset:
+	There is no way to make sure all the indirect resources referring to the particular target is deleted/unset. 
+	So the target flag in the target node is unset and leave a work task for later. 
+	Which will turn the flag on if it finds any resource is still referring to it.
+	If we need to do it more optimally we need to keep a count of vnodes already referring to a target node. 
+	One proposal to achieve it to create another attribute of resource type called resc_target and add the count of nodes referring to it. 
+	So that we can unset the flag when the count reaches zero.
+	*/
+
+	get_all_db_nodes(QUERY_DEFLT, NULL);
 	for (i = 0; i < svr_totnodes; i++) {
 		pnode = pbsndlist[i];
 		if (pnode->nd_state & INUSE_DELETED || pnode->nd_state & INUSE_STALE)
@@ -1343,6 +1363,76 @@ fix_indirectness(resource *presc, struct pbsnode *pnode, int doit)
 
 /**
  * @brief
+ * 		maint_jobs_act
+ *		Check to see that jobs in the maintenance_jobs attribute on a node still exist
+ *		If jobs don't exist any more, remove them from a node's maintenance_jobs attribute
+ *
+ * @param[in]	new	-	newly changed resources_available
+ * @param[in]	pobj	-	pointer to a pbsnode struct
+ * @param[in]	actmode	-	action mode: "NEW" or "ALTER" or "RECOVER"
+ *
+ * @return	int
+ * @retval 0 : success
+ * @retval !0 : failure
+ */
+int
+maint_jobs_act(attribute *new, void *pobj, int actmode)
+{
+	pbs_node *pnode = pobj;
+	char *buf = NULL;
+	int buf_len = 0;
+	struct array_strings *arst = new->at_val.at_arst;
+
+	if (actmode != ATR_ACTION_RECOV)
+		return 0;
+
+	if (pnode->nd_attr[(int) ND_ATR_MaintJobs].at_flags & ATR_VFLAG_SET &&
+							arst->as_usedptr > 0) {
+		int j;
+		int len = 0;
+		int cur_len = 0;
+		attribute not_exist;
+
+		for (j = 0; j < arst->as_usedptr; j++)
+			len += strlen(arst->as_string[j]) + 1; /* 1 for the comma*/
+
+		if (len > buf_len) {
+			char *tmp_buf;
+			tmp_buf = realloc(buf, len + 1);
+			if (tmp_buf == NULL) {
+				free(buf);
+				return (-1);
+			} else {
+				buf = tmp_buf;
+				buf_len = len;
+			}
+		}
+		buf[0] = '\0';
+		for (j = 0; j < arst->as_usedptr; j++) {
+			if (find_job(arst->as_string[j]) == NULL) {
+				strncat(buf, arst->as_string[j], len);
+				strncat(buf, ",", len);
+				buf[len] = '\0';
+			}
+		}
+		/* Did we find a string we need to remove*/
+		cur_len = strlen(buf);
+		if (cur_len > 0) {
+			buf[cur_len - 1] = '\0'; /* remove trailing comma */
+			clear_attr(&not_exist, &node_attr_def[(int) ND_ATR_MaintJobs]);
+			decode_arst(&not_exist, ATTR_NODE_MaintJobs, NULL, buf);
+			set_arst(&pnode->nd_attr[(int) ND_ATR_MaintJobs], &not_exist, DECR);
+		}
+
+		if (arst->as_usedptr > 0)
+			set_vnode_state(pnode, INUSE_MAINTENANCE, Nd_State_Or);
+	}
+	free(buf);
+	return 0;
+}
+
+/**
+ * @brief
  * 		node_np_action - action routine for a node's resources_available attribute
  *		Does several things:
  *		1. prohibits resources_available.hosts from being changed;
@@ -1358,7 +1448,6 @@ fix_indirectness(resource *presc, struct pbsnode *pnode, int doit)
  * @retval	0	- success
  * @retval	nonzero	- error
  */
-
 int
 node_np_action(attribute *new, void *pobj, int actmode)
 {
@@ -1523,7 +1612,7 @@ mark_which_queues_have_nodes()
 	Increment the counter when node gets added to queue and decrement when it gets removed.
 	Consumer can still use it like a bool. This is expensive! 
 	*/
-	get_all_db_nodes(NULL);
+	get_all_db_nodes(QUERY_DEFLT, NULL);
 	for (i = 0; i < svr_totnodes; i++) {
 		if (pbsndlist[i]->nd_pque) {
 			pbsndlist[i]->nd_pque->qu_attr[(int) QE_ATR_HasNodes].at_val.at_long = 1;
@@ -1576,6 +1665,7 @@ node_queue_action(attribute *pattr, void *pobj, int actmode)
 	mark_which_queues_have_nodes();
 	return 0;
 }
+
 /**
  * @brief
  * 		set_node_host_name returns 0 if actmode is 1, otherwise PBSE_ATTRRO
@@ -1588,6 +1678,7 @@ set_node_host_name(attribute *pattr, void *pobj, int actmode)
 	else
 		return PBSE_ATTRRO;
 }
+
 /**
  * @brief
  * 		set_node_host_name returns 0 if actmode is 1, otherwise PBSE_ATTRRO

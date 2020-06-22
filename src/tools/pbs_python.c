@@ -897,6 +897,12 @@ set_node_mom_port(attribute *pattr, void *pobj, int actmode)
 {
 	return 0;
 }
+
+int
+maint_jobs_act(attribute *pattr, void *pobj, int actmode)
+{
+	return 0;
+}
 /**
  * @brief
  * 		node_np_action

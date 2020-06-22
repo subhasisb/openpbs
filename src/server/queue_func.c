@@ -505,14 +505,19 @@ action_queue_partition(attribute *pattr, void *pobj, int actmode)
 	if (strcmp(pattr->at_val.at_str, DEFAULT_PARTITION) == 0)
 		return PBSE_DEFAULT_PARTITION;
 
+	get_all_db_nodes(QUERY_QUEUE, (pbs_queue *) pobj)->qu_qs.qu_name);
 	for (i=0; i < svr_totnodes; i++) {
 		if (pbsndlist[i]->nd_pque) {
 			if (strcmp(pbsndlist[i]->nd_pque->qu_qs.qu_name, ((pbs_queue *) pobj)->qu_qs.qu_name) == 0) {
 				if ((pbsndlist[i]->nd_attr[ND_ATR_partition].at_flags) & ATR_VFLAG_SET &&
-						(pattr->at_flags) & ATR_VFLAG_SET)
-				if (strcmp(pbsndlist[i]->nd_attr[ND_ATR_partition].at_val.at_str,
-						pattr->at_val.at_str))
-					return PBSE_INVALID_PARTITION_QUE;
+						(pattr->at_flags) & ATR_VFLAG_SET) {
+					if (strcmp(pbsndlist[i]->nd_attr[ND_ATR_partition].at_val.at_str,
+							pattr->at_val.at_str))
+						return PBSE_INVALID_PARTITION_QUE;
+
+					return PBSE_NONE;
+					
+				}
 			}
 		}
 	}

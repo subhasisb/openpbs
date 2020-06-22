@@ -1300,7 +1300,7 @@ set_vnode_state_nosave(struct pbsnode *pnode, unsigned long state_bits, enum vno
 		/* degrade all associated reservations. The '1' instructs the function to
 		 * account for the unavailable vnodes in the reservation's counter
 		 */
-		(void) vnode_unavailable(pnode, 1);
+		vnode_unavailable(pnode, 1);
 
 	else if (((nd_prev_state & VNODE_UNAVAILABLE)) &&
 		((!(pnode->nd_state & VNODE_UNAVAILABLE)) ||
@@ -2855,7 +2855,7 @@ deallocate_job(mominfo_t *pmom, job *pjob)
 		return;
 
 	/* MS_TODO Will be done after populate_count refactoring */
-	get_all_db_nodes(NULL);
+	get_all_db_nodes(QUERY_DEFLT, NULL);
 	for (i = 0; i < svr_totnodes; i++) {
 		pbsnode *pnode;
 
@@ -7100,7 +7100,7 @@ free_resvNodes(resc_resv *presv)
 	/* MS_TODO has to be removed like we handle free_nodes
 	Find nodes from selectspec and free it 
 	*/
-	get_all_db_nodes(NULL);
+	get_all_db_nodes(QUERY_DEFLT, NULL);
 	for (i = 0; i < svr_totnodes; i++) {
 		pnode = pbsndlist[i];
 
@@ -7732,7 +7732,7 @@ set_old_subUniverse(resc_resv	*presv)
 	int     rc;
 	char	*sp;
 
-	if (presv == NULL || svr_totnodes == 0)
+	if (presv == NULL)
 		return;
 
 	if (!(presv->ri_wattr[RESV_ATR_resv_nodes].at_flags & ATR_VFLAG_SET)) {
@@ -7823,7 +7823,10 @@ degrade_offlined_nodes_reservations(void)
 {
 	int i;
 
-	DBPRT(("%s: entered\n", __func__))
+	/* MS_TODO This work will be repeated by each server as it is being called from pbs_initd.
+	Piece of puzzle yet need to be solved!
+	*/
+	get_all_db_nodes(QUERY_DEFLT, NULL);
 	for (i = 0; i < svr_totnodes; i++) {
 		struct pbsnode *pn;
 		pn = pbsndlist[i];

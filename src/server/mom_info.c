@@ -472,7 +472,7 @@ find_mombyaddr(pbs_net_t hostaddr, uint port)
 
 	get_resolvable_hostname(hp->h_name, realfirsthost);
 	DBPRT(("realfirsthost=%s", realfirsthost))
-	get_all_db_nodes(realfirsthost);
+	get_all_db_nodes(QUERY_HOSTNAME, realfirsthost);
 	return tfind2((ulong) hostaddr, port, &ipaddrs);
 }
 

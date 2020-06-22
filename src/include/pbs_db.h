@@ -245,10 +245,18 @@ typedef struct pbs_db_resv_info pbs_db_resv_info_t;
  *  (Basically to return rows that have been modified since a point of time)
  *
  */
+
+enum pbs_db_query_flags {
+	QUERY_DEFLT,
+	QUERY_HOSTNAME,
+	QUERY_QUEUE
+};
+typedef enum pbs_db_query_flags pbs_db_query_flags_t;
+
 struct pbs_db_query_options {
-	int	flags;
+	pbs_db_query_flags_t	flags;
 	char *timestamp;
-	char *hostname;
+	char *key;
 };
 typedef struct pbs_db_query_options pbs_db_query_options_t;
 

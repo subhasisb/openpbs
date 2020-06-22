@@ -422,7 +422,7 @@ extern  struct	pbssubn  *find_subnodebyname(char *);
 extern	pbs_node  *find_nodebyname(char *);
 extern	pbs_node  *find_node_fromcache(char *);
 extern	int	pbs_init_node(pbs_node *);
-extern	int	get_all_db_nodes(char *);
+extern	int	get_all_db_nodes(pbs_db_query_flags_t, char *);
 extern	int	update_node_cache(pbs_node *, int);
 extern	pbs_node  *find_nodebyfd(int);
 extern	void	get_resolvable_hostname(char *, char *);
