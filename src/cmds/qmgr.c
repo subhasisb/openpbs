@@ -1175,6 +1175,7 @@ main(int argc, char **argv)
 
 	/*perform needed security library initializations (including none)*/
 
+	setenv(MULTI_SERVER, "ENABLED", 1);
 	if (CS_client_init() != CS_SUCCESS) {
 		fprintf(stderr, "qmgr: unable to initialize security library.\n");
 		exit(2);

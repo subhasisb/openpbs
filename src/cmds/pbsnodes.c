@@ -1080,6 +1080,7 @@ main(int argc, char *argv[])
 		exit(1);
 	}
 
+	setenv(MULTI_SERVER, "ENABLED", 1);
 	if (CS_client_init() != CS_SUCCESS) {
 		fprintf(stderr, "pbsnodes: unable to initialize security library.\n");
 		exit(1);

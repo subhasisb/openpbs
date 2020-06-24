@@ -47,9 +47,12 @@
 #include <string.h>
 #include <stdio.h>
 #include "libpbs.h"
+#include "pbs_ecl.h"
 
 
 static struct batch_status *alloc_bs();
+
+extern int random_srv_conn(svr_conn_t **);
 
 /**
  * @brief
@@ -85,6 +88,119 @@ PBSD_status(int c, int function, char *objid, struct attrl *attrib, char *extend
 
 	/* get the status reply */
 	return (PBSD_status_get(c));
+}
+
+/**
+ * @brief
+ *	wrapper function for PBSD_status
+ *	gets aggregated value for all servers.
+ *
+ * @param[in] c - communication handle
+ * @param[in] id - job id
+ * @param[in] attrib - pointer to attribute list
+ * @param[in] extend - extend string for req
+ * @param[in] cmd - command
+ *
+ * @return	structure handle
+ * @retval	pointer to batch_status struct		success
+ * @retval	NULL					error
+ *
+ */
+struct batch_status *
+PBSD_status_aggregate(int c, int cmd, char *id, struct attrl *attrib, char *extend, int parent_object)
+{
+	int i;
+	struct batch_status *ret = NULL;
+	struct batch_status *next = NULL;
+	struct batch_status *cur = NULL;
+	svr_conn_t **svr_connections = get_conn_servers(c);
+
+	if (!svr_connections)
+		return NULL;
+
+	/* initialize the thread context data, if not already initialized */
+	if (pbs_client_thread_init_thread_context() != 0)
+		return NULL;
+
+	/* first verify the attributes, if verification is enabled */
+	if ((pbs_verify_attributes(random_srv_conn(svr_connections), cmd,
+		parent_object, MGR_CMD_NONE, (struct attropl *) attrib)))
+		return NULL;
+
+	for (i = 0; i < get_current_servers(); i++) {
+		
+		if (svr_connections[i]->state != SVR_CONN_STATE_CONNECTED)
+			continue;
+
+		c = svr_connections[i]->sd;
+
+		if (pbs_client_thread_lock_connection(c) != 0)
+			return NULL;
+
+		if ((next = PBSD_status(c, cmd, id, attrib, extend))) {
+			if (!ret) {
+				ret = next;
+				cur = next->last;
+			} else {
+				cur->next = next;
+				cur = next->last;
+			}
+		}
+
+		/* unlock the thread lock and update the thread context data */
+		if (pbs_client_thread_unlock_connection(c) != 0)
+			return NULL;
+	}
+
+	return ret;
+}
+
+/**
+ * @brief
+ *	wrapper function for PBSD_status
+ *	gets status randomly from one of the configured server.
+ *
+ * @param[in] c - communication handle
+ * @param[in] id - job id
+ * @param[in] attrib - pointer to attribute list
+ * @param[in] extend - extend string for req
+ * @param[in] cmd - command
+ *
+ * @return	structure handle
+ * @retval	pointer to batch_status struct		success
+ * @retval	NULL					error
+ *
+ */
+struct batch_status *
+PBSD_status_random(int c, int cmd, char *id, struct attrl *attrib, char *extend, int parent_object)
+{
+	struct batch_status *ret = NULL;
+	svr_conn_t **svr_connections = get_conn_servers(c);
+
+	if (!svr_connections)
+		return NULL;
+
+	if ((c = random_srv_conn(svr_connections)) < 0)
+		return NULL;
+
+	/* initialize the thread context data, if not already initialized */
+	if (pbs_client_thread_init_thread_context() != 0)
+		return NULL;
+
+	/* first verify the attributes, if verification is enabled */
+	if ((pbs_verify_attributes(c, cmd, parent_object, MGR_CMD_NONE, (struct attropl *) attrib)))
+		return NULL;
+
+	if (pbs_client_thread_lock_connection(c) != 0)
+		return NULL;
+
+	ret = PBSD_status(c, cmd, id, attrib, extend);
+
+	/* unlock the thread lock and update the thread context data */
+	if (pbs_client_thread_unlock_connection(c) != 0)
+		return NULL;
+
+	return ret;
 }
 
 /**
@@ -143,6 +259,7 @@ PBSD_status_get(int c)
 			if (stp->brp_attrl)
 				stp->brp_attrl = 0;
 			bsp->next = NULL;
+			rbsp->last = bsp;
 			stp = stp->brp_stlink;
 		}
 		if (pbs_errno) {

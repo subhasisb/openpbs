@@ -566,6 +566,7 @@ main(int argc, char **argv, char **envp) /* qselect */
 		exit(2);
 	}
 
+	setenv(MULTI_SERVER, "ENABLED", 1);
 	connect = cnt2server(server_out);
 	if (connect <= 0) {
 		fprintf(stderr, "qselect: cannot connect to server %s (errno=%d)\n",
