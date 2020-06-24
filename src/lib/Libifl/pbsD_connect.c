@@ -474,8 +474,10 @@ initialize_server_conns(char *extend_data)
 		loop_i = (loop_i + 1) % get_current_servers();
 		} while (loop_i != ind);
 		
-		if (fd != -1)
+		if (fd != -1) {
 			svr_connections[0]->state = SVR_CONN_STATE_CONNECTED;
+			svr_connections[0]->sd = fd;
+		}
 		else 
 			svr_connections[0]->state = SVR_CONN_STATE_FAILED;
 		

@@ -2183,3 +2183,39 @@ get_current_servers()
 {
 	return pbs_conf.pbs_current_servers;
 }
+
+/**
+ * @brief
+ *	get one of the available connection from multisvr sd
+ *
+ */
+int
+get_available_conn(svr_conn_t **multi_connection)
+{
+	int i;
+
+	for (i = 0; i < get_current_servers(); i++)
+		if (multi_connection[i]->state == SVR_CONN_STATE_CONNECTED)
+			return multi_connection[i]->sd;
+
+	return -1;
+}
+
+/**
+ * @brief
+ *	get random server sd - It will choose a random sd from available no of servers.
+ *
+ */
+int
+random_srv_conn(svr_conn_t **multi_connection)
+{
+	int ind = 0;
+
+	srand(time(0));
+	ind =  rand() % get_current_servers();
+
+	if (multi_connection[ind]->state == SVR_CONN_STATE_CONNECTED)
+		return multi_connection[ind]->sd;
+		
+	return get_available_conn(multi_connection);
+}
