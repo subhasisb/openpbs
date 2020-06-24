@@ -341,3 +341,8 @@ void encode_SHA(char*, size_t, char **);
 #endif
 
 int get_max_servers(void);
+
+/**
+ * Getter function to get the number of currently configured servers.
+ */
+extern int get_current_servers();

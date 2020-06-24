@@ -97,6 +97,8 @@ struct pbs_config pbs_conf = {
 	NULL,					/* pbs_exec_path */
 	NULL,					/* pbs_server_name */
 	NULL,					/* PBS server id */
+	0,						/* single pbs server instance by default */
+	NULL,					/* pbs_server_instances */
 	NULL,					/* scp_path */
 	NULL,					/* rcp_path */
 	NULL,					/* pbs_demux_path */
@@ -251,6 +253,107 @@ parse_config_line(FILE *fp, char **key, char **val)
 
 	return ret;
 }
+
+/**
+ * @brief
+ *	parse_psi - parses the PBS_SERVER_INSTANCES configuration key,value 
+ * in the pbs.conf file
+ *
+ * @param[in] conf_value	configuration value set in pbs.conf
+ *
+ * @return int
+ * @retval -1, For error
+ * @retval 0, For success
+ */
+
+int 
+parse_psi(char * conf_value)
+{
+	char *token = NULL;
+	char *host;
+	int port;
+	int count = 0;
+	char **list;
+	int i;
+	free(pbs_conf.psi);
+
+	list = break_comma_list(conf_value);
+	if (list != NULL) {
+		for (i = 0; list[i] != NULL; i++) {
+			count++;
+		}
+	}
+	if (!(pbs_conf.psi = calloc(count, sizeof(struct pbs_server_instance)))) {
+		fprintf(stderr, "Ran out of memory parsing configuration %s", conf_value);
+		return -1;
+	}
+	count = 0;
+	for (i = 0; list[i] != NULL; i++) {
+		char *p;
+		/* should be a host:port pair, later things can be made more fluid */
+		port = PBS_BATCH_SERVICE_PORT;
+		token = list[i];
+		if ((p = strchr(token, ':'))) {
+			*p = '\0';
+			port = atol(p+1);
+		}
+		host = token;
+		if (*host == '\0') {
+			host = pbs_conf.pbs_server_name;
+		}
+
+		if (!(pbs_conf.psi[count] = calloc(1, sizeof(struct pbs_server_instance)))) {
+			fprintf(stderr, "Ran out of memory parsing configuration %s", conf_value);
+			return -1;
+		}
+		if (!(pbs_conf.psi[count]->name = strdup(host))) {
+			fprintf(stderr, "Ran out of memory parsing multi-server configuration \n");
+			return -1;			
+		}
+		pbs_conf.psi[count]->port = port;
+		count++;
+	}
+	pbs_conf.pbs_current_servers = count;
+	return 0;
+}
+
+/**
+ * @brief
+ *	free_psi - Used to free the memory allocated while parsing PBS_SERVER_INSTANCES.
+ *
+ */
+
+void free_psi()
+{
+	int i;
+
+	/* ignore any PBS_SERVER_INSTANCES and default fill */
+	if (pbs_conf.psi) {
+		for(i = 0; i < get_current_servers(); i++) {
+			if (pbs_conf.psi[i]->name != NULL)
+				free(pbs_conf.psi[i]->name);
+			free(pbs_conf.psi[i]);
+			pbs_conf.psi[i] = NULL;
+		}
+		free(pbs_conf.psi);
+		pbs_conf.psi = NULL;
+		pbs_conf.pbs_current_servers = 1;
+	}
+}
+
+/**
+ * @brief
+ *	set_default_psi - Used to free the memory allocated while parsing PBS_SERVER_INSTANCES and 
+ *  set the default values for PBS_SERVER_INSTANCES.
+ *
+ */
+int
+set_default_psi()
+{
+	free_psi();
+	return(parse_psi(pbs_conf.pbs_server_name));
+}
+
 
 /**
  * @brief
@@ -499,6 +602,10 @@ __pbs_loadconf(int reload)
 				free(pbs_conf.pbs_server_name);
 				pbs_conf.pbs_server_name = strdup(conf_value);
 			}
+			else if (!strcmp(conf_name, PBS_CONF_SERVER_INSTANCES)) {
+				if (parse_psi(conf_value) != 0)
+					goto err;
+			}
 			else if (!strcmp(conf_name, PBS_CONF_RCP)) {
 				free(pbs_conf.rcp_path);
 				pbs_conf.rcp_path = shorten_and_cleanup_path(conf_value);
@@ -690,6 +797,9 @@ __pbs_loadconf(int reload)
 			goto err;
 		}
 	}
+	if ((gvalue = getenv(PBS_CONF_SERVER_INSTANCES)) != NULL) {
+		parse_psi(gvalue);
+	}
 	if ((gvalue = getenv(PBS_CONF_RCP)) != NULL) {
 		free(pbs_conf.rcp_path);
 		pbs_conf.rcp_path = shorten_and_cleanup_path(gvalue);
@@ -846,6 +956,12 @@ __pbs_loadconf(int reload)
 	if (buf[0] != '\0') {
 		fprintf(stderr, "pbsconf error: pbs conf variables not found: %s\n", buf);
 		goto err;
+	}
+
+	/* check sanity of pbs server instances */
+	if (pbs_conf.pbs_current_servers == 0) {
+		if (set_default_psi() != 0)
+			goto err;
 	}
 
 	/*
@@ -1069,6 +1185,8 @@ err:
 		pbs_conf.supported_auth_methods = NULL;
 	}
 
+	free_psi();
+	
 	pbs_conf.load_failed = 1;
 	(void)pbs_client_thread_unlock_conf();
 	return 0;

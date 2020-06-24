@@ -2172,3 +2172,14 @@ get_max_servers(void)
 {
 	return 1;
 }
+
+/**
+ * @brief
+ *	get_current_servers - Getter function to get number of servers configured in PBS complex.
+ *
+ */
+int
+get_current_servers()
+{
+	return pbs_conf.pbs_current_servers;
+}

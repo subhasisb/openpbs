@@ -257,6 +257,222 @@ get_hostsockaddr(char *host, struct sockaddr_in *sap)
 
 /**
  * @brief
+ *	This function establishes the network connection to the choose server.
+ *
+ * @param[in]   server - The hostname of the pbs server to connect to.
+ * @param[in]   port - Port number of the pbs server to connect to.
+ * @param[in]   extend_data - a string to send as "extend" data
+ * 
+ *
+ * @return int
+ * @retval >= 0	The physical server socket.
+ * @retval -1	error encountered setting up the connection.
+ */
+
+int
+tcp_connect(char *server, int server_port, char *extend_data)
+{
+	int i;
+	int sd;
+	int rc;
+	struct sockaddr_in server_addr;
+	struct sockaddr_in my_sockaddr;
+	struct batch_reply	*reply;
+	char errbuf[LOG_BUF_SIZE] = {'\0'};
+
+		/* get socket	*/
+#ifdef WIN32
+		/* the following lousy hack is needed since the socket call needs */
+		/* SYSTEMROOT env variable properly set! */
+		if (getenv("SYSTEMROOT") == NULL) {
+			setenv("SYSTEMROOT", "C:\\WINDOWS", 1);
+			setenv("SystemRoot", "C:\\WINDOWS", 1);
+		}
+#endif
+	sd = socket(AF_INET, SOCK_STREAM, 0);
+	if (sd == -1) {
+		pbs_errno = PBSE_SYSTEM;
+		return -1;
+	}	
+
+	strncpy(pbs_server, server, sizeof(pbs_server)-1); /* set for error messages from commands */
+	pbs_server[sizeof(pbs_server) - 1] = '\0';
+		/* and connect... */
+
+	/* If a specific host name is defined which the client should use */
+	if (pbs_conf.pbs_public_host_name) {
+		if (get_hostsockaddr(pbs_conf.pbs_public_host_name, &my_sockaddr) != 0)
+			return -1; /* pbs_errno was set */
+		/* my address will be in my_sockaddr,  bind the socket to it */
+		my_sockaddr.sin_port = 0;
+		if (bind(sd, (struct sockaddr *)&my_sockaddr, sizeof(my_sockaddr)) != 0) {
+			return -1;
+		}
+	}
+
+	if (get_hostsockaddr(server, &server_addr) != 0)
+		return -1;
+
+	server_addr.sin_port = htons(server_port);
+	if (connect(sd, (struct sockaddr *)&server_addr, sizeof(struct sockaddr)) != 0) {
+		/* connect attempt failed */
+		CLOSESOCKET(sd);
+		pbs_errno = errno;
+		return -1;
+	}
+	
+	/* setup connection level thread context */
+	if (pbs_client_thread_init_connect_context(sd) != 0) {
+		CLOSESOCKET(sd);
+		pbs_errno = PBSE_SYSTEM;
+		return -1;
+	}
+
+
+	/*
+	 * No need for global lock now on, since rest of the code
+	 * is only communication on a connection handle.
+	 * But we dont need to lock the connection handle, since this
+	 * connection handle is not yet been returned to the client
+	 */
+
+	if (load_auths(AUTH_CLIENT)) {
+		CLOSESOCKET(sd);
+		pbs_errno = PBSE_SYSTEM;
+		return -1;
+	}
+
+	/* setup DIS support routines for following pbs_* calls */
+	DIS_tcp_funcs();
+
+	/* The following code was originally  put in for HPUX systems to deal
+	 * with the issue where returning from the connect() call doesn't
+	 * mean the connection is complete.  However, this has also been
+	 * experienced in some Linux ppc64 systems like js-2. Decision was
+	 * made to enable this harmless code for all architectures.
+	 * FIX: Need to use the socket to send
+	 * a message to complete the process.  For IFF authentication there is
+	 * no leading authentication message needing to be sent on the client
+	 * socket, so will send a "dummy" message and discard the replyback.
+	 */
+	if ((i = encode_DIS_ReqHdr(sd, PBS_BATCH_Connect, pbs_current_user)) ||
+		(i = encode_DIS_ReqExtend(sd, extend_data))) {
+		CLOSESOCKET(sd);
+		pbs_errno = PBSE_SYSTEM;
+		return -1;
+	}
+	if (dis_flush(sd)) {
+		CLOSESOCKET(sd);
+		pbs_errno = PBSE_SYSTEM;
+		return -1;
+	}
+
+	reply = PBSD_rdrpy_sock(sd, &rc);
+	PBSD_FreeReply(reply);
+	if (rc != DIS_SUCCESS) {
+		CLOSESOCKET(sd);
+		return -1;
+	}
+
+	if (engage_client_auth(sd, server, server_port, errbuf, sizeof(errbuf)) != 0) {
+		if (pbs_errno == 0)
+			pbs_errno = PBSE_PERM;
+		fprintf(stderr, "auth: error returned: %d\n", pbs_errno);
+		if (errbuf[0] != '\0')
+			fprintf(stderr, "auth: %s\n", errbuf);
+		CLOSESOCKET(sd);
+		return -1;
+	}
+
+	pbs_tcp_timeout = PBS_DIS_TCP_TIMEOUT_VLONG;	/* set for 3 hours */
+
+	/*
+	 * Disable Nagle's algorithm on the TCP connection to server.
+	 * Nagle's algorithm is hurting cmd-server communication.
+	 */
+	if (pbs_connection_set_nodelay(sd) == -1) {
+		CLOSESOCKET(sd);
+		pbs_errno = PBSE_SYSTEM;
+		return -1;
+	}
+
+	return sd;
+}
+
+/**
+ * @brief
+ * 	initialize_server_conns - To intialize the servers connection table.
+ *
+ * @param[in] extend_data 
+ * @param[in] multi_flag 
+ *
+ * @return int
+ * @retval >0 - success
+ * @retval -1 - error
+ */
+int 
+initialize_server_conns(char *extend_data, int multi_flag)
+{
+	int i;
+	int j;
+	int fd = -1;
+	static int seeded = 0;
+	struct timeval tv;
+	unsigned long time_in_micros;
+	int ind;
+	int num_conf_servers = get_current_servers();
+	
+	svr_conn_t **svr_connections = calloc(num_conf_servers, sizeof(svr_conn_t *));
+	if (!svr_connections)
+		return -1;
+		
+	if (multi_flag == 0) {
+		svr_connections[0] = malloc(sizeof(svr_conn_t));
+			if (!svr_connections[0]) 
+			return -1;
+		if (!seeded) {
+			gettimeofday(&tv,NULL);
+			time_in_micros = 1000000 * tv.tv_sec + tv.tv_usec;
+			srand(time_in_micros); /* seed the random generator */
+			seeded = 1;
+		}
+		ind = rand() % get_current_servers();
+		fd = tcp_connect(pbs_conf.psi[ind]->name, pbs_conf.psi[ind]->port, extend_data);
+		if (fd != -1)
+			svr_connections[0]->state = SVR_CONN_STATE_CONNECTED;
+		else 
+			svr_connections[0]->state = SVR_CONN_STATE_FAILED;
+		
+		if (set_conn_servers(fd, (void *)svr_connections))
+			return -1;
+		
+		return fd;
+	}
+	
+	for (i = 0; i < num_conf_servers; i++) {
+		svr_connections[i] = malloc(sizeof(svr_conn_t));
+		if (!svr_connections[i]) {
+			for (j = 0; j < i; j++ )
+				free(svr_connections[j]);
+			free(svr_connections);
+			return -1;
+		}
+		svr_connections[i]->sd = tcp_connect(pbs_conf.psi[i]->name, pbs_conf.psi[i]->port, extend_data);
+		if (svr_connections[i]->sd != -1) {
+			svr_connections[i]->state = SVR_CONN_STATE_CONNECTED;
+			if (fd == -1)
+				fd = svr_connections[i]->sd;
+		} else 
+			svr_connections[i]->state = SVR_CONN_STATE_FAILED;
+	}
+	
+	if (set_conn_servers(fd, (void *)svr_connections))
+		return -1;
+	return fd;
+}
+
+/**
+ * @brief
  *	Makes a PBS_BATCH_Connect request to 'server'.
  *
  * @param[in]   server - the hostname of the pbs server to connect to.
@@ -281,6 +497,8 @@ __pbs_connect_extend(char *server, char *extend_data)
 	char server_name[PBS_MAXSERVERNAME+1];
 	unsigned int server_port;
 	char errbuf[LOG_BUF_SIZE] = {'\0'};
+	int multi_flag = 0;
+
 #ifdef WIN32
 	struct sockaddr_in to_sock;
 	struct sockaddr_in from_sock;
@@ -306,6 +524,19 @@ __pbs_connect_extend(char *server, char *extend_data)
 		pbs_errno = PBSE_NOSERVER;
 		return -1;
 	}
+
+	if (getenv("PBS_CONF_MULTI") != NULL) {
+		multi_flag = 1;
+	}
+		
+	if ((sock = initialize_server_conns(extend_data, multi_flag)) == -1) {
+		pbs_errno = PBSE_INTERNAL;
+		return -1;
+	}		
+	
+	/* Returning here  */
+	
+	return sock;
 
 	if (pbs_conf.pbs_primary && pbs_conf.pbs_secondary) {
 		/* failover configuered ...   */
