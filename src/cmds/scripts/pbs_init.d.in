@@ -591,6 +591,22 @@ status_pbs() {
     fi
 }
 
+hup_pbs() {
+  update_pids
+  if [ "${PBS_START_SERVER}" -gt 0 ] ; then
+    kill -HUP ${pbs_server_pid}
+  fi
+  if [ "${PBS_START_MOM}" -gt 0 ] ; then
+    kill -HUP ${pbs_mom_pid}
+  fi
+  if [ "${PBS_START_SCHED}" -gt 0 ] ; then
+    kill -HUP ${pbs_sched_pid}
+  fi
+  if [ "${PBS_START_COMM}" -gt 0 ] ; then
+    kill -HUP ${pbs_comm_pid}
+  fi
+}
+
 # find_bgl_environment:
 #
 # Finds a BGLDIR path that contains Blue Gene API include
@@ -795,9 +811,12 @@ case "`basename $0`" in
         stop_pbs
         pre_start_pbs
         ;;
+      reload)
+        hup_pbs
+        ;;
       *)
         echo "Usage: `basename $0` --version"
-        echo "Usage: `basename $0` {start|stop|restart|status}"
+        echo "Usage: `basename $0` {start|stop|restart|status|reload}"
         exit 1
         ;;
     esac

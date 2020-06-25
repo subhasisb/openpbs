@@ -1,0 +1,120 @@
+#!/bin/bash
+
+#
+# Copyright (C) 1994-2020 Altair Engineering, Inc.
+# For more information, contact Altair at www.altair.com.
+#
+# This file is part of both the OpenPBS software ("OpenPBS")
+# and the PBS Professional ("PBS Pro") software.
+#
+# Open Source License Information:
+#
+# OpenPBS is free software. You can redistribute it and/or modify it under
+# the terms of the GNU Affero General Public License as published by the
+# Free Software Foundation, either version 3 of the License, or (at your
+# option) any later version.
+#
+# OpenPBS is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+# FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public
+# License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# Commercial License Information:
+#
+# PBS Pro is commercially licensed software that shares a common core with
+# the OpenPBS software.  For a copy of the commercial license terms and
+# conditions, go to: (http://www.pbspro.com/agreement.html) or contact the
+# Altair Legal Department.
+#
+# Altair's dual-license business model allows companies, individuals, and
+# organizations to create proprietary derivative works of OpenPBS and
+# distribute them - whether embedded or bundled with other software -
+# under a commercial license agreement.
+#
+# Use of Altair's trademarks, including but not limited to "PBS™",
+# "OpenPBS®", "PBS Professional®", and "PBS Pro™" and Altair's logos is
+# subject to Altair's trademark licensing policies.
+
+if [ $# -eq 1 ] && [ $1 = "--version" ]; then
+	$(dirname $0)/pbs_init.d --version
+	exit 0
+fi
+
+INST_ID=
+NEW_PBS_CONF=
+NEW_SVR_PORT=
+
+set_new_inst_id() {
+	local _confdir=$(dirname ${PBS_CONF_FILE:-/etc/pbs.conf}) _last_id
+	_last_id=$(/bin/ls -1 ${_confdir}/pbs_*.conf 2>/dev/null | awk -F'[_.]' '{print $2}' | sort -u | tail -1)
+	if [ "x${_last_id}" == "x" ]; then
+		_last_id=1
+	fi
+	INST_ID=$((_last_id + 1))
+	NEW_PBS_CONF="${_confdir}/pbs_${INST_ID}.conf"
+	NEW_SVR_PORT=$((18000 + (_last_id * 2)))
+}
+
+copy_pbs() {
+	local _conf=${PBS_CONF_FILE:-/etc/pbs.conf}
+	local _svrs="" _svr_id _confdir=$(dirname ${_conf})
+	local __PBS_EXEC=$( grep '^[[:space:]]*PBS_EXEC=' ${_conf} | tail -1 | sed 's/^[[:space:]]*PBS_EXEC=\([^[:space:]]*\)[[:space:]]*/\1/' )
+	local __PBS_HOME=$( grep '^[[:space:]]*PBS_HOME=' ${_conf} | tail -1 | sed 's/^[[:space:]]*PBS_HOME=\([^[:space:]]*\)[[:space:]]*/\1/' )
+	local __old_svrs=$( grep '^[[:space:]]*PBS_SERVER_INSTANCES=' ${_conf} | tail -1 | sed 's/^[[:space:]]*PBS_SERVER_INSTANCES=\([^[:space:]]*\)[[:space:]]*/\1/' )
+	local __PBS_SERVER=$( grep '^[[:space:]]*PBS_SERVER=' ${_conf} | tail -1 | sed 's/^[[:space:]]*PBS_SERVER=\([^[:space:]]*\)[[:space:]]*/\1/' )
+
+	if [ "x${__old_svrs}" == "x" ]; then
+		_svrs="${__PBS_SERVER},${__PBS_SERVER}:${NEW_SVR_PORT}"
+	else
+		_svrs="${__old_svrs},${__PBS_SERVER}:${NEW_SVR_PORT}"
+	fi
+	cat ${_conf} | grep -vE '*_SERVICE_PORT|PBS_HOME|PBS_EXEC|PBS_SERVER_*|*_START_*' > ${NEW_PBS_CONF}
+	{
+		echo PBS_SERVER=${__PBS_SERVER}
+		echo PBS_EXEC="${__PBS_EXEC}"
+		echo PBS_HOME="${__PBS_HOME}_${INST_ID}"
+		echo PBS_START_SCHED=0
+		echo PBS_START_COMM=0
+		echo PBS_START_SERVER=1
+		echo PBS_START_MOM=0
+		echo PBS_BATCH_SERVICE_PORT=${NEW_SVR_PORT}
+		echo PBS_BATCH_SERVICE_PORT_DIS=${NEW_SVR_PORT}
+		echo PBS_DATA_SERVICE_PORT=$((NEW_SVR_PORT + 1))
+		echo PBS_SERVER_ID=${INST_ID}
+		echo PBS_SERVER_INSTANCES=${_svrs}
+	} >> ${NEW_PBS_CONF}
+	sed "s@: main code@: main code\\nexport PBS_CONF_FILE=/etc/pbs_${INST_ID}.conf\\n@" /etc/init.d/pbs > /etc/init.d/pbs_${INST_ID}
+	chmod +x /etc/init.d/pbs_${INST_ID}
+	cat ${_conf} | grep -vE 'PBS_SERVER_ID|PBS_SERVER_INSTANCES' > /tmp/_conf
+	echo "PBS_SERVER_ID=1" >> /tmp/_conf
+	echo "PBS_SERVER_INSTANCES=${_svrs}" >> /tmp/_conf
+	mv /tmp/_conf ${_conf}
+	for _svr_id in $(seq $((INST_ID - 1)) -1 0)
+	do
+		if [ -r "${_confdir}/pbs_${_svr_id}.conf" ]; then
+			cat "${_confdir}/pbs_${_svr_id}.conf" | grep -v PBS_SERVER_INSTANCES > /tmp/_conf
+			echo "PBS_SERVER_INSTANCES=${_svrs}" >> /tmp/_conf
+			mv /tmp/_conf "${_confdir}/pbs_${_svr_id}.conf"
+		fi
+	done
+	mkdir -p ${__PBS_HOME}_${INST_ID}
+}
+
+restart_pbs() {
+	local _confdir=$(dirname ${PBS_CONF_FILE:-/etc/pbs.conf})
+	PBS_CONF_FILE=${PBS_CONF_FILE:-/etc/pbs.conf} /etc/init.d/pbs reload
+	for _svr_id in $(seq $((INST_ID - 1)) -1 0)
+	do
+		if [ -f "/etc/init.d/pbs_${_svr_id}" ]; then
+			PBS_CONF_FILE=${_confdir}/pbs_${_svr_id}.conf /etc/init.d/pbs_${_svr_id} reload
+		fi
+	done
+	PBS_CONF_FILE=${NEW_PBS_CONF} /etc/init.d/pbs_${INST_ID} start
+}
+
+set_new_inst_id
+copy_pbs
+restart_pbs

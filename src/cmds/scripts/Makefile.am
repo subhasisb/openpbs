@@ -45,7 +45,7 @@ dist_libinit_DATA = \
 	limits.pbs_mom \
 	limits.pbs_mom.compat \
 	limits.post_services \
-	limits.post_services.compat 
+	limits.post_services.compat
 
 libmpidir = $(libdir)/MPI
 
@@ -86,7 +86,8 @@ dist_libexec_SCRIPTS = \
 	pbs_postinstall \
 	pbs_preuninstall \
 	pbs_posttrans \
-	pbs_schema_upgrade
+	pbs_schema_upgrade \
+	pbs_add_msvr_inst
 
 dist_bin_SCRIPTS = \
 	pbs_topologyinfo \
