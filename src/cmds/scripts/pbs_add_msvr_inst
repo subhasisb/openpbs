@@ -61,21 +61,21 @@ set_new_inst_id() {
 copy_pbs() {
 	local _conf=${PBS_CONF_FILE:-/etc/pbs.conf}
 	local _svrs="" _svr_id _confdir=$(dirname ${_conf})
-	local __PBS_EXEC=$( grep '^[[:space:]]*PBS_EXEC=' ${_conf} | tail -1 | sed 's/^[[:space:]]*PBS_EXEC=\([^[:space:]]*\)[[:space:]]*/\1/' )
-	local __PBS_HOME=$( grep '^[[:space:]]*PBS_HOME=' ${_conf} | tail -1 | sed 's/^[[:space:]]*PBS_HOME=\([^[:space:]]*\)[[:space:]]*/\1/' )
-	local __old_svrs=$( grep '^[[:space:]]*PBS_SERVER_INSTANCES=' ${_conf} | tail -1 | sed 's/^[[:space:]]*PBS_SERVER_INSTANCES=\([^[:space:]]*\)[[:space:]]*/\1/' )
-	local __PBS_SERVER=$( grep '^[[:space:]]*PBS_SERVER=' ${_conf} | tail -1 | sed 's/^[[:space:]]*PBS_SERVER=\([^[:space:]]*\)[[:space:]]*/\1/' )
+	local _PBS_EXEC=$( grep '^[[:space:]]*PBS_EXEC=' ${_conf} | tail -1 | sed 's/^[[:space:]]*PBS_EXEC=\([^[:space:]]*\)[[:space:]]*/\1/' )
+	local _PBS_HOME=$( grep '^[[:space:]]*PBS_HOME=' ${_conf} | tail -1 | sed 's/^[[:space:]]*PBS_HOME=\([^[:space:]]*\)[[:space:]]*/\1/' )
+	local _old_svrs=$( grep '^[[:space:]]*PBS_SERVER_INSTANCES=' ${_conf} | tail -1 | sed 's/^[[:space:]]*PBS_SERVER_INSTANCES=\([^[:space:]]*\)[[:space:]]*/\1/' )
+	local _svr_name=$(hostname -s)
 
-	if [ "x${__old_svrs}" == "x" ]; then
-		_svrs="${__PBS_SERVER},${__PBS_SERVER}:${NEW_SVR_PORT}"
+	if [ "x${_old_svrs}" == "x" ]; then
+		_svrs="${_svr_name},${_svr_name}-${INST_ID}:${NEW_SVR_PORT}"
 	else
-		_svrs="${__old_svrs},${__PBS_SERVER}:${NEW_SVR_PORT}"
+		_svrs="${_old_svrs},${_svr_name}-${INST_ID}:${NEW_SVR_PORT}"
 	fi
 	cat ${_conf} | grep -vE '*_SERVICE_PORT|PBS_HOME|PBS_EXEC|PBS_SERVER_*|*_START_*' > ${NEW_PBS_CONF}
 	{
-		echo PBS_SERVER=${__PBS_SERVER}
-		echo PBS_EXEC="${__PBS_EXEC}"
-		echo PBS_HOME="${__PBS_HOME}_${INST_ID}"
+		echo PBS_SERVER=${_svr_name}-${INST_ID}
+		echo PBS_EXEC="${_PBS_EXEC}"
+		echo PBS_HOME="${_PBS_HOME}_${INST_ID}"
 		echo PBS_START_SCHED=0
 		echo PBS_START_COMM=0
 		echo PBS_START_SERVER=1
@@ -83,13 +83,12 @@ copy_pbs() {
 		echo PBS_BATCH_SERVICE_PORT=${NEW_SVR_PORT}
 		echo PBS_BATCH_SERVICE_PORT_DIS=${NEW_SVR_PORT}
 		echo PBS_DATA_SERVICE_PORT=$((NEW_SVR_PORT + 1))
-		echo PBS_SERVER_ID=${INST_ID}
 		echo PBS_SERVER_INSTANCES=${_svrs}
 	} >> ${NEW_PBS_CONF}
+	echo "$(hostname -i) ${_svr_name}-${INST_ID}" >> /etc/hosts
 	sed "s@: main code@: main code\\nexport PBS_CONF_FILE=/etc/pbs_${INST_ID}.conf\\n@" /etc/init.d/pbs > /etc/init.d/pbs_${INST_ID}
 	chmod +x /etc/init.d/pbs_${INST_ID}
-	cat ${_conf} | grep -vE 'PBS_SERVER_ID|PBS_SERVER_INSTANCES' > /tmp/_conf
-	echo "PBS_SERVER_ID=1" >> /tmp/_conf
+	cat ${_conf} | grep -v PBS_SERVER_INSTANCES > /tmp/_conf
 	echo "PBS_SERVER_INSTANCES=${_svrs}" >> /tmp/_conf
 	mv /tmp/_conf ${_conf}
 	for _svr_id in $(seq $((INST_ID - 1)) -1 0)
@@ -100,7 +99,7 @@ copy_pbs() {
 			mv /tmp/_conf "${_confdir}/pbs_${_svr_id}.conf"
 		fi
 	done
-	mkdir -p ${__PBS_HOME}_${INST_ID}
+	mkdir -p ${_PBS_HOME}_${INST_ID}
 }
 
 restart_pbs() {
