@@ -192,6 +192,7 @@ extern "C" {
 /* Default value of preempt_sort */
 #define PBS_PREEMPT_SORT_DEFAULT	"min_time_since_start"
 
+/* Structure to store each server instance details */
 struct pbs_server_instance 
 {
 	char *name;
@@ -225,7 +226,7 @@ struct pbs_config
 	char *pbs_server_name;		/* name of PBS Server, usually hostname of host on which PBS server is executing */
 	char *pbs_server_id;                  /* name of the database PBS server id associated with the server hostname, pbs_server_name */
 	unsigned int pbs_current_servers;	/* currently configured number of instances */
-	struct  pbs_server_instance **psi;	/* list of pbs server instances loadded from comma separated host:port[,host:port] */
+	struct  pbs_server_instance **psi;	/* list of pbs server instances loaded from comma separated host:port[,host:port] */
 	char *scp_path;			/* path to ssh */
 	char *rcp_path;			/* path to pbs_rsh */
 	char *pbs_demux_path;			/* path to pbs demux */
@@ -533,7 +534,8 @@ extern int usepool(int, int);
 
 extern enum vnode_sharing place_sharing_type(char *, enum vnode_sharing);
 
-extern int initialize_server_conns(char *, int);
+extern int initialize_server_conns(char *);
+extern int (*pfn_connect)(char *, int , char *);
 
 /* This was added to pbs_ifl.h for use by AIF */
 extern int 	pbs_isexecutable(char *);

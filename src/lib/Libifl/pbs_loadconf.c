@@ -351,7 +351,7 @@ int
 set_default_psi()
 {
 	free_psi();
-	return(parse_psi(pbs_conf.pbs_server_name));
+	return (parse_psi(pbs_conf.pbs_server_name));
 }
 
 
