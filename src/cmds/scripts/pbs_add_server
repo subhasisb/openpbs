@@ -58,7 +58,7 @@ set_new_inst_id() {
 	NEW_SVR_PORT=$((18000 + (_last_id * 2)))
 }
 
-copy_pbs() {
+create_new_inst() {
 	local _conf=${PBS_CONF_FILE:-/etc/pbs.conf}
 	local _svrs="" _svr_id _confdir=$(dirname ${_conf})
 	local _PBS_EXEC=$( grep '^[[:space:]]*PBS_EXEC=' ${_conf} | tail -1 | sed 's/^[[:space:]]*PBS_EXEC=\([^[:space:]]*\)[[:space:]]*/\1/' )
@@ -102,7 +102,7 @@ copy_pbs() {
 	mkdir -p ${_PBS_HOME}_${INST_ID}
 }
 
-restart_pbs() {
+hup_pbs() {
 	local _confdir=$(dirname ${PBS_CONF_FILE:-/etc/pbs.conf})
 	PBS_CONF_FILE=${PBS_CONF_FILE:-/etc/pbs.conf} /etc/init.d/pbs reload
 	for _svr_id in $(seq $((INST_ID - 1)) -1 0)
@@ -115,5 +115,5 @@ restart_pbs() {
 }
 
 set_new_inst_id
-copy_pbs
-restart_pbs
+create_new_inst
+hup_pbs

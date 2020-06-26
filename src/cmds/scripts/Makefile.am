@@ -87,7 +87,7 @@ dist_libexec_SCRIPTS = \
 	pbs_preuninstall \
 	pbs_posttrans \
 	pbs_schema_upgrade \
-	pbs_add_msvr_inst
+	pbs_add_server
 
 dist_bin_SCRIPTS = \
 	pbs_topologyinfo \

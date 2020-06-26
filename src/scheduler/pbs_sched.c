@@ -412,6 +412,7 @@ restart(int sig)
 {
 	if (sig) {
 		log_close(1);
+		pbs_loadconf(1);
 		log_open(logfile, path_log);
 		sprintf(log_buffer, "restart on signal %d", sig);
 	} else {

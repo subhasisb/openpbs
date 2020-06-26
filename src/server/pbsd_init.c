@@ -1836,6 +1836,7 @@ change_logs(int sig)
 {
 	acct_close();
 	log_close(1);
+	pbs_loadconf(1);
 	log_open(log_file, path_log);
 	(void)acct_open(acct_file);
 }

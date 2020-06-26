@@ -5678,6 +5678,7 @@ process_hup(void)
 	if (real_hup) {
 		log_event(PBSEVENT_SYSTEM, 0, LOG_INFO, __func__, "reset");
 		log_close(1);
+		pbs_loadconf(1);
 		log_open(log_file, path_log);
 
 		if ((num_var_env = setup_env(pbs_conf.pbs_environment)) == -1) {
@@ -8068,7 +8069,7 @@ net_down_handler(void *data)
  * 	Can be used for any such scenario.
  *
  * @param[in] mode -	reset mode is to bring it back to bursting mode
- * 
+ *
  * @return int
  * @retval >0 : time delta
  * @retval 0 : only in case of reset mode.
@@ -8784,13 +8785,13 @@ main(int argc, char *argv[])
 	}
 #endif
 
-	/* 
+	/*
 	 * Set mom_host to gethostname(), if gethostname() fail, then use PBS_MOM_NODE_NAME
 	 * if it is defined and complies to RFC 952/1123
 	 */
 	c = gethostname(mom_host, (sizeof(mom_host) - 1));
 	if (c != 0) {
-		/* 
+		/*
 		 * backup plan
 		 * use PBS_MOM_NODE_NAME as hostname if it is defined and complies to RFC 952/1123
 		 */
