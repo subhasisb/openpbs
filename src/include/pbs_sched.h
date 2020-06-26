@@ -125,6 +125,7 @@ typedef struct pbs_sched {
 	int sched_cycle_started;
 	/* sched object's attributes  */
 	attribute sch_attr[SCHED_ATR_LAST];
+	short newobj;
 } pbs_sched;
 
 
