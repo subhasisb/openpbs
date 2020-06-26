@@ -503,6 +503,10 @@ enum batch_op {	SET, UNSET, INCR, DECR,
 #define NOMAIL  			"nomail"
 #define SUPPRESS_EMAIL  		"suppress_email"
 #define DELETEHISTORY		"deletehist"
+
+/* Multi-server macro */
+#define MULTI_SERVER			"PBS_CONF_MULTI_SERVER"
+
 /*
  ** This structure is identical to attropl so they can be used
  ** interchangably.  The op field is not used.

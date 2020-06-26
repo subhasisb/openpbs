@@ -75,8 +75,6 @@
 #include "log.h"
 #include "auth.h"
 
-int (*pfn_connect)(char *, int , char *) = NULL;
-
 /**
  * @brief
  *	-returns the default server name.
@@ -403,107 +401,104 @@ tcp_connect(char *server, int server_port, char *extend_data)
 
 /**
  * @brief
- *	This function dynamically sets the api to use for connecting PBS server.
- *
- * @param[in]   server - The hostname of the pbs server to connect to.
- * @param[in]   port - Port number of the pbs server to connect to.
- * @param[in]   extend_data - a string to send as "extend" data
- * 
- * @return int
- * @retval >= 0	The physical server socket.
- * @retval -1	error encountered setting up the connection.
- */
-
-int internal_client_connect(char *server, int port, char *extend_data)
-{
-	return tcp_connect(server, port, extend_data);
-}
-
-/**
- * @brief
  * 	initialize_server_conns - To intialize the servers connection table.
  *
- * @param[in] extend_data 
- * @param[in] multi_flag 
+ * @param[in] num_conf_servers 
  *
- * @return int
- * @retval >0 - success
- * @retval -1 - error
+ * @return svr_conn_t **
+ * @retval !NULL - success
+ * @retval NULL - error
  */
-int 
-initialize_server_conns(char *extend_data)
+svr_conn_t ** 
+initialize_server_conns(int num_conf_servers)
 {
 	int i;
 	int j;
-	int fd = -1;
-	static int seeded = 0;
-	struct timeval tv;
-	unsigned long time_in_micros;
-	int ind;
-	int loop_i;
-	int multi_flag = 0;
-	int num_conf_servers = get_current_servers();
-	
-	if (pfn_connect == NULL)
-		pfn_connect = internal_client_connect;
-		
-	if (getenv("PBS_CONF_MULTI_SERVER") != NULL) {
-		multi_flag = 1;
-	}
-	
 	svr_conn_t **svr_connections = calloc(num_conf_servers, sizeof(svr_conn_t *));
 	if (!svr_connections)
-		return -1;
+		return NULL;
 		
-	if (multi_flag == 0) {
-		svr_connections[0] = malloc(sizeof(svr_conn_t));
-			if (!svr_connections[0]) 
-				return -1;
-		if (!seeded) {
-			gettimeofday(&tv,NULL);
-			time_in_micros = 1000000 * tv.tv_sec + tv.tv_usec;
-			srand(time_in_micros); /* seed the random generator */
-			seeded = 1;
-		}
-		ind = rand() % get_current_servers();
-		loop_i = ind;
-		do {
-		fd = pfn_connect(pbs_conf.psi[loop_i]->name, pbs_conf.psi[loop_i]->port, extend_data);
-		if (fd != -1)
-			break;
-		loop_i = (loop_i + 1) % get_current_servers();
-		} while (loop_i != ind);
-		
-		if (fd != -1)
-			svr_connections[0]->state = SVR_CONN_STATE_CONNECTED;
-		else 
-			svr_connections[0]->state = SVR_CONN_STATE_FAILED;
-		
-		if (set_conn_servers(fd, (void *)svr_connections))
-			return -1;
-		
-		return fd;
-	}
-	
 	for (i = 0; i < num_conf_servers; i++) {
 		svr_connections[i] = malloc(sizeof(svr_conn_t));
 		if (!svr_connections[i]) {
 			for (j = 0; j < i; j++ )
 				free(svr_connections[j]);
 			free(svr_connections);
-			return -1;
+			return NULL;
 		}
-		svr_connections[i]->sd = pfn_connect(pbs_conf.psi[i]->name, pbs_conf.psi[i]->port, extend_data);
+		svr_connections[i]->sd = -1;
+		svr_connections[i]->state = SVR_CONN_STATE_DOWN;
+	}
+	
+	return svr_connections;
+}
+
+/**
+ * @brief
+ * 	To connect to all the servers, fill up the connection table 
+ * 	and returns the first connected socket.
+ *
+ * @param[in] extend_data 
+ *
+ * @return int
+ * @retval >0 - success
+ * @retval -1 - error
+ */
+int 
+connect_to_servers(char *extend_data)
+{
+	int i = 0;
+	int j = 0;
+	int fd = -1;
+	int ind = 0;
+	static int seeded = 0;
+	struct timeval tv;
+	unsigned long time_in_micros;
+	int multi_flag = 0;
+	int num_conf_servers = get_current_servers();
+		
+	if (getenv(MULTI_SERVER) != NULL) {
+		multi_flag = 1;
+	}
+	
+	svr_conn_t **svr_connections = initialize_server_conns(multi_flag?num_conf_servers:1);
+	if (!svr_connections)
+		return -1;
+		
+	do {
+		/* For single mode, connect to anyone random server */
+		if (i == 0 && multi_flag == 0) {
+			if (!seeded) {
+				gettimeofday(&tv,NULL);
+				time_in_micros = 1000000 * tv.tv_sec + tv.tv_usec;
+				srand(time_in_micros); /* seed the random generator */
+				seeded = 1;
+			}	
+			ind = rand() % get_current_servers();
+			j = ind;
+			do {
+				svr_connections[i]->sd = tcp_connect(pbs_conf.psi[j]->name, pbs_conf.psi[j]->port, extend_data);
+				if (svr_connections[i]->sd != -1)
+					break;
+				j = (j + 1) % get_current_servers();
+			} while (j != ind);
+			
+		} else /* For mutiple servers, connect to all servers */
+			svr_connections[i]->sd = tcp_connect(pbs_conf.psi[i]->name, pbs_conf.psi[i]->port, extend_data);
+			
 		if (svr_connections[i]->sd != -1) {
 			svr_connections[i]->state = SVR_CONN_STATE_CONNECTED;
 			if (fd == -1)
 				fd = svr_connections[i]->sd;
 		} else 
 			svr_connections[i]->state = SVR_CONN_STATE_FAILED;
-	}
+			
+		i++;
+	} while ((multi_flag == 1) && (i < num_conf_servers));
 	
 	if (set_conn_servers(fd, (void *)svr_connections))
 		return -1;
+		
 	return fd;
 }
 
@@ -560,7 +555,7 @@ __pbs_connect_extend(char *server, char *extend_data)
 		return -1;
 	}
 		
-	if ((sock = initialize_server_conns(extend_data)) == -1) {
+	if ((sock = connect_to_servers(extend_data)) == -1) {
 		pbs_errno = PBSE_INTERNAL;
 		return -1;
 	}		

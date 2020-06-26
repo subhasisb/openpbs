@@ -534,9 +534,6 @@ extern int usepool(int, int);
 
 extern enum vnode_sharing place_sharing_type(char *, enum vnode_sharing);
 
-extern int initialize_server_conns(char *);
-extern int (*pfn_connect)(char *, int , char *);
-
 /* This was added to pbs_ifl.h for use by AIF */
 extern int 	pbs_isexecutable(char *);
 extern char 	*pbs_ispbsdir(char *, char *);

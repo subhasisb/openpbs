@@ -142,7 +142,8 @@ int set_conn_chan(int, pbs_tcp_chan_t *);
 pthread_mutex_t * get_conn_mutex(int);
 int set_conn_servers(int, void*);
 void * get_conn_servers(int);
-
+extern svr_conn_t ** initialize_server_conns(int);
+extern int connect_to_servers(char *);
 /* max number of preempt orderings */
 #define PREEMPT_ORDER_MAX 20
 
