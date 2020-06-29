@@ -75,6 +75,7 @@ struct job_list {
  *	-reads selectjob reply from stream
  *
  * @param[in] c - communication handle
+ * @param[in] jlist - structure which holds job list and related counters.
  *
  * @return	string list
  * @retval	list of strings		success
@@ -120,7 +121,7 @@ PBSD_select_get(int c, struct job_list *jlist)
 		 */
 
 		totsize = stringtot + (njobs + 1) * (sizeof(char *));
-		
+
 		if (!jlist->jobs) {
 			retval = (char **)malloc(totsize);
 			jlist->jobs = retval;
@@ -175,10 +176,10 @@ __pbs_selectjob(int c, struct attropl *attrib, char *extend)
 {
 	char **ret = NULL;
 	int i;
-	svr_conn_t **multi_connection;
+	svr_conn_t **svr_connections;
 	struct job_list jlist = {0};
 
-	if ((multi_connection = get_conn_servers(c)) == NULL)
+	if ((svr_connections = get_conn_servers(c)) == NULL)
 		return NULL;
 
 	/* initialize the thread context data, if not already initialized */
@@ -186,16 +187,16 @@ __pbs_selectjob(int c, struct attropl *attrib, char *extend)
 		return NULL;
 
 	/* first verify the attributes, if verification is enabled */
-	if (pbs_verify_attributes(random_srv_conn(multi_connection), PBS_BATCH_SelectJobs, MGR_OBJ_JOB,
+	if (pbs_verify_attributes(random_srv_conn(svr_connections), PBS_BATCH_SelectJobs, MGR_OBJ_JOB,
 		MGR_CMD_NONE, attrib))
 		return NULL;
 
 	for (i = 0; i < get_current_servers(); i++) {
 
-		if (multi_connection[i]->state != SVR_CONN_STATE_CONNECTED)
+		if (svr_connections[i] && svr_connections[i]->state != SVR_CONN_STATE_CONNECTED)
 			continue;
 
-		c = multi_connection[i]->sd;
+		c = svr_connections[i]->sd;
 
 		/* lock pthread mutex here for this connection */
 		/* blocking call, waits for mutex release */
@@ -242,9 +243,9 @@ __pbs_selstat(int c, struct attropl *attrib, struct attrl *rattrib, char *extend
 	struct batch_status *ret = NULL;
 	struct batch_status *next = NULL;
 	struct batch_status *cur = NULL;
-	svr_conn_t **multi_connection = get_conn_servers(c);
+	svr_conn_t **svr_connections = get_conn_servers(c);
 
-	if (!multi_connection)
+	if (!svr_connections)
 		return NULL;
 
 	/* initialize the thread context data, if not already initialized */
@@ -252,17 +253,16 @@ __pbs_selstat(int c, struct attropl *attrib, struct attrl *rattrib, char *extend
 		return NULL;
 
 	/* first verify the attributes, if verification is enabled */
-	if (pbs_verify_attributes(random_srv_conn(multi_connection),
+	if (pbs_verify_attributes(random_srv_conn(svr_connections),
 	    PBS_BATCH_SelectJobs, MGR_OBJ_JOB, MGR_CMD_NONE, attrib))
 		return NULL;
 
-
 	for (i = 0; i < get_current_servers(); i++) {
 
-		if (multi_connection[i]->state != SVR_CONN_STATE_CONNECTED)
+		if (svr_connections[i]->state != SVR_CONN_STATE_CONNECTED)
 			continue;
 
-		c = multi_connection[i]->sd;
+		c = svr_connections[i]->sd;
 
 		/* lock pthread mutex here for this connection */
 		/* blocking call, waits for mutex release */

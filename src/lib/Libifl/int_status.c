@@ -113,9 +113,9 @@ PBSD_status_aggregate(int c, int cmd, char *id, struct attrl *attrib, char *exte
 	struct batch_status *ret = NULL;
 	struct batch_status *next = NULL;
 	struct batch_status *cur = NULL;
-	svr_conn_t **multi_connection = get_conn_servers(c);
+	svr_conn_t **svr_connections = get_conn_servers(c);
 
-	if (!multi_connection)
+	if (!svr_connections)
 		return NULL;
 
 	/* initialize the thread context data, if not already initialized */
@@ -123,16 +123,16 @@ PBSD_status_aggregate(int c, int cmd, char *id, struct attrl *attrib, char *exte
 		return NULL;
 
 	/* first verify the attributes, if verification is enabled */
-	if ((pbs_verify_attributes(random_srv_conn(multi_connection), cmd,
+	if ((pbs_verify_attributes(random_srv_conn(svr_connections), cmd,
 		parent_object, MGR_CMD_NONE, (struct attropl *) attrib)))
 		return NULL;
 
 	for (i = 0; i < get_current_servers(); i++) {
 		
-		if (multi_connection[i]->state != SVR_CONN_STATE_CONNECTED)
+		if (svr_connections[i]->state != SVR_CONN_STATE_CONNECTED)
 			continue;
 
-		c = multi_connection[i]->sd;
+		c = svr_connections[i]->sd;
 
 		if (pbs_client_thread_lock_connection(c) != 0)
 			return NULL;
@@ -175,12 +175,12 @@ struct batch_status *
 PBSD_status_random(int c, int cmd, char *id, struct attrl *attrib, char *extend, int parent_object)
 {
 	struct batch_status *ret = NULL;
-	svr_conn_t **multi_connection = get_conn_servers(c);
+	svr_conn_t **svr_connections = get_conn_servers(c);
 
-	if (!multi_connection)
+	if (!svr_connections)
 		return NULL;
 
-	if ((c = random_srv_conn(multi_connection)) < 0)
+	if ((c = random_srv_conn(svr_connections)) < 0)
 		return NULL;
 
 	/* initialize the thread context data, if not already initialized */

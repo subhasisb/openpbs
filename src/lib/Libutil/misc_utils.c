@@ -2190,13 +2190,13 @@ get_current_servers()
  *
  */
 int
-get_available_conn(svr_conn_t **multi_connection)
+get_available_conn(svr_conn_t **svr_connections)
 {
 	int i;
 
 	for (i = 0; i < get_current_servers(); i++)
-		if (multi_connection[i]->state == SVR_CONN_STATE_CONNECTED)
-			return multi_connection[i]->sd;
+		if (svr_connections[i]->state == SVR_CONN_STATE_CONNECTED)
+			return svr_connections[i]->sd;
 
 	return -1;
 }
@@ -2207,15 +2207,15 @@ get_available_conn(svr_conn_t **multi_connection)
  *
  */
 int
-random_srv_conn(svr_conn_t **multi_connection)
+random_srv_conn(svr_conn_t **svr_connections)
 {
 	int ind = 0;
 
 	srand(time(0));
 	ind =  rand() % get_current_servers();
 
-	if (multi_connection[ind]->state == SVR_CONN_STATE_CONNECTED)
-		return multi_connection[ind]->sd;
+	if (svr_connections[ind]->state == SVR_CONN_STATE_CONNECTED)
+		return svr_connections[ind]->sd;
 		
-	return get_available_conn(multi_connection);
+	return get_available_conn(svr_connections);
 }
