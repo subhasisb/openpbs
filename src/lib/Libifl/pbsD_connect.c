@@ -448,58 +448,64 @@ int
 connect_to_servers(char *extend_data)
 {
 	int i = 0;
-	int j = 0;
 	int fd = -1;
-	int ind = 0;
+	int start = 0;
 	static int seeded = 0;
 	struct timeval tv;
 	unsigned long time_in_micros;
 	int multi_flag = 0;
 	int num_conf_servers = get_current_servers();
-		
-	if (getenv(MULTI_SERVER) != NULL) {
-		multi_flag = 1;
+
+	multi_flag = getenv(MULTI_SERVER) != NULL;
+
+	if (!multi_flag && !seeded) {
+		gettimeofday(&tv, NULL);
+		time_in_micros = 1000000 * tv.tv_sec + tv.tv_usec;
+		srand(time_in_micros); /* seed the random generator */
+		seeded = 1;
 	}
-	
-	svr_conn_t **svr_connections = initialize_server_conns(multi_flag?num_conf_servers:1);
+
+	svr_conn_t **svr_connections = calloc(num_conf_servers, sizeof(svr_conn_t *));
 	if (!svr_connections)
 		return -1;
-		
+
+	if (!multi_flag)
+		start = rand() % get_current_servers();
+	else
+		start = 0;
+
+	i = start;
 	do {
-		/* For single mode, connect to anyone random server */
-		if (i == 0 && multi_flag == 0) {
-			if (!seeded) {
-				gettimeofday(&tv,NULL);
-				time_in_micros = 1000000 * tv.tv_sec + tv.tv_usec;
-				srand(time_in_micros); /* seed the random generator */
-				seeded = 1;
-			}	
-			ind = rand() % get_current_servers();
-			j = ind;
-			do {
-				svr_connections[i]->sd = tcp_connect(pbs_conf.psi[j]->name, pbs_conf.psi[j]->port, extend_data);
-				if (svr_connections[i]->sd != -1)
-					break;
-				j = (j + 1) % get_current_servers();
-			} while (j != ind);
-			
-		} else /* For mutiple servers, connect to all servers */
-			svr_connections[i]->sd = tcp_connect(pbs_conf.psi[i]->name, pbs_conf.psi[i]->port, extend_data);
-			
-		if (svr_connections[i]->sd != -1) {
+		if (!svr_connections[i]) {
+			if (!(svr_connections[i] = malloc(sizeof(svr_conn_t))))
+				goto err;
+		}
+
+		if ((svr_connections[i]->sd = tcp_connect(pbs_conf.psi[i]->name, pbs_conf.psi[i]->port, extend_data)) != -1) {
 			svr_connections[i]->state = SVR_CONN_STATE_CONNECTED;
-			if (fd == -1)
-				fd = svr_connections[i]->sd;
-		} else 
+			fd = svr_connections[i]->sd;
+			if (!multi_flag)
+				break;
+		} else
 			svr_connections[i]->state = SVR_CONN_STATE_FAILED;
-			
+
 		i++;
-	} while ((multi_flag == 1) && (i < num_conf_servers));
-	
+		if (i >= num_conf_servers)
+			i = 0;
+	} while (i != start);
+
 	if (set_conn_servers(fd, (void *)svr_connections))
 		return -1;
-		
+
 	return fd;
+
+err:
+	/* free svr_connections array and return */
+	for (i = 0; i < num_conf_servers; i++)
+		free(svr_connections[i]);
+
+	free(svr_connections);
+	return -1;
 }
 
 /**
