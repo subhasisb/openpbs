@@ -163,6 +163,7 @@ enum srv_atr {
 	SRV_ATR_rpp_max_pkt_check,
 	SRV_ATR_max_job_sequence_id,
 	SRV_ATR_has_runjob_hook,
+	SRV_ATR_job_stat_limit,
 #if defined(PBS_SECURITY) && (PBS_SECURITY == KRB5)
 	SRV_ATR_acl_krb_realm_enable,
 	SRV_ATR_acl_krb_realms,

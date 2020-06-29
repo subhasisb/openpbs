@@ -331,6 +331,7 @@ extern "C" {
 #define ATTR_cred_renew_period	"cred_renew_period"
 #define ATTR_cred_renew_cache_period "cred_renew_cache_period"
 #define ATTR_attr_update_period "attr_update_period"
+#define ATTR_job_stat_limit "job_stat_limit"
 
 /**
  * RPP_MAX_PKT_CHECK_DEFAULT controls the number of loops used to process
