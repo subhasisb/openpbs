@@ -302,42 +302,33 @@ server_disconnect(int connect)
  *
  */
 static void
-close_server_conn(int index_to_shards)
+close_server_conn(int svr_index)
 {
+	svr_conn_t *svr_conns = NULL;
 
-	svr_conn_t **svr_conns = NULL;
+	svr_conns = get_conn_servers();
 
-	pbs_client_thread_lock_connection(entry_to_svr_conns);
-
-	svr_conns = (svr_conn_t **)get_conn_servers(entry_to_svr_conns);
-
-	if (!svr_conns) {
-		/* unlock the connection level lock */
-		pbs_client_thread_unlock_connection(entry_to_svr_conns);
+	if (!svr_conns)
 		return;
-	}
 
-	if (svr_conns[index_to_shards] &&
-			svr_conns[index_to_shards]->state == SVR_CONN_STATE_CONNECTED) {
-		FD_CLR(svr_conns[index_to_shards]->sd , &master_fdset);
-
-		if (svr_conns[index_to_shards]->sd >= 0) {
-			close_tcp_connection(svr_conns[index_to_shards]->sd);
+	if (svr_conns[svr_index].state == SVR_CONN_STATE_CONNECTED) {
+		FD_CLR(svr_conns[svr_index].sd , &master_fdset);
+		if (svr_conns[svr_index].sd >= 0) {
+			close_tcp_connection(svr_conns[svr_index].sd);
 			/* unlock the connection level lock */
-			svr_conns[index_to_shards]->sd = -1;
-			if (svr_conns[index_to_shards]->secondary_sd >= 0) {
+			svr_conns[svr_index].sd = -1;
+			if (svr_conns[svr_index].secondary_sd >= 0) {
 				/* We no need to call close_tcp_connection() once again on secondary connection
 				   It is because PBS_BATCH_Disconnect is sent as part of close_tcp_connection on primary.
 				   The other reason is Server is just expecting only end of cycle on secondary connection 
 				*/ 
-				CS_close_socket(svr_conns[index_to_shards]->secondary_sd);
-				CLOSESOCKET(svr_conns[index_to_shards]->secondary_sd);
-				dis_destroy_chan(svr_conns[index_to_shards]->secondary_sd);
-				svr_conns[index_to_shards]->secondary_sd = -1;
+				CS_close_socket(svr_conns[svr_index].secondary_sd);
+				CLOSESOCKET(svr_conns[svr_index].secondary_sd);
+				dis_destroy_chan(svr_conns[svr_index].secondary_sd);
+				svr_conns[svr_index].secondary_sd = -1;
 			}
 		}
-		svr_conns[index_to_shards]->state = SVR_CONN_STATE_DOWN;
-		pbs_client_thread_unlock_connection(entry_to_svr_conns);
+		svr_conns[svr_index].state = SVR_CONN_STATE_DOWN;
 	}
 }
 
@@ -473,7 +464,7 @@ restart(int sig)
 		pbs_loadconf(1);
 		log_open(logfile, path_log);
 
-		num_conf_svrs = get_current_servers();
+		num_conf_svrs = get_num_servers();
 
 		if (num_conf_svrs > MAX_ALLOWED_SVRS) {
 			log_record(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_INFO, __func__,  "Maximum allowed servers exceeded");	
@@ -481,8 +472,8 @@ restart(int sig)
 		}
 
 		for (i = 0; i < num_conf_svrs; i++) {
-			if (pbs_conf.psi[i]->name != NULL)
-				addclient(pbs_conf.psi[i]->name);
+			if (pbs_conf.psi[i].name != NULL)
+				addclient(pbs_conf.psi[i].name);
 		}
 		
 		sprintf(log_buffer, "restart on signal %d", sig);
@@ -594,11 +585,10 @@ badconn(char *msg)
 int
 accept_svr_conn(int *max_sd)
 {
-	int		new_socket = -1;
-	pbs_socklen_t	slen;
-	int		i;
-	pbs_net_t	addr;
-	static int	svr_conns_initialised = 0;
+	int new_socket = -1;
+	pbs_socklen_t slen;
+	int i;
+	pbs_net_t addr;
 #ifdef TCP_USER_TIMEOUT
 	int 		tcp_timeout = TCP_TIMEOUT;
 #endif
@@ -631,7 +621,7 @@ accept_svr_conn(int *max_sd)
 	}
 
 	addr = (pbs_net_t)saddr.sin_addr.s_addr;
-	for (i=0; i<numclients; i++) {
+	for (i = 0; i < numclients; i++) {
 		if (addr == okclients[i])
 			break;
 	}
@@ -639,15 +629,6 @@ accept_svr_conn(int *max_sd)
 		badconn("unauthorized host");
 		close(new_socket);
 		return SCH_ERROR;
-	}
-
-	if (!svr_conns_initialised) {
-		svr_conn_t **svr_conns;
-		if ((svr_conns = initialize_server_conns(get_current_servers())) == NULL)
-			return -1;
-		set_conn_servers(new_socket, svr_conns);
-		svr_conns_initialised = 1;
-		entry_to_svr_conns = new_socket;
 	}
 
 	if (socket_to_conn(new_socket, saddr) == -1) {
@@ -891,7 +872,7 @@ main(int argc, char *argv[])
 	if (pbs_loadconf(0) == 0)
 		return (1);
 
-	num_cfg_svrs = get_current_servers();
+	num_cfg_svrs = get_num_servers();
 
 	set_log_conf(pbs_conf.pbs_leaf_name, pbs_conf.pbs_mom_node_name,
 			pbs_conf.locallog, pbs_conf.syslogfac,
@@ -1184,10 +1165,9 @@ main(int argc, char *argv[])
 	if (pbs_conf.pbs_leaf_name)
 		addclient(pbs_conf.pbs_leaf_name);
 
-
 	for (svr_inst_idx = 0; svr_inst_idx < num_cfg_svrs; svr_inst_idx++) {
-		if (pbs_conf.psi[svr_inst_idx]->name != NULL)
-			addclient(pbs_conf.psi[svr_inst_idx]->name);
+		if (pbs_conf.psi[svr_inst_idx].name != NULL)
+			addclient(pbs_conf.psi[svr_inst_idx].name);
 	}
 
 	if (configfile) {
@@ -1413,7 +1393,7 @@ main(int argc, char *argv[])
 		}
 
 		/* destroy ch_shards table */
-		for (svr_inst_idx = 0; svr_inst_idx < get_current_servers(); svr_inst_idx++) {
+		for (svr_inst_idx = 0; svr_inst_idx < get_num_servers(); svr_inst_idx++) {
 			if (svr_conns[svr_inst_idx])
 				free(svr_conns[svr_inst_idx]);
 		}
@@ -1447,19 +1427,13 @@ main(int argc, char *argv[])
 static int
 socket_to_conn(int sock, struct sockaddr_in saddr_in)
 {
-	svr_conn_t **svr_conns;
 	struct hostent *phe;
 	char *svr_id;
 	int cmd;
-	char *colon_ptr;
 	int svr_conn_index;
-
-	/* Use server_sock as virtual socket to get connection objects for all servers */
-	svr_conns = (svr_conn_t **)get_conn_servers(entry_to_svr_conns);
-	if (svr_conns == NULL) {
-		log_event(PBSEVENT_ERROR, PBS_EVENTCLASS_SCHED, LOG_ERR, __func__, "Error in getting svr_conns table");
-		return -1;
-	}
+	char svrname[PBS_MAXHOSTNAME];
+	int port;
+	svr_conn_t *conn_arr = NULL;
 
 	if (get_sched_cmd(sock, &cmd, &svr_id) != 1) {
 		log_eventf(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SCHED, LOG_ERR, __func__,
@@ -1467,52 +1441,42 @@ socket_to_conn(int sock, struct sockaddr_in saddr_in)
 		return -1;
 	}
 
-	colon_ptr = strchr(svr_id, ':') ;
-	if (colon_ptr == NULL) {
+	if (parse_pbs_name_port(svr_id, svrname, &port) != 0) {
 		log_event(PBSEVENT_ERROR, PBS_EVENTCLASS_SCHED, LOG_ERR, __func__, "malformed svr_id");
 		return -1;
-	}	
-	*colon_ptr = '\0';
-	svr_conn_index = get_svr_index(svr_id);
-	*colon_ptr = ':';
-	if (svr_conn_index == -1) {
+	}
+
+	svr_conn_index = get_svr_index(svrname);
+	if (svr_conn_index == -1 || svr_conn_index >= get_num_servers()) {
 		log_event(PBSEVENT_ERROR, PBS_EVENTCLASS_SCHED, LOG_ERR, __func__, "Unknown server");
 		return -1;
 	}
 
-	if (svr_conns[svr_conn_index] == NULL) {
-		svr_conns[svr_conn_index] = malloc(sizeof(svr_conn_t));
-		if (svr_conns[svr_conn_index] == NULL) {
-			log_err(errno, __func__, MEM_ERR_MSG);
-			return -1;
-		}
-	
-		svr_conns[svr_conn_index]->sd = -1;
-		svr_conns[svr_conn_index]->secondary_sd = -1;
-	}
+	if ((conn_arr = get_conn_servers()) == NULL)
+		return -1;
 
-	if (svr_conns[svr_conn_index]->sd == -1) {
+	if (conn_arr[svr_conn_index].sd == -1) {
 		if ((phe = gethostbyaddr((char *) &saddr_in.sin_addr, sizeof(saddr_in.sin_addr), AF_INET)) == NULL) {
 			log_eventf(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SCHED, LOG_ERR, __func__,
 				"gethostbyaddr failed, errno=%d in function %s ",  errno, __func__);
 			return -1;
 		}
 
-		strcpy(svr_conns[svr_conn_index]->host_name, phe->h_name);
+		strcpy(conn_arr[svr_conn_index].host_name, phe->h_name);
 		/* We will wait to mark this as connected until we get secondary connection */
-		svr_conns[svr_conn_index]->state = SVR_CONN_STATE_DOWN;
-		svr_conns[svr_conn_index]->state_change_time = time(0);
-		strcpy(svr_conns[svr_conn_index]->svr_id, svr_id);
+		conn_arr[svr_conn_index].state = SVR_CONN_STATE_DOWN;
+		conn_arr[svr_conn_index].state_change_time = time(0);
+		strcpy(conn_arr[svr_conn_index].svr_id, svr_id);
 	}
 
 	free(svr_id);
 
-	if (svr_conns[svr_conn_index]->sd == -1) {
-		svr_conns[svr_conn_index]->sd = sock;
+	if (conn_arr[svr_conn_index].sd == -1) {
+		conn_arr[svr_conn_index].sd = sock;
 		FD_SET(sock, &master_fdset);
 	} else {
-		svr_conns[svr_conn_index]->secondary_sd = sock;
-		svr_conns[svr_conn_index]->state = SVR_CONN_STATE_CONNECTED;
+		conn_arr[svr_conn_index].secondary_sd = sock;
+		conn_arr[svr_conn_index].state = SVR_CONN_STATE_CONNECTED;
 	}
 
 	return 0;
@@ -1572,19 +1536,21 @@ schedule_wrapper(fd_set *read_fdset, int opt_no_restart)
 	int cmd;
 	int alarm_time = 0;
 	char *runjobid = NULL;
-	svr_conn_t **svr_conns = NULL;
-	int num_cfg_svrs = get_current_servers();
+	svr_conn_t *svr_conns = NULL;
+	int num_cfg_svrs = get_num_servers();
 
-	/* Use virtual socket i.e. server_sock when calling get_conn_shards */
-	svr_conns = (svr_conn_t **)get_conn_servers(entry_to_svr_conns);
+	svr_conns = get_conn_servers();
 	if (svr_conns == NULL)
 		die(0);
 
-	for (svr_inst_idx = 0; svr_inst_idx < num_cfg_svrs; svr_inst_idx++) {
-		sock_to_check = svr_conns[svr_inst_idx]->sd;
-		second_connection = svr_conns[svr_inst_idx]->secondary_sd;
+	if (sigprocmask(SIG_BLOCK, &allsigs, &oldsigs) == -1)
+		log_err(errno, __func__, "sigprocmask(SIG_BLOCK)");
 
-		if ((sock_to_check != -1) && FD_ISSET(sock_to_check, read_fdset)) {
+	for (svr_inst_idx = 0; svr_inst_idx < num_cfg_svrs; svr_inst_idx++) {
+		sock_to_check = svr_conns[svr_inst_idx].sd;
+		second_connection = svr_conns[svr_inst_idx].secondary_sd;
+
+		if (sock_to_check != -1 && second_connection != -1 && FD_ISSET(sock_to_check, read_fdset)) {
 			int ret;
 			ret = get_sched_cmd(sock_to_check, &cmd, &runjobid);
 			if (ret != 1) {
@@ -1606,10 +1572,6 @@ schedule_wrapper(fd_set *read_fdset, int opt_no_restart)
 					num_svrs_updated++;
 				}
 
-
-				if (sigprocmask(SIG_BLOCK, &allsigs, &oldsigs) == -1)
-					log_err(errno, __func__, "sigprocmask(SIG_BLOCK)");
-
 				/* Keep track of time to use in SIGSEGV handler */
 #ifdef NAS /* localmod 031 */
 				now = time(NULL);
@@ -1627,20 +1589,17 @@ schedule_wrapper(fd_set *read_fdset, int opt_no_restart)
 				DBPRT(("Scheduler received command %d\n", cmd));
 #endif /* localmod 031 */
 
-				/* magic happens here */				
-				sched_ret = schedule(cmd, entry_to_svr_conns, runjobid);
-				if (sched_ret != 0 ) {
-					close_server_conn(svr_inst_idx);
-
+				/* magic happens here */
+				if ((sched_ret = schedule(cmd, sock_to_check, runjobid)) == 1) {
 					if (sigprocmask(SIG_SETMASK, &oldsigs, NULL) == -1)
 						log_err(errno, __func__, "sigprocmask(SIG_SETMASK)");
 
 					if (cmd == SCH_QUIT)
 						return 1;
-					else
-						continue;
-				} else {
-					if (send_cycle_end(second_connection))
+
+					close_server_conn(svr_inst_idx);
+				} else {	/* Successful cycle */
+					if (send_cycle_end(second_connection) == -1)
 						close_server_conn(svr_inst_idx);
 				}
 
@@ -1648,12 +1607,12 @@ schedule_wrapper(fd_set *read_fdset, int opt_no_restart)
 					free(runjobid);
 					runjobid = NULL;
 				}
-
-				if (sigprocmask(SIG_SETMASK, &oldsigs, NULL) == -1)
-					log_err(errno, __func__, "sigprocmask(SIG_SETMASK)");
 			}
 		}
 	}
+
+	if (sigprocmask(SIG_SETMASK, &oldsigs, NULL) == -1)
+		log_err(errno, __func__, "sigprocmask(SIG_SETMASK)");
 
 	return 0;
 }

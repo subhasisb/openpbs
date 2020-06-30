@@ -1511,15 +1511,17 @@ check_nodes(status *policy, server_info *sinfo, queue_info *qinfo, resource_resv
 nspec **
 check_normal_node_path(status *policy, server_info *sinfo, queue_info *qinfo, resource_resv *resresv, unsigned int flags, schd_error *err)
 {
-	nspec			**nspec_arr = NULL;
-	selspec			*spec = NULL;
-	place			*pl = NULL;
-	int			rc = 0;
-	char			*grouparr[2] = {0};
-	np_cache		*npc = NULL;
-	int			error = 0;
-	node_partition		**nodepart = NULL;
-	node_info		**ninfo_arr = NULL;
+	nspec **nspec_arr = NULL;
+	selspec *spec = NULL;
+	place *pl = NULL;
+	int rc = 0;
+	char *grouparr[2] = { 0 };
+	np_cache *npc = NULL;
+	int error = 0;
+	node_partition **nodepart = NULL;
+	node_info **ninfo_arr = NULL;
+	int using_svr_nodes = 0;
+	int svr_index_used = -1;
 
 	if (sinfo == NULL || resresv == NULL || err == NULL) {
 		if (err != NULL)
@@ -1575,8 +1577,10 @@ check_normal_node_path(status *policy, server_info *sinfo, queue_info *qinfo, re
 			/* if there are nodes assigned to the queue, then check those */
 			if (qinfo->has_nodes)
 				ninfo_arr = qinfo->nodes;
-			else
+			else {
 				ninfo_arr = sinfo->unassoc_nodes;
+				using_svr_nodes = 1;
+			}
 		} else
 			/* last up we're not in a queue with nodes -- use the unassociated nodes */
 			ninfo_arr = sinfo->unassoc_nodes;
@@ -1615,13 +1619,23 @@ check_normal_node_path(status *policy, server_info *sinfo, queue_info *qinfo, re
 
 	get_resresv_spec(resresv, &spec, &pl);
 
+	if (using_svr_nodes && nodepart == NULL && sinfo->svr_node_array[resresv->svr_index]->unassoc_nodes != NULL) {
+		ninfo_arr = sinfo->svr_node_array[resresv->svr_index]->unassoc_nodes;
+		svr_index_used = resresv->svr_index;
+	}
+
 	err->status_code = NOT_RUN;
-	rc = eval_selspec(policy, spec, pl, ninfo_arr, nodepart, resresv,
-		flags, &nspec_arr, err);
+	rc = eval_selspec(policy, spec, pl, ninfo_arr, nodepart, resresv, flags, &nspec_arr, err);
 
 	/* We can run, yippie! */
 	if (rc > 0)
 		return nspec_arr;
+	else if (svr_index_used != -1) { /* Try "all" nodes, the owner doesn't have enough resources to run the job */
+		ninfo_arr = sinfo->unassoc_nodes;
+		rc = eval_selspec(policy, spec, pl, ninfo_arr, nodepart, resresv, flags, &nspec_arr, err);
+		if (rc > 0)
+			return nspec_arr;
+	}
 
 	/* We were not told why the resresv can't run: Use generic reason */
 	if (err->status_code == SCHD_UNKWN)

@@ -898,7 +898,7 @@ main(int argc, char *argv[])
 	time_t		     timenow;
 	struct attrl	    *pattr = NULL;
 	int		     con;
-	char		    *def_server;
+	char		    *def_server = NULL;
 	int		     errflg = 0;
 	char		    *errmsg;
 	int		     i;
@@ -927,12 +927,6 @@ main(int argc, char *argv[])
 		return 1;
 	}
 #endif
-
-	/* get default server, may be changed by -s option */
-
-	def_server = pbs_default();
-	if (def_server == NULL)
-		def_server = "";
 
 	if (argc == 1)
 		errflg = 1;
@@ -1080,7 +1074,15 @@ main(int argc, char *argv[])
 		exit(1);
 	}
 
-	setenv(MULTI_SERVER, "ENABLED", 1);
+	if (def_server == NULL) {
+		def_server = pbs_default();
+		if (def_server == NULL)
+			def_server = "";
+
+		/* User didn't specify a server, talk to all */
+		setenv(MULTI_SERVER, "ENABLED", 1);
+	}
+
 	if (CS_client_init() != CS_SUCCESS) {
 		fprintf(stderr, "pbsnodes: unable to initialize security library.\n");
 		exit(1);

@@ -46,6 +46,7 @@ fi
 INST_ID=
 NEW_PBS_CONF=
 NEW_SVR_PORT=
+WITH_MOM=$1
 
 set_new_inst_id() {
 	local _confdir=$(dirname ${PBS_CONF_FILE:-/etc/pbs.conf}) _last_id
@@ -79,7 +80,13 @@ create_new_inst() {
 		echo PBS_START_SCHED=0
 		echo PBS_START_COMM=0
 		echo PBS_START_SERVER=1
-		echo PBS_START_MOM=0
+		if [ ! -z $WITH_MOM ]; then
+			echo PBS_START_MOM=1
+			echo PBS_MOM_SERVICE_PORT=`expr $NEW_SVR_PORT + 10000`
+			echo PBS_MANAGER_SERVICE_PORT=`expr $NEW_SVR_PORT + 10001`
+	    else
+			echo PBS_START_MOM=0
+	    fi
 		echo PBS_BATCH_SERVICE_PORT=${NEW_SVR_PORT}
 		echo PBS_BATCH_SERVICE_PORT_DIS=${NEW_SVR_PORT}
 		echo PBS_DATA_SERVICE_PORT=$((NEW_SVR_PORT + 1))

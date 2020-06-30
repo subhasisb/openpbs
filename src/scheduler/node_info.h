@@ -70,6 +70,7 @@ free_node_info_chunk(th_data_free_ninfo *data);
  */
 void free_nodes(node_info **ninfo_arr);
 
+int group_nodes_by_svr(node_info **ninfo_arr, server_info *sinfo, int num_nodes);
 
 /*
  *      new_node_info - allocates a new node_info

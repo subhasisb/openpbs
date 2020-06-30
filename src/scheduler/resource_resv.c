@@ -196,6 +196,7 @@ new_resource_resv()
 	resresv->resresv_ind = -1;
 	resresv->run_event = NULL;
 	resresv->end_event = NULL;
+	resresv->svr_index = -1;
 
 	return resresv;
 }
@@ -702,6 +703,8 @@ dup_resource_resv(resource_resv *oresresv, server_info *nsinfo, queue_info *nqin
 		free_resource_resv(nresresv);
 		return NULL;
 	}
+
+	nresresv->svr_index = oresresv->svr_index;
 
 	return nresresv;
 }
@@ -1638,6 +1641,9 @@ update_resresv_on_run(resource_resv *resresv, nspec **nspec_arr)
 		resresv->start = resresv->server->server_time;
 		resresv->end = resresv->start + calc_time_left(resresv, 0);
 		resresv->job->accrue_type = JOB_RUNNING;
+
+		/* Job might have run on a different server, change it's owner */
+		resresv->svr_index = nspec_arr[0]->ninfo->svr_index;
 
 		if (resresv->aoename != NULL) {
 			for (i = 0; nspec_arr[i] != NULL; i++) {

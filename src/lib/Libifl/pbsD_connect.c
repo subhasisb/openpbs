@@ -61,6 +61,7 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <netinet/in.h>
+#include <pthread.h>
 #ifndef WIN32
 #include <netinet/tcp.h>
 #endif
@@ -74,6 +75,9 @@
 #include "pbs_internal.h"
 #include "log.h"
 #include "auth.h"
+#include "ifl_internal.h"
+
+extern pthread_key_t psi_key;
 
 /**
  * @brief
@@ -401,37 +405,78 @@ tcp_connect(char *server, int server_port, char *extend_data)
 
 /**
  * @brief
- * 	initialize_server_conns - To intialize the servers connection table.
+ * 	get_conn_servers - get the array of server connections
  *
- * @param[in] num_conf_servers 
+ * @param	void
  *
- * @return svr_conn_t **
- * @retval !NULL - success
- * @retval NULL - error
+ * @return	void
+ * @retval	!NULL - success
+ * @retval	NULL - error
+ *
+ * @par Side Effects:
+ *	None
+ *
+ * @par MT-safe: Yes
  */
-svr_conn_t ** 
-initialize_server_conns(int num_conf_servers)
+void *
+get_conn_servers(void)
 {
-	int i;
-	int j;
-	svr_conn_t **svr_connections = calloc(MAX_ALLOWED_SVRS, sizeof(svr_conn_t *));
+	svr_conn_t *conn_arr = NULL;
 
-	if (!svr_connections)
-		return NULL;
-		
-	for (i = 0; i < num_conf_servers; i++) {
-		svr_connections[i] = malloc(sizeof(svr_conn_t));
-		if (!svr_connections[i]) {
-			for (j = 0; j < i; j++ )
-				free(svr_connections[j]);
-			free(svr_connections);
+	conn_arr = pthread_getspecific(psi_key);
+	if (conn_arr == NULL && pbs_conf.psi != NULL) {
+		int num_svrs;
+		int i;
+
+		num_svrs = get_num_servers();
+		conn_arr = calloc(num_svrs, sizeof(svr_conn_t));
+		if (conn_arr == NULL) {
+			pbs_errno = PBSE_SYSTEM;
 			return NULL;
 		}
-		svr_connections[i]->sd = -1;
-		svr_connections[i]->state = SVR_CONN_STATE_DOWN;
+
+		for (i = 0; i < num_svrs; i++) {
+			strcpy(conn_arr[i].name, pbs_conf.psi[i].name);
+			conn_arr[i].port = pbs_conf.psi[i].port;
+			conn_arr[i].sd = -1;
+			conn_arr[i].secondary_sd = -1;
+			conn_arr[i].state = SVR_CONN_STATE_DOWN;
+		}
+
+		pthread_setspecific(psi_key, conn_arr);
 	}
-	
-	return svr_connections;
+
+	return conn_arr;
+}
+
+
+/**
+ * @brief	Helper function for connect_to_servers to connect to a particular server
+ *
+ * @param[in]		idx - array index for the server to connect to
+ * @param[in,out]	conn_arr - array of svr_conn_t
+ * @param[in]		extend_data - any additional data relevant for connection
+ *
+ * @return	int
+ * @retval	-1 for error
+ * @retval	fd of connection
+ */
+static int
+connect_to_server(int idx, svr_conn_t *conn_arr, char *extend_data)
+{
+	if (conn_arr[idx].state != SVR_CONN_STATE_CONNECTED) {
+		if ((conn_arr[idx].sd =
+				tcp_connect(conn_arr[idx].name, conn_arr[idx].port, extend_data)) != -1) {
+			conn_arr[idx].state = SVR_CONN_STATE_CONNECTED;
+			pbs_client_thread_lock_conntable();
+			add_connection(conn_arr[idx].sd);
+			pbs_client_thread_unlock_conntable();
+		}
+		else
+			conn_arr[idx].state = SVR_CONN_STATE_FAILED;
+	}
+
+	return conn_arr[idx].sd;
 }
 
 /**
@@ -439,7 +484,9 @@ initialize_server_conns(int num_conf_servers)
  * 	To connect to all the servers, fill up the connection table 
  * 	and returns the first connected socket.
  *
- * @param[in] extend_data 
+ * @param[in]	server_name - name of the server to connect to (NULL if not known)
+ * @param[in]	port - port of the server to connect to (considered if server_name is not NULL)
+ * @param[in]	extend_data
  *
  * @return int
  * @retval >0 - success
@@ -452,61 +499,42 @@ connect_to_servers(char *server_name, uint port, char *extend_data)
 	int fd = -1;
 	int start = -1;
 	int multi_flag = 0;
-	int num_conf_servers = get_current_servers();
+	int num_conf_servers = get_num_servers();
 
 	multi_flag = getenv(MULTI_SERVER) != NULL;
 
-	svr_conn_t **svr_connections = calloc(num_conf_servers, sizeof(svr_conn_t *));
-	if (!svr_connections)
+	svr_conn_t *svr_connections = get_conn_servers();
+
+	if (svr_connections == NULL)
 		return -1;
 
 	if (!multi_flag) {
 		if (server_name) {
-			for (i = 0; i < get_current_servers(); i++) {
-				if (!strcmp(server_name, pbs_conf.psi[i]->name) && port == pbs_conf.psi[i]->port) {
+			for (i = 0; i < num_conf_servers; i++) {
+				if (!strcmp(server_name, pbs_conf.psi[i].name) && port == pbs_conf.psi[i].port) {
 					start = i;
 					break;
 				}
 			}
 		}
 		if (start == -1)
-			start = rand_num() % get_current_servers();
+			start = rand_num() % num_conf_servers;
 	}
 	else
 		start = 0;
 
 	i = start;
 	do {
-		if (!svr_connections[i]) {
-			if (!(svr_connections[i] = malloc(sizeof(svr_conn_t))))
-				goto err;
-		}
-
-		if ((svr_connections[i]->sd = tcp_connect(pbs_conf.psi[i]->name, pbs_conf.psi[i]->port, extend_data)) != -1) {
-			svr_connections[i]->state = SVR_CONN_STATE_CONNECTED;
-			fd = svr_connections[i]->sd;
-			if (!multi_flag)
-				break;
-		} else
-			svr_connections[i]->state = SVR_CONN_STATE_FAILED;
+		fd = connect_to_server(i, svr_connections, extend_data);
+		if (svr_connections[i].state == SVR_CONN_STATE_CONNECTED && !multi_flag)
+			break;
 
 		i++;
 		if (i >= num_conf_servers)
 			i = 0;
 	} while (i != start);
 
-	if (set_conn_servers(fd, (void *)svr_connections))
-		return -1;
-
 	return fd;
-
-err:
-	/* free svr_connections array and return */
-	for (i = 0; i < num_conf_servers; i++)
-		free(svr_connections[i]);
-
-	free(svr_connections);
-	return -1;
 }
 
 /**
@@ -554,18 +582,16 @@ __pbs_connect_extend(char *server, char *extend_data)
 	if (pbs_loadconf(0) == 0)
 		return -1;
 
-	/* get server host and port	*/
-
 	server = PBS_get_server(server, server_name, &server_port);
-	if (server == NULL) {
-		pbs_errno = PBSE_NOSERVER;
-		return -1;
-	}
-		
+ 	if (server == NULL) {
+ 		pbs_errno = PBSE_NOSERVER;
+ 		return -1;
+ 	}
+
 	if ((sock = connect_to_servers(server_name, server_port, extend_data)) == -1) {
 		pbs_errno = PBSE_INTERNAL;
 		return -1;
-	}		
+	}
 	
 	/* Returning here  */
 	

@@ -69,6 +69,7 @@
 #include <pbs_ifl.h>
 #include <log.h>
 #include <libutil.h>
+#include <libpbs.h>
 
 #include "data_types.h"
 #include "resv_info.h"
@@ -1276,10 +1277,12 @@ confirm_reservation(status *policy, int pbs_sd, resource_resv *unconf_resv, serv
 	int occr_count = nresv->resv->count;
 	int ridx = nresv->resv->resv_idx - 1;
 
+	svr_conn_t *svr_conn = get_conn_servers();
+
 	logmsg[0] = logmsg2[0] = '\0';
 
 	err = new_schd_error();
-	if (err == NULL)
+	if (err == NULL || svr_conn == NULL)
 		return RESV_CONFIRM_FAIL;
 
 
@@ -1554,6 +1557,9 @@ confirm_reservation(status *policy, int pbs_sd, resource_resv *unconf_resv, serv
 			rconf = RESV_CONFIRM_FAIL;
 		}
 	}
+
+	if (nresv_parent->svr_index != -1)
+		pbs_sd = svr_conn[nresv_parent->svr_index].sd;
 
 	/* Finished simulating occurrences now time to confirm if ok. Currently
 	 * the confirmation is an all or nothing process but may come to change. */

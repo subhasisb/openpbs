@@ -119,16 +119,6 @@ extern char pbs_current_group[];
 #define SVR_CONN_STATE_CONNECTED 1
 #define SVR_CONN_STATE_FAILED -1
 
-typedef struct svr_conn {
-	int sd;                     /* File descriptor for the open socket */
-	int secondary_sd;           /* Secondary File descriptor for the open socket */
-	int state;                  /* Connection state */
-	time_t state_change_time;   /* Connnetion state change time */
-	time_t last_used_time;      /* Last used time for the connection */
-	char host_name[256];        /* hostname of the connection coming from */
-	char svr_id[MAX_SVR_ID];    /* svr_id of the form server_name:port */
-} svr_conn_t;
-
 typedef struct pbs_conn {
 	int ch_errno;		  /* last error on this connection */
 	char *ch_errtxt;	  /* pointer to last server error text	*/
@@ -145,12 +135,11 @@ int get_conn_errno(int);
 pbs_tcp_chan_t * get_conn_chan(int);
 int set_conn_chan(int, pbs_tcp_chan_t *);
 pthread_mutex_t * get_conn_mutex(int);
-int set_conn_servers(int, void*);
-void * get_conn_servers(int);
-extern svr_conn_t ** initialize_server_conns(int);
 extern int connect_to_servers(char *, uint, char *);
 /* max number of preempt orderings */
 #define PREEMPT_ORDER_MAX 20
+
+void * get_conn_servers(void);
 
 /* PBS Batch Reply Structure */
 
@@ -190,6 +179,8 @@ struct rq_preempt {
 };
 
 typedef struct rq_preempt brp_preempt_jobs;
+
+extern pthread_key_t psi_key;
 
 #define BATCH_REPLY_CHOICE_NULL		1	/* no reply choice, just code */
 #define BATCH_REPLY_CHOICE_Queue	2	/* Job ID, see brp_jid */
@@ -347,7 +338,8 @@ extern struct batch_reply *PBSD_rdrpy(int);
 extern struct batch_reply *PBSD_rdrpy_sock(int, int *);
 extern void PBSD_FreeReply(struct batch_reply *);
 extern struct batch_status *PBSD_status(int, int, char *, struct attrl *, char *);
-extern int random_srv_conn(svr_conn_t **);
+extern int random_srv_conn(svr_conn_t *);
+extern int get_available_conn(svr_conn_t *svr_connections);
 extern struct batch_status *PBSD_status_aggregate(int, int, char *, struct attrl *, char *, int);
 extern struct batch_status *PBSD_status_random(int, int, char *, struct attrl *, char *, int);
 extern preempt_job_info *PBSD_preempt_jobs(int, char **);

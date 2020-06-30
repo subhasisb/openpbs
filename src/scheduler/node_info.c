@@ -264,14 +264,127 @@ alloc_tdata_nd_query(struct batch_status *nodes, server_info *sinfo, int sidx, i
 }
 
 /**
+ * @brief	Group together nodes belonging to the same server
+ *
+ * @param[in]	ninfo_arr - array of node_info objects
+ * @param[in]	sinfo - server_info object
+ * @param[in]	num_nodes - number of total nodes
+ *
+ * @return int
+ * @retval 1 for Success
+ * @retval 0 for Failure
+ */
+int
+group_nodes_by_svr(node_info **ninfo_arr, server_info *sinfo, int num_nodes)
+{
+	int i;
+	int *nd_svr_map = NULL;
+	int *svr_num_nodes = NULL;
+	int numsvrs;
+	svr_node_info **new_arr = NULL;
+	svr_node_info *newsvn_info = NULL;
+	int *svr_node_count = NULL;
+
+	if (ninfo_arr == NULL)
+		return 0;
+
+	numsvrs = get_num_servers();
+
+	/* Count how many nodes for each server, and create a mapping for each */
+	nd_svr_map = malloc(sizeof(int) * num_nodes);
+	if (nd_svr_map == NULL)
+		goto memerr;
+	svr_num_nodes = calloc(numsvrs, sizeof(int));
+	if (svr_num_nodes == NULL)
+		goto memerr;
+	svr_node_count = calloc(numsvrs, sizeof(int));
+	if (svr_node_count == NULL)
+		goto memerr;
+
+	for (i = 0; ninfo_arr[i] != NULL; i++) {
+		int svrindex;
+		node_info *ninfo = ninfo_arr[i];
+
+		svrindex = ninfo->svr_index;
+		nd_svr_map[i] = svrindex;
+		svr_num_nodes[svrindex] += 1;
+	}
+
+	/* Now that we know the node count for each server, Allocate the svr_node_info list */
+	free_svr_node_info_array(sinfo->svr_node_array);
+	sinfo->svr_node_array = NULL;
+	new_arr = calloc((numsvrs + 1), sizeof(svr_node_info *));
+	if (new_arr == NULL)
+		goto memerr;
+	for (i = 0; i < numsvrs; i++) {
+		int num_nodes = svr_num_nodes[i];
+
+		if (num_nodes == 0) {
+			new_arr[i] = NULL;
+			continue;
+		}
+
+		newsvn_info = new_svr_node_info();
+		if (newsvn_info == NULL)
+			goto memerr;
+		newsvn_info->num_nodes = num_nodes;
+		newsvn_info->svr_idx = i;
+		newsvn_info->nodes = malloc(sizeof(node_info *) * (num_nodes + 1));
+		if (newsvn_info->nodes == NULL)
+			goto memerr;
+		newsvn_info->nodes[0] = NULL;
+		newsvn_info->svrname = pbs_conf.psi[i].name;
+		new_arr[i] = newsvn_info;
+	}
+	new_arr[i] = NULL;
+
+	/* Finally, go through the node svr map and fill out the nodes in each svr_node_info object */
+	for (i = 0; i < num_nodes; i++) {
+		int svridx = nd_svr_map[i];
+		int arridx = svr_node_count[svridx];
+
+		new_arr[svridx]->nodes[arridx] = ninfo_arr[i];
+		svr_node_count[svridx] += 1;
+	}
+	/* Set last element NULL for each server's node array */
+	for (i = 0; i < numsvrs; i++) {
+		int arridx = svr_node_count[i];
+
+		if (new_arr[i] != NULL) {
+			new_arr[i]->nodes[arridx] = NULL;
+			new_arr[i]->unassoc_nodes = new_arr[i]->nodes;
+		}
+	}
+
+	sinfo->svr_node_array = new_arr;
+
+	free(nd_svr_map);
+	free(svr_num_nodes);
+	free(svr_node_count);
+
+	return 1;
+
+memerr:
+	free_svr_node_info(newsvn_info);
+	free_svr_node_info_array(new_arr);
+	free(nd_svr_map);
+	free(svr_num_nodes);
+	free(svr_node_count);
+	log_err(errno, __func__, MEM_ERR_MSG);
+	return 0;
+
+}
+
+/**
  * @brief
  *      query_nodes - query all the nodes associated with a server
  *
  * @param[in]	pbs_sd	-	communication descriptor wit the pbs server
  * @param[in,out]	sinfo	-	server information
  *
- * @return	array of nodes associated with server
- *
+ * @return node_info **
+ * @retval newly allocated node info array
+ * @retval NULL for Error
  */
 node_info **
 query_nodes(int pbs_sd, server_info *sinfo)
@@ -335,7 +448,7 @@ query_nodes(int pbs_sd, server_info *sinfo)
 		}
 	}
 
-	/* get nodes from PBS server */
+	/* get nodes from all PBS servers */
 	if ((nodes = pbs_statvnode(pbs_sd, NULL, attrib, NULL)) == NULL) {
 		err = pbs_geterrmsg(pbs_sd);
 		log_eventf(PBSEVENT_SCHED, PBS_EVENTCLASS_NODE, LOG_INFO, "", "Error getting nodes: %s", err);
@@ -365,16 +478,18 @@ query_nodes(int pbs_sd, server_info *sinfo)
 
 		ninfo_arr[nidx] = NULL;
 	} else {
-		if ((ninfo_arr = (node_info **) malloc((num_nodes + 1) * sizeof(node_info *))) == NULL) {
+		int num_nodes_cpy = num_nodes;
+
+		if ((ninfo_arr = (node_info **) malloc((num_nodes_cpy + 1) * sizeof(node_info *))) == NULL) {
 			log_err(errno, __func__, MEM_ERR_MSG);
 			pbs_statfree(nodes);
 			return NULL;
 		}
 		ninfo_arr[0] = NULL;
-		chunk_size = num_nodes / num_threads;
+		chunk_size = num_nodes_cpy / num_threads;
 		chunk_size = (chunk_size > MT_CHUNK_SIZE_MIN) ? chunk_size : MT_CHUNK_SIZE_MIN;
-		for (j = 0, num_tasks = 0; num_nodes > 0;
-				j += chunk_size, num_tasks++, num_nodes -= chunk_size) {
+		for (j = 0, num_tasks = 0; num_nodes_cpy > 0;
+				j += chunk_size, num_tasks++, num_nodes_cpy -= chunk_size) {
 			tdata = alloc_tdata_nd_query(nodes, sinfo, j, j + chunk_size - 1);
 			if (tdata == NULL) {
 				th_err = 1;
@@ -453,9 +568,20 @@ query_nodes(int pbs_sd, server_info *sinfo)
 #ifdef NAS /* localmod 062 */
 	site_vnode_inherit(ninfo_arr);
 #endif /* localmod 062 */
+
 	resolve_indirect_resources(ninfo_arr);
+
+	/* Group together nodes belonging to each server */
+	if (group_nodes_by_svr(ninfo_arr, sinfo, num_nodes) == 0) {
+		pbs_statfree(nodes);
+		free_nodes(ninfo_arr);
+		return NULL;
+	}
+
 	sinfo->num_nodes = nidx;
+
 	pbs_statfree(nodes);
+
 	return ninfo_arr;
 }
 
@@ -498,6 +624,13 @@ query_node_info(struct batch_status *node, server_info *sinfo)
 		if (!strcmp(attrp->name, ATTR_NODE_state))
 			set_node_info_state(ninfo, attrp->value);
 
+		else if (!strcmp(attrp->name, ATTR_server)) {
+			ninfo->svr_index = get_svr_index(attrp->value);
+			if (ninfo->svr_index == -1) {
+				free_node_info(ninfo);
+				return NULL;
+			}
+		}
 		/* Host name */
 		else if (!strcmp(attrp->name, ATTR_NODE_Mom)) {
 			if (ninfo->mom)
@@ -519,14 +652,6 @@ query_node_info(struct batch_status *node, server_info *sinfo)
 		else if(!strcmp(attrp->name, ATTR_partition)) {
 			ninfo->partition = string_dup(attrp->value);
 			if (ninfo->partition == NULL) {
-				log_err(errno, __func__, MEM_ERR_MSG);
-				return NULL;
-			}
-		}
-
-		else if(!strcmp(attrp->name, ATTR_server)) {
-			ninfo->svr_name = string_dup(attrp->value);
-			if (ninfo->svr_name == NULL) {
 				log_err(errno, __func__, MEM_ERR_MSG);
 				return NULL;
 			}
@@ -777,7 +902,8 @@ new_node_info()
 #endif
 	new->partition = NULL;
 	new->np_arr = NULL;
-	new->svr_name = NULL;
+	new->svr_index = -1;
+
 	return new;
 }
 
@@ -965,9 +1091,6 @@ free_node_info(node_info *ninfo)
 
 		if (ninfo->partition != NULL)
 			free(ninfo->partition);
-
-		if (ninfo->svr_name != NULL)
-			free(ninfo->svr_name);
 
 		if (ninfo->np_arr != NULL)
 			free(ninfo->np_arr);
@@ -1680,7 +1803,6 @@ dup_node_info(node_info *onode, server_info *nsinfo,
 
 	nnode->server = nsinfo;
 	nnode->name = string_dup(onode->name);
-	nnode->svr_name = string_dup(onode->svr_name);
 	nnode->mom = string_dup(onode->mom);
 	nnode->queue_name = string_dup(onode->queue_name);
 
@@ -1775,6 +1897,8 @@ dup_node_info(node_info *onode, server_info *nsinfo,
 			return NULL;
 		}
 	}
+
+	nnode->svr_index = onode->svr_index;
 
 	return nnode;
 }

@@ -145,7 +145,7 @@ typedef struct th_data_free_ninfo th_data_free_ninfo;
 typedef struct th_data_dup_resresv th_data_dup_resresv;
 typedef struct th_data_query_jinfo th_data_query_jinfo;
 typedef struct th_data_free_resresv th_data_free_resresv;
-
+typedef struct svr_node_info svr_node_info;
 
 #ifdef NAS
 /* localmod 034 */
@@ -390,6 +390,19 @@ struct schedattrs
 	long server_dyn_res_alarm;
 };
 
+struct svr_node_info
+{
+	int svr_idx;
+	char *svrname;
+	int num_nodes;			/* number of nodes associated with the server */
+
+	node_info **nodes;		/* array of nodes associated with the server */
+	node_info **unassoc_nodes;	/* array of nodes not associated with queues */
+	char **nodesigs;		/* node signatures from server nodes */
+
+	node_info **unordered_nodes;
+};
+
 struct server_info
 {
 	unsigned has_soft_limit:1;	/* server has a soft user/grp limit set */
@@ -417,15 +430,13 @@ struct server_info
 	void *liminfo;			/* limit storage information */
 	int flt_lic;			/* number of free floating licences */
 	int num_queues;			/* number of queues that reside on the server */
-	int num_nodes;			/* number of nodes associated with the server */
 	int num_resvs;			/* number of reservations on the server */
 	int num_preempted;		/* number of jobs currently preempted */
 	char **node_group_key;		/* the node grouping resources */
 	state_count sc;			/* number of jobs in each state */
 	queue_info **queues;		/* array of queues */
 	queue_info ***queue_list;	/* 3 dimensional array, used to order jobs in round_robin */
-	node_info **nodes;		/* array of nodes associated with the server */
-	node_info **unassoc_nodes;	/* array of nodes not associated with queues */
+
 	resource_resv **resvs;		/* the reservations on the server */
 	resource_resv **running_jobs;	/* array of jobs which are in state R */
 	resource_resv **exiting_jobs;	/* array of jobs which are in state E */
@@ -456,12 +467,24 @@ struct server_info
 	counts *total_user_counts;
 	counts *total_alljobcounts;
 
+	resource_resv *qrun_job;	/* used if running a job via qrun request */
+	/* policy structure for the server.  This is an easy storage location for
+	 * the policy struct.  The policy struct will be passed around separately
+	 */
+	status *policy;
+	fairshare_head *fairshare;	/* root of fairshare tree */
+	resresv_set **equiv_classes;
+
+	node_partition *allpart;	/* node partition for all nodes */
+
+	int num_nodes;			/* number of nodes associated with the server */
+
+	node_info **nodes;		/* array of nodes associated with the server */
+	node_info **unassoc_nodes;	/* array of nodes not associated with queues */
 	node_partition **nodepart;	/* array pointers to node partitions */
 	int num_parts;			/* number of node partitions(node_group_key) */
-	node_partition *allpart;	/* node partition for all nodes */
 	int num_hostsets;		/* the size of hostsets */
 	node_partition **hostsets;	/* partitions for vnodes on a host */
-
 	char **nodesigs;		/* node signatures from server nodes */
 
 	/* cache of node partitions we created.  We cache them all here and
@@ -470,16 +493,10 @@ struct server_info
 	 * just a cache.  It will be regenerated when needed
 	 */
 	np_cache **npc_arr;
-
-	resource_resv *qrun_job;	/* used if running a job via qrun request */
-	/* policy structure for the server.  This is an easy storage location for
-	 * the policy struct.  The policy struct will be passed around separately
-	 */
-	status *policy;
-	fairshare_head *fairshare;	/* root of fairshare tree */
-	resresv_set **equiv_classes;
 	node_bucket **buckets;		/* node bucket array */
 	node_info **unordered_nodes;
+
+	struct svr_node_info **svr_node_array;	/* Array of server to node info */
 #ifdef NAS
 	/* localmod 034 */
 	share_head *share_head;	/* root of share info */
@@ -611,7 +628,6 @@ struct job_info
 	resource_req *resreq_rel;	/* list of resources released */
 	char *depend_job_str;		/* dependent jobs in a ':' separated string */
 	resource_resv **dependent_jobs; /* dependent jobs with runone depenency */
-	char *svr_name;
 
 #ifdef NAS
 	/* localmod 045 */
@@ -702,6 +718,7 @@ struct node_info
 	 * nodes do.  This means ninfo is not part of ninfo -> server -> nodes.
 	 */
 	server_info *server;
+	int svr_index;
 	char *queue_name;		/* the queue the node is associated with */
 
 	int num_jobs;			/* number of jobs running on the node */
@@ -738,7 +755,6 @@ struct node_info
 	node_partition *hostset;	/* other vnodes on on the same host */
 	node_scratch nscr;		/* scratch space local to node search code */
 	char *partition;		/* partition to which node belongs to */
-	char *svr_name;			/* svr_id which is of the form server_name:port */
 	time_t last_state_change_time;	/* Node state change at time stamp */
 	time_t last_used_time;		/* Node was last active at this time */
 	te_list *node_events;		/* list of run events that affect the node */
@@ -816,6 +832,7 @@ struct resource_resv
 	job_info *job;			/* pointer to job specific structure */
 	resv_info *resv;		/* pointer to reservation specific structure */
 
+	int svr_index;	/* Index of the server which owns the job */
 	char *aoename;			   /* store name of aoe if requested */
 	char *eoename;			   /* store name of eoe if requested */
 	char **node_set_str;		   /* user specified node string */

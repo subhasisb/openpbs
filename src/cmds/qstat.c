@@ -2732,10 +2732,10 @@ qstat -B [-f] [-F format] [-D delim] [ server_name... ]\n";
 	def_server = pbs_default();
 	if (def_server == NULL)
 		def_server = "";
+	setenv(MULTI_SERVER, "ENABLED", 1);
 	
 	/*perform needed security library initializations (including none)*/
 
-	setenv(MULTI_SERVER, "ENABLED", 1);
 	if (CS_client_init() != CS_SUCCESS)
 		exit_qstat("unable to initialize security library.");
 

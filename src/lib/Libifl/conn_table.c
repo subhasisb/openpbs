@@ -45,7 +45,6 @@ static pbs_conn_t **connection = NULL;
 static int curr_connection_sz = 0;
 static int allocated_connection = 0;
 
-static int add_connection(int);
 static pbs_conn_t * get_connection(int);
 static int destroy_conntable(void);
 static void _destroy_connection(int);
@@ -98,7 +97,7 @@ static void _destroy_connection(int);
  * @par MT-safe: No
  *
  */
-static int
+int
 add_connection(int fd)
 {
 	pthread_mutexattr_t attr = {{0}};
@@ -134,6 +133,7 @@ add_connection(int fd)
 		connection[fd]->ch_errtxt = NULL;
 		connection[fd]->ch_errno = 0;
 	}
+	allocated_connection++;
 	return 0;
 
 add_connection_err:
@@ -260,7 +260,6 @@ get_connection(int fd)
 	if ((fd >= curr_connection_sz) || (connection[fd] == NULL)) {
 		if (add_connection(fd) != 0)
 			return NULL;
-		allocated_connection++;
 	}
 	return connection[fd];
 }
@@ -521,76 +520,4 @@ get_conn_mutex(int fd)
 	mutex = &(p->ch_mutex);
 	UNLOCK_TABLE(NULL);
 	return mutex;
-}
-
-/**
- * @brief
- * 	set_conn_servers - set connection ch_servers synchronously
- *
- * @param[in] fd - socket number
- * @param[in] servers - tcp chan to set on connection
- *
- * @return int
- * @retval 0 - success
- * @retval -1 - error
- *
- * @par Side Effects:
- *	None
- *
- * @par MT-safe: Yes
- */
-int
-set_conn_servers(int fd, void *servers)
-{
-	pbs_conn_t *p = NULL;
-
-	if (INVALID_SOCK(fd))
-		return -1;
-
-	LOCK_TABLE(-1);
-	p = get_connection(fd);
-	if (p == NULL) {
-		errno = ENOTCONN;
-		UNLOCK_TABLE(-1);
-		return -1;
-	}
-	p->ch_servers = servers;
-	UNLOCK_TABLE(-1);
-	return 0;
-}
-
-/**
- * @brief
- * 	get_conn_servers - get connection ch_servers synchronously
- *
- * @param[in] fd - socket number
- *
- * @return void 
- * @retval !NULL - success
- * @retval NULL - error
- *
- * @par Side Effects:
- *	None
- *
- * @par MT-safe: Yes
- */
-void *
-get_conn_servers(int fd)
-{
-	pbs_conn_t *p = NULL;
-	void *servers = NULL;
-
-	if (INVALID_SOCK(fd))
-		return NULL;
-
-	LOCK_TABLE(NULL);
-	p = get_connection(fd);
-	if (p == NULL) {
-		errno = ENOTCONN;
-		UNLOCK_TABLE(NULL);
-		return NULL;
-	}
-	servers = p->ch_servers;
-	UNLOCK_TABLE(NULL);
-	return servers;
 }

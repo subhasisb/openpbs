@@ -261,7 +261,8 @@ free_node_bucket(node_bucket *nb) {
 
 /* node bucket array destructor */
 void
-free_node_bucket_array(node_bucket **buckets) {
+free_node_bucket_array(node_bucket **buckets)
+{
 	int i;
 
 	if (buckets == NULL)
@@ -873,7 +874,9 @@ bucket_to_nspecs(status *policy, chunk_map **cb_map, resource_resv *resresv)
  * @retval 1 if the job should use the bucket algorithm
  * @retval 0 if not
  */
-int job_should_use_buckets(resource_resv *resresv) {
+int
+job_should_use_buckets(resource_resv *resresv)
+{
 
 	if (resresv == NULL)
 		return 0;

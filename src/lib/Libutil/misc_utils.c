@@ -2202,13 +2202,50 @@ get_msvr_mode(void)
 
 /**
  * @brief
- *	get_current_servers - Getter function to get number of servers configured in PBS complex.
+ *	get_num_servers - Getter function to get number of servers configured in PBS complex.
  *
  */
 int
-get_current_servers()
+get_num_servers()
 {
-	return pbs_conf.pbs_current_servers;
+	return pbs_conf.pbs_num_servers;
+}
+
+/**
+ * @brief	Get the server name and port number from svrname:port string
+ *
+ * @param[in]	svr_id - id in the format server_name:port
+ * @param[out]	svrname - buffer to store server name
+ * @param[out]	svrport - buffer to store port number
+ *
+ * @return	int
+ * @retval	0 for success
+ * @retval	1 for error
+ */
+int
+parse_pbs_name_port(char *svr_id, char *svrname, int *svrport)
+{
+	char *ptr = NULL;
+	char *endptr;
+	long port = PBS_BATCH_SERVICE_PORT;
+
+	if (svr_id == NULL || svrname == NULL || svrport == NULL)
+		return 1;
+
+	ptr = strchr(svr_id, ':');
+	if (ptr != NULL) {
+		*ptr = '\0';
+		port = strtol(ptr + 1, &endptr, 10);
+		if (*endptr != '\0')
+			return 1;
+	}
+	*svrport = (int) port;
+	snprintf(svrname, PBS_MAXHOSTNAME, "%s", svr_id);
+
+	if (ptr != NULL)
+		*ptr = ':';
+
+	return 0;
 }
 
 /**

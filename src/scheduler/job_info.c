@@ -102,6 +102,7 @@
 #include <pbs_ifl.h>
 #include <log.h>
 #include <libutil.h>
+#include <libpbs.h>
 #include <pbs_share.h>
 #include <pbs_internal.h>
 #include <pbs_error.h>
@@ -1216,6 +1217,13 @@ query_job(struct batch_status *job, server_info *sinfo, schd_error *err)
 			resresv->job->NAS_pri = resresv->job->priority;
 #endif /* localmod 045 */
 		}
+		else if (!strcmp(attrp->name, ATTR_server)) {
+			resresv->svr_index = get_svr_index(attrp->value);
+			if (resresv->svr_index == -1) {
+				free_resource_resv(resresv);
+				return NULL;
+			}
+		}
 		else if (!strcmp(attrp->name, ATTR_qtime)) { /* queue time */
 			count = strtol(attrp->value, &endp, 10);
 			if (*endp == '\0')
@@ -1246,9 +1254,6 @@ query_job(struct batch_status *job, server_info *sinfo, schd_error *err)
 		}
 		else if (!strcmp(attrp->name, ATTR_N))		/* job name (qsub -N) */
 			resresv->job->job_name = string_dup(attrp->value);
-
-		else if (!strcmp(attrp->name, ATTR_server))
-			resresv->job->svr_name = string_dup(attrp->value);
 
 		else if (!strcmp(attrp->name, ATTR_state)) { /* state of job */
 			if (set_job_state(attrp->value, resresv->job) == 0) {
@@ -1483,9 +1488,6 @@ new_job_info()
 	jinfo->resreq_rel = NULL;
 	jinfo->depend_job_str = NULL;
 	jinfo->dependent_jobs = NULL;
-	jinfo->svr_name = NULL;
-
-
 	jinfo->formula_value = 0.0;
 
 #ifdef RESC_SPEC
@@ -1546,9 +1548,6 @@ free_job_info(job_info *jinfo)
 
 	if (jinfo->dependent_jobs != NULL)
 		free(jinfo->dependent_jobs);
-
-	if (jinfo->svr_name != NULL)
-		free(jinfo->svr_name);
 
 	free_resource_req_list(jinfo->resused);
 
@@ -1772,7 +1771,7 @@ update_job_attr(int pbs_sd, resource_resv *resresv, char *attr_name,
 
 	if (pattr != NULL && (flags & UPDATE_NOW)) {
 		int rc;
-		rc = send_attr_updates(pbs_sd, resresv->name, pattr);
+		rc = send_attr_updates(pbs_sd, resresv, pattr);
 		free_attrl_list(pattr);
 		return rc;
 	}
@@ -1789,14 +1788,15 @@ update_job_attr(int pbs_sd, resource_resv *resresv, char *attr_name,
  *      call is so that the job's attr_updates list gets free'd and NULL'd.
  *      We don't want to send the attr updates multiple times
  *
- * @param[in]	pbs_sd	-	server connection descriptor
+ * @param[in]	pbs_sd	-	the connection descriptor to the server
  * @param[in]	job	-	job to send attributes to
  *
  * @return	int(ret val from send_attr_updates)
  * @retval	1	- success
  * @retval	0	- failure to update
  */
-int send_job_updates(int pbs_sd, resource_resv *job)
+int
+send_job_updates(int pbs_sd, resource_resv *job)
 {
 	int rc;
 	struct attrl *iter_attr = NULL;
@@ -1816,7 +1816,7 @@ int send_job_updates(int pbs_sd, resource_resv *job)
 			return 0;
 	}
 
-	rc = send_attr_updates(pbs_sd, job->name, job->job->attr_updates);
+	rc = send_attr_updates(pbs_sd, job, job->job->attr_updates);
 
 	free_attrl_list(job->job->attr_updates);
 	job->job->attr_updates = NULL;
@@ -1837,12 +1837,14 @@ int send_job_updates(int pbs_sd, resource_resv *job)
  * @retval	0	failure to update
  */
 int
-send_attr_updates(int pbs_sd, char *job_name, struct attrl *pattr)
+send_attr_updates(int pbs_sd, resource_resv *job, struct attrl *pattr)
 {
 	char *errbuf;
 	int one_attr = 0;
+	char *job_name;
+	svr_conn_t *svr_conn = get_conn_servers();
 
-	if (job_name == NULL || pattr == NULL)
+	if (job == NULL || pattr == NULL || svr_conn == NULL)
 		return 0;
 
 	if (pbs_sd == SIMULATE_SD)
@@ -1851,6 +1853,9 @@ send_attr_updates(int pbs_sd, char *job_name, struct attrl *pattr)
 	if (pattr->next == NULL)
 		one_attr = 1;
 
+	job_name = job->name;
+
+	pbs_sd = svr_conn[job->svr_index].sd;
 	if (pbs_asyalterjob(pbs_sd, job_name, pattr, NULL) == 0) {
 		last_attr_updates = time(NULL);
 		return 1;
@@ -2861,8 +2866,6 @@ dup_job_info(job_info *ojinfo, queue_info *nqinfo, server_info *nsinfo)
 
 	njinfo->depend_job_str = string_dup(njinfo->depend_job_str);
 
-	njinfo->svr_name = string_dup(ojinfo->svr_name);
-
 #ifdef RESC_SPEC
 	njinfo->rspec = dup_rescspec(ojinfo->rspec);
 #endif
@@ -3379,6 +3382,7 @@ find_jobs_to_preempt(status *policy, resource_resv *hjob, server_info *sinfo, in
 			}
 		}
 	}
+
 
 	/* use locally dup'd copy of sinfo so we don't modify the original */
 	if ((nsinfo = dup_server_info(sinfo)) == NULL) {

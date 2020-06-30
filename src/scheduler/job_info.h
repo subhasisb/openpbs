@@ -90,7 +90,7 @@ update_job_attr(int pbs_sd, resource_resv *resresv, char *attr_name,
 int send_job_updates(int pbs_sd, resource_resv *job);
 
 /* send delayed attributes to the server for a job */
-int send_attr_updates(int pbs_sd, char *job_name, struct attrl *pattr);
+int send_attr_updates(int pbs_sd, resource_resv *job, struct attrl *pattr);
 
 
 /*

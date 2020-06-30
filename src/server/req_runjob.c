@@ -288,13 +288,13 @@ call_to_process_hooks(struct batch_request *preq, char *hook_msg, size_t msg_len
 int
 need_to_run_elsewhere(struct batch_request *preq)
 {
-	char destination[PBS_MAX_SRV_INSTANCE + 1];
+	char destination[MAX_SVR_ID + 1];
 	char *pc;
 
 	if (!preq->rq_extend)
 		return FALSE;
 
-	strncpy(destination, preq->rq_extend, PBS_MAX_SRV_INSTANCE);
+	strncpy(destination, preq->rq_extend, sizeof(destination));
 	if ((pc = strchr(destination, ':')) != NULL)
 		*pc = '\0';
 	if (strcmp(destination, pbs_conf.pbs_server_name))

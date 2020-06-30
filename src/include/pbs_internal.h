@@ -195,11 +195,11 @@ extern "C" {
 #define MAX_ALLOWED_SVRS 100
 
 /* Structure to store each server instance details */
-struct pbs_server_instance 
+typedef struct pbs_server_instance
 {
-	char *name;
+	char name[PBS_MAXHOSTNAME];
 	int port;
-};
+} pbs_server_instance;
 
 struct pbs_config
 {
@@ -227,8 +227,8 @@ struct pbs_config
 	char *pbs_exec_path;			/* path to the pbs exec dir */
 	char *pbs_server_name;		/* name of PBS Server, usually hostname of host on which PBS server is executing */
 	char *pbs_server_id;                  /* name of the database PBS server id associated with the server hostname, pbs_server_name */
-	unsigned int pbs_current_servers;	/* currently configured number of instances */
-	struct  pbs_server_instance **psi;	/* list of pbs server instances loaded from comma separated host:port[,host:port] */
+	unsigned int pbs_num_servers;	/* currently configured number of instances */
+	pbs_server_instance *psi;	/* array of pbs server instances loaded from comma separated host:port[,host:port] */
 	char *scp_path;			/* path to ssh */
 	char *rcp_path;			/* path to pbs_rsh */
 	char *pbs_demux_path;			/* path to pbs demux */
@@ -389,9 +389,6 @@ enum accrue_types {
 
 /* this is the PBS defult jobscript_max_size default value is 100MB*/
 #define DFLT_JOBSCRIPT_MAX_SIZE "100mb"
-
-/* svr_id is of the form sever_name:port. 4 is the lengh of the port, 1 for NULL char */
-#define MAX_SVR_ID (PBS_MAXSERVERNAME + 5)
 
 /* internal attributes */
 #define ATTR_prov_vnode	"prov_vnode"	/* job attribute */
@@ -572,7 +569,6 @@ extern char *convert_time(char *);
 extern struct batch_status *bs_isort(struct batch_status *bs,
 	int (*cmp_func)(struct batch_status*, struct batch_status *));
 extern struct batch_status *bs_find(struct batch_status *, const char *);
-
 
 #endif /* _USRDLL */
 

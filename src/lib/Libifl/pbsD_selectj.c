@@ -58,9 +58,6 @@
 #include "dis.h"
 #include "pbs_ecl.h"
 
-
-extern int random_srv_conn(svr_conn_t **);
-
 static int PBSD_select_put(int, int, struct attropl *, struct attrl *, char *);
 
 struct job_list {
@@ -176,10 +173,10 @@ __pbs_selectjob(int c, struct attropl *attrib, char *extend)
 {
 	char **ret = NULL;
 	int i;
-	svr_conn_t **svr_connections;
+	svr_conn_t *svr_connections;
 	struct job_list jlist = {0};
 
-	if ((svr_connections = get_conn_servers(c)) == NULL)
+	if ((svr_connections = get_conn_servers()) == NULL)
 		return NULL;
 
 	/* initialize the thread context data, if not already initialized */
@@ -191,12 +188,11 @@ __pbs_selectjob(int c, struct attropl *attrib, char *extend)
 		MGR_CMD_NONE, attrib))
 		return NULL;
 
-	for (i = 0; i < get_current_servers(); i++) {
-
-		if ((svr_connections[i] == NULL) || svr_connections[i]->state != SVR_CONN_STATE_CONNECTED)
+	for (i = 0; i < get_num_servers(); i++) {
+		if (svr_connections[i].state != SVR_CONN_STATE_CONNECTED)
 			continue;
 
-		c = svr_connections[i]->sd;
+		c = svr_connections[i].sd;
 
 		/* lock pthread mutex here for this connection */
 		/* blocking call, waits for mutex release */
@@ -243,7 +239,7 @@ __pbs_selstat(int c, struct attropl *attrib, struct attrl *rattrib, char *extend
 	struct batch_status *ret = NULL;
 	struct batch_status *next = NULL;
 	struct batch_status *cur = NULL;
-	svr_conn_t **svr_connections = get_conn_servers(c);
+	svr_conn_t *svr_connections = get_conn_servers();
 
 	if (!svr_connections)
 		return NULL;
@@ -257,12 +253,12 @@ __pbs_selstat(int c, struct attropl *attrib, struct attrl *rattrib, char *extend
 	    PBS_BATCH_SelectJobs, MGR_OBJ_JOB, MGR_CMD_NONE, attrib))
 		return NULL;
 
-	for (i = 0; i < get_current_servers(); i++) {
+	for (i = 0; i < get_num_servers(); i++) {
 
-		if ((svr_connections[i] == NULL) || svr_connections[i]->state != SVR_CONN_STATE_CONNECTED)
+		if (svr_connections[i].state != SVR_CONN_STATE_CONNECTED)
 			continue;
 
-		c = svr_connections[i]->sd;
+		c = svr_connections[i].sd;
 
 		/* lock pthread mutex here for this connection */
 		/* blocking call, waits for mutex release */

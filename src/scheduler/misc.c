@@ -106,6 +106,7 @@
 #include "fairshare.h"
 #include "resource_resv.h"
 #include "resource.h"
+#include "libpbs.h"
 
 
 /**
@@ -1645,8 +1646,8 @@ get_svr_index(char *svrname)
 	int i;
 	int svrindex = -1;
 
-	for (i = 0; i < pbs_conf.pbs_current_servers; i++) {
-		if (strcmp(pbs_conf.psi[i]->name, svrname) == 0) {
+	for (i = 0; i < get_num_servers(); i++) {
+		if (strcmp(pbs_conf.psi[i].name, svrname) == 0) {
 			svrindex = i;
 			break;
 		}

@@ -47,6 +47,8 @@ extern "C" {
 
 #include "pbs_ifl.h"
 
+int add_connection(int);
+
 extern int __pbs_asyrunjob(int, char *, char *, char *);
 
 extern int __pbs_asyrunjob_ack(int c, char *jobid, char *location, char *extend);

@@ -245,7 +245,7 @@ query_server(status *pol, int pbs_sd)
 	 */
 	bs_resvs = stat_resvs(pbs_sd);
 
-	/* get the nodes, if any - NOTE: will set sinfo -> num_nodes */
+	/* query the nodes */
 	if ((sinfo->nodes = query_nodes(pbs_sd, sinfo)) == NULL) {
 		pbs_statfree(server);
 		sinfo->fairshare = NULL;
@@ -268,10 +268,20 @@ query_server(status *pol, int pbs_sd)
 		return NULL;
 	}
 
-	if (sinfo->has_nodes_assoc_queue)
-		sinfo->unassoc_nodes =
-			node_filter(sinfo->nodes, sinfo->num_nodes, is_unassoc_node, NULL, 0);
-	else
+	if (sinfo->has_nodes_assoc_queue) {
+		int i;
+
+		for (i = 0; i < get_num_servers(); i++) {
+			svr_node_info *svr_node_obj = sinfo->svr_node_array[i];
+
+			if (svr_node_obj != NULL) {
+				svr_node_obj->unassoc_nodes =
+						node_filter(svr_node_obj->nodes, svr_node_obj->num_nodes, is_unassoc_node, NULL, 0);
+			}
+		}
+
+		sinfo->unassoc_nodes = node_filter(sinfo->nodes, sinfo->num_nodes, is_unassoc_node, NULL, 0);
+	} else
 		sinfo->unassoc_nodes = sinfo->nodes;
 
 	/* count the queues and total up the individual queue states
@@ -412,7 +422,7 @@ query_server(status *pol, int pbs_sd)
 
 	collect_resvs_on_nodes(sinfo->nodes, sinfo->resvs, sinfo->num_resvs);
 
-	sinfo->unordered_nodes = malloc((sinfo->num_nodes+1) * sizeof(node_info*));
+	sinfo->unordered_nodes = malloc((sinfo->num_nodes + 1) * sizeof(node_info*));
 	if(sinfo->unordered_nodes == NULL) {
 		sinfo->fairshare = NULL;
 		free_server(sinfo);
@@ -981,11 +991,6 @@ free_server_info(server_info *sinfo)
 		free(sinfo->running_jobs);
 	if (sinfo->exiting_jobs != NULL)
 		free(sinfo->exiting_jobs);
-	/* if we don't have nodes associated with queues, this is a reference */
-	if (sinfo->has_nodes_assoc_queue == 0)
-		sinfo->unassoc_nodes = NULL;
-	else if (sinfo->unassoc_nodes != NULL)
-		free(sinfo->unassoc_nodes);
 	if (sinfo->alljobcounts != NULL)
 		free_counts_list(sinfo->alljobcounts);
 	if (sinfo->group_counts != NULL)
@@ -1002,16 +1007,6 @@ free_server_info(server_info *sinfo)
 		free_counts_list(sinfo->total_project_counts);
 	if (sinfo->total_user_counts != NULL)
 		free_counts_list(sinfo->total_user_counts);
-	if (sinfo->nodepart != NULL)
-		free_node_partition_array(sinfo->nodepart);
-	if (sinfo->allpart)
-		free_node_partition(sinfo->allpart);
-	if (sinfo->hostsets != NULL)
-		free_node_partition_array(sinfo->hostsets);
-	if (sinfo->nodesigs)
-		free_string_array(sinfo->nodesigs);
-	if (sinfo->npc_arr != NULL)
-		free_np_cache_array(sinfo->npc_arr);
 	if (sinfo->node_group_key != NULL)
 		free_string_array(sinfo->node_group_key);
 	if (sinfo->calendar != NULL)
@@ -1028,14 +1023,28 @@ free_server_info(server_info *sinfo)
 		free_queue_list(sinfo->queue_list);
 	if(sinfo->equiv_classes != NULL)
 		free_resresv_set_array(sinfo->equiv_classes);
-	if(sinfo->buckets != NULL)
-		free_node_bucket_array(sinfo->buckets);
 
-	if(sinfo->unordered_nodes != NULL)
-		free(sinfo->unordered_nodes);
+	free_node_partition(sinfo->allpart);
 
 	free_resource_list(sinfo->res);
 	free(sinfo->job_sort_formula);
+
+	/* if we don't have nodes associated with queues, this is a reference */
+	if (sinfo->has_nodes_assoc_queue == 0)
+		sinfo->unassoc_nodes = NULL;
+	else if (sinfo->unassoc_nodes != NULL)
+		free(sinfo->unassoc_nodes);
+
+	free_node_partition_array(sinfo->nodepart);
+	free_node_partition_array(sinfo->hostsets);
+
+	free_string_array(sinfo->nodesigs);
+	free_np_cache_array(sinfo->npc_arr);
+	free_node_bucket_array(sinfo->buckets);
+
+	free(sinfo->unordered_nodes);
+	free_svr_node_info_array(sinfo->svr_node_array);
+	sinfo->svr_node_array = NULL;
 
 #ifdef NAS
 	/* localmod 034 */
@@ -1152,8 +1161,6 @@ new_server_info(int limallocflag)
 	sinfo->calendar = NULL;
 	sinfo->running_jobs = NULL;
 	sinfo->exiting_jobs = NULL;
-	sinfo->nodes = NULL;
-	sinfo->unassoc_nodes = NULL;
 	sinfo->resvs = NULL;
 	sinfo->alljobcounts = NULL;
 	sinfo->group_counts = NULL;
@@ -1163,25 +1170,28 @@ new_server_info(int limallocflag)
 	sinfo->total_group_counts = NULL;
 	sinfo->total_project_counts = NULL;
 	sinfo->total_user_counts = NULL;
-	sinfo->nodepart = NULL;
-	sinfo->allpart = NULL;
-	sinfo->hostsets = NULL;
-	sinfo->nodesigs = NULL;
 	sinfo->node_group_key = NULL;
-	sinfo->npc_arr = NULL;
 	sinfo->qrun_job = NULL;
 	sinfo->policy = NULL;
 	sinfo->fairshare = NULL;
 	sinfo->equiv_classes = NULL;
-	sinfo->buckets = NULL;
-	sinfo->unordered_nodes = NULL;
 	sinfo->num_queues = 0;
-	sinfo->num_nodes = 0;
 	sinfo->num_resvs = 0;
-	sinfo->num_hostsets = 0;
 	sinfo->flt_lic = 0;
 	sinfo->server_time = 0;
 	sinfo->job_sort_formula = NULL;
+	sinfo->svr_node_array = NULL;
+	sinfo->allpart = NULL;
+	sinfo->nodes = NULL;
+	sinfo->unassoc_nodes = NULL;
+	sinfo->nodepart = NULL;
+	sinfo->hostsets = NULL;
+	sinfo->nodesigs = NULL;
+	sinfo->npc_arr = NULL;
+	sinfo->buckets = NULL;
+	sinfo->unordered_nodes = NULL;
+	sinfo->num_nodes = 0;
+	sinfo->num_hostsets = 0;
 
 	if ((limallocflag != 0))
 		sinfo->liminfo = lim_alloc_liminfo();
@@ -1665,6 +1675,20 @@ update_server_on_run(status *policy, server_info *sinfo,
 					num_unassoc = count_array((void **) sinfo->unassoc_nodes);
 					qsort(sinfo->unassoc_nodes, num_unassoc, sizeof(node_info *),
 						multi_node_sort);
+				}
+
+				/* Also sort the node list of owning server */
+				if (get_num_servers() > 1) {
+					svr_node_info *svr_nd_info = sinfo->svr_node_array[resresv->svr_index];
+
+					qsort(svr_nd_info->nodes, svr_nd_info->num_nodes, sizeof(node_info *),
+						multi_node_sort);
+
+					if (svr_nd_info->nodes != svr_nd_info->unassoc_nodes) {
+						num_unassoc = count_array((void **) svr_nd_info->unassoc_nodes);
+						qsort(svr_nd_info->unassoc_nodes, num_unassoc, sizeof(node_info *),
+							multi_node_sort);
+					}
 				}
 			}
 		}
@@ -2310,6 +2334,11 @@ dup_server_info(server_info *osinfo)
 			free_server_info(nsinfo);
 			return NULL;
 		}
+	}
+
+	if (group_nodes_by_svr(nsinfo->nodes, nsinfo, nsinfo->num_nodes) == 0) {
+		free_server_info(nsinfo);
+		return NULL;
 	}
 
 	return nsinfo;
@@ -3982,4 +4011,77 @@ add_ptr_to_array(void *ptr_arr, void *ptr)
 		arr[cnt] = NULL;
 	}
 	return arr;
+}
+
+/**
+ * @brief	Constructor of svr_node_info
+ *
+ * @param	void
+ *
+ * @return svr_node_info *
+ * @retval a newly allocated svr_node_info object
+ * @retval NULL for malloc error
+ *
+ */
+svr_node_info *
+new_svr_node_info(void)
+{
+	svr_node_info *new_obj = NULL;
+
+	new_obj = malloc(sizeof(svr_node_info));
+	if (new_obj == NULL) {
+		log_err(errno, __func__, MEM_ERR_MSG);
+		return NULL;
+	}
+
+	new_obj->nodes = NULL;
+	new_obj->unassoc_nodes = NULL;
+	new_obj->nodesigs = NULL;
+	new_obj->unordered_nodes = NULL;
+	new_obj->num_nodes = 0;
+
+	return new_obj;
+}
+
+/**
+ * @brief	Destructor of svr_node_info
+ *
+ * @param[out]	obj - the object to deallocate
+ *
+ * @return 	void
+ */
+void
+free_svr_node_info(svr_node_info *obj)
+{
+	if (obj == NULL)
+		return;
+
+	free(obj->unassoc_nodes);
+
+	free_string_array(obj->nodesigs);
+
+	free(obj->unordered_nodes);
+	free(obj);
+}
+
+/**
+ * @brief	Deallocate a svr_node_info* array
+ *
+ * @param[out]	arr - the array to deallocate
+ *
+ * @return	void
+ */
+void
+free_svr_node_info_array(svr_node_info **arr)
+{
+	int i;
+
+	if (arr == NULL)
+		return;
+
+	for (i = 0; arr[i] != NULL; i++) {
+		free_svr_node_info(arr[i]);
+	}
+
+	free(arr);
 }

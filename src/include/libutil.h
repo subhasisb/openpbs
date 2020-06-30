@@ -350,11 +350,11 @@ void encode_SHA(char*, size_t, char **);
 #endif
 #endif
 
-int get_max_servers(void);
-
 /**
  * Getter function to get the number of currently configured servers.
  */
-extern int get_current_servers();
+extern int get_num_servers();
+
+extern int parse_pbs_name_port(char *svr_id, char *svrname, int *svrport);
 
 extern int rand_num();

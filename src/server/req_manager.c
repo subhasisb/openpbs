@@ -116,6 +116,7 @@ extern pbs_sched *sched_alloc(char *sched_name);
 extern void sched_free(pbs_sched *psched);
 extern int sched_delete(pbs_sched *psched);
 
+extern char *pbs_server_name;
 extern struct server server;
 extern pbs_list_head     svr_queues;
 extern attribute_def que_attr_def[];

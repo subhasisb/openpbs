@@ -474,6 +474,14 @@ node_info **dup_unordered_nodes(node_info **old_unordered_nodes, node_info **nno
 
 void *add_ptr_to_array(void *ptr_arr, void *ptr);
 
+svr_node_info *new_svr_node_info(void);
+svr_node_info **dup_svr_node_info_array(svr_node_info **old_arr, server_info *sinfo);
+svr_node_info *dup_svr_node_info(svr_node_info *old_obj, server_info *sinfo);
+
+void free_svr_node_info(svr_node_info *obj);
+
+void free_svr_node_info_array(svr_node_info **arr);
+
 #ifdef	__cplusplus
 }
 #endif

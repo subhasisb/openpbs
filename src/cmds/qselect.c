@@ -552,12 +552,13 @@ main(int argc, char **argv, char **envp) /* qselect */
 		if (parse_destination_id(destination, &queue_name_out, &server_name_out)) {
 			fprintf(stderr, "qselect: illegally formed destination: %s\n", destination);
 			exit(2);
-		} else {
-			if (notNULL(server_name_out)) {
-				strncpy(server_out, server_name_out, sizeof(server_out));
-				server_out[sizeof(server_out) - 1] = '\0';
-			}
 		}
+
+		if (notNULL(server_name_out)) {
+			strncpy(server_out, server_name_out, sizeof(server_out));
+			server_out[sizeof(server_out) - 1] = '\0';
+		} else	/* User didn't specify a server, talk to all */
+			setenv(MULTI_SERVER, "ENABLED", 1);
 	}
 
 	/*perform needed security library initializations (including none)*/
@@ -566,7 +567,6 @@ main(int argc, char **argv, char **envp) /* qselect */
 		exit(2);
 	}
 
-	setenv(MULTI_SERVER, "ENABLED", 1);
 	connect = cnt2server(server_out);
 	if (connect <= 0) {
 		fprintf(stderr, "qselect: cannot connect to server %s (errno=%d)\n",
