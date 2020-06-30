@@ -282,6 +282,40 @@ call_to_process_hooks(struct batch_request *preq, char *hook_msg, size_t msg_len
 	return rc;
 }
 
+int
+need_to_run_elsewhere(struct batch_request *preq)
+{
+	char destination[PBS_MAXSERVERNAME + 1];
+	char *pc;
+
+	if (!preq->rq_extend)
+		return FALSE;
+
+	strncpy(destination, preq->rq_extend, PBS_MAXSERVERNAME);
+	if ((pc = strchr(destination, ':')) != NULL)
+		*pc = '\0';
+	if (strcmp(destination, pbs_conf.pbs_server_name))
+		return TRUE;
+
+	return FALSE;
+}
+
+void
+move_and_runjob(struct batch_request *preq, job *pjob)
+{
+	char dest[PBS_MAXHOSTNAME + 1];
+
+	strcpy(dest, preq->rq_ind.rq_run.rq_destin);
+	free(preq->rq_ind.rq_run.rq_destin);
+	preq->rq_type = PBS_BATCH_MoveJob;
+	strcpy(preq->rq_ind.rq_move.rq_jid, pjob->ji_qs.ji_jobid);
+	sprintf(preq->rq_ind.rq_move.rq_destin, "%s@%s", pjob->ji_qs.ji_queue, preq->rq_extend);
+	preq->rq_ind.rq_move.run_job = 1;
+	strcpy(preq->rq_ind.rq_move.run_job_dest, dest);
+
+	req_movejob(preq);
+}
+
 /**
  * @brief
  * 		req_runjob - service the Run Job and Asyc Run Job Requests
@@ -324,6 +358,11 @@ req_runjob(struct batch_request *preq)
 	parent = chk_job_request(jid, preq, &jt, NULL);
 	if (parent == NULL)
 		return;		/* note, req_reject already called */
+
+	if (need_to_run_elsewhere(preq)) {
+		move_and_runjob(preq, parent);
+		return;
+	}
 
 	/* the job must be in an execution queue */
 

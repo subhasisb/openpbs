@@ -67,7 +67,7 @@
 
 int exitstatus = 0; /* Exit Status */
 int async = 0;
-static void execute(char *, char *, char *);
+static void execute(char *, char *, char *, char *);
 
 
 
@@ -83,8 +83,10 @@ main(int argc, char **argv)
 	char job[PBS_MAXCLTJOBID];      /* Job Id */
 	char server[MAXSERVERNAME];	    /* Server name */
 	char *location = NULL;          /* Where to run the job */
+	char *dest = NULL;
+	extern char *optarg;
 
-	static char opts[] = "H:a";     /* See man getopt */
+	static char opts[] = "H:a:D:";     /* See man getopt */
 	static char *usage = "Usage: qrun [-a] [-H vnode_specification ] job_identifier_list\n"
 			     "       qrun [-a] [-H - ] job_identifier_list\n"
 			     "       qrun --version\n";
@@ -106,7 +108,7 @@ main(int argc, char **argv)
 		switch (s) {
 
 			case 'H':
-				if (strlen(optarg) == 0) {
+				if (!optarg) {
 					fprintf(stderr, "qrun: illegal -H value\n");
 					errflg++;
 					break;
@@ -116,6 +118,15 @@ main(int argc, char **argv)
 
 			case 'a':
 				async = 1;
+				break;
+		
+			case 'D':
+				if (!optarg) {
+					fprintf(stderr, "qrun: illegal -D value\n");
+					errflg++;
+					break;
+				}
+				dest = optarg;
 				break;
 
 			case '?':
@@ -143,7 +154,7 @@ main(int argc, char **argv)
 			exitstatus = 1;
 			continue;
 		}
-		execute(job, server, location);
+		execute(job, server, location, dest);
 	}
 
 	/*cleanup security library initializations before exiting*/
@@ -168,7 +179,7 @@ main(int argc, char **argv)
  *
  */
 static void
-execute(char *job, char *server, char *location)
+execute(char *job, char *server, char *location, char *dest)
 {
 	int ct;         /* Connection to the server */
 	int err;        /* Error return from pbs_run */
@@ -181,9 +192,9 @@ execute(char *job, char *server, char *location)
 cnt:
 	if ((ct = cnt2server(server)) > 0) {
 		if (async)
-			err = pbs_asyrunjob(ct, job, location, NULL);
+			err = pbs_asyrunjob(ct, job, location, dest);
 		else
-			err = pbs_runjob(ct, job, location, NULL);
+			err = pbs_runjob(ct, job, location, dest);
 
 		if (err && (pbs_errno != PBSE_UNKJOBID)) {
 			errmsg = pbs_geterrmsg(ct);

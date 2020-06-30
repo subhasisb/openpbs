@@ -2194,10 +2194,8 @@ get_available_conn(svr_conn_t **svr_connections)
 {
 	int i;
 
-	for (i = 0; i < get_current_servers(); i++) {
-		if (svr_connections[i] == NULL)
-			continue;
-		if (svr_connections[i]->state == SVR_CONN_STATE_CONNECTED)
+	for (i = 0; i < get_current_servers(); i++)
+		if (svr_connections[i] && svr_connections[i]->state == SVR_CONN_STATE_CONNECTED)
 			return svr_connections[i]->sd;
 	}
 

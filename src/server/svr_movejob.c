@@ -675,6 +675,8 @@ send_job(job *jobp, pbs_net_t hostaddr, int port, int move_type,
 	struct  hostent *hp;
 	struct in_addr   addr;
 	long		 tempval;
+	int		ret;
+	char		*reject_msg;
 
 	/* if job has a script read it from database */
 	if (jobp->ji_qs.ji_svrflags & JOB_SVFLG_SCRIPT) {
@@ -866,7 +868,6 @@ send_job(job *jobp, pbs_net_t hostaddr, int port, int move_type,
 					char		name_buf[MAXPATHLEN+1];
 					int		rfd;
 					int		len;
-					char		*reject_msg;
 					int		err;
 
 					err = pbs_errno;
@@ -916,7 +917,6 @@ send_job(job *jobp, pbs_net_t hostaddr, int port, int move_type,
 			}
 
 			if (credlen > 0) {
-				int	ret;
 
 				ret = PBSD_jcred(con, jobp->ji_extended.ji_ext.ji_credtype, credbuf, credlen, PROT_TCP, NULL);
 				if ((ret == 0) || (i == (RETRY - 1)))
@@ -947,6 +947,18 @@ send_job(job *jobp, pbs_net_t hostaddr, int port, int move_type,
 			unlink(script_name);
 			exit(SEND_JOB_FATAL);
 		}
+
+		if (preq->rq_type == PBS_BATCH_MoveJob && preq->rq_ind.rq_move.run_job) {
+			ret = pbs_asyrunjob(con, job_id, preq->rq_ind.rq_move.run_job_dest, NULL);
+			if (ret) {
+				reject_msg = pbs_geterrmsg(con);
+				if (reject_msg != NULL) {
+					log_errf(pbs_errno, __func__, "msg: %s dest: %s jobid: %s", reject_msg, preq->rq_ind.rq_move.run_job_dest, job_id);
+				} else
+					log_errf(pbs_errno, __func__, "Server returned error %d for job %s", pbs_errno, job_id);
+			}
+		}
+
 		svr_disconnect(con);
 
 		/* delete the temp script file */

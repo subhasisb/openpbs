@@ -446,11 +446,11 @@ initialize_server_conns(int num_conf_servers)
  * @retval -1 - error
  */
 int 
-connect_to_servers(char *extend_data)
+connect_to_servers(char *server_name, uint port, char *extend_data)
 {
 	int i = 0;
 	int fd = -1;
-	int start = 0;
+	int start = -1;
 	static int seeded = 0;
 	struct timeval tv;
 	unsigned long time_in_micros;
@@ -470,8 +470,18 @@ connect_to_servers(char *extend_data)
 	if (!svr_connections)
 		return -1;
 
-	if (!multi_flag)
-		start = rand() % get_current_servers();
+	if (!multi_flag) {
+		if (server_name) {
+			for (i = 0; i < get_current_servers(); i++) {
+				if (!strcmp(server_name, pbs_conf.psi[i]->name) && port == pbs_conf.psi[i]->port) {
+					start = i;
+					break;
+				}
+			}
+		}
+		if (start == -1)
+			start = rand() % get_current_servers();
+	}
 	else
 		start = 0;
 
@@ -562,7 +572,7 @@ __pbs_connect_extend(char *server, char *extend_data)
 		return -1;
 	}
 		
-	if ((sock = connect_to_servers(extend_data)) == -1) {
+	if ((sock = connect_to_servers(server_name, server_port, extend_data)) == -1) {
 		pbs_errno = PBSE_INTERNAL;
 		return -1;
 	}		
