@@ -115,7 +115,7 @@ lc_host_name()
 check_started() {
 
   ps_out=`ps -p $1 -o args 2> /dev/null | tail -1`
-  if [ -z "${ps_out}" -o "`echo ${ps_out} | cut -c1`" = "[" ]  ; then
+  if [ -z "${ps_out}" -o "x`echo ${ps_out} | cut -c1`" == "x[" ]  ; then
     ps_out=`ps -p $1 -o command 2> /dev/null | tail -1`
     if [ -z "${ps_out}" ]; then
 	return 1
@@ -124,7 +124,7 @@ check_started() {
 
 # strip out everything except executable name
   prog_name=`echo ${ps_out} | grep -how "$2"`
-  if [ "x${prog_name}" = "x$2" ] ; then
+  if [ "x${prog_name}" == "x$2" ] ; then
     return 0;
   fi
 
@@ -183,7 +183,7 @@ check_prog() {
   esac
 
   if [ -n "${pid}" ]; then
-    if [ "${pid}" -ne -1 ] ; then
+    if [ ${pid} -ne -1 ] ; then
       if check_started "${pid}" "$daemon_name" ; then
         return 0
       fi
@@ -454,8 +454,14 @@ start_pbs() {
 }
 
 stop_pbs() {
+    local _oldval=""
     echo "Stopping PBS"
     update_pids
+    if [ "x${PBS_SERVER_INSTANCES}" != "x" ]; then
+      _oldval=${PBS_SERVER_INSTANCES}
+      _svr=${PBS_SERVER}:${PBS_BATCH_SERVICE_PORT:-15001}
+      export PBS_SERVER_INSTANCES=${_svr}
+    fi
     if [ "${PBS_START_SERVER}" -gt 0 ] ; then
       active_server=`lc_host_name \`${PBS_EXEC}/bin/qstat -Bf 2>/dev/null | \
 	  grep "server_host = " | \
@@ -524,6 +530,9 @@ stop_pbs() {
     fi
     # make sure the daemons have exited for up to 180 seconds
     # if any still there, exit with message and error
+    if [ "x${_oldval}" != "x" ]; then
+      export PBS_SERVER_INSTANCES=${_oldval}
+    fi
     waitloop=1
     echo "Waiting for shutdown to complete"
     while [ ${waitloop} -lt 180 ]
@@ -561,6 +570,10 @@ stop_pbs() {
 
 status_pbs() {
     update_pids
+    if [ "x${PBS_SERVER_INSTANCES}" != "x" ]; then
+      _svr=${PBS_SERVER}:${PBS_BATCH_SERVICE_PORT:-15001}
+      export PBS_SERVER_INSTANCES=${_svr}
+    fi
     if [ "${PBS_START_SERVER}" -gt 0 ] ; then
       if check_prog "server" || check_prog "oldserver" ; then
 	echo "pbs_server is pid ${pid}"
@@ -593,16 +606,16 @@ status_pbs() {
 
 hup_pbs() {
   update_pids
-  if [ "${PBS_START_SERVER}" -gt 0 ] ; then
+  if check_prog "server"; then
     kill -HUP ${pbs_server_pid}
   fi
-  if [ "${PBS_START_MOM}" -gt 0 ] ; then
+  if check_prog "mom"; then
     kill -HUP ${pbs_mom_pid}
   fi
-  if [ "${PBS_START_SCHED}" -gt 0 ] ; then
+  if check_prog "sched"; then
     kill -HUP ${pbs_sched_pid}
   fi
-  if [ "${PBS_START_COMM}" -gt 0 ] ; then
+  if check_prog "pbs_comm"; then
     kill -HUP ${pbs_comm_pid}
   fi
 }
@@ -724,6 +737,8 @@ conf=${PBS_CONF_FILE:-/etc/pbs.conf}
 
 # re-apply saved env variables
 . "${env_save}"
+
+export PBS_CONF_FILE=${conf}
 
 rm -f "${env_save}"
 

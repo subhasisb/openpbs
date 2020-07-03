@@ -526,6 +526,11 @@ if [ ! -d "$PBS_HOME" -o ! "$(/bin/ls -A $PBS_HOME)" ]; then
 	${PBS_EXEC}/libexec/pbs_postinstall $component $PBS_VERSION $PBS_EXEC $PBS_HOME "" "sameconf"
 fi
 
+if [ "x${PBS_SERVER_INSTANCES}" != "x" ]; then
+	_svr=${PBS_SERVER}:${PBS_BATCH_SERVICE_PORT:-15001}
+	export PBS_SERVER_INSTANCES=${_svr}
+fi
+
 # Store the old PBS VERSION for later use
 if [ -f "$PBS_HOME/pbs_version" ]; then
 	old_pbs_version=`cat $PBS_HOME/pbs_version`
