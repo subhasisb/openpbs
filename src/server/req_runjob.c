@@ -143,8 +143,11 @@ extern char *msg_job_abort;
 extern pbs_list_head svr_deferred_req;
 extern time_t time_now;
 extern int   svr_totnodes;	/* non-zero if using nodes */
+extern unsigned int pbs_server_port_dis;
 extern job  *chk_job_request(char *, struct batch_request *, int *, int *);
 extern int send_cred(job *pjob);
+extern int get_hostaddr_port_from_svr(char *, pbs_net_t *, uint *);
+extern int connect_2_svr(pbs_net_t, uint);
 
 
 /* private data */
@@ -304,6 +307,9 @@ void
 move_and_runjob(struct batch_request *preq, job *pjob)
 {
 	char dest[PBS_MAXHOSTNAME + 1];
+	int conn = -1;
+	pbs_net_t	 hostaddr;
+	unsigned int	 port = pbs_server_port_dis;
 
 	strcpy(dest, preq->rq_ind.rq_run.rq_destin);
 	free(preq->rq_ind.rq_run.rq_destin);
@@ -312,6 +318,18 @@ move_and_runjob(struct batch_request *preq, job *pjob)
 	sprintf(preq->rq_ind.rq_move.rq_destin, "%s@%s", pjob->ji_qs.ji_queue, preq->rq_extend);
 	preq->rq_ind.rq_move.run_job = 1;
 	strcpy(preq->rq_ind.rq_move.run_job_dest, dest);
+
+	get_hostaddr_port_from_svr(preq->rq_ind.rq_move.rq_destin, &hostaddr, &port);
+
+	if (get_peer_server_sock(hostaddr, port) == -1) {
+		if ((conn = connect_2_svr(hostaddr, port)) == -1) {
+			req_reject(SEND_JOB_FATAL, 0, preq);
+			return;
+		}
+
+		DBPRT(("Peer server fd: %d", conn))
+		set_as_peer_server_conn(conn);
+	}
 
 	req_movejob(preq);
 }

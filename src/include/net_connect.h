@@ -191,6 +191,7 @@ int  client_to_svr_extend(pbs_net_t, unsigned int port, int, char*);
 void set_client_to_svr_timeout(unsigned int);
 void close_conn(int socket);
 pbs_net_t get_connectaddr(int sock);
+extern uint get_connectport(int);
 int  get_connecthost(int sock, char *namebuf, int size);
 pbs_net_t get_hostaddr(char *hostname);
 int comp_svraddr(pbs_net_t, char *);
@@ -203,6 +204,8 @@ int  wait_request(time_t waittime, void *priority_context);
 extern void *priority_context;
 void net_add_close_func(int, void(*)(int));
 extern  pbs_net_t  get_addr_of_nodebyname(char *name, unsigned int *port);
+extern void set_as_peer_server_conn(int);
+extern int get_peer_server_sock(pbs_net_t, unsigned int);
 
 conn_t *get_conn(int sock); /* gets the connection, for a given socket id */
 void connection_idlecheck(void);
@@ -223,6 +226,7 @@ struct connection {
 	void		(*cn_oncl)(int); /* func to call on close */
 	unsigned short	cn_prio_flag;	/* flag for a priority socket */
 	pbs_list_link   cn_link;  /* link to the next connection in the linked list */
+	pbs_list_link   cn_link_peer_svr;
 	/* following attributes are for */
 	/* credential checking */
 	time_t          cn_timestamp;

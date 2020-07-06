@@ -122,6 +122,52 @@ __runjob_helper(int c, char *jobid, char *location, char *extend, int req_type)
 	return rc;
 }
 
+int
+PBSD_runjob(int c, char *jobid, char *location, char *extend, int req_type)
+{
+	int rc = 0;
+	unsigned long resch = 0;
+
+	if ((jobid == NULL) || (*jobid == '\0'))
+		return (pbs_errno = PBSE_IVALREQ);
+	if (location == NULL)
+		location = "";
+
+	/* setup DIS support routines for following DIS calls */
+
+	DIS_tcp_funcs();
+
+	/* send run request */
+
+	if ((rc = encode_DIS_ReqHdr(c, req_type, pbs_current_user)) ||
+		(rc = encode_DIS_Run(c, jobid, location, resch)) ||
+		(rc = encode_DIS_ReqExtend(c, extend))) {
+		if (set_conn_errtxt(c, dis_emsg[rc]) != 0)
+			pbs_errno = PBSE_SYSTEM;
+		else
+			pbs_errno = PBSE_PROTOCOL;
+
+		pbs_client_thread_unlock_connection(c);
+		return pbs_errno;
+	}
+
+	if (dis_flush(c)) {
+		pbs_errno = PBSE_PROTOCOL;
+		return pbs_errno;
+	}
+
+	if (req_type != PBS_BATCH_AsyrunJob) {
+		struct batch_reply *reply = NULL;
+
+		/* Get reply */
+		reply = PBSD_rdrpy(c);
+		rc = get_conn_errno(c);
+		PBSD_FreeReply(reply);
+	}
+
+	return rc;
+}
+
 /**
  * @brief
  *	-send async run job batch request.

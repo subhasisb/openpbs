@@ -325,6 +325,7 @@ extern void PBS_free_aopl(struct attropl *);
 extern void advise(char *, ...);
 extern int PBSD_rdytocmt(int, char *, int, char **);
 extern int PBSD_commit(int, char *, int, char **);
+extern int PBSD_runjob(int, char *, char *, char *, int);
 extern int PBSD_jcred(int, int, char *, int, int, char **);
 extern int PBSD_jscript(int, char *, int, char **);
 extern int PBSD_jscript_direct(int, char *, int, char **);
