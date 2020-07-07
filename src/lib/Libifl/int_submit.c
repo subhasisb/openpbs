@@ -285,6 +285,48 @@ PBSD_commit(int c, char *jobid, int prot, char **msgid)
 
 /**
  * @brief
+ *	-PBS_commit.c This function does the Commit sub-function of
+ *	the Queue Job request.
+ *
+ * @param[in] c - socket fd
+ * @param[in] jobid - job identifier
+ * @param[in] dest - destination execvnode
+ *
+ * @return      int
+ * @retval      0               success
+ * @retval      !0(pbs_errno)   failure
+ *
+ */
+int
+PBSD_commit_and_run(int c, char *jobid, char *dest)
+{
+	struct batch_reply *reply;
+	int rc;
+
+	DIS_tcp_funcs();
+
+	if ((rc = encode_DIS_ReqHdr(c, PBS_BATCH_Commit, pbs_current_user)) ||
+	    (rc = encode_DIS_JobId(c, jobid)) ||
+	    (rc = encode_DIS_ReqExtend(c, dest))) {
+		if (set_conn_errtxt(c, dis_emsg[rc]) != 0) {
+			return (pbs_errno = PBSE_SYSTEM);
+		}
+		return (pbs_errno = PBSE_PROTOCOL);
+	}
+
+	if (dis_flush(c)) {
+		return (pbs_errno = PBSE_PROTOCOL);
+	}
+
+	reply = PBSD_rdrpy(c);
+
+	PBSD_FreeReply(reply);
+
+	return get_conn_errno(c);
+}
+
+/**
+ * @brief
  *	-PBS_scbuf.c Send a chunk of a of the job script to the server.
  *	Called by pbs_submit.  The buffer length could be
  *	zero; the server should handle that case...

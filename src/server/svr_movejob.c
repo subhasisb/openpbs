@@ -282,7 +282,7 @@ local_move(job *jobp, struct batch_request *req)
 	}
 
 
-	if ((pbs_errno = svr_enquejob(jobp)) != 0)
+	if ((pbs_errno = svr_enquejob(jobp, NULL)) != 0)
 		return -1;		/* should never ever get here */
 	account_jobstr(jobp, PBS_ACCT_QUEUE);
 
@@ -863,8 +863,7 @@ send_job(job *jobp, pbs_net_t hostaddr, int port, int move_type,
 					/* already running, mark it so */
 					log_event(PBSEVENT_ERROR, PBS_EVENTCLASS_JOB, LOG_INFO, jobp->ji_qs.ji_jobid, "Mom reports job already running");
 					exit(SEND_JOB_OK);
-				}
-				else if ((pbs_errno == PBSE_HOOKERROR) || (pbs_errno == PBSE_HOOK_REJECT)  ||
+				} else if ((pbs_errno == PBSE_HOOKERROR) || (pbs_errno == PBSE_HOOK_REJECT)  ||
 					(pbs_errno == PBSE_HOOK_REJECT_RERUNJOB) || (pbs_errno == PBSE_HOOK_REJECT_DELETEJOB)) {
 					char		name_buf[MAXPATHLEN+1];
 					int		rfd;
@@ -904,8 +903,7 @@ send_job(job *jobp, pbs_net_t hostaddr, int port, int move_type,
 						exit(SEND_JOB_HOOK_REJECT_RERUNJOB);
 					if (err == PBSE_HOOK_REJECT_DELETEJOB)
 						exit(SEND_JOB_HOOK_REJECT_DELETEJOB);
-				}
-				else {
+				} else {
 					(void)sprintf(log_buffer, "send of job to %s failed error = %d", destin, pbs_errno);
 					log_event(PBSEVENT_JOB, PBS_EVENTCLASS_JOB, LOG_INFO, jobp->ji_qs.ji_jobid, log_buffer);
 					continue;
@@ -940,18 +938,15 @@ send_job(job *jobp, pbs_net_t hostaddr, int port, int move_type,
 			jobp->ji_qs.ji_substate = JOB_SUBSTATE_TRNOUTCM;
 		}
 
-		if (PBSD_commit(con, job_id, PROT_TCP, NULL) != 0) {
+		if (preq->rq_type == PBS_BATCH_MoveJob && preq->rq_ind.rq_move.runjob_dest)
+			ret = PBSD_commit_and_run(con, job_id, preq->rq_ind.rq_move.runjob_dest);
+		else
+			ret = PBSD_commit(con, job_id, PROT_TCP, NULL);
+		
+		if (ret != 0) {
 			/* delete the temp script file */
 			unlink(script_name);
 			exit(SEND_JOB_FATAL);
-		}
-
-		if (preq->rq_type == PBS_BATCH_MoveJob && preq->rq_ind.rq_move.run_job) {
-			if (PBSD_runjob(con, job_id, preq->rq_ind.rq_move.run_job_dest, NULL, PBS_BATCH_RunJob) != 0) {
-				/* delete the temp script file */
-				unlink(script_name);
-				exit(SEND_JOB_FATAL);
-			}
 		}
 
 		svr_disconnect(con);

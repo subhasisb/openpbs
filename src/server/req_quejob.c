@@ -1723,6 +1723,7 @@ req_commit(struct batch_request *preq)
 	pbs_db_jobscr_info_t	jobscr;
 	pbs_db_obj_info_t	obj;
 	long			time_msec;
+	struct batch_request	*preq_runjob = NULL;
 #ifdef	WIN32
 	struct	_timeb		tval;
 #else
@@ -1829,7 +1830,7 @@ req_commit(struct batch_request *preq)
 	pj->ji_wattr[(int)JOB_ATR_qrank].at_val.at_long = time_msec;
 	pj->ji_wattr[(int)JOB_ATR_qrank].at_flags |= ATR_SET_MOD_MCACHE;
 
-	if ((rc = svr_enquejob(pj)) != 0) {
+	if ((rc = svr_enquejob(pj, preq->rq_extend)) != 0) {
 		job_purge(pj);
 		req_reject(rc, 0, preq);
 		return;
@@ -1896,6 +1897,26 @@ req_commit(struct batch_request *preq)
 		pj->ji_wattr[(int)JOB_ATR_jobname].at_val.at_str,
 		pj->ji_qhdr->qu_qs.qu_name);
 
+	/* allocate a new batch req to use for runjob at the end 
+	as we will be freeing br in replyjobid */
+	if (preq->rq_extend) {
+		if ((preq_runjob = alloc_br(PBS_BATCH_RunJob)) == NULL) {
+			job_purge(pj);
+			req_reject(PBSE_SYSTEM, 0, preq);
+			return;
+		}
+
+		preq_runjob->rq_perm = preq->rq_perm;
+		strcpy(preq_runjob->rq_ind.rq_run.rq_jid, pj->ji_qs.ji_jobid);
+		preq_runjob->rq_ind.rq_run.rq_destin = strdup(preq->rq_extend);
+		if (preq_runjob->rq_ind.rq_run.rq_destin == NULL) {
+			free_br(preq_runjob);
+			job_purge(pj);
+			req_reject(PBSE_SYSTEM, 0, preq);
+			return;
+		}
+	}
+	
 	/* acknowledge the request with the job id */
 	if ((rc = reply_jobid(preq, pj->ji_qs.ji_jobid, BATCH_REPLY_CHOICE_Commit))) {
 		(void)snprintf(log_buffer, sizeof(log_buffer),
@@ -1911,6 +1932,9 @@ req_commit(struct batch_request *preq)
 
 	if ((pj->ji_qs.ji_svrflags & JOB_SVFLG_HERE) == 0)
 		issue_track(pj);	/* notify creator where job is */
+
+	if (preq_runjob)
+		req_runjob(preq_runjob);
 #endif		/* PBS_SERVER */
 }
 

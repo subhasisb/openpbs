@@ -251,7 +251,7 @@ tickle_for_reply(void)
  *		Updated default attributes and resources specific to job type.
  */
 int
-svr_enquejob(job *pjob)
+svr_enquejob(job *pjob, char *select_spec)
 {
 	attribute *pattrjb;
 	attribute_def *pdef;
@@ -470,14 +470,16 @@ svr_enquejob(job *pjob)
 
 			/* better notify the Scheduler we have a new job */
 
-			if (find_assoc_sched_jid(pjob->ji_qs.ji_jobid, &psched))
-				set_scheduler_flag(SCH_SCHEDULE_NEW, psched);
-			else {
-				sprintf(log_buffer, "Unable to reach scheduler associated with job %s", pjob->ji_qs.ji_jobid);
-				log_err(-1, __func__, log_buffer);
+			if (!select_spec) {
+				if (find_assoc_sched_jid(pjob->ji_qs.ji_jobid, &psched))
+					set_scheduler_flag(SCH_SCHEDULE_NEW, psched);
+				else {
+					sprintf(log_buffer, "Unable to reach scheduler associated with job %s", pjob->ji_qs.ji_jobid);
+					log_err(-1, __func__, log_buffer);
+				}
 			}
-		} else if (server.sv_attr[SVR_ATR_EligibleTimeEnable].at_val.at_long &&
-			server.sv_attr[SVR_ATR_scheduling].at_val.at_long) {
+		} else if (server.sv_attr[SRV_ATR_EligibleTimeEnable].at_val.at_long &&
+			server.sv_attr[SRV_ATR_scheduling].at_val.at_long && !select_spec) {
 
 			/* notify the Scheduler we have moved a job here */
 

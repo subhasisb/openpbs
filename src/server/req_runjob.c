@@ -316,8 +316,7 @@ move_and_runjob(struct batch_request *preq, job *pjob)
 	preq->rq_type = PBS_BATCH_MoveJob;
 	strcpy(preq->rq_ind.rq_move.rq_jid, pjob->ji_qs.ji_jobid);
 	sprintf(preq->rq_ind.rq_move.rq_destin, "%s@%s", pjob->ji_qs.ji_queue, preq->rq_extend);
-	preq->rq_ind.rq_move.run_job = 1;
-	strcpy(preq->rq_ind.rq_move.run_job_dest, dest);
+	strcpy(preq->rq_ind.rq_move.runjob_dest, dest);
 
 	get_hostaddr_port_from_svr(preq->rq_ind.rq_move.rq_destin, &hostaddr, &port);
 
@@ -361,6 +360,8 @@ req_runjob(struct batch_request *preq)
 	struct deferred_request *pdefr;
 	char		  hook_msg[HOOK_MSG_SIZE];
 	pbs_sched	  *psched;
+
+	DBPRT(("Enetering %s", __func__))
 
 	if (license_expired) {
 		req_reject(PBSE_LICENSEINV, 0, preq);

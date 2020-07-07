@@ -287,7 +287,6 @@ reply_send(struct batch_request *request)
 		return 0;
 	}
 
-
 	/* if this is a child request, just move the error to the parent */
 	if (request->rq_parentbr) {
 		if ((request->rq_parentbr->rq_reply.brp_choice == BATCH_REPLY_CHOICE_NULL) && (request->rq_parentbr->rq_reply.brp_code == 0)) {

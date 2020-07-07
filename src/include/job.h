@@ -1003,7 +1003,7 @@ extern int   site_check_user_map(job *, char *);
 extern int   site_check_user_map(void *, int, char *);
 extern int   site_allow_u(char *user, char *host);
 extern void  svr_dequejob(job *);
-extern int   svr_enquejob(job *);
+extern int   svr_enquejob(job *, char *);
 extern void  svr_evaljobstate(job *, int *, int *, int);
 extern void  set_statechar(job *);
 extern int   svr_setjobstate(job *, int, int);

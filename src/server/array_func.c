@@ -949,8 +949,8 @@ create_subjob(job *parent, char *newjid, int *rc)
 	time_msec = (tval.tv_sec * 1000L) + (tval.tv_usec/1000L);
 	/* set the queue rank attribute */
 	subj->ji_wattr[(int)JOB_ATR_qrank].at_val.at_long = time_msec;
-	subj->ji_wattr[(int)JOB_ATR_qrank].at_flags |= ATR_SET_MOD_MCACHE;
-	if (svr_enquejob(subj) != 0) {
+	subj->ji_wattr[(int)JOB_ATR_qrank].at_flags |= ATR_VFLAG_SET|ATR_VFLAG_MODCACHE;
+	if (svr_enquejob(subj, NULL) != 0) {
 		job_purge(subj);
 		*rc = PBSE_IVALREQ;
 		return NULL;

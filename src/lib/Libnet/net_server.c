@@ -839,8 +839,9 @@ get_peer_server_sock(pbs_net_t hostaddr, unsigned int port)
 	conn_t *cp;
 
 	for (cp = (conn_t *) GET_NEXT(peer_svr_conns); cp; cp = GET_NEXT(cp->cn_link_peer_svr)) {
-		if (cp->cn_addr == hostaddr && cp->cn_port == port)
+		if (cp->cn_addr == hostaddr && cp->cn_port == port) {
 			return cp->cn_sock;
+		}
 	}
 	 
 	return -1;
@@ -994,8 +995,7 @@ cleanup_conn(int idx)
 			"could not remove socket %d from poll list", svr_conn[idx]->cn_sock);
 		log_err(err, __func__, logbuf);
 	}
-	if (svr_conn[idx]->cn_prio_flag)
-	{
+	if (svr_conn[idx]->cn_prio_flag) {
 		if (tpp_em_del_fd(priority_context, svr_conn[idx]->cn_sock) < 0) {
 			int err = errno;
 			snprintf(logbuf, sizeof(logbuf),
@@ -1006,6 +1006,7 @@ cleanup_conn(int idx)
 
 	/* Remove connection from the linked list */
 	delete_link(&svr_conn[idx]->cn_link);
+	delete_link(&svr_conn[idx]->cn_link_peer_svr);
 
 	svr_conn[idx]->cn_physhost[0] = '\0';
 	if (svr_conn[idx]->cn_credid) {

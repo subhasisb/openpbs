@@ -1135,7 +1135,7 @@ close_quejob(int sfds)
 					delete_link(&pjob->ji_alljobs);
 					pjob->ji_qs.ji_state = JOB_STATE_QUEUED;
 					pjob->ji_qs.ji_substate = JOB_SUBSTATE_QUEUED;
-					if (svr_enquejob(pjob))
+					if (svr_enquejob(pjob, NULL))
 						(void)job_abt(pjob, msg_err_noqueue);
 
 				}
@@ -1405,8 +1405,10 @@ free_br(struct batch_request *preq)
 		case PBS_BATCH_AsyrunJob_ack:
 		case PBS_BATCH_StageIn:
 		case PBS_BATCH_ConfirmResv:
-			if (preq->rq_ind.rq_run.rq_destin)
+			if (preq->rq_ind.rq_run.rq_destin) {
 				(void)free(preq->rq_ind.rq_run.rq_destin);
+				preq->rq_ind.rq_run.rq_destin = NULL;
+			}
 			break;
 		case PBS_BATCH_StatusJob:
 		case PBS_BATCH_StatusQue:

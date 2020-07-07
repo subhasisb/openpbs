@@ -1702,7 +1702,7 @@ pbsd_init_reque(job *pjob, int change_state)
 	pjob->ji_wattr[(int)JOB_ATR_substate].at_val.at_long = pjob->ji_qs.ji_substate;
 	pjob->ji_wattr[(int)JOB_ATR_substate].at_flags |= ATR_SET_MOD_MCACHE;
 
-	if ((rc = svr_enquejob(pjob)) == 0) {
+	if ((rc = svr_enquejob(pjob, NULL)) == 0) {
 		(void)strcat(logbuf, msg_init_queued);
 		(void)strcat(logbuf, pjob->ji_qs.ji_queue);
 		log_event(PBSEVENT_SYSTEM | PBSEVENT_ADMIN | PBSEVENT_DEBUG,

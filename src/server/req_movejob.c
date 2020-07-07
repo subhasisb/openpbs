@@ -249,8 +249,8 @@ req_orderjob(struct batch_request *req)
 		(void)strcpy(pjob2->ji_qs.ji_queue, tmpqn);
 		svr_dequejob(pjob1);
 		svr_dequejob(pjob2);
-		(void)svr_enquejob(pjob1);
-		(void)svr_enquejob(pjob2);
+		(void)svr_enquejob(pjob1, NULL);
+		(void)svr_enquejob(pjob2, NULL);
 
 	} else {
 		swap_link(&pjob1->ji_jobque,  &pjob2->ji_jobque);

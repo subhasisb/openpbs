@@ -97,8 +97,6 @@ decode_DIS_MoveJob(int sock, struct batch_request *preq)
 	if (rc) return rc;
 
 	rc = disrfst(sock, PBS_MAXDEST+1, preq->rq_ind.rq_move.rq_destin);
-
-	preq->rq_ind.rq_move.run_job = 0;
-
+	
 	return rc;
 }
