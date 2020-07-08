@@ -191,7 +191,7 @@ req_modifyjob(struct batch_request *preq)
 	}
 
 	if (pseldef == NULL)  /* do one time to keep handy */
-		pseldef = find_resc_def(svr_resc_def, "select", svr_resc_size);
+		pseldef = &svr_resc_def[RESC_SELECT];
 
 	pjob = chk_job_request(preq->rq_ind.rq_modify.rq_objname, preq, &jt, NULL);
 	if (pjob == NULL)
@@ -395,9 +395,9 @@ req_modifyjob(struct batch_request *preq)
 		svr_evaljobstate(pjob, &newstate, &newsubstate, 0);
 		(void)svr_setjobstate(pjob, newstate, newsubstate);
 	}
-	
+
 	job_save_db(pjob); /* we must save the updates anyway, if any */
-	
+
 	log_eventf(PBSEVENT_JOB, PBS_EVENTCLASS_JOB, LOG_INFO, pjob->ji_qs.ji_jobid, msg_manager, msg_jobmod, preq->rq_user, preq->rq_host);
 
 	/* if a resource limit changed for a running job, send to MOM */
@@ -643,7 +643,7 @@ modify_job_attr(job *pjob, svrattrl *plist, int perm, int *bad)
 		if (newattr[i].at_flags & ATR_VFLAG_MODIFY) {
 			if ((job_attr_def[i].at_flags & ATR_DFLAG_NOSAVM))
 				continue;
-				
+
 			if (job_attr_def[i].at_action) {
 				rc = job_attr_def[i].at_action(&newattr[i],
 					pjob, ATR_ACTION_ALTER);

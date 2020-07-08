@@ -363,7 +363,7 @@ req_selectjobs(struct batch_request *preq)
 	long job_limit = 0;
 	long count = 0;
 
-	job_limit = server.sv_attr[SRV_ATR_job_stat_limit].at_val.at_long;
+	job_limit = server.sv_attr[SVR_ATR_job_stat_limit].at_val.at_long;
 
 	/*
 	 * if the letter T (or t) is in the extend string,  select subjobs
@@ -431,7 +431,7 @@ req_selectjobs(struct batch_request *preq)
 	else
 		pjob = (job *)GET_NEXT(svr_alljobs);
 	while (pjob) {
-		if (server.sv_attr[(int)SRV_ATR_query_others].at_val.at_long ||
+		if (server.sv_attr[(int)SVR_ATR_query_others].at_val.at_long ||
 			(svr_authorize_jobreq(preq, pjob) == 0)) {
 
 			/* either job owner or has special permission to see job */

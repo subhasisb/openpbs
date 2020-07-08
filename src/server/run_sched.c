@@ -343,7 +343,7 @@ contact_sched(int cmd, char *jobid, pbs_sched *psched, conn_origin_t which_conn)
 			close_conn(sock);
 			return (-1);
 		}
-		
+
 		psched->scheduler_sock[sched_sock_arr_index] = sock;
 		return sock;
 	}
@@ -644,7 +644,7 @@ set_sched_state(pbs_sched *psched, char *state)
 {
 	 set_attr_svr(&(psched->sch_attr[(int) SCHED_ATR_sched_state]),
 			 &sched_attr_def[(int) SCHED_ATR_sched_state], state);
-	 server.sv_attr[(int)SRV_ATR_State].at_flags |= ATR_VFLAG_MODCACHE;
+	 server.sv_attr[(int)SVR_ATR_State].at_flags |= ATR_VFLAG_MODCACHE;
 }
 
 /**
@@ -729,5 +729,3 @@ handle_deferred_cycle_close()
 	}
 
 }
-
-
