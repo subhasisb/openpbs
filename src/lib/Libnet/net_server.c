@@ -791,9 +791,8 @@ add_conn_priority(int sd, enum conn_type type, pbs_net_t addr, unsigned int port
 
 	/* Add to list of connections */
 	CLEAR_LINK(conn->cn_link);
-	append_link(&svr_allconns, &conn->cn_link, conn);
-
 	CLEAR_LINK(conn->cn_link_peer_svr);
+	append_link(&svr_allconns, &conn->cn_link, conn);
 
 	if (tpp_em_add_fd(poll_context, sd, EM_IN | EM_HUP | EM_ERR) < 0) {
 		int err = errno;
@@ -819,7 +818,7 @@ add_conn_priority(int sd, enum conn_type type, pbs_net_t addr, unsigned int port
 }
 
 void
-set_as_peer_server_conn(int fd)
+set_peer_server_conn(int fd)
 {
 	conn_t *conn = get_conn(fd);
 	if (conn) {
@@ -827,10 +826,31 @@ set_as_peer_server_conn(int fd)
 		if (tpp_em_del_fd(poll_context, fd) < 0) {
 			int err = errno;
 			snprintf(logbuf, sizeof(logbuf),
-				"could not remove socket %d from poll list", fd);
+				 "could not remove socket %d from poll list", fd);
 			log_err(err, __func__, logbuf);
 		}
+#ifdef SO_KEEPALIVE
+		int optval = 1;
+
+		if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof(optval)) < 0) {
+			log_errf(-1, __func__, "setsockopt(SO_KEEPALIVE) errno=%d", errno);
+			return;
+		}
+#endif
 	}
+}
+
+int
+is_socket_up(int fd)
+{
+	int error = 0;
+	socklen_t len = sizeof(error);
+	int ret = getsockopt(fd, SOL_SOCKET, SO_ERROR, &error, &len);
+
+	if (ret || error)
+		return 0;
+
+	return 1;
 }
 
 int
@@ -839,11 +859,10 @@ get_peer_server_sock(pbs_net_t hostaddr, unsigned int port)
 	conn_t *cp;
 
 	for (cp = (conn_t *) GET_NEXT(peer_svr_conns); cp; cp = GET_NEXT(cp->cn_link_peer_svr)) {
-		if (cp->cn_addr == hostaddr && cp->cn_port == port) {
+		if (cp->cn_addr == hostaddr && cp->cn_port == port)
 			return cp->cn_sock;
-		}
 	}
-	 
+
 	return -1;
 }
 

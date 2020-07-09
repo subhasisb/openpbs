@@ -938,8 +938,8 @@ send_job(job *jobp, pbs_net_t hostaddr, int port, int move_type,
 			jobp->ji_qs.ji_substate = JOB_SUBSTATE_TRNOUTCM;
 		}
 
-		if (preq->rq_type == PBS_BATCH_MoveJob && preq->rq_ind.rq_move.runjob_dest)
-			ret = PBSD_commit_and_run(con, job_id, preq->rq_ind.rq_move.runjob_dest);
+		if (preq->rq_type == PBS_BATCH_MoveJob && preq->rq_ind.rq_move.run_exec_vnode)
+			ret = PBSD_commit_and_run(con, job_id, preq->rq_ind.rq_move.run_exec_vnode);
 		else
 			ret = PBSD_commit(con, job_id, PROT_TCP, NULL);
 		
