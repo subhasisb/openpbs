@@ -598,7 +598,6 @@ reply_text(struct batch_request *preq, int code, char *text)
  * 		Return a reply with the job id.
  *
  * @see req_queuejob()
- * @see req_rdytocommit()
  * @see req_commit()
  *
  * @par Side-effects:
