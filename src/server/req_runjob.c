@@ -306,18 +306,18 @@ need_to_run_elsewhere(struct batch_request *preq)
 void
 move_and_runjob(struct batch_request *preq, job *pjob)
 {
-	char dest[PBS_MAXHOSTNAME + 1];
+	char *dest;
 	int sock;
 	int conn = -1;
 	pbs_net_t	 hostaddr;
 	unsigned int	 port = pbs_server_port_dis;
 
-	strcpy(dest, preq->rq_ind.rq_run.rq_destin);
+	dest = strdup(preq->rq_ind.rq_run.rq_destin);
 	free(preq->rq_ind.rq_run.rq_destin);
 	preq->rq_type = PBS_BATCH_MoveJob;
 	strcpy(preq->rq_ind.rq_move.rq_jid, pjob->ji_qs.ji_jobid);
 	sprintf(preq->rq_ind.rq_move.rq_destin, "%s@%s", pjob->ji_qs.ji_queue, preq->rq_extend);
-	strcpy(preq->rq_ind.rq_move.run_exec_vnode, dest);
+	preq->rq_ind.rq_move.run_exec_vnode = dest;
 
 	get_hostaddr_port_from_svr(preq->rq_ind.rq_move.rq_destin, &hostaddr, &port);
 
@@ -372,8 +372,6 @@ req_runjob(struct batch_request *preq)
 	struct deferred_request *pdefr;
 	char		  hook_msg[HOOK_MSG_SIZE];
 	pbs_sched	  *psched;
-
-	DBPRT(("Enetering %s", __func__))
 
 	if (license_expired) {
 		req_reject(PBSE_LICENSEINV, 0, preq);

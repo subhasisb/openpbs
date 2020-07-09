@@ -140,7 +140,7 @@ struct rq_py_spawn {
 struct rq_move {
 	char rq_jid[PBS_MAXSVRJOBID + 1];
 	char rq_destin[(PBS_MAXSVRRESVID > PBS_MAXDEST ? PBS_MAXSVRRESVID : PBS_MAXDEST) + 1];
-	char run_exec_vnode[PBS_MAXHOSTNAME + 1];
+	char *run_exec_vnode;
 };
 
 /* Resource Query/Reserve/Free */

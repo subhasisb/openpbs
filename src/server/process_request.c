@@ -1468,6 +1468,9 @@ free_br(struct batch_request *preq)
 			free(preq->rq_ind.rq_preempt.ppj_list);
 			free(preq->rq_reply.brp_un.brp_preempt_jobs.ppj_list);
 			break;
+		case PBS_BATCH_MoveJob:
+			free(preq->rq_ind.rq_move.run_exec_vnode);
+			break;
 #endif /* PBS_MOM */
 	}
 	if (preq->tppcmd_msgid)

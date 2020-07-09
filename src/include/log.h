@@ -80,7 +80,7 @@
 #ifdef	DEBUG
 #define	DBPRT(x)	printf x;
 #else
-#define	DBPRT(x)	sys_printf x
+#define	DBPRT(x)
 #endif
 
 #define IFNAME_MAX 256

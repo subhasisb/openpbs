@@ -522,8 +522,7 @@ process_socket(int sock)
 		/* EOF will be handled in cn_func */
 	}
 
-	if (svr_conn[idx]->cn_func)
-		svr_conn[idx]->cn_func(svr_conn[idx]->cn_sock);
+	svr_conn[idx]->cn_func(svr_conn[idx]->cn_sock);
 
 	return 0;
 }

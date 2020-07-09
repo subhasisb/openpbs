@@ -162,7 +162,6 @@ svr_connect(pbs_net_t hostaddr, unsigned int port, void (*func)(int), enum conn_
 		log_err(errno, msg_daemonname, "sigprocmask(BLOCK)");
 
 	sock = client_to_svr(hostaddr, port, B_RESERVED);
-	DBPRT(("sock: %d", sock))
 	if (pbs_errno == PBSE_NOLOOPBACKIF)
 		log_err(PBSE_NOLOOPBACKIF, "client_to_svr", msg_noloopbackif);
 
