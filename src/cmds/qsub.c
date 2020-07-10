@@ -4364,6 +4364,8 @@ do_connect(char *server_out, char *retmsg)
 	int rc = 0;
 	char host[PBS_MAXHOSTNAME + 1];
 
+	setenv(MULTI_SERVER, "ENABLED", 1);
+
 	/* Set single threaded mode */
 	pbs_client_thread_set_single_threaded_mode();
 

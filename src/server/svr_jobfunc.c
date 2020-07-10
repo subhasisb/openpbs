@@ -478,8 +478,8 @@ svr_enquejob(job *pjob, char *select_spec)
 					log_err(-1, __func__, log_buffer);
 				}
 			}
-		} else if (server.sv_attr[SRV_ATR_EligibleTimeEnable].at_val.at_long &&
-			server.sv_attr[SRV_ATR_scheduling].at_val.at_long && !select_spec) {
+		} else if (server.sv_attr[SVR_ATR_EligibleTimeEnable].at_val.at_long &&
+			server.sv_attr[SVR_ATR_scheduling].at_val.at_long && !select_spec) {
 
 			/* notify the Scheduler we have moved a job here */
 

@@ -345,6 +345,7 @@ extern struct batch_reply *PBSD_rdrpy(int);
 extern struct batch_reply *PBSD_rdrpy_sock(int, int *);
 extern void PBSD_FreeReply(struct batch_reply *);
 extern struct batch_status *PBSD_status(int, int, char *, struct attrl *, char *);
+extern int random_srv_conn(svr_conn_t **);
 extern struct batch_status *PBSD_status_aggregate(int, int, char *, struct attrl *, char *, int);
 extern struct batch_status *PBSD_status_random(int, int, char *, struct attrl *, char *, int);
 extern preempt_job_info *PBSD_preempt_jobs(int, char **);

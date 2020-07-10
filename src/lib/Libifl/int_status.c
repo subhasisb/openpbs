@@ -48,11 +48,46 @@
 #include <stdio.h>
 #include "libpbs.h"
 #include "pbs_ecl.h"
+#include "libutil.h"
 
 
 static struct batch_status *alloc_bs();
 
-extern int random_srv_conn(svr_conn_t **);
+/**
+ * @brief
+ *	get one of the available connection from multisvr sd
+ *
+ */
+int
+get_available_conn(svr_conn_t **svr_connections)
+{
+	int i;
+
+	for (i = 0; i < get_current_servers(); i++)
+		if (svr_connections[i] && svr_connections[i]->state == SVR_CONN_STATE_CONNECTED)
+			return svr_connections[i]->sd;
+
+	return -1;
+}
+
+/**
+ * @brief
+ *	get random server sd - It will choose a random sd from available no of servers.
+ *
+ */
+int
+random_srv_conn(svr_conn_t **svr_connections)
+{
+	int ind = 0;
+
+	srand(time(0));
+	ind =  rand() % get_current_servers();
+
+	if (svr_connections[ind] && svr_connections[ind]->state == SVR_CONN_STATE_CONNECTED)
+		return svr_connections[ind]->sd;
+		
+	return get_available_conn(svr_connections);
+}
 
 /**
  * @brief
