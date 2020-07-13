@@ -451,20 +451,13 @@ connect_to_servers(char *server_name, uint port, char *extend_data)
 	int i = 0;
 	int fd = -1;
 	int start = -1;
-	static int seeded = 0;
-	struct timeval tv;
-	unsigned long time_in_micros;
 	int multi_flag = 0;
 	int num_conf_servers = get_current_servers();
 
 	multi_flag = getenv(MULTI_SERVER) != NULL;
 
-	if (!multi_flag && !seeded) {
-		gettimeofday(&tv, NULL);
-		time_in_micros = 1000000 * tv.tv_sec + tv.tv_usec;
-		srand(time_in_micros); /* seed the random generator */
-		seeded = 1;
-	}
+	if (!multi_flag)
+		random_seed();
 
 	svr_conn_t **svr_connections = calloc(num_conf_servers, sizeof(svr_conn_t *));
 	if (!svr_connections)
