@@ -229,9 +229,7 @@ validate_perm_res_in_select(char *val, int val_exist)
 
 			/* first check for any invalid resources in the select */
 			for (j=0; j<nelem; ++j) {
-
-				presc = find_resc_def(svr_resc_def, pkvp[j].kv_keyw,
-					svr_resc_size);
+				presc = find_resc_def(svr_resc_def, pkvp[j].kv_keyw);
 				if (presc) {
 					if ((presc->rs_flags & resc_access_perm) == 0) {
 						if ((resc_in_err = strdup(pkvp[j].kv_keyw)) == NULL)
@@ -507,8 +505,7 @@ req_quejob(struct batch_request *preq)
 		psatl = (svrattrl *)GET_NEXT(preq->rq_ind.rq_queuejob.rq_attr);
 		while (psatl) {
 			/* look for run count attribute */
-			index = find_attr(job_attr_def, psatl->al_name,
-				JOB_ATR_LAST);
+			index = find_attr(job_attr_idx, job_attr_def, psatl->al_name);
 			if (index == (int)JOB_ATR_run_version) {
 				(void)job_attr_def[index].at_decode(
 					&pj->ji_wattr[index],
@@ -611,7 +608,7 @@ req_quejob(struct batch_request *preq)
 
 		/* identify the attribute by name */
 
-		index = find_attr(job_attr_def, psatl->al_name, JOB_ATR_LAST);
+		index = find_attr(job_attr_idx, job_attr_def, psatl->al_name);
 		if (index < 0) {
 
 			/* didn`t recognize the name */
@@ -699,8 +696,7 @@ req_quejob(struct batch_request *preq)
 				resource	*presc;
 				resource_def	*prdef;
 
-				prdef = find_resc_def(svr_resc_def, psatl->al_resc,
-					svr_resc_size);
+				prdef = find_resc_def(svr_resc_def, psatl->al_resc);
 				if (prdef == 0) {
 					job_purge(pj);
 					reply_badattr(rc, 1, psatl, preq);
@@ -2268,7 +2264,7 @@ req_resvSub(struct batch_request *preq)
 			return;
 		}
 		/* identify the attribute by name */
-		index = find_attr(resv_attr_def, psatl->al_name, RESV_ATR_LAST);
+		index = find_attr(resv_attr_idx, resv_attr_def, psatl->al_name);
 		if (index < 0) {
 
 			if (ignore_attr(psatl->al_name) >= 0) {
@@ -2859,15 +2855,13 @@ get_queue_for_reservation(resc_resv *presv)
 	j = sizeof(dont_set_in_max) / sizeof(struct dont_set_in_max);
 	for (i = 0; i < j; ++i) {
 		resource_def *prdef;
-		prdef = find_resc_def(svr_resc_def, dont_set_in_max[i].ds_name,
-			svr_resc_size);
+		prdef = find_resc_def(svr_resc_def, dont_set_in_max[i].ds_name);
 		dont_set_in_max[i].ds_rescp = find_resc_entry(
 			&presv->ri_wattr[RESV_ATR_resource],
 			prdef);
 		if (dont_set_in_max[i].ds_rescp)
 			delete_link(&dont_set_in_max[i].ds_rescp->rs_link);
 	}
-
 
 	rc = resv_attr_def[RESV_ATR_resource].at_encode(pattr, plhed,
 		ATTR_rescavail, NULL,
@@ -2883,7 +2877,6 @@ get_queue_for_reservation(resc_resv *presv)
 				&presv->ri_wattr[RESV_ATR_resource].at_val.at_list,
 				&dont_set_in_max[i].ds_rescp->rs_link,
 				dont_set_in_max[i].ds_rescp);
-
 	}
 	if (rc < 0) {
 		free_br(newreq);
@@ -3047,7 +3040,7 @@ get_queue_for_reservation(resc_resv *presv)
 static  int
 ignore_attr(char *name)
 {
-	return  (find_attr(job_attr_def, name, JOB_ATR_LAST));
+	return  (find_attr(job_attr_idx, job_attr_def, name));
 }
 
 

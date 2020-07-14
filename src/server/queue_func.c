@@ -93,7 +93,6 @@ extern long	 svr_history_enable;
 extern pbs_db_conn_t	*svr_db_conn;
 #endif
 
-
 /**
  * @brief
  * 		que_alloc - allocate space for a queue structure and initialize
