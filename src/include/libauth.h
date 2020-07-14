@@ -42,6 +42,8 @@
 extern "C" {
 #endif
 
+#include "log.h"
+
 #undef DLLEXPORT
 #ifdef WIN32
 #define DLLEXPORT __declspec(dllexport)
