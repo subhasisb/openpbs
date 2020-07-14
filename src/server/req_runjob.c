@@ -314,6 +314,7 @@ move_and_runjob(struct batch_request *preq, job *pjob)
 
 	dest = strdup(preq->rq_ind.rq_run.rq_destin);
 	free(preq->rq_ind.rq_run.rq_destin);
+	preq->rq_ind.rq_move.orig_rq_type = preq->rq_type;
 	preq->rq_type = PBS_BATCH_MoveJob;
 	strcpy(preq->rq_ind.rq_move.rq_jid, pjob->ji_qs.ji_jobid);
 	sprintf(preq->rq_ind.rq_move.rq_destin, "%s@%s", pjob->ji_qs.ji_queue, preq->rq_extend);

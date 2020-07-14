@@ -141,6 +141,7 @@ struct rq_move {
 	char rq_jid[PBS_MAXSVRJOBID + 1];
 	char rq_destin[(PBS_MAXSVRRESVID > PBS_MAXDEST ? PBS_MAXSVRRESVID : PBS_MAXDEST) + 1];
 	char *run_exec_vnode;
+	int orig_rq_type;
 };
 
 /* Resource Query/Reserve/Free */

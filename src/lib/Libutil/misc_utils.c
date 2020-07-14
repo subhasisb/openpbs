@@ -2211,8 +2211,8 @@ get_current_servers()
 	return pbs_conf.pbs_current_servers;
 }
 
-void
-random_seed()
+int
+rand_num()
 {
 	static int seeded = 0;
 	struct timeval tv;
@@ -2222,4 +2222,6 @@ random_seed()
 		srand(1000000 * tv.tv_sec + tv.tv_usec); /* seed the random generator */
 		seeded = 1;
 	}
+
+	return rand();
 }

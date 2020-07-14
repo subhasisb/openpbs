@@ -456,9 +456,6 @@ connect_to_servers(char *server_name, uint port, char *extend_data)
 
 	multi_flag = getenv(MULTI_SERVER) != NULL;
 
-	if (!multi_flag)
-		random_seed();
-
 	svr_conn_t **svr_connections = calloc(num_conf_servers, sizeof(svr_conn_t *));
 	if (!svr_connections)
 		return -1;
@@ -473,7 +470,7 @@ connect_to_servers(char *server_name, uint port, char *extend_data)
 			}
 		}
 		if (start == -1)
-			start = rand() % get_current_servers();
+			start = rand_num() % get_current_servers();
 	}
 	else
 		start = 0;

@@ -357,4 +357,4 @@ int get_max_servers(void);
  */
 extern int get_current_servers();
 
-extern void random_seed();
+extern int rand_num();
