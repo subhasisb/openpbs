@@ -67,5 +67,8 @@ struct batch_status *
 __pbs_statserver(int c, struct attrl *attrib, char *extend)
 {
 	/* MS_TODO server values has to be aggregated */
+	if (extend && !strcmp(extend, "full"))
+		return PBSD_status_aggregate(c, PBS_BATCH_StatusSvr, "", attrib, extend, MGR_OBJ_SERVER);
+
 	return PBSD_status_random(c, PBS_BATCH_StatusSvr, "", attrib, extend, MGR_OBJ_SERVER);
 }

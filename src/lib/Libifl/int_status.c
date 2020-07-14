@@ -46,12 +46,90 @@
 
 #include <string.h>
 #include <stdio.h>
+#include <ctype.h>
 #include "libpbs.h"
 #include "pbs_ecl.h"
 #include "libutil.h"
 
 
 static struct batch_status *alloc_bs();
+
+#define TRANSIT_STATE 0
+#define QUEUE_STATE 1
+#define HELD_STATE 2
+#define WAIT_STATE 3
+#define RUN_STATE 4
+#define EXITING_STATE 5
+#define BEGUN_STATE 6
+#define MAX_STATE 7
+
+static char *statename[] = { "Transit", "Queued", "Held", "Waiting",
+		"Running", "Exiting", "Begun"};
+
+/**
+ * @brief
+ *	decoded state attribute to count array
+ *
+ * @param[in] string - string holding state of job
+ * @param[out] count    - count array having job per state
+ *
+ */
+static void
+decode_states(char *string, long *count)
+{
+	char *c, *s;
+	long *d;
+
+	c = string;
+	while (isspace(*c) && *c != '\0')
+		c++;
+	while (*c != '\0') {
+		s = c;
+		while ((*c != ':') && (*c != '\0'))
+			c++;
+		if (*c == '\0')
+			break;
+		*c = '\0';
+		d = NULL;
+		if (strcmp(s, statename[QUEUE_STATE]) == 0)
+			d = &count[QUEUE_STATE];
+		else if (strcmp(s, statename[RUN_STATE]) == 0)
+			d = &count[RUN_STATE];
+		else if (strcmp(s, statename[HELD_STATE]) == 0)
+			d = &count[HELD_STATE];
+		else if (strcmp(s, statename[WAIT_STATE]) == 0)
+			d = &count[WAIT_STATE];
+		else if (strcmp(s, statename[TRANSIT_STATE]) == 0)
+			d = &count[TRANSIT_STATE];
+		else if (strcmp(s, statename[EXITING_STATE]) == 0)
+			d = &count[EXITING_STATE];
+		else if (strcmp(s, statename[BEGUN_STATE]) == 0)
+			d = &count[BEGUN_STATE];
+		c++;
+		if (d) {
+			s = c;
+			*d = strtol(s, &c, 10);
+			if (*c != '\0')
+				c++;
+		} else {
+			while (*c != ' ' && *c != '\0')
+				c++;
+		}
+	}
+}
+
+static void
+encode_states(char *buf, long *cur, long *nxt)
+{
+	int index;
+	int len = 0;
+
+	buf[0] = '\0';
+	for (index = 0; index < MAX_STATE; index++) {
+		len += sprintf(buf + len, "%s:%ld ", statename[index],
+			      cur[index] + nxt[index]);
+	}
+}
 
 /**
  * @brief
@@ -124,6 +202,51 @@ PBSD_status(int c, int function, char *objid, struct attrl *attrib, char *extend
 	return (PBSD_status_get(c));
 }
 
+static void
+aggregate(struct batch_status *cur, struct batch_status *nxt)
+{
+	long cur_st_ct[MAX_STATE] = {0};
+	long nxt_st_ct[MAX_STATE] = {0};
+	struct attrl *a = NULL;
+	struct attrl *b = NULL;
+	char *tot_jobs_attr = NULL;
+	long tot_jobs = 0;
+	char *endp;
+	int found;
+
+	if (!cur || !nxt)
+		return;
+
+	for (a = cur->attribs, found = 0; a; a = a->next) {
+		if (a->name && strcmp(a->name, ATTR_count) == 0) {
+			decode_states(a->value, cur_st_ct);
+			found++;
+		} else if (a->name && strcmp(a->name, ATTR_total) == 0) {
+			tot_jobs_attr = a->value;
+			tot_jobs += strtol(a->value, &endp, 10);
+			found++;
+		}
+		if (found == 2)
+			break;
+	}
+	for (b = nxt->attribs, found = 0; b; b = b->next) {
+		if (b->name && strcmp(b->name, ATTR_count) == 0) {
+			decode_states(b->value, nxt_st_ct);
+			found++;
+		} else if (b->name && strcmp(b->name, ATTR_total) == 0) {
+			tot_jobs += strtol(b->value, &endp, 10);
+			found++;
+		}
+		if (found == 2)
+			break;
+	}
+
+	if (a && b)
+		encode_states(a->value, cur_st_ct, nxt_st_ct);
+	if (tot_jobs_attr)
+		sprintf(tot_jobs_attr, "%ld", tot_jobs);
+}
+
 /**
  * @brief
  *	wrapper function for PBSD_status
@@ -176,8 +299,17 @@ PBSD_status_aggregate(int c, int cmd, char *id, struct attrl *attrib, char *exte
 				ret = next;
 				cur = next->last;
 			} else {
-				cur->next = next;
-				cur = next->last;
+				switch(parent_object) {
+					case MGR_OBJ_SERVER:
+					case MGR_OBJ_QUEUE:
+						aggregate(cur, next);
+						pbs_statfree(next);
+						next = NULL;
+						break;
+					default:
+						cur->next = next;
+						cur = next->last;
+				}
 			}
 		}
 

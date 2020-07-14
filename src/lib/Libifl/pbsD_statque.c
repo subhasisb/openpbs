@@ -67,5 +67,5 @@ struct batch_status *
 __pbs_statque(int c, char *id, struct attrl *attrib, char *extend)
 {
 	/* MS_TODO queue values has to be aggregated */
-	return PBSD_status_random(c, PBS_BATCH_StatusQue, id, attrib, extend, MGR_OBJ_QUEUE);
+	return PBSD_status_aggregate(c, PBS_BATCH_StatusQue, id, attrib, extend, MGR_OBJ_QUEUE);
 }
