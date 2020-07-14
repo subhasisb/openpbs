@@ -322,15 +322,16 @@ close_server_conn(int index_to_shards)
 			svr_conns[index_to_shards]->state == SVR_CONN_STATE_CONNECTED) {
 		FD_CLR(svr_conns[index_to_shards]->sd , &master_fdset);
 
-		if (svr_conns[index_to_shards]->secondary_sd >= 0) {
-			close_tcp_connection(svr_conns[index_to_shards]->secondary_sd);
-			/* unlock the connection level lock */
-			svr_conns[index_to_shards]->secondary_sd = -1;
-		}
 		if (svr_conns[index_to_shards]->sd >= 0) {
 			close_tcp_connection(svr_conns[index_to_shards]->sd);
 			/* unlock the connection level lock */
 			svr_conns[index_to_shards]->sd = -1;
+			if (svr_conns[index_to_shards]->secondary_sd >= 0) {
+				CS_close_socket(svr_conns[index_to_shards]->secondary_sd);
+				CLOSESOCKET(svr_conns[index_to_shards]->secondary_sd);
+				dis_destroy_chan(svr_conns[index_to_shards]->secondary_sd);
+				svr_conns[index_to_shards]->secondary_sd = -1;
+			}
 		}
 		svr_conns[index_to_shards]->state = SVR_CONN_STATE_DOWN;
 		pbs_client_thread_unlock_connection(entry_to_svr_conns);
@@ -1496,7 +1497,8 @@ socket_to_conn(int sock, struct sockaddr_in saddr_in)
 		}
 
 		strcpy(svr_conns[svr_conn_index]->host_name, phe->h_name);
-		svr_conns[svr_conn_index]->state = SVR_CONN_STATE_CONNECTED;
+		/* We will wait to mark this as connected until we get secondary connection */
+		svr_conns[svr_conn_index]->state = SVR_CONN_STATE_DOWN;
 		svr_conns[svr_conn_index]->state_change_time = time(0);
 		strcpy(svr_conns[svr_conn_index]->svr_id, svr_id);
 	}
@@ -1506,8 +1508,10 @@ socket_to_conn(int sock, struct sockaddr_in saddr_in)
 	if (svr_conns[svr_conn_index]->sd == -1) {
 		svr_conns[svr_conn_index]->sd = sock;
 		FD_SET(sock, &master_fdset);
-	} else
+	} else {
 		svr_conns[svr_conn_index]->secondary_sd = sock;
+		svr_conns[svr_conn_index]->state = SVR_CONN_STATE_CONNECTED;
+	}
 
 	return 0;
 }
@@ -1595,7 +1599,6 @@ schedule_wrapper(int num_cfg_svrs, int *update_svr,fd_set *read_fdset, int opt_n
 				if (update_svr != NULL && (*update_svr)) {
 					/* update sched object attributes on server */
 					if (update_svr_schedobj(svr_conns[0]->sd, cmd, alarm_time) == 0) {
-						send_cycle_end(second_connection);
 						close_server_conn(svr_inst_idx);
 						continue;
 					}
@@ -1626,7 +1629,6 @@ schedule_wrapper(int num_cfg_svrs, int *update_svr,fd_set *read_fdset, int opt_n
 				/* magic happens here */				
 				sched_ret = schedule(cmd, svr_conns[0]->sd, runjobid);
 				if (sched_ret != 0 ) {
-					send_cycle_end(second_connection);
 					close_server_conn(svr_inst_idx);
 
 					if (sigprocmask(SIG_SETMASK, &oldsigs, NULL) == -1)
