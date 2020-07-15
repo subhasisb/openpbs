@@ -1,0 +1,419 @@
+#!/bin/bash
+
+DELETE_CLUSTER=0
+NO_SVRS=0
+NO_MOMS_PER_SVR=0
+NO_CPUS_PER_MOM=0
+SVRS_INSTANCES=
+NEW_SVRS=
+
+cur_dir=$(pwd)
+TMP_DIR=${TMP_DIR:-/tmp}
+
+function _build_base_image() {
+    local _ret
+
+    if [ "x$(docker images -qf label=pbs-pocker=1 pbs-pocker:base | wc -l)" != "x0" ]; then
+        return
+    fi
+
+    cd ${cur_dir}
+    cat >${TMP_DIR}/pp_dockerfile<<__PP_DF__
+FROM centos:8
+COPY . /pbssrc
+RUN set -ex \\
+    && groupadd -g 1900 tstgrp00 \\
+    && groupadd -g 1901 tstgrp01 \\
+    && groupadd -g 1902 tstgrp02 \\
+    && groupadd -g 1903 tstgrp03 \\
+    && groupadd -g 1904 tstgrp04 \\
+    && groupadd -g 1905 tstgrp05 \\
+    && groupadd -g 1906 tstgrp06 \\
+    && groupadd -g 1907 tstgrp07 \\
+    && groupadd -g 901 pbs \\
+    && groupadd -g 1146 agt \\
+    && useradd -K UMASK=0022 -m -s /bin/bash -u 4357 -g tstgrp00 -G tstgrp00 pbsadmin \\
+    && useradd -K UMASK=0022 -m -s /bin/bash -u 9000 -g tstgrp00 -G tstgrp00 pbsbuild \\
+    && useradd -K UMASK=0022 -m -s /bin/bash -u 884 -g tstgrp00 -G tstgrp00 pbsdata \\
+    && useradd -K UMASK=0022 -m -s /bin/bash -u 4367 -g tstgrp00 -G tstgrp00 pbsmgr \\
+    && useradd -K UMASK=0022 -m -s /bin/bash -u 4373 -g tstgrp00 -G tstgrp00 pbsnonroot \\
+    && useradd -K UMASK=0022 -m -s /bin/bash -u 4356 -g tstgrp00 -G tstgrp00 pbsoper \\
+    && useradd -K UMASK=0022 -m -s /bin/bash -u 4358 -g tstgrp00 -G tstgrp00 pbsother \\
+    && useradd -K UMASK=0022 -m -s /bin/bash -u 4371 -g tstgrp00 -G tstgrp00 pbsroot \\
+    && useradd -K UMASK=0022 -m -s /bin/bash -u 4355 -g tstgrp00 -G tstgrp02,tstgrp00 pbstest \\
+    && useradd -K UMASK=0022 -m -s /bin/bash -u 4359 -g tstgrp00 -G tstgrp00 pbsuser \\
+    && useradd -K UMASK=0022 -m -s /bin/bash -u 4361 -g tstgrp00 -G tstgrp01,tstgrp02,tstgrp00 pbsuser1 \\
+    && useradd -K UMASK=0022 -m -s /bin/bash -u 4362 -g tstgrp00 -G tstgrp01,tstgrp03,tstgrp00 pbsuser2 \\
+    && useradd -K UMASK=0022 -m -s /bin/bash -u 4363 -g tstgrp00 -G tstgrp01,tstgrp04,tstgrp00 pbsuser3 \\
+    && useradd -K UMASK=0022 -m -s /bin/bash -u 4364 -g tstgrp01 -G tstgrp04,tstgrp05,tstgrp01 pbsuser4 \\
+    && useradd -K UMASK=0022 -m -s /bin/bash -u 4365 -g tstgrp02 -G tstgrp04,tstgrp06,tstgrp02 pbsuser5 \\
+    && useradd -K UMASK=0022 -m -s /bin/bash -u 4366 -g tstgrp03 -G tstgrp04,tstgrp07,tstgrp03 pbsuser6 \\
+    && useradd -K UMASK=0022 -m -s /bin/bash -u 4368 -g tstgrp01 -G tstgrp01 pbsuser7 \\
+    && useradd -K UMASK=0022 -m -s /bin/bash -u 11000 -g tstgrp00 -G tstgrp00 tstusr00 \\
+    && useradd -K UMASK=0022 -m -s /bin/bash -u 11001 -g tstgrp00 -G tstgrp00 tstusr01 \\
+    && ONLY_INSTALL_DEPS=1 /pbssrc/ci/do.sh \\
+    && dnf install -y openssh-server passwd \\
+    && echo 'Defaults  always_set_home' > /etc/sudoers.d/pbs \\
+    && echo 'Defaults  !requiretty' >> /etc/sudoers.d/pbs \\
+    && echo 'ALL ALL=(ALL)  NOPASSWD: ALL' >> /etc/sudoers.d/pbs \\
+    && ssh-keygen -A \\
+    && /usr/sbin/sshd \\
+    && ssh-keygen -N "" -C "common-ssh-pair" -f ~/.ssh/id_rsa -t rsa -q \\
+    && cp ~/.ssh/id_rsa.pub ~/.ssh/authorized_keys \\
+    && echo 'root:pbs' | chpasswd \\
+    && for user in \$(awk -F: '/^(pbs|tst)/ {print \$1}' /etc/passwd); do \\
+        rm -rf /home/\${user}/.ssh; \\
+        cp -rfp ~/.ssh /home/\${user}/; \\
+        chown -R \${user}: /home/\${user}/.ssh; \\
+        echo "\${user}:pbs" | chpasswd; \\
+    done \\
+    && echo 'Host *' >> /etc/ssh/ssh_config \\
+    && echo '  StrictHostKeyChecking no' >> /etc/ssh/ssh_config \\
+    && echo '  ConnectionAttempts 3' >> /etc/ssh/ssh_config \\
+    && echo '  IdentityFile ~/.ssh/id_rsa' >> /etc/ssh/ssh_config \\
+    && echo '  PreferredAuthentications publickey,password' >> /etc/ssh/ssh_config \\
+    && echo 'PermitRootLogin yes' >> /etc/ssh/sshd_config \\
+    && rm -rf /var/run/*.pid /run/nologin /pbssrc /tmp/*
+__PP_DF__
+
+    docker build --force-rm --rm -f ${TMP_DIR}/pp_dockerfile -t pbs-pocker:base --label pbs-pocker=1 .
+    _ret=$?
+    rm -f ${TMP_DIR}/pp_dockerfile
+    if [ ${_ret} -ne 0 ]; then
+        echo "base image build failed"
+        exit 1
+    fi
+}
+
+function _build_pbs_base_image() {
+    local _ret
+
+    if [ "x$(docker images -qf label=pbs-pocker=1 pbs:base | wc -l)" != "x0" ]; then
+        return
+    fi
+
+    cd ${cur_dir}
+    cat >${cur_dir}/docker-entrypoint<<__PP_DE__
+#!/bin/bash
+
+/usr/sbin/sshd
+
+if [ "x\$1" == "xserver" ]; then
+    /opt/pbs/libexec/pbs_postinstall
+    if [ "x\$2" != "x" ]; then
+        echo "PBS_SERVER_INSTANCES=\$2" >> /etc/pbs.conf
+    fi
+elif [ "x\$1" == "xmom" ]; then
+    PBS_SERVER=\$2 /opt/pbs/libexec/pbs_postinstall execution
+    if [ "x\$3" != "x" ]; then
+        echo "PBS_SERVER_INSTANCES=\$3" >> /etc/pbs.conf
+    fi
+else
+    exec /bin/bash
+fi
+echo "PBS_LOG_HIGHRES_TIMESTAMP=1" >> /etc/pbs.conf
+/opt/pbs/libexec/pbs_init.d start
+exec /bin/bash
+__PP_DE__
+    cat >${cur_dir}/update-svrs<<__PP_US__
+#!/bin/bash
+
+cat /etc/pbs.conf | grep -v PBS_SERVER_INSTANCES > /tmp/tconf
+echo "PBS_SERVER_INSTANCES=\$1" >> /tmp/tconf
+mv /tmp/tconf /etc/pbs.conf
+/opt/pbs/libexec/pbs_init.d reload
+__PP_US__
+    cat >${TMP_DIR}/pp_dockerfile<<__PP_DF__
+FROM pbs-pocker:base
+ENTRYPOINT [ "/docker-entrypoint" ]
+COPY . /pbssrc
+RUN set -ex \\
+    && cd /pbssrc \\
+    && cp ./update-svrs /update-svrs \\
+    && cp ./docker-entrypoint /docker-entrypoint \\
+    && chmod +x /docker-entrypoint /update-svrs \\
+    && ./autogen.sh \\
+    && mkdir target \\
+    && cd target \\
+    && ../configure CFLAGS="-g -O2 -Wall -Werror" --prefix=/opt/pbs --enable-ptl --with-swig=/usr/local \\
+    && make -j12 \\
+    && make -j12 install \\
+    && cd / \\
+    && rm -rf /pbssrc
+__PP_DF__
+
+    docker build --force-rm --rm -f ${TMP_DIR}/pp_dockerfile -t pbs:base --label pbs-pocker=1 .
+    _ret=$?
+    rm -f ${TMP_DIR}/pp_dockerfile ${cur_dir}/docker-entrypoint ${cur_dir}/update-svrs
+    if [ ${_ret} -ne 0 ]; then
+        echo "pbs base image build failed"
+        exit 1
+    fi
+}
+
+function _setup_docker_network() {
+    if [ "x$(docker network ls -f label=pbs-pocker=1 -q | wc -l)" != "x0" ]; then
+        return
+    fi
+    docker network create --attachable --label pbs-pocker=1 pbs.local >/dev/null
+    if [ $? -ne 0 ]; then
+        echo "docker network setup failed"
+        exit 1
+    fi
+}
+
+function __set_svr_insts() {
+    local _cur_svrs _cur_svr_insts=""
+
+    if [ "x${SVRS_INSTANCES}" != "x" ]; then
+        return
+    fi
+
+    _cur_svrs=$(docker ps -f label=pbs-pocker=1 -f label=server=1 -q | wc -l)
+
+    if [ ${_cur_svrs} -gt 0 -o ${NO_SVRS} -gt 1 ]; then
+        _cur_svr_insts="$(docker exec pbs-server-1 grep PBS_SERVER_INSTANCES /etc/pbs.conf 2>/dev/null)"
+        if [ "x${_cur_svr_insts}" != "x" ]; then
+            _cur_svr_insts="$(echo ${_cur_svr_insts} | cut -d= -f2)"
+            SVRS_INSTANCES=${_cur_svr_insts}
+        elif [ ${_cur_svrs} -gt 0 ]; then
+            SVRS_INSTANCES=pbs-server-1
+        fi
+        for i in $(seq $(( _cur_svrs + 1)) 1 $((_cur_svrs + NO_SVRS)))
+        do
+            SVRS_INSTANCES=${SVRS_INSTANCES},pbs-server-${i}
+            NEW_SVRS="${NEW_SVRS} ${i}"
+        done
+        if [ "x${SVRS_INSTANCES:0:1}" == "x," ]; then
+            SVRS_INSTANCES=${SVRS_INSTANCES:1}
+        fi
+    fi
+}
+
+function _setup_svrs() {
+    local _cur_svrs=$(docker ps -f label=pbs-pocker=1 -f label=server=1 -q | wc -l)
+    local _svrs=${NO_SVRS} _moms
+
+    if [ ${_svrs} -eq 0 -a ${_cur_svrs} -gt 0 ]; then
+        return
+    fi
+
+    __set_svr_insts
+
+    if [ ${NO_SVRS} -eq 0 ]; then
+        _svrs=1
+    fi
+
+    for i in $(seq $(( _cur_svrs + 1)) 1 $((_cur_svrs + _svrs)))
+    do
+        docker run -itd \
+            --domainname pbs.local \
+            --network pbs.local \
+            --dns-search pbs.local \
+            --label server=1 \
+            -h pbs-server-${i} \
+            --name pbs-server-${i} \
+            pbs:base server ${SVRS_INSTANCES} >/dev/null
+        if [ $? -ne 0 ]; then
+            echo "Failed to start pbs-server-${i}"
+            exit 1
+        else
+            echo "Started pbs-server-${i} instance"
+        fi
+    done
+
+    for i in $(seq $(( _cur_svrs + 1)) 1 $((_cur_svrs + _svrs)))
+    do
+        echo "Waiting for pbs-server-${i}"
+        for j in $(seq 0 1 180)
+        do
+            docker exec -it -e PBS_SERVER_INSTANCES=pbs-server-${i} pbs-server-${i} \
+                /opt/pbs/bin/qstat &>/dev/null
+            if [ $? -eq 0 ]; then
+                echo "pbs-server-${i} up"
+                break
+            else
+                sleep 1
+            fi
+        done
+        if [ ${j} -eq 180 ]; then
+            echo "pbs-server-${i} not up after 180 sec"
+        fi
+    done
+
+    if [ ${_cur_svrs} -gt 0 ]; then
+        for i in $(seq 1 1 ${_cur_svrs})
+        do
+            docker exec -it pbs-server-${i} /update-svrs ${SVRS_INSTANCES}
+            _moms=$(docker ps -f label=pbs-pocker=1 -f label=svron=${i} -f label=mom=1 -q | wc -l)
+            for j in $(seq 1 1 ${_moms})
+            do
+                docker exec -it pbs-mom-${i}-${j} /update-svrs ${SVRS_INSTANCES}
+            done
+        done
+    fi
+}
+
+function __setup_mom_helper() {
+    local _svr=$1
+    local _cur_moms=$(docker ps -f label=pbs-pocker=1 -f label=svron=${_svr} -f label=mom=1 -q | wc -l)
+
+    for i in $(seq $(( _cur_moms + 1)) 1 $(( _cur_moms + NO_MOMS_PER_SVR)))
+    do
+        docker run -itd \
+            --domainname pbs.local \
+            --network pbs.local \
+            --dns-search pbs.local \
+            --label mom=1 \
+            --label svron=${_svr} \
+            -h pbs-mom-${_svr}-${i} \
+            --name pbs-mom-${_svr}-${i} \
+            pbs:base mom pbs-server-${_svr} ${SVRS_INSTANCES} >/dev/null
+        if [ $? -ne 0 ]; then
+            echo "Failed to start pbs-mom-${_svr}-${i}"
+            exit 1
+        else
+            echo "Started pbs-mom-${_svr}-${i} instance"
+        fi
+        docker exec -it -e PBS_SERVER_INSTANCES=pbs-server-${_svr} pbs-server-${_svr} \
+            /opt/pbs/bin/qmgr -c "c n pbs-mom-${_svr}-${i}" pbs-server-${_svr}
+        if [ $? -ne 0 ]; then
+            echo "Failed to create mom (pbs-mom-${_svr}-${i}) on pbs-server-${_svr}"
+            exit 1
+        else
+            echo "Created mom (pbs-mom-${_svr}-${i}) on pbs-server-${_svr}"
+        fi
+        if [ ${NO_CPUS_PER_MOM} -ne 0 ]; then
+            docker exec -it -e PBS_SERVER_INSTANCES=pbs-server-${_svr} pbs-server-${_svr} \
+                /opt/pbs/bin/qmgr -c "s n pbs-mom-${_svr}-${i} resources_available.ncpus = ${NO_CPUS_PER_MOM}"
+        fi
+    done
+}
+
+function _setup_moms() {
+    local _cur_svrs=$(docker ps -f label=pbs-pocker=1 -f label=server=1 -q | wc -l)
+
+    if [ ${NO_SVRS} -eq 0 ]; then
+        for j in $(seq 1 1 ${_cur_svrs})
+        do
+            __setup_mom_helper ${j}
+        done
+    else
+        for j in ${NEW_SVRS}
+        do
+            __setup_mom_helper ${j}
+        done
+    fi
+}
+
+function setup_cluster() {
+    _build_base_image
+    _build_pbs_base_image
+    _setup_docker_network
+    _setup_svrs
+    if [ ${NO_MOMS_PER_SVR} -gt 0 ]; then
+        _setup_moms
+    fi
+}
+
+function modify_cpus() {
+    local _cur_svrs=$(docker ps -f label=pbs-pocker=1 -f label=server=1 -q | wc -l)
+    local _moms
+
+    for i in $(seq 1 1 ${_cur_svrs})
+    do
+        _moms=$(docker ps -f label=pbs-pocker=1 -f label=svron=${i} -f label=mom=1 -q | wc -l)
+        for j in $(seq 1 1 ${_moms})
+        do
+            docker exec -it -e PBS_SERVER_INSTANCES=pbs-server-${i} pbs-server-${i} \
+                /opt/pbs/bin/qmgr -c "s n pbs-mom-${i}-${j} resources_available.ncpus = ${NO_CPUS_PER_MOM}"
+        done
+    done
+}
+
+function usage() {
+    echo
+    echo "Usage:"
+    echo
+    echo "  $(basename $0) [-s <count>] [-m <count>] [-c <count>]"
+    echo
+    echo "-s <count>  - Create or add new <count> servers"
+    echo "-m <count>  - Create or add new <count> moms"
+    echo "              If -s is not provided then new <count> moms will be added to each current servers"
+    echo "              else new <count> moms will be added to each new servers only"
+    echo "-c <count>  - Set <count> as available ncpus on each moms"
+    echo "              If -s and -m is not provided then <count> will be set all existing moms on all servers"
+    echo "              If only -m provided then <count> will be set on all new moms"
+    echo "              If only -s provided then this will be ignored"
+    echo "-d          - Delete containers created by this script"
+}
+
+function parse_params() {
+    if [ ! -f ${cur_dir}/ci/do.sh ]; then
+        echo "Please run it from PBS source directory!"
+        exit 1
+    fi
+    while [ $# -gt 0 ]
+    do
+        case $1 in
+          -s)
+                if [ "x$2" == "x" ]; then
+                    echo "Option -s needs count!"
+                    usage
+                    exit 1
+                fi
+                NO_SVRS=$2
+                shift 2
+            ;;
+          -m)
+                if [ "x$2" == "x" ]; then
+                    echo "Option -m needs count!"
+                    usage
+                    exit 1
+                fi
+                NO_MOMS_PER_SVR=$2
+                shift 2
+            ;;
+          -c)
+                if [ "x$2" == "x" ]; then
+                    echo "Option -c needs count!"
+                    usage
+                    exit 1
+                fi
+                NO_CPUS_PER_MOM=$2
+                shift 2
+            ;;
+          -d) DELETE_CLUSTER=1; shift 1;;
+          -h) usage; exit 0;;
+          *) echo "Invalid option: $1"; exit 1;;
+        esac
+    done
+
+    if [ ${DELETE_CLUSTER} -eq 0 ]; then
+        if [ ${NO_SVRS} -eq 0 -a -${NO_MOMS_PER_SVR} -eq 0 -a ${NO_CPUS_PER_MOM} -eq 0 ]; then
+            echo "Provide atlest one option!"
+            usage
+            exit 1
+        fi
+    else
+        if [ ${NO_SVRS} -ne 0 -o -${NO_MOMS_PER_SVR} -ne 0 -o ${NO_CPUS_PER_MOM} -ne 0 ]; then
+            echo "Options -s, -m or -c and not be mixed with -d"
+            usage
+            exit 1
+        fi
+    fi
+}
+
+parse_params "$@"
+if [ ${DELETE_CLUSTER} -eq 1 ]; then
+    docker rm -f $(docker ps -f label=pbs-pocker=1 -f label=mom=1 -q) &>/dev/null
+    docker rm -f $(docker ps -f label=pbs-pocker=1 -f label=server=1 -q) &>/dev/null
+    docker rm -f $(docker ps -f label=pbs-pocker=1 -q) &>/dev/null
+    docker network rm pbs.local &>/dev/null
+    exit 0
+fi
+if [ ${NO_SVRS} -eq 0 -a -${NO_MOMS_PER_SVR} -eq 0 ]; then
+    modify_cpus
+else
+    setup_cluster
+fi
