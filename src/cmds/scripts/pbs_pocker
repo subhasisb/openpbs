@@ -3,7 +3,8 @@
 DELETE_CLUSTER=0
 NO_SVRS=0
 NO_MOMS_PER_SVR=0
-NO_CPUS_PER_MOM=0
+NO_VNODE_PER_MOM=0
+NO_CPUS_PER_VNODE=0
 SVRS_INSTANCES=
 NEW_SVRS=
 
@@ -86,10 +87,23 @@ __PP_DF__
 }
 
 function _build_pbs_base_image() {
-    local _ret
+    local _ret _cur_md5 _image_md5 _has_con
 
+    cd ${cur_dir}
     if [ "x$(docker images -qf label=pbs-pocker=1 pbs:base | wc -l)" != "x0" ]; then
-        return
+        _cur_md5=$(git ls-files | xargs md5sum | md5sum | awk '{ print $1 }')
+        _image_md5=$(docker inspect pbs:base -f '{{ index .Config.Labels "pbs-src-md5"}}' 2>/dev/null)
+        if [ "x${_cur_md5}" == "x${_image_md5}" ]; then
+            return
+        fi
+        _has_con=$(docker ps -f label=pbs-pocker=1 -q | head -1)
+        if [ "x${_has_con}" != "x" ]; then
+            echo "PBS Source is changed and containers are running, please run '$0 -d' first"
+            exit 1
+        fi
+        docker rmi pbs:base &>/dev/null
+    else
+        _cur_md5=$(git ls-files | xargs md5sum | md5sum | awk '{ print $1 }')
     fi
 
     cd ${cur_dir}
@@ -142,7 +156,12 @@ RUN set -ex \\
     && rm -rf /pbssrc
 __PP_DF__
 
-    docker build --force-rm --rm -f ${TMP_DIR}/pp_dockerfile -t pbs:base --label pbs-pocker=1 .
+    docker build --force-rm --rm \
+        -f ${TMP_DIR}/pp_dockerfile \
+        -t pbs:base \
+        --label pbs-pocker=1 \
+        --label pbs-src-md5=${_cur_md5} \
+        .
     _ret=$?
     rm -f ${TMP_DIR}/pp_dockerfile ${cur_dir}/docker-entrypoint ${cur_dir}/update-svrs
     if [ ${_ret} -ne 0 ]; then
@@ -192,7 +211,7 @@ function __set_svr_insts() {
 
 function _setup_svrs() {
     local _cur_svrs=$(docker ps -f label=pbs-pocker=1 -f label=server=1 -q | wc -l)
-    local _svrs=${NO_SVRS} _moms
+    local _svrs=${NO_SVRS} _moms _svrn
 
     if [ ${_svrs} -eq 0 -a ${_cur_svrs} -gt 0 ]; then
         return
@@ -206,38 +225,39 @@ function _setup_svrs() {
 
     for i in $(seq $(( _cur_svrs + 1)) 1 $((_cur_svrs + _svrs)))
     do
+        _svrn=pbs-server-${i}
         docker run -itd \
             --domainname pbs.local \
             --network pbs.local \
             --dns-search pbs.local \
             --label server=1 \
-            -h pbs-server-${i} \
-            --name pbs-server-${i} \
+            -h ${_svrn} \
+            --name ${_svrn} \
             pbs:base server ${SVRS_INSTANCES} >/dev/null
         if [ $? -ne 0 ]; then
-            echo "Failed to start pbs-server-${i}"
+            echo "Failed to start ${_svrn}"
             exit 1
         else
-            echo "Started pbs-server-${i} instance"
+            echo "Started ${_svrn} instance"
         fi
     done
 
     for i in $(seq $(( _cur_svrs + 1)) 1 $((_cur_svrs + _svrs)))
     do
-        echo "Waiting for pbs-server-${i}"
+        _svrn=pbs-server-${i}
+        echo "Waiting for ${_svrn}"
         for j in $(seq 0 1 180)
         do
-            docker exec -it -e PBS_SERVER_INSTANCES=pbs-server-${i} pbs-server-${i} \
-                /opt/pbs/bin/qstat &>/dev/null
+            docker exec -it -e PBS_SERVER_INSTANCES=${_svrn} ${_svrn} /opt/pbs/bin/qstat &>/dev/null
             if [ $? -eq 0 ]; then
-                echo "pbs-server-${i} up"
+                echo "${_svrn} up"
                 break
             else
                 sleep 1
             fi
         done
         if [ ${j} -eq 180 ]; then
-            echo "pbs-server-${i} not up after 180 sec"
+            echo "${_svrn} not up after 180 sec"
         fi
     done
 
@@ -254,38 +274,90 @@ function _setup_svrs() {
     fi
 }
 
+function __create_vnodedef() {
+    local _mom=$1 _deff=${TMP_DIR}/vnodes _cpu=${NO_CPUS_PER_VNODE}
+
+    if [ ${_cpu} -eq 0 ]; then
+        _cpu=$(nproc --all)
+    fi
+    rm -f ${_deff}
+    {
+        echo '$configversion 2'
+        echo "${_mom}: resources_available.ncpus=0"
+        echo "${_mom}: resources_available.mem=0"
+        for i in $(seq 1 1 ${NO_VNODE_PER_MOM})
+        do
+            echo "${_mom}[${i}]: resources_available.ncpus=${_cpu}"
+            echo "${_mom}[${i}]: resources_available.host=${_mom}[${i}]"
+        done
+    } > ${_deff}
+}
+
+function __vnodes_on_mom() {
+    local _svr=${1} _mom=${2} _count=${3} _modify=${4:-0} _cpu=${NO_CPUS_PER_VNODE}
+
+    if [ ${_cpu} -eq 0 ]; then
+        _cpu=$(nproc --all)
+    fi
+    {
+        echo '$configversion 2'
+        echo "${_mom}: resources_available.ncpus=0"
+        echo "${_mom}: resources_available.mem=0"
+        for i in $(seq 1 1 ${_count})
+        do
+            echo "${_mom}[${i}]: resources_available.ncpus=${_cpu}"
+            echo "${_mom}[${i}]: resources_available.host=${_mom}[${i}]"
+        done
+    } > ${TMP_DIR}/vnodes
+    docker cp ${TMP_DIR}/vnodes ${_mom}:/tmp/vnodes
+    rm -f ${TMP_DIR}/vnodes
+    docker exec -it ${_mom} /opt/pbs/sbin/pbs_mom -s remove vnodes &>/dev/null
+    docker exec -it ${_mom} /opt/pbs/sbin/pbs_mom -s insert vnodes /tmp/vnodes
+    docker exec -it ${_mom} /opt/pbs/libexec/pbs_init.d restart &>/dev/null
+    docker exec -it ${_svr} /opt/pbs/bin/qmgr -c "c n ${_mom}" &>/dev/null
+    if [ ${_modify} -eq 1 ]; then
+        echo "Modified vnodes on mom ${_mom}"
+    else
+        echo "Created vnodes on mom ${_mom}"
+    fi
+}
+
 function __setup_mom_helper() {
-    local _svr=$1
+    local _svr=$1 _cmd _vnodes _momn _svrn=pbs-server-$1
     local _cur_moms=$(docker ps -f label=pbs-pocker=1 -f label=svron=${_svr} -f label=mom=1 -q | wc -l)
 
     for i in $(seq $(( _cur_moms + 1)) 1 $(( _cur_moms + NO_MOMS_PER_SVR)))
     do
+        _momn=pbs-mom-${_svr}-${i}
         docker run -itd \
             --domainname pbs.local \
             --network pbs.local \
             --dns-search pbs.local \
             --label mom=1 \
             --label svron=${_svr} \
-            -h pbs-mom-${_svr}-${i} \
-            --name pbs-mom-${_svr}-${i} \
-            pbs:base mom pbs-server-${_svr} ${SVRS_INSTANCES} >/dev/null
+            -h ${_momn} \
+            --name ${_momn} \
+            pbs:base mom ${_svrn} ${SVRS_INSTANCES} >/dev/null
         if [ $? -ne 0 ]; then
-            echo "Failed to start pbs-mom-${_svr}-${i}"
+            echo "Failed to start ${_momn}"
             exit 1
         else
-            echo "Started pbs-mom-${_svr}-${i} instance"
+            echo "Started ${_momn} instance"
         fi
-        docker exec -it -e PBS_SERVER_INSTANCES=pbs-server-${_svr} pbs-server-${_svr} \
-            /opt/pbs/bin/qmgr -c "c n pbs-mom-${_svr}-${i}" pbs-server-${_svr}
+        docker exec -it -e PBS_SERVER_INSTANCES=${_svrn} ${_svrn} /opt/pbs/bin/qmgr -c "c n ${_momn}"
         if [ $? -ne 0 ]; then
-            echo "Failed to create mom (pbs-mom-${_svr}-${i}) on pbs-server-${_svr}"
+            echo "Failed to create mom (${_momn}) on ${_svrn}"
             exit 1
         else
-            echo "Created mom (pbs-mom-${_svr}-${i}) on pbs-server-${_svr}"
+            echo "Created mom (${_momn}) on ${_svrn}"
         fi
-        if [ ${NO_CPUS_PER_MOM} -ne 0 ]; then
-            docker exec -it -e PBS_SERVER_INSTANCES=pbs-server-${_svr} pbs-server-${_svr} \
-                /opt/pbs/bin/qmgr -c "s n pbs-mom-${_svr}-${i} resources_available.ncpus = ${NO_CPUS_PER_MOM}"
+        if [ ${NO_VNODE_PER_MOM} -gt 0 ]; then
+            __vnodes_on_mom ${_svrn} ${_momn} ${NO_VNODE_PER_MOM}
+        else
+            if [ ${NO_CPUS_PER_VNODE} -ne 0 ]; then
+                docker exec -it -e PBS_SERVER_INSTANCES=${_svrn} ${_svrn} \
+                    /opt/pbs/bin/qmgr -c "s n ${_momn} resources_available.ncpus = ${NO_CPUS_PER_VNODE}"
+            fi
         fi
     done
 }
@@ -318,34 +390,92 @@ function setup_cluster() {
 
 function modify_cpus() {
     local _cur_svrs=$(docker ps -f label=pbs-pocker=1 -f label=server=1 -q | wc -l)
-    local _moms
+    local _moms _vnodes _momn _cmd
 
     for i in $(seq 1 1 ${_cur_svrs})
     do
         _moms=$(docker ps -f label=pbs-pocker=1 -f label=svron=${i} -f label=mom=1 -q | wc -l)
         for j in $(seq 1 1 ${_moms})
         do
-            docker exec -it -e PBS_SERVER_INSTANCES=pbs-server-${i} pbs-server-${i} \
-                /opt/pbs/bin/qmgr -c "s n pbs-mom-${i}-${j} resources_available.ncpus = ${NO_CPUS_PER_MOM}"
+            _momn=pbs-mom-${i}-${j}
+            _cmd="docker exec -e PBS_SERVER_INSTANCES=pbs-server-${i}"
+            _vnodes=$(${_cmd} ${_momn} /opt/pbs/sbin/pbs_mom -s list)
+            if [ "x${_vnodes}" != "x" ]; then
+                _vnodes=$(${_cmd} pbs-server-${i} /opt/pbs/bin/pbsnodes -av | grep -E "^${_momn}\\[" | wc -l)
+                __vnodes_on_mom pbs-server-${i} ${_momn} ${_vnodes} 1 &>/dev/null
+            else
+                docker exec -it -e PBS_SERVER_INSTANCES=pbs-server-${i} pbs-server-${i} \
+                    /opt/pbs/bin/qmgr -c "s n ${_momn} resources_available.ncpus = ${NO_CPUS_PER_VNODE}"
+            fi
+        done
+    done
+}
+
+function modify_vnodes() {
+    local _cur_svrs=$(docker ps -f label=pbs-pocker=1 -f label=server=1 -q | wc -l)
+    local _moms _cmd
+
+    for i in $(seq 1 1 ${_cur_svrs})
+    do
+        docker exec -it -e PBS_SERVER_INSTANCES=pbs-server-${i} pbs-server-${i} \
+            /opt/pbs/bin/qmgr -c "d n @default"
+    done
+    for i in $(seq 1 1 ${_cur_svrs})
+    do
+        _moms=$(docker ps -f label=pbs-pocker=1 -f label=svron=${i} -f label=mom=1 -q | wc -l)
+        for j in $(seq 1 1 ${_moms})
+        do
+            __vnodes_on_mom pbs-server-${i} pbs-mom-${i}-${j} ${NO_VNODE_PER_MOM} 1
         done
     done
 }
 
 function usage() {
+    local _prog=$(basename $0)
     echo
     echo "Usage:"
     echo
-    echo "  $(basename $0) [-s <count>] [-m <count>] [-c <count>]"
+    echo "  ${_prog} [-s <count>] [-m <count>] [-c <count>]"
     echo
     echo "-s <count>  - Create or add new <count> servers"
     echo "-m <count>  - Create or add new <count> moms"
     echo "              If -s is not provided then new <count> moms will be added to each current servers"
     echo "              else new <count> moms will be added to each new servers only"
-    echo "-c <count>  - Set <count> as available ncpus on each moms"
-    echo "              If -s and -m is not provided then <count> will be set all existing moms on all servers"
-    echo "              If only -m provided then <count> will be set on all new moms"
+    echo "-v <count>  - Create or alter <count> vnodes on mom(s)"
+    echo "              If -m is provided then <count> vnodes will created on new moms only"
+    echo "              else vnodes will be created or altered on all exitsing vnodes on all moms"
+    echo "-c <count>  - Set <count> as available ncpus on each vnode"
+    echo "              If -s and -m is not provided then <count> will be set all existing vnodes on all moms"
+    echo "              If only -m provided then <count> will be set on all vnodes on all new moms"
     echo "              If only -s provided then this will be ignored"
     echo "-d          - Delete containers created by this script"
+    echo
+    echo "Examples:"
+    echo
+    echo "Create (or add new) 3 servers, no moms, no vnodes"
+    echo "  ${_prog} -s 3"
+    echo
+    echo "Create (or add new) 2 servers with 3 moms (no vnodes) on each new server"
+    echo "  ${_prog} -s 2 -m 2"
+    echo
+    echo "Add 2 new moms (no vnodes) on each existing server"
+    echo "  ${_prog} -m 2"
+    echo
+    echo "Create (or add new) 3 servers with 2 moms (with 3 vnodes on each new mom) on each new server"
+    echo "  ${_prog} -s 3 -m 3 -v 3"
+    echo
+    echo "Create (or add new) 2 servers with 2 moms (with 100 ncpus on each new mom) on each new server"
+    echo "  ${_prog} -s 2 -m 2 -c 100"
+    echo
+    echo "Modify ncpus to 100 on each existing vnodes on each mom on each server"
+    echo "  ${_prog} -c 100"
+    echo
+    echo "Add 5 vnodes on each existing mom on each server"
+    echo "  ${_prog} -v 5"
+    echo
+    echo "Last 2 examples in one shot"
+    echo "  ${_prog} -v 5 -c 100"
+    echo
 }
 
 function parse_params() {
@@ -356,7 +486,7 @@ function parse_params() {
     while [ $# -gt 0 ]
     do
         case $1 in
-          -s)
+            -s)
                 if [ "x$2" == "x" ]; then
                     echo "Option -s needs count!"
                     usage
@@ -365,7 +495,7 @@ function parse_params() {
                 NO_SVRS=$2
                 shift 2
             ;;
-          -m)
+            -m)
                 if [ "x$2" == "x" ]; then
                     echo "Option -m needs count!"
                     usage
@@ -374,30 +504,39 @@ function parse_params() {
                 NO_MOMS_PER_SVR=$2
                 shift 2
             ;;
-          -c)
+            -v)
+                if [ "x$2" == "x" ]; then
+                    echo "Option -v needs count!"
+                    usage
+                    exit 1
+                fi
+                NO_VNODE_PER_MOM=$2
+                shift 2
+            ;;
+            -c)
                 if [ "x$2" == "x" ]; then
                     echo "Option -c needs count!"
                     usage
                     exit 1
                 fi
-                NO_CPUS_PER_MOM=$2
+                NO_CPUS_PER_VNODE=$2
                 shift 2
             ;;
-          -d) DELETE_CLUSTER=1; shift 1;;
-          -h) usage; exit 0;;
-          *) echo "Invalid option: $1"; exit 1;;
+            -d) DELETE_CLUSTER=1; shift 1;;
+            -h) usage; exit 0;;
+            *) echo "Invalid option: $1"; exit 1;;
         esac
     done
 
     if [ ${DELETE_CLUSTER} -eq 0 ]; then
-        if [ ${NO_SVRS} -eq 0 -a -${NO_MOMS_PER_SVR} -eq 0 -a ${NO_CPUS_PER_MOM} -eq 0 ]; then
+        if [ ${NO_SVRS} -eq 0 -a -${NO_MOMS_PER_SVR} -eq 0 -a ${NO_VNODE_PER_MOM} -eq 0 -a ${NO_CPUS_PER_VNODE} -eq 0 ]; then
             echo "Provide atlest one option!"
             usage
             exit 1
         fi
     else
-        if [ ${NO_SVRS} -ne 0 -o -${NO_MOMS_PER_SVR} -ne 0 -o ${NO_CPUS_PER_MOM} -ne 0 ]; then
-            echo "Options -s, -m or -c and not be mixed with -d"
+        if [ ${NO_SVRS} -ne 0 -o -${NO_MOMS_PER_SVR} -ne 0 -o ${NO_VNODE_PER_MOM} -ne 0 -o ${NO_CPUS_PER_VNODE} -ne 0 ]; then
+            echo "Options -s, -m, -v or -c and not be mixed with -d"
             usage
             exit 1
         fi
@@ -412,8 +551,10 @@ if [ ${DELETE_CLUSTER} -eq 1 ]; then
     docker network rm pbs.local &>/dev/null
     exit 0
 fi
-if [ ${NO_SVRS} -eq 0 -a -${NO_MOMS_PER_SVR} -eq 0 ]; then
+if [ ${NO_SVRS} -eq 0 -a ${NO_MOMS_PER_SVR} -eq 0 -a ${NO_VNODE_PER_MOM} -eq 0 ]; then
     modify_cpus
+elif [ ${NO_SVRS} -eq 0 -a ${NO_MOMS_PER_SVR} -eq 0 -a ${NO_VNODE_PER_MOM} -ne 0 ]; then
+    modify_vnodes
 else
     setup_cluster
 fi
