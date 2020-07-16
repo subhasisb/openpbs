@@ -14,7 +14,8 @@ TMP_DIR=${TMP_DIR:-/tmp}
 function _build_base_image() {
     local _ret
 
-    if [ "x$(docker images -qf label=pbs-pocker=1 pbs-pocker:base | wc -l)" != "x0" ]; then
+    _ret=$(docker images -qf label=pbs-pocker=1 pbs-pocker:base 2>/dev/null | wc -l)
+    if [ "x${_ret//[[:space:]]/}" != "x0" ]; then
         return
     fi
 
@@ -90,7 +91,8 @@ function _build_pbs_base_image() {
     local _ret _cur_md5 _image_md5 _has_con
 
     cd ${cur_dir}
-    if [ "x$(docker images -qf label=pbs-pocker=1 pbs:base | wc -l)" != "x0" ]; then
+    _ret=$(docker images -qf label=pbs-pocker=1 pbs:base 2>/dev/null | wc -l)
+    if [ "x${_ret//[[:space:]]/}" != "x0" ]; then
         _cur_md5=$(git ls-files | xargs md5sum | md5sum | awk '{ print $1 }')
         _image_md5=$(docker inspect pbs:base -f '{{ index .Config.Labels "pbs-src-md5"}}' 2>/dev/null)
         if [ "x${_cur_md5}" == "x${_image_md5}" ]; then
@@ -146,6 +148,7 @@ RUN set -ex \\
     && cp ./update-svrs /update-svrs \\
     && cp ./docker-entrypoint /docker-entrypoint \\
     && chmod +x /docker-entrypoint /update-svrs \\
+    && ( [ -f Makefile ] && make distclean || true ) \\
     && ./autogen.sh \\
     && mkdir target \\
     && cd target \\
@@ -171,7 +174,10 @@ __PP_DF__
 }
 
 function _setup_docker_network() {
-    if [ "x$(docker network ls -f label=pbs-pocker=1 -q | wc -l)" != "x0" ]; then
+    local _ret
+
+    _ret=$(docker network ls -f label=pbs-pocker=1 -q 2>/dev/null | wc -l)
+    if [ "x${_ret//[[:space:]]/}" != "x0" ]; then
         return
     fi
     docker network create --attachable --label pbs-pocker=1 pbs.local >/dev/null
@@ -189,6 +195,7 @@ function __set_svr_insts() {
     fi
 
     _cur_svrs=$(docker ps -f label=pbs-pocker=1 -f label=server=1 -q | wc -l)
+    _cur_svrs=${_cur_svrs//[[:space:]]/}
 
     if [ ${_cur_svrs} -gt 0 -o ${NO_SVRS} -gt 1 ]; then
         _cur_svr_insts="$(docker exec pbs-server-1 grep PBS_SERVER_INSTANCES /etc/pbs.conf 2>/dev/null)"
@@ -212,6 +219,8 @@ function __set_svr_insts() {
 function _setup_svrs() {
     local _cur_svrs=$(docker ps -f label=pbs-pocker=1 -f label=server=1 -q | wc -l)
     local _svrs=${NO_SVRS} _moms _svrn
+
+    _cur_svrs=${_cur_svrs//[[:space:]]/}
 
     if [ ${_svrs} -eq 0 -a ${_cur_svrs} -gt 0 ]; then
         return
@@ -266,6 +275,7 @@ function _setup_svrs() {
         do
             docker exec -it pbs-server-${i} /update-svrs ${SVRS_INSTANCES}
             _moms=$(docker ps -f label=pbs-pocker=1 -f label=svron=${i} -f label=mom=1 -q | wc -l)
+            _moms=${_moms//[[:space:]]/}
             for j in $(seq 1 1 ${_moms})
             do
                 docker exec -it pbs-mom-${i}-${j} /update-svrs ${SVRS_INSTANCES}
@@ -326,6 +336,8 @@ function __setup_mom_helper() {
     local _svr=$1 _cmd _vnodes _momn _svrn=pbs-server-$1
     local _cur_moms=$(docker ps -f label=pbs-pocker=1 -f label=svron=${_svr} -f label=mom=1 -q | wc -l)
 
+    _cur_moms=${_cur_moms//[[:space:]]/}
+
     for i in $(seq $(( _cur_moms + 1)) 1 $(( _cur_moms + NO_MOMS_PER_SVR)))
     do
         _momn=pbs-mom-${_svr}-${i}
@@ -365,6 +377,8 @@ function __setup_mom_helper() {
 function _setup_moms() {
     local _cur_svrs=$(docker ps -f label=pbs-pocker=1 -f label=server=1 -q | wc -l)
 
+    _cur_svrs=${_cur_svrs//[[:space:]]/}
+
     if [ ${NO_SVRS} -eq 0 ]; then
         for j in $(seq 1 1 ${_cur_svrs})
         do
@@ -392,9 +406,12 @@ function modify_cpus() {
     local _cur_svrs=$(docker ps -f label=pbs-pocker=1 -f label=server=1 -q | wc -l)
     local _moms _vnodes _momn _cmd
 
+    _cur_svrs=${_cur_svrs//[[:space:]]/}
+
     for i in $(seq 1 1 ${_cur_svrs})
     do
         _moms=$(docker ps -f label=pbs-pocker=1 -f label=svron=${i} -f label=mom=1 -q | wc -l)
+        _moms=${_moms//[[:space:]]/}
         for j in $(seq 1 1 ${_moms})
         do
             _momn=pbs-mom-${i}-${j}
@@ -402,7 +419,7 @@ function modify_cpus() {
             _vnodes=$(${_cmd} ${_momn} /opt/pbs/sbin/pbs_mom -s list)
             if [ "x${_vnodes}" != "x" ]; then
                 _vnodes=$(${_cmd} pbs-server-${i} /opt/pbs/bin/pbsnodes -av | grep -E "^${_momn}\\[" | wc -l)
-                __vnodes_on_mom pbs-server-${i} ${_momn} ${_vnodes} 1 &>/dev/null
+                __vnodes_on_mom pbs-server-${i} ${_momn} ${_vnodes//[[:space:]]/} 1 &>/dev/null
             else
                 docker exec -it -e PBS_SERVER_INSTANCES=pbs-server-${i} pbs-server-${i} \
                     /opt/pbs/bin/qmgr -c "s n ${_momn} resources_available.ncpus = ${NO_CPUS_PER_VNODE}"
@@ -415,6 +432,7 @@ function modify_vnodes() {
     local _cur_svrs=$(docker ps -f label=pbs-pocker=1 -f label=server=1 -q | wc -l)
     local _moms _cmd
 
+    _cur_svrs=${_cur_svrs//[[:space:]]/}
     for i in $(seq 1 1 ${_cur_svrs})
     do
         docker exec -it -e PBS_SERVER_INSTANCES=pbs-server-${i} pbs-server-${i} \
@@ -423,6 +441,7 @@ function modify_vnodes() {
     for i in $(seq 1 1 ${_cur_svrs})
     do
         _moms=$(docker ps -f label=pbs-pocker=1 -f label=svron=${i} -f label=mom=1 -q | wc -l)
+        _moms=${_moms//[[:space:]]/}
         for j in $(seq 1 1 ${_moms})
         do
             __vnodes_on_mom pbs-server-${i} pbs-mom-${i}-${j} ${NO_VNODE_PER_MOM} 1
