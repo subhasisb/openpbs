@@ -1719,6 +1719,7 @@ req_commit_now(struct batch_request *preq,  job *pj)
 	pbs_db_obj_info_t obj;
 	long time_msec;
 	struct batch_request *preq_runjob = NULL;
+	char *runjob_extend = NULL;
 #ifdef WIN32
 	struct _timeb tval;
 #else
@@ -1819,7 +1820,25 @@ req_commit_now(struct batch_request *preq,  job *pj)
 	pj->ji_wattr[(int)JOB_ATR_qrank].at_val.at_long = time_msec;
 	pj->ji_wattr[(int)JOB_ATR_qrank].at_flags |= ATR_SET_MOD_MCACHE;
 
-	if ((rc = svr_enquejob(pj, preq->rq_extend)) != 0) {
+	/*
+	 * As per Nithin's qmove + qrun changes extend will have dest/select_spec without any marker
+	 * but as per implicit commit job, extend will have implicit commit marker with extra extend from qsub
+	 * (if any)
+	 *
+	 * And as per qmove + qrun changes, extend is passed to svr_enquejob, and if its not NULL
+	 * then svr_enqueue_job will not notify sched for new job
+	 * which conficts in case of implicit commit job from qsub
+	 *
+	 * (for now) so to remove this confict check for implicit commit job marker and if extend
+	 * doesn't have it then only pass extend to svr_enquejob, else pass NULL
+	 *
+	 * But in future we should change Nithin's changes and put marker in extend then here
+	 * check that marker and if that marker exists then only pass it to svr_enquejob
+	 */
+	if (preq->rq_extend && strstr(preq->rq_extend, EXTEND_OPT_IMPLICIT_COMMIT) == NULL)
+		runjob_extend = preq->rq_extend;
+
+	if ((rc = svr_enquejob(pj, runjob_extend)) != 0) {
 		job_purge(pj);
 		req_reject(rc, 0, preq);
 		return;
@@ -1890,7 +1909,7 @@ req_commit_now(struct batch_request *preq,  job *pj)
 
 	/* allocate a new batch req to use for runjob at the end
 	as we will be freeing br in replyjobid */
-	if (preq->rq_extend) {
+	if (runjob_extend) {
 		if ((preq_runjob = alloc_br(PBS_BATCH_RunJob)) == NULL) {
 			job_purge(pj);
 			req_reject(PBSE_SYSTEM, 0, preq);
@@ -1899,7 +1918,7 @@ req_commit_now(struct batch_request *preq,  job *pj)
 
 		preq_runjob->rq_perm = preq->rq_perm;
 		strcpy(preq_runjob->rq_ind.rq_run.rq_jid, pj->ji_qs.ji_jobid);
-		preq_runjob->rq_ind.rq_run.rq_destin = strdup(preq->rq_extend);
+		preq_runjob->rq_ind.rq_run.rq_destin = strdup(runjob_extend);
 		if (preq_runjob->rq_ind.rq_run.rq_destin == NULL) {
 			free_br(preq_runjob);
 			job_purge(pj);
