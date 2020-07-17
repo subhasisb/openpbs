@@ -50,6 +50,7 @@
 #include "libpbs.h"
 #include "pbs_ecl.h"
 #include "libutil.h"
+#include "attribute.h"
 
 
 static struct batch_status *alloc_bs();
@@ -203,7 +204,7 @@ PBSD_status(int c, int function, char *objid, struct attrl *attrib, char *extend
 }
 
 static void
-aggregate(struct batch_status *cur, struct batch_status *nxt)
+aggr_job_ct(struct batch_status *cur, struct batch_status *nxt)
 {
 	long cur_st_ct[MAX_STATE] = {0};
 	long nxt_st_ct[MAX_STATE] = {0};
@@ -245,6 +246,129 @@ aggregate(struct batch_status *cur, struct batch_status *nxt)
 		encode_states(a->value, cur_st_ct, nxt_st_ct);
 	if (tot_jobs_attr)
 		sprintf(tot_jobs_attr, "%ld", tot_jobs);
+}
+
+#define DOUBLE 0
+#define LONG 1
+#define STRING 2
+#define SIZE 3
+
+static void
+assess_type(char *val, int *type, double *val_double, long *val_long, char *val_str)
+{
+	char *pc;
+
+	if (strchr(val, '.')) {
+		if ((*val_double = strtod(val, &pc)))
+			*type = DOUBLE;
+		else if (pc && *pc != '\0')
+			*type = STRING;
+	} else {
+		if ((*val_long = strtol(val, &pc, 10)))
+			*type = LONG;
+		else if (pc && *pc != '\0')
+			*type = STRING;
+	}
+	if (*type == STRING) {
+		if ((*pc == 'k' || *pc == 'm' || *pc == 'g' || *pc == 't' || *pc == 'p') && pc[1] == 'b') {
+			*type = SIZE;
+			*val_long = strtol(val, &pc, 10);
+		}
+	}
+}
+
+static void
+accumulate_values(struct attrl *a, struct attrl *b)
+{
+	double val_double = 0;
+	long val_long = 0;
+	char val_str[20];
+	char *pc;
+	int type = -1;
+	struct attrl *cur;
+	struct attribute attr;
+	struct attribute new;
+	char buf[32];
+
+	if (!a || !b || !b->resource || *b->resource == '\0' || !b->value || *b->value == '\0')
+		return;
+
+	assess_type(b->value, &type, &val_double, &val_long, val_str);
+
+	if (type == STRING)
+		return;
+
+	for (cur = a; cur; cur = cur->next) {
+		if (cur->name && !strcmp(cur->name, ATTR_rescassn) &&
+		    cur->resource && !strcmp(cur->resource, b->resource)) {
+			switch (type) {
+			case DOUBLE:
+				val_double += strtod(cur->value, &pc);
+				sprintf(buf, "%f", val_double);
+				break;
+			case LONG:
+				val_long += strtol(cur->value, &pc, 10);
+				sprintf(buf, "%ld", val_long);
+				break;
+			case SIZE:
+				decode_size(&attr, NULL, NULL, val_str);
+				decode_size(&new, NULL, NULL, cur->value);
+				set_size(&attr, &new, INCR);
+				from_size(&attr.at_val.at_size, buf);
+			default:
+				break;
+			}
+			free(cur->value);
+			cur->value = malloc(strlen(buf) + 1);
+			strcpy(cur->value, buf);
+			break;
+		}
+	}
+	/* value exists in next but not in cur. Create it */
+	if (!cur) {
+		struct attrl *at = dup_attrl(b);
+		for (cur = a; cur->next; cur = cur->next)
+			;
+		cur->next = at;
+	}
+}
+
+static void
+aggr_resc_ct(struct batch_status *cur, struct batch_status *nxt)
+{
+	struct attrl *b = NULL;
+
+	if (!cur || !nxt)
+		return;
+
+	for (b = nxt->attribs; b; b = b->next) {
+		if (b->name && strcmp(b->name, ATTR_rescassn) == 0)
+			accumulate_values(cur->attribs, b);
+	}
+}
+
+static void
+aggregate_queue(struct batch_status *sv1, struct batch_status *sv2)
+{
+	struct batch_status *a = NULL;
+	struct batch_status *b = NULL;
+
+	for (b = sv2; b; b = b->next) {
+		for (a = sv1; a; a = a->next) {
+			if (a->name && b->name && !strcmp(a->name, b->name)) {
+				aggr_job_ct(a, b);
+				aggr_resc_ct(a, b);
+				break;
+			}
+		}
+	}
+}
+
+static void
+aggregate_svr(struct batch_status *sv1, struct batch_status *sv2)
+{
+	aggr_job_ct(sv1, sv2);
+	aggr_resc_ct(sv1, sv2);
 }
 
 /**
@@ -301,8 +425,12 @@ PBSD_status_aggregate(int c, int cmd, char *id, struct attrl *attrib, char *exte
 			} else {
 				switch(parent_object) {
 					case MGR_OBJ_SERVER:
+						aggregate_svr(ret, next);
+						pbs_statfree(next);
+						next = NULL;
+						break;
 					case MGR_OBJ_QUEUE:
-						aggregate(cur, next);
+						aggregate_queue(ret, next);
 						pbs_statfree(next);
 						next = NULL;
 						break;
