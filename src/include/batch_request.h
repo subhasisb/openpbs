@@ -421,6 +421,7 @@ extern int decode_DIS_Run(int, struct batch_request *);
 extern int decode_DIS_ShutDown(int, struct batch_request *);
 extern int decode_DIS_SignalJob(int, struct batch_request *);
 extern int decode_DIS_Status(int, struct batch_request *);
+extern int decode_DIS_Diffstatus(int, struct batch_request *);
 extern int decode_DIS_TrackJob(int, struct batch_request *);
 extern int decode_DIS_replySvr(int, struct batch_reply *);
 extern int decode_DIS_svrattrl(int, pbs_list_head *);

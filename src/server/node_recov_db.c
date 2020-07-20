@@ -350,6 +350,8 @@ node_save_db(struct pbsnode *pnode)
 	if (rc == 0)
 		pnode->nd_svrflags &= ~NODE_NEWOBJ;
 
+	update_node_timedlist(pnode); /* add to the latest nodes list */
+
 done:
 	free_db_attr_list(&dbnode.db_attr_list);
 

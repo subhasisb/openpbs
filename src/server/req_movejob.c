@@ -270,5 +270,8 @@ req_orderjob(struct batch_request *req)
 	job_save_db(pjob1);
 	job_save_db(pjob2);
 
+	/* the client stat cache cannot reorder jobs, so we need to force it to refresh */
+	force_cli_daemons_update(PBS_NET_CONN_FROM_QSTAT_DAEMON);
+
 	reply_ack(req);
 }

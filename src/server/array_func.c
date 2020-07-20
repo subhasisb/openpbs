@@ -265,6 +265,14 @@ update_sj_parent(job *parent, job *sj, char *sjid, char oldstate, char newstate)
 	int ostatenum;
 	int nstatenum;
 
+	/* if a subjob is moving to FINISHED or EXPIRED, we need to add it to the deleted_ids list */
+	if (oldstate == JOB_STATE_LTR_QUEUED || oldstate == JOB_STATE_LTR_EXPIRED || oldstate == JOB_STATE_LTR_FINISHED) {
+		if (newstate == JOB_STATE_LTR_EXPIRED || newstate == JOB_STATE_LTR_FINISHED) {
+			if (parent && parent->ji_ajinfo)
+				append_deleted_ids(&parent->ji_ajinfo->subjobs_deleted, (char *) uLTostr(get_index_from_jid(sjid), 10));
+		}
+	}
+
 	if (oldstate == newstate)
 		return;
 
@@ -559,6 +567,8 @@ setup_ajinfo(job *pjob, int mode)
 	trktbl->tkm_end = end;
 	trktbl->tkm_step = step;
 	trktbl->tkm_flags = 0;
+	CLEAR_HEAD(trktbl->subjobs_timed);
+	CLEAR_HEAD(trktbl->subjobs_deleted);
 	pjob->ji_ajinfo = trktbl;
 	return PBSE_NONE;
 }

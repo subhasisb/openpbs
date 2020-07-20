@@ -94,6 +94,7 @@ struct server {
 	} sv_qs;
 	attribute sv_attr[SVR_ATR_LAST]; /* the server attributes */
 	short newobj;
+	struct timeval update_tm; 		/* last updated timestamp */
 	time_t sv_started;		       /* time server started */
 	time_t sv_hotcycle;		       /* if RECOV_HOT,time of last restart */
 	time_t sv_next_schedule;	   /* when to next run scheduler cycle */
@@ -112,6 +113,10 @@ struct server {
 
 extern struct server	server;
 extern	pbs_list_head	svr_alljobs;
+extern	pbs_list_head	svr_alljobs_timed; /* update-time sorted list of jobs - head has latest */
+extern	pbs_list_head	svr_allnodes_timed; /* update-time sorted list of nodes - head has latest */
+extern  pbs_list_head	svr_alljobs_deleted; /* deleted job ids, for diffstat functionality */
+extern	pbs_list_head	svr_allnodes_deleted; /* deleted node ids, for diffstat */
 extern	pbs_list_head	svr_allresvs;	/* all reservations in server */
 
 /* degraded reservations globals */

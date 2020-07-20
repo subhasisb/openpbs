@@ -80,6 +80,9 @@ void *conn = NULL;
 #ifdef PRINTJOBSVR
 /* just to make jattr_get_set.c happy */
 attribute_def job_attr_def[1] = {{0}};
+void
+update_job_timedlist(job *pjob) {
+}
 #endif
 
 #define BUF_SIZE 512

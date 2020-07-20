@@ -108,7 +108,6 @@ extern	void unset_license_linger(void);
 extern	void unset_job_history_enable(void);
 extern	void unset_job_history_duration(void);
 extern	void unset_max_job_sequence_id(void);
-extern	void force_qsub_daemons_update(void);
 extern  void unset_node_fail_requeue(void);
 extern pbs_sched *sched_alloc(char *sched_name);
 extern void sched_free(pbs_sched *psched);
@@ -749,6 +748,7 @@ mgr_set_attr2(attribute *pattr, void *pidx, attribute_def *pdef, int limit, svra
 
 			if (pold->at_type == ATR_TYPE_LIST) {
 				list_move(&pnew->at_val.at_list, &pold->at_val.at_list);
+				mark_attr_set(pold);
 			} else if (pold->at_type == ATR_TYPE_RESC) {
 				set_resc(pold, pnew, INCR);
 				/* clear ATR_VFLAG_DEFLT on modified values */
@@ -819,6 +819,7 @@ mgr_set_attr2(attribute *pattr, void *pidx, attribute_def *pdef, int limit, svra
 
 			if (pold->at_type == ATR_TYPE_LIST) {
 				list_move(&pnew->at_val.at_list, &pold->at_val.at_list);
+				mark_attr_set(pold);
 			} else if (pold->at_type == ATR_TYPE_RESC) {
 				set_resc(pold, pnew, INCR);
 				/* clear ATR_VFLAG_DEFLT on modified values */
@@ -1034,8 +1035,8 @@ mgr_unset_attr(attribute *pattr, void *pidx, attribute_def *pdef, int limit, svr
 			presc = (resource *)GET_NEXT((pattr + index)->at_val.at_list);
 			if (presc == NULL)
 				mark_attr_not_set(pattr+index);
-			(pattr+index)->at_flags |= ATR_MOD_MCACHE;
-
+			else
+				mark_attr_set(pattr+index);
 		} else if (((pdef + index)->at_type == ATR_TYPE_ENTITY) &&
 			(plist->al_resc != NULL)) {
 
@@ -1065,7 +1066,7 @@ mgr_unset_attr(attribute *pattr, void *pidx, attribute_def *pdef, int limit, svr
 			/* now free the whole attribute */
 
 			(pdef + index)->at_free(pattr + index);
-			(pattr + index)->at_flags |= ATR_VFLAG_MODIFY;
+			mark_attr_not_set(pattr + index);
 		}
 		plist = (svrattrl *)GET_NEXT(plist->al_link);
 	}
@@ -1472,7 +1473,7 @@ mgr_server_unset(struct batch_request *preq, conn_t *conn)
 			resize_prov_table(max_concurrent_prov);
 		} else if (strcasecmp(plist->al_name,
 			ATTR_dfltqsubargs) == 0) {
-			force_qsub_daemons_update();
+			force_cli_daemons_update(PBS_NET_CONN_FROM_QSUB_DAEMON);
 		} else if (strcasecmp(plist->al_name,
 			ATTR_nodefailrq) == 0) {
 			unset_node_fail_requeue();
@@ -2104,6 +2105,8 @@ mgr_node_set(struct batch_request *preq)
 					if ((pnode->nd_nsnfree == 0) && (pnode->nd_state == 0))
 						set_vnode_state(pnode, INUSE_JOB, Nd_State_Or);
 
+					update_node_timedlist(pnode);
+
 					mgr_log_attr(msg_man_set, plist, PBS_EVENTCLASS_NODE, pnode->nd_name, NULL);
 				}
 			}
@@ -2437,6 +2440,8 @@ mgr_node_unset(struct batch_request *preq)
 					}
 				}
 
+				update_node_timedlist(pnode);
+
 				mgr_log_attr(msg_man_set, plist,
 					PBS_EVENTCLASS_NODE, pnode->nd_name, NULL);
 			}
@@ -2686,24 +2691,25 @@ remove_mom_ipaddresses_list(mominfo_t *pmom)
 int
 create_pbs_node2(char *objname, svrattrl *plist, int perms, int *bad, struct pbsnode **rtnpnode, int nodup, int allow_unkresc)
 {
-	struct pbsnode	*pnode;
+	struct pbsnode *pnode;
 	struct pbsnode **tmpndlist;
-	int		ntype;		/* node type, always PBS */
-	char		*pc;
-	char		*phost;		/* trial host name */
-	char		*pname;		/* node name w/o any :ts       */
-	u_long		*pul = NULL;	/* 0 terminated host adrs array*/
-	int		 rc;
-	int		 j;
-	int		 iht;
-	attribute	*pattr;
-	svrattrl	*plx;
-	mominfo_t	*pmom;
-	mom_svrinfo_t	*smp;
-	resource_def	*prdef;
-	resource	*presc;
-	char 		 realfirsthost[PBS_MAXHOSTNAME+1];
-	int		 ret;
+	int ntype; /* node type, always PBS */
+	char *pc;
+	char *phost;		/* trial host name */
+	char *pname;		/* node name w/o any :ts       */
+	u_long *pul = NULL; /* 0 terminated host adrs array*/
+	int rc;
+	int j;
+	int iht;
+	attribute *pattr;
+	svrattrl *plx;
+	mominfo_t *pmom;
+	mom_svrinfo_t *smp;
+	resource_def *prdef;
+	resource *presc;
+	char realfirsthost[PBS_MAXHOSTNAME + 1];
+	int ret;
+	deleted_obj_t *dj;
 
 	if (rtnpnode != NULL)
 		*rtnpnode = NULL;
@@ -2991,6 +2997,14 @@ create_pbs_node2(char *objname, svrattrl *plist, int perms, int *bad, struct pbs
 		}
 	}
 
+	/* bfore we return success, we need to remove id from svr_allnodes_deleted list, if node created with same name after deletion */
+	dj = find_deleted_id(&svr_allnodes_deleted, pname);
+	if (dj) {
+		delete_link(&dj->deleted_obj_link);
+		free(dj->obj_id);
+		free(dj);
+	}
+
 	if (rtnpnode != NULL)
 		*rtnpnode = pnode;
 	return (ret);	    /*create completely successful*/
@@ -3096,40 +3110,33 @@ mgr_sched_delete(struct batch_request *preq)
  */
 
 static void
-mgr_node_delete(preq)
-struct batch_request *preq;
+mgr_node_delete(struct batch_request *preq)
 {
-	int		numnodes = 1;
-	struct pbsnode  *pnode;
-	struct pbssubn  *psub;
-	char		*nodename;
-	int		rc;
-
-	int		i, len;
-	int		n;
-	int		problem_cnt = 0;
-	char		*problem_names;
-	struct pbsnode  **problem_nodes = NULL;
-	svrattrl	*plist;
-	mom_svrinfo_t	*psvrmom;
+	int numnodes = 1;
+	struct pbsnode *pnode;
+	struct pbssubn *psub;
+	char *nodename;
+	int rc;
+	int i, len;
+	int n;
+	int problem_cnt = 0;
+	char *problem_names;
+	struct pbsnode **problem_nodes = NULL;
+	svrattrl *plist;
+	mom_svrinfo_t *psvrmom;
 
 	nodename = preq->rq_ind.rq_manager.rq_objname;
 
-	if ((*preq->rq_ind.rq_manager.rq_objname == '\0') ||
-		(*preq->rq_ind.rq_manager.rq_objname == '@')) {
-
+	if ((*preq->rq_ind.rq_manager.rq_objname == '\0') || (*preq->rq_ind.rq_manager.rq_objname == '@')) {
 		/*In this instance the delete node req is to apply to all */
 		/*nodes at the local ('\0')  or specified ('@') server */
-
 		if ((pbsndlist != NULL) && svr_totnodes) {
 			nodename = all_nodes;
 			pnode = *pbsndlist;
 			numnodes = svr_totnodes;
-		}
-		else { /* specified server has no nodes in its node table */
+		} else { /* specified server has no nodes in its node table */
 			pnode = NULL;
 		}
-
 	} else {
 		pnode = find_nodebyname(nodename);
 	}
@@ -3240,8 +3247,6 @@ struct batch_request *preq;
 		if (numnodes == 1)
 			break;
 	} /*bottom of the for()*/
-
-	save_nodes_db(1, NULL);
 
 	if (numnodes > 1) {		/*modification was for all nodes  */
 

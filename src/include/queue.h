@@ -87,7 +87,6 @@ struct pbs_queue {
 	int qu_njstate[PBS_NUMJOBSTATE]; /* # of jobs per state */
 
 	/* the queue attributes */
-
 	attribute qu_attr[QA_ATR_LAST];
 	short newobj;
 };

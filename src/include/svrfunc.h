@@ -54,6 +54,18 @@ extern "C" {
 #include "pbs_sched.h"
 #include "pbs_entlim.h"
 
+/* deleted_obj_t is used in a linked list
+ * to keep track of objects that are deleted.
+ * Currently, deleted nodes and jobs are only tracked
+ * 
+ * see req_stat, append_deleted_ids()
+ */
+typedef struct {
+	pbs_list_link deleted_obj_link;
+	char *obj_id;   /* obj identifier */
+	struct timeval tm_deleted; /* time of deletion */
+} deleted_obj_t;
+
 extern int check_num_cpus(void);
 extern int chk_hold_priv(long, int);
 extern void close_client(int);
@@ -138,6 +150,12 @@ extern int compare_obj_hash(void *, int , void *);
 extern void panic_stop_db();
 extern void free_db_attr_list(pbs_db_attr_list_t *);
 extern void req_stat_svr_ready(struct work_task *);
+extern void update_node_timedlist(pbsnode *);
+extern void append_deleted_ids(pbs_list_head *, char *);
+extern void stat_deleted_ids(pbs_list_head *, struct timeval, pbs_list_head *, struct timeval *, int *, struct timeval *);
+extern deleted_obj_t *find_deleted_id(pbs_list_head *, char *);
+struct timeval parse_ts_from_extend(char *);
+extern	void force_cli_daemons_update(int);
 
 #ifdef _PROVISION_H
 extern int find_prov_vnode_list(job *, exec_vnode_listtype *, char **);
@@ -384,8 +402,8 @@ struct stat_cntl {
 	char sc_jobid[PBS_MAXSVRJOBID + 1];
 };
 
-extern int status_job(job *, struct batch_request *, svrattrl *, pbs_list_head *, int *, int);
-extern int status_subjob(job *, struct batch_request *, svrattrl *, int, pbs_list_head *, int *, int);
+extern int status_job(job *, struct batch_request *, svrattrl *, pbs_list_head *, int *, int, struct timeval);
+extern int status_subjob(job *, struct batch_request *, svrattrl *, int, pbs_list_head *, int *, int, struct timeval);
 extern int stat_to_mom(job *, struct stat_cntl *);
 
 #endif /* STAT_CNTL */

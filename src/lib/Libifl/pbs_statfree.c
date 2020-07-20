@@ -52,6 +52,47 @@
 
 /**
  * @brief
+ *	free a batch status attributes
+ *
+ * @param[in] batch_status - the batch status structure whose attribs to be freed
+ *
+ */
+void
+free_bs_attribs(struct batch_status *bsp)
+{
+	struct attrl        *atnxt;
+	while (bsp->attribs != NULL) {
+		if (bsp->attribs->name != NULL)
+			(void)free(bsp->attribs->name);
+		if (bsp->attribs->resource != NULL)
+			(void) free(bsp->attribs->resource);
+		if (bsp->attribs->value != NULL)
+			(void)free(bsp->attribs->value);
+		atnxt = bsp->attribs->next;
+		(void)free(bsp->attribs);
+		bsp->attribs = atnxt;
+	}
+}
+
+
+/**
+ * @brief
+ *	free a batch status structure
+ *
+ * @param[in] batch_status - the batch status structure to be freed
+ *
+ */
+void 
+free_bs(struct batch_status *bsp)
+{
+	if (bsp->name != NULL)(void)free(bsp->name);
+	if (bsp->text != NULL)(void)free(bsp->text);
+	free_bs_attribs(bsp);
+	free(bsp);
+}
+
+/**
+ * @brief
  *	-The function that deallocates a "batch_status" structure
  *
  * @param[in] bsp - pointer to batch request.
@@ -62,25 +103,11 @@
 void
 __pbs_statfree(struct batch_status *bsp)
 {
-	struct attrl        *atnxt;
 	struct batch_status *bsnxt;
 
 	while (bsp != NULL) {
-		if (bsp->name != NULL)(void)free(bsp->name);
-		if (bsp->text != NULL)(void)free(bsp->text);
-		while (bsp->attribs != NULL) {
-			if (bsp->attribs->name != NULL)
-				(void)free(bsp->attribs->name);
-			if (bsp->attribs->resource != NULL)
-				(void) free(bsp->attribs->resource);
-			if (bsp->attribs->value != NULL)
-				(void)free(bsp->attribs->value);
-			atnxt = bsp->attribs->next;
-			(void)free(bsp->attribs);
-			bsp->attribs = atnxt;
-		}
 		bsnxt = bsp->next;
-		(void)free(bsp);
+		free_bs(bsp);
 		bsp = bsnxt;
 	}
 }

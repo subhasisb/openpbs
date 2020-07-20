@@ -252,6 +252,8 @@ job_save_db(job *pjob)
 	if ((rc = pbs_db_save_obj(conn, &obj, savetype)) == 0)
 		pjob->newobj = 0;
 
+	update_job_timedlist(pjob); /* add to the latest jobs list */
+
 done:
 	free_db_attr_list(&dbjob.db_attr_list);
 

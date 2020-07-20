@@ -73,6 +73,8 @@ int __pbs_disconnect(int);
 
 char *__pbs_geterrmsg(int);
 
+void __pbs_seterrmsg(int, char *);
+
 int __pbs_holdjob(int, char *, char *, char *);
 
 int __pbs_loadconf(int);
@@ -134,6 +136,8 @@ int __pbs_delresv(int, char *, char *);
 int __pbs_terminate(int, int, char *);
 
 preempt_job_info *__pbs_preempt_jobs(int, char **);
+
+extern struct timeval __pbs_get_last_stat_ts();
 
 #ifdef	__cplusplus
 }

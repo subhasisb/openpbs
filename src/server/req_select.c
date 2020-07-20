@@ -90,7 +90,6 @@ static int  sel_attr(attribute *, struct select_list *);
 static int  select_job(job *, struct select_list *, int, int);
 static int  select_subjob(char, struct select_list *);
 
-
 /**
  * @brief
  * 		order_chkpnt - provide order value for various checkpoint attribute values
@@ -308,6 +307,98 @@ add_select_array_entries(job *pjob, int dosub, char *statelist,
  *	             and only the list of specified attributes if specified
  *
  * @param[in,out] preq - Select Job Request or Select-status Job Request
+ * @param[in] pjob - the job to add to the reply
+ * @param[in] selistp - ptr to the select list
+ * @param[in] statelist - list of states to include
+ * @param[in/out] pselx - select return
+ * @param[in] dosubjobs - select subjobs as well? 
+ * @param[in] dohistjob - select history jobs as well?
+ * @param[in] from_tm - in case of diffstat, the timestamp to stat updates from
+ *
+ * @return void
+ *
+ */
+int
+add_selstat_reply(struct batch_request *preq, job *pjob, struct select_list *selistp, 
+		char *statelist, struct brp_select ***pselx, int dosubjobs, int dohistjobs, struct timeval from_tm)
+{
+	struct batch_reply *preply = &preq->rq_reply;
+	svrattrl *plist;
+	int i, rc;
+	int bad = 0;
+
+	if (server.sv_attr[SVR_ATR_query_others].at_val.at_long || svr_authorize_jobreq(preq, pjob) == 0) {
+		/*
+		* either job owner or has special permission to see job
+		* and
+		* look at the job and see if the required attributes match
+		* If "T" was specified, dosubjobs is set, and if the job is
+		* an Array Job, then the State is Not checked. The State
+		* must be checked against the state of each Subjob
+		*/
+
+		if (select_job(pjob, selistp, dosubjobs, dohistjobs)) {
+
+			/* job is selected, include in reply */
+			if (preq->rq_type == PBS_BATCH_SelectJobs) {
+
+				/* Select Jobs Reply */
+
+				preply->brp_count += add_select_array_entries(pjob, dosubjobs, statelist, pselx, selistp);
+
+			} else if ((pjob->ji_qs.ji_svrflags & JOB_SVFLG_SubJob) == 0 || dosubjobs == 2) {
+
+				/* Select-Status Reply */
+
+				plist = (svrattrl *) GET_NEXT(preq->rq_ind.rq_select.rq_rtnattr);
+				if (dosubjobs == 1 && pjob->ji_ajinfo) {
+					for (i = pjob->ji_ajinfo->tkm_start ; i <= pjob->ji_ajinfo->tkm_end ; i += pjob->ji_ajinfo->tkm_step) {
+						char sjst = JOB_STATE_LTR_QUEUED;
+
+						get_subjob_and_state(pjob, i, &sjst, NULL);
+						if (sjst == JOB_STATE_LTR_UNKNOWN)
+							return 0;
+						if (statelist == 0 || chk_job_statenum(sjst, statelist)) {
+							if (preq->rq_type != PBS_BATCH_SelectJobs && preply->brp_count >= MAX_JOBS_PER_REPLY) {
+								rc = reply_send_status_part(preq);
+								if (rc != PBSE_NONE)
+									return -2;
+								preply->brp_count = 0;
+							}
+							rc = status_subjob(pjob, preq, plist, i, &preply->brp_un.brp_status, &bad, 0, from_tm);
+							if (rc && rc != PBSE_PERM)
+								return -1;
+							plist = (svrattrl *) GET_NEXT(preq->rq_ind.rq_select.rq_rtnattr);
+						}
+					}
+				} else {
+					if (preq->rq_type != PBS_BATCH_SelectJobs && preply->brp_count >= MAX_JOBS_PER_REPLY) {
+						rc = reply_send_status_part(preq);
+						if (rc != PBSE_NONE)
+							return -2;
+						preply->brp_count = 0;
+					}
+					rc = status_job(pjob, preq, plist, &preply->brp_un.brp_status, &bad, 0, from_tm);
+					if (rc && rc != PBSE_PERM)
+						return -1;
+				}
+			}
+		}
+	}
+	return 0;
+}
+
+/**
+ * @brief
+ * 	Service both the Select Job Request and the (special for the scheduler)
+ * 	Select-status Job Request
+ *
+ *	This request selects jobs based on a supplied criteria and returns
+ *	Select   - a list of the job identifiers which meet the criteria
+ *	Sel_stat - a list of the status of the jobs that meet the criteria
+ *	             and only the list of specified attributes if specified
+ *
+ * @param[in,out] preq - Select Job Request or Select-status Job Request
  *
  * @return void
  *
@@ -316,7 +407,6 @@ void
 req_selectjobs(struct batch_request *preq)
 {
 	int bad = 0;
-	int i;
 	job *pjob;
 	svrattrl *plist;
 	pbs_queue *pque;
@@ -328,6 +418,7 @@ req_selectjobs(struct batch_request *preq)
 	int rc;
 	struct select_list *selistp;
 	pbs_sched *psched;
+	struct timeval from_tm = {0, 0};
 
 	if (preq->rq_extend != NULL) {
 		/*
@@ -353,6 +444,7 @@ req_selectjobs(struct batch_request *preq)
 			}
 			dohistjobs = 1;
 		}
+		from_tm = parse_ts_from_extend(preq->rq_extend);
 	}
 
 	/*
@@ -387,73 +479,46 @@ req_selectjobs(struct batch_request *preq)
 	pselx = &preply->brp_un.brp_select;
 	preply->brp_count = 0;
 
-	/* now start checking for jobs that match the selection criteria */
-	if (pque)
-		pjob = (job *) GET_NEXT(pque->qu_jobs);
-	else
-		pjob = (job *) GET_NEXT(svr_alljobs);
-	while (pjob) {
-		if (get_sattr_long(SVR_ATR_query_others) || svr_authorize_jobreq(preq, pjob) == 0) {
-
-			/*
-			 * either job owner or has special permission to see job
-			 * and
-			 * look at the job and see if the required attributes match
-			 * If "T" was specified, dosubjobs is set, and if the job is
-			 * an Array Job, then the State is Not checked. The State
-			 * must be checked against the state of each Subjob
-			 */
-
-			if (select_job(pjob, selistp, dosubjobs, dohistjobs)) {
-
-				/* job is selected, include in reply */
-				if (preq->rq_type == PBS_BATCH_SelectJobs) {
-
-					/* Select Jobs Reply */
-
-					preply->brp_count += add_select_array_entries(pjob, dosubjobs, pstate, &pselx, selistp);
-
-				} else if ((pjob->ji_qs.ji_svrflags & JOB_SVFLG_SubJob) == 0 || dosubjobs == 2) {
-
-					/* Select-Status Reply */
-
-					plist = (svrattrl *) GET_NEXT(preq->rq_ind.rq_select.rq_rtnattr);
-					if (dosubjobs == 1 && pjob->ji_ajinfo) {
-						for (i = pjob->ji_ajinfo->tkm_start ; i <= pjob->ji_ajinfo->tkm_end ; i += pjob->ji_ajinfo->tkm_step) {
-							char sjst = JOB_STATE_LTR_QUEUED;
-
-							get_subjob_and_state(pjob, i, &sjst, NULL);
-							if (sjst == JOB_STATE_LTR_UNKNOWN)
-								continue;
-							if (pstate == 0 || chk_job_statenum(sjst, pstate)) {
-								if (preply->brp_count >= MAX_JOBS_PER_REPLY) {
-									rc = reply_send_status_part(preq);
-									if (rc != PBSE_NONE)
-										return;
-									preply->brp_count = 0;
-								}
-								rc = status_subjob(pjob, preq, plist, i, &preply->brp_un.brp_status, &bad, 0);
-								if (rc && rc != PBSE_PERM)
-									goto out;
-								plist = (svrattrl *) GET_NEXT(preq->rq_ind.rq_select.rq_rtnattr);
-							}
-						}
-					} else {
-						rc = status_job(pjob, preq, plist, &preply->brp_un.brp_status, &bad, 0);
-						if (rc && rc != PBSE_PERM)
-							goto out;
-					}
-				}
-			}
+	rc = PBSE_NONE;
+	preply->latestObj.tv_sec = 0;
+	preply->latestObj.tv_usec = 0;
+	if (!IS_FULLSTAT(from_tm)) { /* if not a full stat = diff stat */
+		if ((last_job_purge_ts.tv_sec != 0) && TS_NEWER(last_job_purge_ts, from_tm)) {
+			/* oops too old timestamp, reject */
+			req_reject(PBSE_STALE_DIFFQUERY, 0, preq);
+			return;
 		}
-		if (pque)
-			pjob = (job *) GET_NEXT(pjob->ji_jobque);
-		else
-			pjob = (job *) GET_NEXT(pjob->ji_alljobs);
-		if (preq->rq_type != PBS_BATCH_SelectJobs && preply->brp_count >= MAX_JOBS_PER_REPLY && pjob) {
-			rc = reply_send_status_part(preq);
-			if (rc != PBSE_NONE)
-				return;
+		preply->brp_auxcode = 1; /* diffstat reply */
+		pjob = (job *) GET_PRIOR(svr_alljobs_timed);
+		if (pjob)
+			preply->latestObj = pjob->update_tm;
+
+		/* traverse backwards to find the oldest job matching (>=) the provided from time stamp */
+		while (pjob && (rc == PBSE_NONE)) {
+			if (!(TS_NEWER(pjob->update_tm, from_tm)))
+				break;
+			rc = add_selstat_reply(preq, pjob, selistp, pstate, &pselx, dosubjobs, dohistjobs, from_tm);  /* stat backwards, IFL will reverse */
+			if( rc == -2)
+				return; /* critical error in reply_send, so simply bail out */
+			else if (rc == -1)
+				goto out;
+			pjob = (job *) GET_PRIOR(pjob->ji_timed_link);
+		}
+
+		/* now stat deleted jobs */
+		stat_deleted_ids(&svr_alljobs_deleted, from_tm, &preply->brp_un.brp_status, &last_job_purge_ts, &preply->brp_count, &preply->latestObj);
+	} else { /* full stat */
+		/* now start checking for jobs that match the selection criteria */
+		pjob = (pque) ? (job *) GET_NEXT(pque->qu_jobs) : (job *) GET_NEXT(svr_alljobs);	
+
+		while (pjob) {
+			rc = add_selstat_reply(preq, pjob, selistp, pstate, &pselx, dosubjobs, dohistjobs, from_tm);
+			if( rc == -2)
+				return; /* critical error in reply_send, so simply bail out */
+			else if (rc == -1)
+				goto out;
+
+			pjob = (pque) ? (job *) GET_NEXT(pjob->ji_jobque) : (job *) GET_NEXT(pjob->ji_alljobs);
 		}
 	}
 out:

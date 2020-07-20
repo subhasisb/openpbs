@@ -692,6 +692,7 @@ PBSD_status_get(int c, struct batch_status **last, int *obj_type, int prot)
 			pbs_errno = PBSE_PROTOCOL;
 		goto end;
 	} else if (get_conn_errno(c) == 0) {
+		set_last_stat_ts(reply->latestObj);
 		rbsp = reply->brp_un.brp_statc;
 		reply->brp_un.brp_statc = NULL;
 	}

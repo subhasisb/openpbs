@@ -147,7 +147,7 @@ decode_b(attribute *patr, char *name, char *rescn, char *val)
 			patr->at_val.at_long = i;
 		else
 			return (PBSE_BADATVAL);
-		post_attr_set(patr);
+		mark_attr_set(patr);
 	}
 	return (0);
 }
@@ -242,7 +242,7 @@ set_b(attribute *attr, attribute *new, enum batch_op op)
 
 		default:	return (PBSE_INTERNAL);
 	}
-	post_attr_set(attr);
+	mark_attr_set(attr);
 	return (0);
 }
 
@@ -307,5 +307,5 @@ set_attr_b(attribute *pattr, long val, enum batch_op op)
 		default:
 			return;
 	}
-	post_attr_set(pattr);
+	mark_attr_set(pattr);
 }

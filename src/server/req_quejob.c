@@ -353,9 +353,9 @@ req_quejob(struct batch_request *preq)
 			return;
 		}
 
-		if (conn->cn_authen & PBS_NET_CONN_FORCE_QSUB_UPDATE) {
-			req_reject(PBSE_FORCE_QSUB_UPDATE, 0, preq);
-			conn->cn_authen &= ~PBS_NET_CONN_FORCE_QSUB_UPDATE;
+		if (conn->cn_authen & PBS_NET_CONN_FORCE_UPDATE) {
+			req_reject(PBSE_FORCE_CLIENT_UPDATE, 0, preq);
+			conn->cn_authen &= ~PBS_NET_CONN_FORCE_UPDATE;
 			return;
 		}
 	}
@@ -3261,7 +3261,7 @@ copy_params_from_job(char *jobid, resc_resv *presv)
 	else
 		set_rattr_l_slim(presv, RESV_ATR_start, time_now, SET);
 
-	post_attr_set(get_rattr(presv, RESV_ATR_SchedSelect));
+	mark_attr_set(get_rattr(presv, RESV_ATR_SchedSelect));
 
 	job_resc_entry = (resource *)GET_NEXT(get_jattr_list(pjob, JOB_ATR_resource));
 	for (; job_resc_entry; job_resc_entry = (resource *)GET_NEXT(job_resc_entry->rs_link)) {

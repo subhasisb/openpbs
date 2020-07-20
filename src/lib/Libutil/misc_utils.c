@@ -348,7 +348,8 @@ pbs_strcpy(char *dest, const char *src)
  *
  * @note: Caller needs ensure non-NULL pointers
  */
-char *pbs_strncpy(char *dest, const char *src, size_t n)
+char *
+pbs_strncpy(char *dest, const char *src, size_t n)
 {
 	if (strlen(src) < n - 1)
 		strcpy(dest, src);
@@ -1894,50 +1895,6 @@ create_query_file(void)
 	f = fopen(filename, "w");
 	if (f != NULL)
 		fclose(f);
-}
-
-/**
- * @brief
- *	stats te information of the empty file created in /tmp/ to decide
- *  whether to add sleep for .2 seconds or not
- *
- * @param[in] - void
- *
- * @return - void
- */
-void
-delay_query(void)
-{
-	char filename[MAXPATHLEN + 1];
-#ifdef WIN32
-	struct _stat buf;
-#else
-	struct stat buf;
-#endif
-
-	uid_t usid = getuid();
-#ifdef WIN32
-	LPSTR win_sid=NULL;
-	if (!ConvertSidToStringSid(usid, &win_sid)) {
-		fprintf(stderr, "qstat: failed to convert SID to string with error=%d\n", GetLastError());
-		return;
-	}
-	snprintf(filename, sizeof(filename), "%s\\.pbs_last_query_%s", TMP_DIR, win_sid);
-	if(_stat(filename, &buf) == 0) {
-		if(((time(NULL)*1000) - (buf.st_mtime * 1000)) < 10) {
-			Sleep(200);
-		}
-	}
-	LocalFree(win_sid);
-#else
-	snprintf(filename, sizeof(filename), "%s/.pbs_last_query_%d", TMP_DIR, usid);
-	if(stat(filename, &buf) == 0) {
-		if(((time(NULL)*1000) - (buf.st_mtime * 1000)) < 10) {
-			usleep(200000);
-		}
-	}
-#endif /* WIN32 */
-	atexit(create_query_file);
 }
 
 /**

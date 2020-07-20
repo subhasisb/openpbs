@@ -37,7 +37,12 @@
  * subject to Altair's trademark licensing policies.
  */
 
+#include <pbs_config.h>
 #include "pbs_nodes.h"
+#include "list_link.h"
+
+extern	pbs_list_head	svr_allnodes_timed;
+void update_node_timedlist(pbsnode *);
 
 /**
  * @brief	Get attribute of node based on given attr index
@@ -167,6 +172,7 @@ set_nattr_generic(struct pbsnode *pnode, int attr_idx, char *val, char *rscn, en
 	if (pnode == NULL || val == NULL)
 		return 1;
 
+	update_node_timedlist(pnode);
 	return set_attr_generic(get_nattr(pnode, attr_idx), &node_attr_def[attr_idx], val, rscn, op);
 }
 
@@ -188,6 +194,7 @@ set_nattr_str_slim(struct pbsnode *pnode, int attr_idx, char *val, char *rscn)
 	if (pnode == NULL || val == NULL)
 		return 1;
 
+	update_node_timedlist(pnode);
 	return set_attr_generic(get_nattr(pnode, attr_idx), &node_attr_def[attr_idx], val, rscn, INTERNAL);
 }
 
@@ -209,6 +216,7 @@ set_nattr_l_slim(struct pbsnode *pnode, int attr_idx, long val, enum batch_op op
 	if (pnode == NULL)
 		return 1;
 
+	update_node_timedlist(pnode);
 	set_attr_l(get_nattr(pnode, attr_idx), val, op);
 
 	return 0;
@@ -232,6 +240,7 @@ set_nattr_b_slim(struct pbsnode *pnode, int attr_idx, long val, enum batch_op op
 	if (pnode == NULL)
 		return 1;
 
+	update_node_timedlist(pnode);
 	set_attr_b(get_nattr(pnode, attr_idx), val, op);
 
 	return 0;
@@ -255,6 +264,7 @@ set_nattr_c_slim(struct pbsnode *pnode, int attr_idx, char val, enum batch_op op
 	if (pnode == NULL)
 		return 1;
 
+	update_node_timedlist(pnode);
 	set_attr_c(get_nattr(pnode, attr_idx), val, op);
 
 	return 0;
@@ -278,6 +288,7 @@ set_nattr_short_slim(struct pbsnode *pnode, int attr_idx, short val, enum batch_
 	if (pnode == NULL)
 		return 1;
 
+	update_node_timedlist(pnode);
 	set_attr_short(get_nattr(pnode, attr_idx), val, op);
 
 	return 0;
@@ -314,6 +325,7 @@ is_nattr_set(const struct pbsnode *pnode, int attr_idx)
 void
 free_nattr(struct pbsnode *pnode, int attr_idx)
 {
+	update_node_timedlist(pnode);
 	if (pnode != NULL)
 		free_attr(node_attr_def, get_nattr(pnode, attr_idx), attr_idx);
 }
@@ -329,6 +341,7 @@ free_nattr(struct pbsnode *pnode, int attr_idx)
 void
 clear_nattr(struct pbsnode *pnode, int attr_idx)
 {
+	update_node_timedlist(pnode);
 	clear_attr(get_nattr(pnode, attr_idx), &node_attr_def[attr_idx]);
 }
 
@@ -347,4 +360,42 @@ set_nattr_jinfo(struct pbsnode *pnode, int attr_idx, struct pbsnode *val)
 	attribute *attr = get_nattr(pnode, attr_idx);
 	attr->at_val.at_jinfo = val;
 	attr->at_flags = ATR_SET_MOD_MCACHE;
+	update_node_timedlist(pnode);
+}
+
+/**
+ * @brief
+ * 		set this node at the right place in the jobs list sorted on update time
+ *
+ * @param[in]	pnode - node pointer
+ *
+ * @return	void
+ *
+ * @par MT-Safe: Yes
+ * @par Side Effects: None
+ *
+ */
+void
+update_node_timedlist(pbsnode *pnode)
+{
+#ifndef PBS_MOM
+	/* the time updation functionlity is required only for server daemon */
+	pbsnode *platest;
+
+	if (!pnode) 
+		return; /* null, newobj, or dup'd node for hook processing, ignore */
+	 
+	gettimeofday(&pnode->update_tm, NULL); /* update the current timestamp */ 
+
+	platest = (pbsnode *) GET_PRIOR(svr_allnodes_timed);
+	if (platest == pnode)
+		return; /* all set */
+
+	if (platest == NULL)
+		insert_link(&svr_allnodes_timed, &pnode->nd_allnodes_timed, pnode, LINK_INSET_AFTER); /* link first in server's list */
+	else {
+		delete_link(&pnode->nd_allnodes_timed);
+		insert_link(&platest->nd_allnodes_timed, &pnode->nd_allnodes_timed, pnode, LINK_INSET_AFTER); /* link after 'latest' node in server's list */
+	}
+#endif
 }
