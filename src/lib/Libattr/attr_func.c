@@ -213,6 +213,7 @@ free_null(attribute *attr)
 	attr->at_flags &= ~(ATR_VFLAG_SET|ATR_VFLAG_INDIRECT|ATR_VFLAG_TARGET);
 	if (attr->at_user_encoded != NULL || attr->at_priv_encoded != NULL)
 		free_svrcache(attr);
+	mark_attr_not_set(attr);
 }
 
 /**
@@ -1683,6 +1684,8 @@ set_attr_generic(attribute *pattr, attribute_def *pdef, char *value, char *rescn
 
 	rc = set_attr_with_attr(pdef, pattr, &tempat, op);
 
+	mark_attr_set(pattr);
+
 	pdef->at_free(&tempat);
 
 	return rc;
@@ -1731,8 +1734,12 @@ set_attr_with_attr(attribute_def *pdef, attribute *oattr, attribute *nattr, enum
 void
 mark_attr_not_set(attribute *attr)
 {
-	if (attr != NULL)
-		attr->at_flags &= ~ATR_VFLAG_SET;
+	if (attr != NULL) {
+		ATR_UNSET(attr);
+#ifndef PBS_MOM
+		post_attr_set_unset(attr);
+#endif
+	}
 }
 
 /**
@@ -1749,8 +1756,12 @@ mark_attr_not_set(attribute *attr)
 void
 mark_attr_set(attribute *attr)
 {
-	if (attr != NULL)
-		attr->at_flags |= ATR_VFLAG_SET;
+	if (attr != NULL) {
+		attr->at_flags |= ATR_SET_MOD_MCACHE;
+#ifndef PBS_MOM
+		post_attr_set_unset(attr);
+#endif
+	}
 }
 
 /**
@@ -1774,7 +1785,7 @@ is_attr_set(const attribute *pattr)
 }
 
 /**
- * @brief	Common function to update attribute after set action performed.
+ * @brief	Common function to update attribute after set/unset action performed.
  *
  * @param[in]	attr	-	pointer to the attribute
  *
@@ -1784,9 +1795,9 @@ is_attr_set(const attribute *pattr)
  * @par Side Effects: None
  */
 void
-post_attr_set(attribute *attr)
+post_attr_set_unset(attribute *attr)
 {
-	attr->at_flags |= ATR_SET_MOD_MCACHE;
+	gettimeofday(&attr->update_tm, NULL); /* update the current timestamp */
 }
 
 /**
@@ -1907,4 +1918,65 @@ get_attr_list(const attribute *pattr)
 		return pattr->at_val.at_list;
 	else
 		return dummy;
+}
+
+
+/**
+ * @brief	duplicate attibute list from array parent to subjob
+ * 			skipping unwanted attributes for subjob
+ * 
+ *
+ * @param[in]	array - pointer to the array
+ *
+ * @return	attribute list
+ * @retval	list of attributes
+ * @retval	NULL for error
+ */
+struct attrl *
+make_subjob_attrs_from_array(struct batch_status *array)
+{
+	struct attrl *oattr_list = array->attribs;
+	struct attrl *nattr_head = NULL;
+	struct attrl *nattr;
+	struct attrl *nattr_prev = NULL;
+	struct attrl *oattr;
+
+	for (oattr = oattr_list; oattr != NULL; oattr = oattr->next) {
+		if (strstr(oattr->name, ATTR_array)) /* skip array attributes */
+			continue;
+
+		/* duplicate everything else */
+		nattr = dup_attrl(oattr);
+		if (!nattr)
+			return NULL;
+
+		if (nattr_prev == NULL) {
+			nattr_head = nattr;
+			nattr_prev = nattr_head;
+		} else {
+			nattr_prev->next = nattr;
+			nattr_prev = nattr;
+		}
+
+		/* update if state/substate */
+		if (strcmp(nattr->name, ATTR_state) == 0) {
+			free(nattr->value);
+			nattr->value = malloc(2);
+			if (nattr->value == NULL) {
+				free_attrl_list(nattr_head);
+				return NULL;
+			}
+			nattr->value[0] = JOB_STATE_LTR_QUEUED;
+			nattr->value[1] = '\0';
+		} else if (strcmp(nattr->name, ATTR_substate) == 0) {
+			free(nattr->value);
+			nattr->value = strdup(TOSTR(JOB_SUBSTATE_QUEUED));
+			if (nattr->value == NULL) {
+				free_attrl_list(nattr_head);
+				return NULL;
+			}
+		}
+	}
+
+	return nattr_head;
 }

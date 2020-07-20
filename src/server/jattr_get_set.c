@@ -37,6 +37,7 @@
  * subject to Altair's trademark licensing policies.
  */
 
+#include <pbs_config.h>
 #include "job.h"
 
 /**
@@ -306,8 +307,12 @@ get_jattr_priv_encoded(const job *pjob, int attr_idx)
 void
 set_job_state(job *pjob, char val)
 {
-	if (pjob != NULL)
+	if (pjob != NULL) {
+#ifndef PBS_MOM
+		update_job_timedlist(pjob);
+#endif
 		set_attr_c(get_jattr(pjob, JOB_ATR_state), val, SET);
+	}
 }
 
 /**
@@ -344,6 +349,9 @@ set_jattr_generic(job *pjob, int attr_idx, char *val, char *rscn, enum batch_op 
 	if (pjob == NULL || val == NULL)
 		return 1;
 
+#ifndef PBS_MOM
+	update_job_timedlist(pjob);
+#endif
 	return set_attr_generic(get_jattr(pjob, attr_idx), &job_attr_def[attr_idx], val, rscn, op);
 }
 
@@ -365,6 +373,9 @@ set_jattr_str_slim(job *pjob, int attr_idx, char *val, char *rscn)
 	if (pjob == NULL || val == NULL)
 		return 1;
 
+#ifndef PBS_MOM
+	update_job_timedlist(pjob);
+#endif
 	return set_attr_generic(get_jattr(pjob, attr_idx), &job_attr_def[attr_idx], val, rscn, INTERNAL);
 }
 
@@ -386,6 +397,9 @@ set_jattr_l_slim(job *pjob, int attr_idx, long val, enum batch_op op)
 	if (pjob == NULL)
 		return 1;
 
+#ifndef PBS_MOM
+	update_job_timedlist(pjob);
+#endif
 	set_attr_l(get_jattr(pjob, attr_idx), val, op);
 
 	return 0;
@@ -408,7 +422,10 @@ set_jattr_ll_slim(job *pjob, int attr_idx, long long val, enum batch_op op)
 {
 	if (pjob == NULL)
 		return 1;
-
+		
+#ifndef PBS_MOM
+	update_job_timedlist(pjob);
+#endif
 	set_attr_ll(get_jattr(pjob, attr_idx), val, op);
 
 	return 0;
@@ -433,6 +450,9 @@ set_jattr_b_slim(job *pjob, int attr_idx, long val, enum batch_op op)
 	if (pjob == NULL)
 		return 1;
 
+#ifndef PBS_MOM
+	update_job_timedlist(pjob);
+#endif
 	set_attr_b(get_jattr(pjob, attr_idx), val, op);
 
 	return 0;
@@ -456,11 +476,39 @@ set_jattr_c_slim(job *pjob, int attr_idx, char val, enum batch_op op)
 	if (pjob == NULL)
 		return 1;
 
+#ifndef PBS_MOM
+	update_job_timedlist(pjob);
+#endif
 	set_attr_c(get_jattr(pjob, attr_idx), val, op);
 
 	return 0;
 }
 
+/**
+ * @brief	set job attr from given attribute
+ *
+ * @param[in]	pjob - pointer to job
+ * @param[in]	attr_idx - attribute index to set
+ * @param[in]	attr - the source to set from
+ * @param[in]	op - batch_op operation, SET, INCR, DECR etc.
+ *
+ * @return	int
+ * @retval	0 for success
+ * @retval	1 for failure
+ */
+int
+set_jattr_with_attr(job *pjob, int attr_idx, attribute *nattr, enum batch_op op)
+{
+	if (pjob == NULL)
+		return 1;
+
+#ifndef PBS_MOM
+	update_job_timedlist(pjob);
+#endif
+	set_attr_with_attr(&job_attr_def[attr_idx], get_jattr(pjob, attr_idx), nattr, op);
+
+	return 0;
+}
 
 /**
  * @brief	Check if a job attribute is set
@@ -493,8 +541,10 @@ void
 mark_jattr_not_set(job *pjob, int attr_idx)
 {
 	if (pjob != NULL) {
-		attribute *attr = get_jattr(pjob, attr_idx);
-		ATR_UNSET(attr);
+		mark_attr_not_set(get_jattr(pjob, attr_idx));
+#ifndef PBS_MOM
+		update_job_timedlist(pjob);
+#endif
 	}
 }
 
@@ -509,8 +559,12 @@ mark_jattr_not_set(job *pjob, int attr_idx)
 void
 mark_jattr_set(job *pjob, int attr_idx)
 {
-	if (pjob != NULL)
-		(get_jattr(pjob, attr_idx))->at_flags |= ATR_VFLAG_SET;
+	if (pjob != NULL) {
+		mark_attr_set(get_jattr(pjob, attr_idx));
+#ifndef PBS_MOM
+		update_job_timedlist(pjob);
+#endif
+	}
 }
 
 /**
@@ -524,6 +578,8 @@ mark_jattr_set(job *pjob, int attr_idx)
 void
 free_jattr(job *pjob, int attr_idx)
 {
-	if (pjob != NULL)
+	if (pjob != NULL) {
 		free_attr(job_attr_def, get_jattr(pjob, attr_idx), attr_idx);
+		mark_jattr_not_set(pjob, attr_idx);
+	}
 }

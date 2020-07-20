@@ -54,7 +54,7 @@
  *	-Return the last error message the server returned on
  *	this connection.
  *
- * @param[in] connect - soket descriptor
+ * @param[in] connect - socket descriptor
  *
  * @return	string
  * @retval	connection contexts
@@ -66,8 +66,7 @@
 char *
 __pbs_geterrmsg(int connect)
 {
-	struct pbs_client_thread_connect_context * con =
-		pbs_client_thread_find_connect_context(connect);
+	struct pbs_client_thread_connect_context *con = pbs_client_thread_find_connect_context(connect);
 	struct pbs_client_thread_context *thrd_ctxt = pbs_client_thread_get_context_data();
 
 	/*
@@ -79,4 +78,44 @@ __pbs_geterrmsg(int connect)
 		return (con->th_ch_errtxt);
 	else
 		return get_conn_errtxt(connect);
+}
+
+/**
+ * @brief
+ *	-Set the last error message  on
+ *	this connection.
+ *
+ * @param[in] connect - socket descriptor
+ * @param[in] errmsg - error message to set
+ *
+ * @return	string
+ * @retval	connection contexts
+ *		TLS			multithread
+ *		STRUCTURE		single thread
+ *
+ */
+void
+__pbs_seterrmsg(int connect, char *errmsg)
+{
+	struct pbs_client_thread_connect_context *con = pbs_client_thread_find_connect_context(connect);
+	struct pbs_client_thread_context *thrd_ctxt = pbs_client_thread_get_context_data();
+
+	if (!errmsg)
+		return;
+		
+	/*
+	 * multithreaded callers will have the connection contexts stored
+	 * in the TLS, whereas single threaded clients dont use the TLS
+	 * So, return connection structure values after checking
+	 */
+	if (con && thrd_ctxt && (thrd_ctxt->th_pbs_mode==0)) {
+		if (con->th_ch_errtxt != NULL)
+				free(con->th_ch_errtxt);
+
+		if ((con->th_ch_errtxt = strdup(errmsg)) == NULL)
+			pbs_errno = PBSE_SYSTEM;
+	} else {
+		if (set_conn_errtxt(connect, errmsg) != 0)
+			pbs_errno = PBSE_SYSTEM;
+	}
 }

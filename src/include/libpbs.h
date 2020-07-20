@@ -215,6 +215,7 @@ struct batch_reply
 	int brp_count;
 	int brp_type;
 	struct batch_status *last;
+	struct timeval latestObj; /* timestamp of latest object for diff queries */
 	union {
 		char brp_jid[PBS_MAXSVRJOBID + 1];
 		struct brp_select *brp_select; /* select replies */
@@ -413,6 +414,7 @@ int encode_DIS_JobsList(int sock, char **jobs_list, int numofjobs);
 int get_server_fd_from_jid(int c, char *jobid);
 int multi_svr_op(int fd);
 int get_job_svr_inst_id(int c, char *job_id);
+void set_last_stat_ts(struct timeval);
 
 #ifdef __cplusplus
 }

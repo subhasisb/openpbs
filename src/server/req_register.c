@@ -179,6 +179,8 @@ static void update_depend(job *pjob, char *d_jobid, char *d_svr, int op, int typ
 	if (d_job == NULL)
 		return;
 
+	update_job_timedlist(pjob);
+
 	pattr = get_jattr(pjob, JOB_ATR_depend);
 	dp = find_depend(type, pattr);
 	if (op == DEPEND_ADD) {
@@ -192,7 +194,7 @@ static void update_depend(job *pjob, char *d_jobid, char *d_svr, int op, int typ
 			return; /* Job dependency already established */
 		if (strcmp(pjob->ji_qs.ji_jobid, d_jobid)) {
 			dpj = make_dependjob(dp, d_jobid, d_svr);
-			post_attr_set(pattr);
+			mark_attr_set(pattr);
 			job_save(pjob);
 			/* runone dependencies are circular */
 			if (type == JOB_DEPEND_TYPE_RUNONE)
@@ -929,8 +931,9 @@ int depend_runone_remove_dependency(job *pjob)
 				temp_pdj = find_dependjob(find_depend(JOB_DEPEND_TYPE_RUNONE, pattr), pjob->ji_qs.ji_jobid);
 				if (temp_pdj) {
 					del_depend_job(temp_pdj);
-					pattr->at_flags |= ATR_MOD_MCACHE;
+					mark_attr_set(pattr);
 				}
+				update_job_timedlist(d_pjob);
 			}
 		}
 		del_depend(pdep);
@@ -1223,7 +1226,7 @@ static struct depend *make_depend(int type, attribute *pattr)
 	if (pdep) {
 		clear_depend(pdep, type, 0);
 		append_link(&pattr->at_val.at_list, &pdep->dp_link, pdep);
-		post_attr_set(pattr);
+		mark_attr_set(pattr);
 	}
 	return (pdep);
 }
@@ -1506,7 +1509,7 @@ decode_depend(attribute *patr, char *name, char *rescn, char *val)
 		valwd = parse_comma_string(NULL);
 	}
 
-	post_attr_set(patr);
+	mark_attr_set(patr);
 	return (0);
 }
 
@@ -1727,7 +1730,7 @@ enum batch_op op;
 		case DECR:	/* not defined */
 		default:	return (PBSE_IVALREQ);
 	}
-	post_attr_set(attr);
+	mark_attr_set(attr);
 	return (0);
 }
 

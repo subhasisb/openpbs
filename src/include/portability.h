@@ -55,6 +55,7 @@
 #define get_uncpath(char)  
 #define critical_section() 
 
+#define MAXPIPENAME 1000
 
 #ifdef PBS_MOM
 #define TRAILING_CHAR '/'

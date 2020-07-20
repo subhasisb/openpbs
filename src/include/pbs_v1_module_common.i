@@ -88,11 +88,14 @@ struct python_interpreter_data  svr_interp_data;
 int svr_delay_entry = 0;
 pbs_list_head svr_queues;  /* list of queues */
 pbs_list_head svr_alljobs;  /* list of all jobs in server */
+pbs_list_head svr_alljobs_timed; /* update-time sorted list of jobs - head has latest */
+pbs_list_head svr_alljobs_deleted; /* all deleted jobs */
 pbs_list_head svr_allresvs;  /* all reservations in server */
 pbs_list_head svr_queues;
-pbs_list_head svr_alljobs;
 pbs_list_head svr_allresvs;
 pbs_list_head svr_allhooks;
+pbs_list_head svr_allnodes_timed; /* update-time sorted list of nodes */
+pbs_list_head svr_allnodes_deleted; /* list of all deleted nodes */
 pbs_list_head svr_queuejob_hooks;
 pbs_list_head svr_modifyjob_hooks;
 pbs_list_head svr_resvsub_hooks;
@@ -718,6 +721,10 @@ chk_vnode_pool(attribute *pattr, void *pobject, int actmode) {
 int
 validate_job_formula(attribute *pattr, void *pobject, int actmode) {
 	return (PBSE_NONE);
+}
+
+void
+update_job_timedlist(job *pjob) {
 }
 #endif /* defined(PBS_V1_COMMON_MODULE_DEFINE_STUB_FUNCS) */
 

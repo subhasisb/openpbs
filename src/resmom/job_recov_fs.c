@@ -194,7 +194,6 @@ job_save_fs(job *pjob)
 	} else {
 		/* an attribute changed,  update mtime */
 		set_jattr_l_slim(pjob, JOB_ATR_mtime, time_now, SET);
-
 		/*
 		 * write the whole structure to the file.
 		 * For a update, this is done to a new file to protect the

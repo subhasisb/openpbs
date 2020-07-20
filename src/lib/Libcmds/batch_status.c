@@ -40,6 +40,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "pbs_ifl.h"
 
@@ -135,10 +136,17 @@ bs_find(struct batch_status *bs, const char *name)
  *
  * @return 	void
  */
-void
-init_bstat(struct batch_status *bstat)
+struct batch_status *
+init_bstat()
 {
+	struct batch_status *bstat = (struct batch_status *) malloc(sizeof(struct batch_status));
+	if (bstat == NULL)
+		return NULL;
+
 	bstat->next = NULL;
+	bstat->prev = NULL;
 	bstat->text = NULL;
 	bstat->attribs = NULL;
+
+	return bstat;
 }

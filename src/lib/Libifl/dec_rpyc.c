@@ -78,6 +78,7 @@ static struct batch_status *
 read_batch_status(int sock, int *objtype, int *rc)
 {
 	struct batch_status *pstcmd;
+	struct attrl  *pat;
 
 	if (rc == NULL || objtype == NULL) {
 		if (rc)
@@ -85,12 +86,10 @@ read_batch_status(int sock, int *objtype, int *rc)
 		return NULL;
 	}
 
-	pstcmd = (struct batch_status *) malloc(sizeof(struct batch_status));
-	if (pstcmd == NULL) {
+	if ((pstcmd = init_bstat()) == NULL) {
 		*rc = DIS_NOMALLOC;
 		return NULL;
 	}
-	init_bstat(pstcmd);
 
 	*objtype = disrui(sock, rc);
 	if (*rc == DIS_SUCCESS)
@@ -99,9 +98,28 @@ read_batch_status(int sock, int *objtype, int *rc)
 		pbs_statfree(pstcmd);
 		return NULL;
 	}
+
+	/* need to call this for deleted ids to satisfy protocol */
 	*rc = decode_DIS_attrl(sock, &pstcmd->attribs);
-	if (*rc)
+
+	if (*objtype == MGR_OBJ_DELETED && !*rc) {
+		/* add a an attribute called "deleted", to let client know this id is deleted */
+		if ((pat = new_attrl())) {
+			pat->name = strdup("deleted");
+			pat->resource = NULL;
+			pat->value = strdup("1");
+		} 
+		if (!pat || !pat->name || !pat->value)
+			*rc = DIS_NOMALLOC;
+		else
+			pstcmd->attribs = pat;
+	}
+	
+	if (*rc) {
 		pbs_statfree(pstcmd);
+		pstcmd = NULL;
+	}
+	
 	return pstcmd;
 }
 
@@ -116,6 +134,7 @@ read_batch_status(int sock, int *objtype, int *rc)
  * 	remaining subjobs and uses batch_status struct instead of job struct
  *
  * @param[in]  array - pointer batch status of parent array job
+ * @param[in]  r - updated range attribute of the parent array job
  * @param[out] count - count of subjobs expanded
  *
  * @return int
@@ -123,80 +142,33 @@ read_batch_status(int sock, int *objtype, int *rc)
  * @retval 1 - failure
  */
 static int
-expand_remaining_subjob(struct batch_status *array, int *count)
+expand_remaining_subjob(struct batch_status *array, range *r, int *count)
 {
-	range *r = NULL;
 	int sjidx = -1;
-	char *remain;
-	struct attrl *sj_attrs = NULL;
 	char *parent_jid;
+	struct attrl *sj_attrs;
 
 	if (array == NULL || count == NULL)
 		return 0;
 
 	*count = 0;
 	parent_jid = array->name;
-	remain = get_attr(array->attribs, ATTR_array_indices_remaining, NULL);
-	if (remain == NULL || *remain == '-')
-		return 0;
-	r = range_parse(remain);
-	if (r == NULL)
-		return 1;
-	sj_attrs = dup_attrl_list(array->attribs);
-	if (sj_attrs != NULL) {
-		struct attrl *next;
-		struct attrl *prev = NULL;
-		int should_break = 0;
-
-		for (next = sj_attrs; next->next; next = next->next) {
-			if (strcmp(next->name, ATTR_state) == 0) {
-				free(next->value);
-				next->value = malloc(2);
-				if (next->value == NULL) {
-					free_attrl_list(sj_attrs);
-					return 1;
-				}
-				next->value[0] = JOB_STATE_LTR_QUEUED;
-				next->value[1] = '\0';
-				should_break++;
-			} else if (strcmp(next->name, ATTR_substate) == 0) {
-				free(next->value);
-				next->value = strdup(TOSTR(JOB_SUBSTATE_QUEUED));
-				if (next->value == NULL) {
-					free_attrl_list(sj_attrs);
-					return 1;
-				}
-				should_break++;
-			} else if (strcmp(next->name, ATTR_array) == 0) {
-				if (prev) {
-					prev->next = NULL;
-					free_attrl_list(next);
-					next = NULL;
-					should_break++;
-				}
-			}
-			if (should_break == 3 || next == NULL)
-				break;
-			prev = next;
-		}
-	} else {
-		free_range_list(r);
-		return 1;
-	}
+#ifdef CLI_DEBUG
+		fprintf(stderr, "--> IFL expanding array %s, ", array->name);
+#endif
+	sj_attrs = make_subjob_attrs_from_array(array);
 	while ((sjidx = range_next_value(r, sjidx)) >= 0) {
-		struct batch_status *pstcmd = (struct batch_status *) malloc(sizeof(struct batch_status));
 		char *name;
+		struct batch_status *pstcmd = init_bstat();
 
 		if (pstcmd == NULL) {
 			free_range_list(r);
 			free_attrl_list(sj_attrs);
 			return 1;
 		}
-		pstcmd->next = NULL;
-		pstcmd->text = NULL;
-		pstcmd->name = NULL;
+
 		pstcmd->attribs = dup_attrl_list(sj_attrs);
-		if (pstcmd->attribs == NULL) {
+		if (sj_attrs && (pstcmd->attribs == NULL)) {
 			pbs_statfree(pstcmd);
 			free_range_list(r);
 			free_attrl_list(sj_attrs);
@@ -209,6 +181,9 @@ expand_remaining_subjob(struct batch_status *array, int *count)
 			free_attrl_list(sj_attrs);
 			return 1;
 		}
+#ifdef CLI_DEBUG
+		fprintf(stderr, "=> %s ", name);
+#endif
 		pstcmd->name = strdup(name);
 		if (pstcmd->name == NULL) {
 			pbs_statfree(pstcmd);
@@ -222,6 +197,9 @@ expand_remaining_subjob(struct batch_status *array, int *count)
 	}
 	free_range_list(r);
 	free_attrl_list(sj_attrs);
+#ifdef CLI_DEBUG
+		fprintf(stderr, "\n");
+#endif
 	return 0;
 }
 
@@ -260,6 +238,57 @@ cmp_sj_name(struct batch_status *a, struct batch_status *b)
 }
 
 /**
+ * @brief	Create the jobarray by expanding subjobs from the remaining indexes attribute
+ *
+ * @param[out] pstcx - pointer to where next data can be inserted
+ * @param[in] pstcmd_ja - batch structure of the parent job array 
+ * @param[in]  remain_range - updated range attribute of the parent array job
+ * @param[out] count - count of subjobs expanded
+ *
+ * @return int
+ * @retval 0 - success
+ * @retval 1 - failure
+ */
+struct batch_status **
+flush_ja(struct batch_status **pstcx, struct batch_status *pstcmd_ja, range *remain_range, struct batch_reply *reply)
+{
+	struct batch_status *pstcmd, *pstcmd_last = NULL;
+
+	if (expand_remaining_subjob(pstcmd_ja, remain_range, &reply->brp_count) != 0) {
+		pbs_statfree(pstcmd_ja);
+		return NULL;
+	}
+#ifdef CLI_DEBUG
+		fprintf(stderr, "--> flush_ja, Complete array = ");
+#endif
+
+	pstcmd_ja->next = bs_isort(pstcmd_ja->next, cmp_sj_name);
+
+	/* find the last element, but also print elements in debug mode */
+	pstcmd_last = pstcmd_ja; 
+	pstcmd = pstcmd_last;
+	while(pstcmd) {
+#ifdef CLI_DEBUG
+		fprintf(stderr, "%s => ", pstcmd->name);
+#endif
+		pstcmd_last = pstcmd;
+		pstcmd = pstcmd->next;
+	}
+	if (reply->brp_auxcode == 1) { /* diffstat reply, so reverse order */
+		pstcmd_last->next = *pstcx;
+		*pstcx = pstcmd_ja;
+	} else {
+		*pstcx = pstcmd_ja;
+		pstcx = &pstcmd_last->next;
+	}
+	
+#ifdef CLI_DEBUG
+		fprintf(stderr, "\n");
+#endif
+	return pstcx;
+}
+
+/**
  * @brief-
  *	decode a Batch Protocol Reply Structure for a Command
  *
@@ -292,8 +321,8 @@ decode_DIS_replyCmd(int sock, struct batch_reply *reply, int prot)
 	struct batch_status *pstcmd = NULL;
 	struct batch_status **pstcx = NULL;
 	struct batch_deljob_status *pdel;
-	struct batch_status *pstcmd_last = NULL;
 	struct batch_status *pstcmd_ja = NULL;
+	range *remain_range = NULL;
 	int rc = 0;
 	size_t txtlen;
 	preempt_job_info *ppj = NULL;
@@ -378,6 +407,16 @@ again:
 			if (rc)
 				return rc;
 			reply->brp_count += ct;
+			reply->latestObj.tv_sec = disrul(sock, &rc);
+			if (rc) 
+				return rc;
+			reply->latestObj.tv_usec = disrul(sock, &rc);
+			if (rc) 
+				return rc;
+
+#ifdef CLI_DEBUG
+			fprintf(stderr, "IFL stat: diffstat=%d, count=%d, latestobj={%ld:%ld}\n",  reply->brp_auxcode,  reply->brp_count,  reply->latestObj.tv_sec, reply->latestObj.tv_usec);
+#endif
 
 			while (ct--) {
 
@@ -388,45 +427,56 @@ again:
 						pbs_statfree(pstcmd);
 					return rc;
 				}
+#ifdef CLI_DEBUG
+				fprintf(stderr, "IFL read object=%s\n", pstcmd->name);
+#endif				
 				if (reply->brp_type == MGR_OBJ_JOBARRAY_PARENT) {
+					char *remain;
 					if (pstcmd_ja != NULL) {
-						pstcmd_ja->next = bs_isort(pstcmd_ja->next, cmp_sj_name);
-						for (pstcmd_last = pstcmd_ja; pstcmd_last->next; pstcmd_last = pstcmd_last->next)
-							;
-						*pstcx = pstcmd_ja;
-						pstcx = &pstcmd_last->next;
+						pstcx = flush_ja(pstcx, pstcmd_ja, remain_range, reply);
+						if (!pstcx)
+							return DIS_NOMALLOC;
 						pstcmd_ja = NULL;
 					}
-					if (expand_remaining_subjob(pstcmd, &reply->brp_count) != 0) {
-						pbs_statfree(pstcmd);
-						return DIS_NOMALLOC;
+					/* just store it in pstcmd_ja, but do not expand it */
+					if ((remain = get_attr(pstcmd->attribs, ATTR_array_indices_remaining, NULL))) {
+						pstcmd_ja = pstcmd;
+						remain_range = range_parse(remain);
+					} else {
+						/* nothing to expand, treat like a normal job */
+						goto normal;
 					}
-					pstcmd_ja = pstcmd;
 					continue;
-				} else if (reply->brp_type == MGR_OBJ_SUBJOB) {
+				} else if ((reply->brp_type == MGR_OBJ_SUBJOB) && (pstcmd_ja)) {
+					int subjob_id = get_index_from_jid(pstcmd->name);
+					/* find it subjobid is also in queued range, and was expanded, if so, delete the old one */
+					if (range_contains(remain_range, subjob_id))
+						range_remove_value(&remain_range, subjob_id);
 					pstcmd->next = pstcmd_ja->next;
 					pstcmd_ja->next = pstcmd;
 					continue;
 				} else {
 					if (pstcmd_ja != NULL) {
-						pstcmd_ja->next = bs_isort(pstcmd_ja->next, cmp_sj_name);
-						for (pstcmd_last = pstcmd_ja; pstcmd_last->next; pstcmd_last = pstcmd_last->next)
-							;
-						*pstcx = pstcmd_ja;
-						pstcx = &pstcmd_last->next;
+						pstcx = flush_ja(pstcx, pstcmd_ja, remain_range, reply);
+						if (!pstcx)
+							return DIS_NOMALLOC;
 						pstcmd_ja = NULL;
 					}
-					*pstcx = pstcmd;
-					pstcx = &pstcmd->next;
+normal:
+					if (reply->brp_auxcode == 1) { /* diffstat reply, so reverse order */
+						pstcmd->next = *pstcx;
+						*pstcx = pstcmd;
+					} else {
+						*pstcx = pstcmd;
+						pstcx = &pstcmd->next;
+					}
 				}
 			}
 			if (pstcmd_ja != NULL) {
-				pstcmd_ja->next = bs_isort(pstcmd_ja->next, cmp_sj_name);
-				for (pstcmd_last = pstcmd_ja; pstcmd_last->next; pstcmd_last = pstcmd_last->next)
-					;
-				*pstcx = pstcmd_ja;
-				pstcx = &pstcmd_last->next;
-				pstcmd = pstcmd_last;
+				pstcx = flush_ja(pstcx, pstcmd_ja, remain_range, reply);
+				if (!pstcx)
+						return DIS_NOMALLOC;
+				pstcmd_ja = NULL;
 			}
 
 			if (reply->brp_un.brp_statc)

@@ -876,6 +876,79 @@ struct batch_status *build_return_status(struct batch_status *bstatus,
 
 /**
  * @brief
+ *	-Create a stathost compatible result from the batch_status list provided.
+ * The given batch status list is a list of vnodes. This function will glean 
+ * out the list of physical hosts from the vnode list.
+ *
+ * @param[in] connect - soket descriptor
+ * @param[in] hid - hostid queried or NULL for all hosts
+ * @param[in] bstatus - list of batch structure structues representing vnodes
+ *
+ * @return	batch_status - list of batch status structures representing hosts
+ * 
+ */
+struct batch_status *
+make_stathost_return(int con, char *hid, struct batch_status *bstatus)
+{
+	int i;
+	/* variables used across many function, these are what make the function */
+	char *various = "<various>";
+	struct host_list *phost_list = NULL;
+	struct consumable *consum = NULL;
+	int host_list_size = 0;
+	int consumable_size = 0;
+	struct pbs_client_thread_connect_context *context;
+	struct batch_status *breturn = NULL;
+
+	build_host_list(bstatus, &phost_list, &host_list_size, &consum, &consumable_size);
+	if ((hid == NULL) || (*hid == '\0')) {
+		/*
+		 * No host specified, so for each host found in the host_list
+		 * entries, gather info from the vnodes associated with that host
+		 */
+		for (i=0; i<host_list_size; ++i) {
+			hid = (phost_list+i)->hl_name;
+			breturn = build_return_status(bstatus, hid, breturn, phost_list, host_list_size, consum, consumable_size, various);
+		}
+	} else {
+		/*
+		 * Specific host names gather info from the vnodes associate with it
+		 */
+		breturn = build_return_status(bstatus, hid, breturn, phost_list, host_list_size, consum, consumable_size, various);
+		if ((breturn == NULL) && (pbs_errno == PBSE_UNKNODE)) {
+			/*
+			 * store error in TLS if available. Fallback to
+			 * connection structure.
+			 */
+			context = pbs_client_thread_find_connect_context(con);
+			if (context != NULL) {
+				if (context->th_ch_errtxt != NULL)
+					free(context->th_ch_errtxt);
+				if ((context->th_ch_errtxt = strdup(pbse_to_txt(pbs_errno))) == NULL)
+					pbs_errno = PBSE_SYSTEM;
+			} else {
+				if (set_conn_errtxt(con, pbse_to_txt(pbs_errno)) != 0)
+					pbs_errno = PBSE_SYSTEM;
+			}
+		}
+	}
+
+	for (i = 0; i < consumable_size; i++) {
+		free((consum+i)->cons_avail_str);
+		free((consum+i)->cons_resource);
+	}
+	free(consum);
+	consum = NULL;
+	consumable_size = 0;
+	free(phost_list);
+	phost_list = NULL;
+	host_list_size  = 0;
+
+	return breturn;
+}
+
+/**
+ * @brief
  * 	pbs_stathost - return status on a single named host or all hosts known
  *	A host is defined by the value of resources_available.host
  *
@@ -897,81 +970,16 @@ struct batch_status *build_return_status(struct batch_status *bstatus,
 struct batch_status *
 __pbs_stathost(int con, char *hid, struct attrl *attrib, char *extend)
 {
-	struct batch_status *breturn;	/* the list returned to the caller */
+	struct batch_status *breturn = NULL;	/* the list returned to the caller */
 	struct batch_status *bstatus;	/* used internally		   */
-	int   i;
-	/* variables used across many function, these are what make the function */
-	char		 *various         = "<various>";
-	struct host_list  *phost_list      = NULL;
-	struct consumable *consum          = NULL;
-	int		  host_list_size  = 0;
-	int		  consumable_size = 0;
-	struct pbs_client_thread_connect_context *context;
-
-	breturn = NULL;
 
 	/* get status of all vnodes */
 	bstatus = pbs_statvnode(con, "", attrib, extend);
-
 	if (bstatus == NULL)
 		return NULL;
 
-	build_host_list(bstatus, &phost_list, &host_list_size,
-		&consum, &consumable_size);
-
-	if ((hid == NULL) || (*hid == '\0')) {
-
-		/*
-		 * No host specified, so for each host found in the host_list
-		 * entries, gather info from the vnodes associated with that host
-		 */
-
-		for (i=0; i<host_list_size; ++i) {
-			hid = (phost_list+i)->hl_name;
-			breturn = build_return_status(bstatus, hid, breturn,
-				phost_list, host_list_size,
-				consum, consumable_size,
-				various);
-		}
-
-	} else {
-
-		/*
-		 * Specific host names gather info from the vnodes associate with it
-		 */
-
-		breturn = build_return_status(bstatus, hid, breturn,
-			phost_list, host_list_size,
-			consum, consumable_size,
-			various);
-		if ((breturn == NULL) && (pbs_errno == PBSE_UNKNODE)) {
-			/*
-			 * store error in TLS if available. Fallback to
-			 * connection structure.
-			 */
-			context = pbs_client_thread_find_connect_context(con);
-			if (context != NULL) {
-				if (context->th_ch_errtxt != NULL)
-					free(context->th_ch_errtxt);
-				if ((context->th_ch_errtxt = strdup(pbse_to_txt(pbs_errno))) == NULL) {
-					pbs_errno = PBSE_SYSTEM;
-					return NULL;
-				}
-			} else {
-				if (set_conn_errtxt(con, pbse_to_txt(pbs_errno)) != 0) {
-					pbs_errno = PBSE_SYSTEM;
-					return NULL;
-				}
-			}
-		}
-	}
+	breturn = make_stathost_return(con, hid, bstatus);
 
 	pbs_statfree(bstatus);	/* free info returned by pbs_statvnodes() */
-	free(consum);
-	consum = NULL;
-	consumable_size = 0;
-	free(phost_list);
-	phost_list = NULL;
-	host_list_size  = 0;
 	return breturn;
 }

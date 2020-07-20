@@ -392,7 +392,7 @@ set_resc_assigned(void *pobj, int objtype, enum batch_op op)
 						return;
 				}
 				rscdef->rs_set(&pr->rs_value, &rescp->rs_value, op);
-				sysru->at_flags |= ATR_MOD_MCACHE;
+				mark_attr_set(sysru);
 			}
 
 			/* update queue attribute of resources assigned */
@@ -405,7 +405,7 @@ set_resc_assigned(void *pobj, int objtype, enum batch_op op)
 						return;
 				}
 				rscdef->rs_set(&pr->rs_value, &rescp->rs_value, op);
-				queru->at_flags |= ATR_MOD_MCACHE;
+				mark_attr_set(queru);
 			}
 		}
 		rescp = (resource *)GET_NEXT(rescp->rs_link);
@@ -1155,6 +1155,8 @@ unset_job_history_enable(void)
 	job *pjob = NULL;
 	job *nxpjob = NULL;
 
+	force_cli_daemons_update(PBS_NET_CONN_FROM_QSTAT_DAEMON);
+	
 	sprintf(log_buffer, "job_history_enable has been unset.");
 	log_event(PBSEVENT_ADMIN, PBS_EVENTCLASS_SERVER,
 		LOG_NOTICE, msg_daemonname, log_buffer);
@@ -1210,6 +1212,8 @@ set_job_history_enable(attribute *pattr, void *pobject, int actmode)
 			(void)set_task(WORK_Timed,
 				(long)(time_now + SVR_CLEAN_JOBHIST_TM),
 				svr_clean_job_history, 0);
+
+			force_cli_daemons_update(PBS_NET_CONN_FROM_QSTAT_DAEMON);
 		} else {
 			unset_job_history_enable();
 		}
@@ -6730,19 +6734,20 @@ default_queue_chk(attribute *pattr, void *pobj, int actmode)
 /**
  *
  * @brief
- *		Marks a connection flag that tells a qsub daemon that something has
- *		changed in the server, and its req_queuejob request needs to be redone.
+ * Marks a connection flag that tells a qsub daemon that something has
+ * changed in the server, and its req_queuejob request needs to be redone.
  *
+ * @param[in] conn_type - PBS_NET_CONN_FROM_QSUB_DAEMON or PBS_NET_CONN_FROM_QSTAT_DAEMON
  */
 void
-force_qsub_daemons_update(void)
+force_cli_daemons_update(int conn_type)
 {
 	conn_t *cp = NULL;
 	if (svr_allconns.ll_next == NULL)
 		return;
 	for (cp = (conn_t *)GET_NEXT(svr_allconns);cp; cp = GET_NEXT(cp->cn_link)) {
-		if (cp->cn_authen & PBS_NET_CONN_FROM_QSUB_DAEMON)
-			cp->cn_authen |= PBS_NET_CONN_FORCE_QSUB_UPDATE;
+		if (cp->cn_authen & conn_type)
+			cp->cn_authen |= PBS_NET_CONN_FORCE_UPDATE;
 	}
 }
 
@@ -6766,7 +6771,7 @@ force_qsub_daemons_update_action(attribute *pattr, void *pobj, int actmode)
 	if (pattr == NULL) {
 		return (PBSE_INTERNAL);
 	}
-	force_qsub_daemons_update();
+	force_cli_daemons_update(PBS_NET_CONN_FROM_QSUB_DAEMON);
 
 	return (PBSE_NONE);
 }
@@ -6838,4 +6843,187 @@ void memory_debug_log(struct work_task *ptask) {
 		free(buf);
 	}
 #endif /* malloc_info */
+}
+
+/**
+ * @brief
+ * 		Append this id to the list of deleted ids for this object type
+ *
+ * @param[in]	phead - list head for this object type
+ * @param[in]	id    - identifier of this object
+ *
+ * @return	void
+ *
+ * @par MT-Safe: Yes
+ * @par Side Effects: None
+ *
+ */
+void
+append_deleted_ids(pbs_list_head *head, char *id)
+{
+	deleted_obj_t *dj;
+
+	if (!(dj = malloc(sizeof(deleted_obj_t))))
+		log_errf(-1, __func__, "Failed to allocate space for deleted obj %s", id);
+	else {
+		deleted_obj_t *platest;
+
+		log_eventf(PBSEVENT_DEBUG3, PBS_EVENTCLASS_JOB, LOG_DEBUG, id, "diffstat saving deleted id"); 
+		if ((dj->obj_id = strdup(id))) {
+			gettimeofday(&dj->tm_deleted, NULL);
+			CLEAR_LINK(dj->deleted_obj_link);
+
+			platest = (deleted_obj_t *) GET_PRIOR((*head));
+			if (platest == NULL)
+				insert_link(head, &dj->deleted_obj_link, dj, LINK_INSET_AFTER); /* link first in server's list */
+			else
+				insert_link(&platest->deleted_obj_link, &dj->deleted_obj_link, dj, LINK_INSET_AFTER); /* link after 'latest' job in server's list */
+		} else {
+			free(dj);
+			log_errf(-1, __func__, "Failed to allocate space for deleted obj %s", id);
+		}
+	}
+}
+
+/**
+ * @brief
+ * 		add a single deleted id to the batch reply
+ *
+ * @param[in]	id - the id to add
+ * @param[in]	preply - pointer to the reply structure to add to
+ *
+ * @return	int
+ * @retval	0 - success
+ * @retval	!0 - Error - pbs errno
+ *
+ * @par MT-Safe: Yes
+ * @par Side Effects: None
+ *
+ */
+int 
+add_deleted_id(char *id, struct batch_reply *preply)
+{
+	struct brp_status *pstat = NULL;
+	pstat = (struct brp_status *) malloc(sizeof(struct brp_status));
+	if (pstat == NULL)
+		return PBSE_SYSTEM;
+
+	CLEAR_LINK(pstat->brp_stlink);
+	pstat->brp_objtype = MGR_OBJ_DELETED;
+	strcpy(pstat->brp_objname, id);
+	CLEAR_HEAD(pstat->brp_attr);
+	append_link(&preply->brp_un.brp_status, &pstat->brp_stlink, pstat);
+	preply->brp_count++;
+
+	log_errf(-1, __func__, "*** Adding deleted id %s to selstat reply!!", id);
+
+	return 0;
+}
+
+/**
+ * @brief
+ * 		add deleted ids to the batch reply for the stat request
+ *
+ * @param[in]	phead - list head for this object type
+ * @param[in]	from_tm - ids deleted after this timestamp only
+ * @param[in]	preply - ptr to the reply structure
+ * @param[out]	last_purge_ts - return the last purged ts
+ *
+ * @return	int
+ * @retval	0 - success
+ * @retval	!0 - Error - pbs errno
+ *
+ * @par MT-Safe: Yes
+ * @par Side Effects: None
+ *
+ */
+int
+stat_deleted_ids(pbs_list_head *head, struct timeval from_tm, struct batch_reply *preply, struct timeval *last_purge_ts)
+{
+	deleted_obj_t *dj, *nxt;
+	struct timeval lastdo = {0,0};
+	int rc = 0;
+
+	dj = (deleted_obj_t *) GET_PRIOR((*head));
+	if (dj)
+		lastdo = dj->tm_deleted;
+
+	while (dj) {
+		if (!(TS_NEWER(dj->tm_deleted, from_tm)))
+			break;
+
+		if ((rc = add_deleted_id(dj->obj_id, preply)) != 0)
+			return rc;
+
+		/* important: save prev ptr as my node's position can change in the timed list */
+		nxt = (deleted_obj_t *) GET_PRIOR(dj->deleted_obj_link);
+		if (time_now - dj->tm_deleted.tv_sec > DEL_OBJ_TIME) {
+			/* too old, remove from deleted objs list */
+			log_errf(-1, __func__, "*** Removing object %s to deleted list as too old!!", dj->obj_id);
+			free(dj->obj_id);
+			delete_link(&dj->deleted_obj_link);
+			gettimeofday(last_purge_ts, NULL);
+		}
+		dj = nxt;
+	}
+
+	if (TS_NEWER(lastdo, preply->latestObj))
+		preply->latestObj = lastdo;
+
+	return 0;
+}
+
+/**
+ * @brief
+ * 		find the deleted object id from the deleted id list provided
+ *
+ * @param[in]	phead  - list head for this object type
+ * @param[in]	obj_id - id of the object to search
+ *
+ * @return	void
+ *
+ * @par MT-Safe: Yes
+ * @par Side Effects: None
+ *
+ */
+deleted_obj_t *
+find_deleted_id(pbs_list_head *head, char *obj_id)
+{
+	deleted_obj_t *dj;
+	dj = (deleted_obj_t *) GET_NEXT((*head));
+	while (dj) {
+		if (strcmp(dj->obj_id, obj_id) == 0) {
+			return dj;
+		}
+		dj = (deleted_obj_t *) GET_NEXT(dj->deleted_obj_link);
+	}
+	return NULL;
+}
+
+/**
+ * @brief
+ * 	utility routine to parse timestamp from extend field of request
+ *
+ * @param[in] extend - the extend string to parse
+ *
+ * @return	timeval - the parsed timestamp or {0, 0}
+ *
+ * @par MT-Safe: Yes
+ * @par Side Effects: None
+ *
+ */
+struct timeval 
+parse_ts_from_extend(char *extend)
+{
+	char *p;
+	struct timeval from_tm = {0, 0};
+
+	if ((p = strchr(extend, (int) ',')) != NULL) {
+		p++; /* go past comma */
+		from_tm.tv_sec = strtoul(p, &p, 10);
+		if (*p == ':')
+			p++; /* go past : */
+		from_tm.tv_usec = strtoul(p, NULL, 10);
+	}
+	return from_tm;
 }

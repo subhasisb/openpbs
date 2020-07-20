@@ -2079,7 +2079,7 @@ account_job_update(job *pjob, int type)
 		pb += i;
 		len -= i;
 
-		set_attr_with_attr(&job_attr_def[JOB_ATR_resc_used_acct], get_jattr(pjob, JOB_ATR_resc_used_acct), get_jattr(pjob, JOB_ATR_resc_used), INCR);
+		set_jattr_with_attr(pjob, JOB_ATR_resc_used_acct, get_jattr(pjob, JOB_ATR_resc_used), INCR);
 	}
 
 writeit:

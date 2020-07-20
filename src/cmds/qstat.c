@@ -64,6 +64,13 @@
 #include "pbs_internal.h"
 #include "libutil.h"
 #include <arpa/inet.h>
+#ifndef WIN32
+#include <sys/un.h>
+#include <signal.h>
+#include <errno.h>
+#endif
+#include "attribute.h"
+#include "pbs_error.h"
 
 #if	TCL_QSTAT
 #include	<sys/stat.h>
@@ -73,14 +80,23 @@ extern char *	tcl_atrsep;
 #endif /* localmod 071 */
 #endif
 
+int child_process = 0;
+
+typedef enum { JOBS, QUEUES, SERVERS } modelist_t;
+
 /* default server */
 char *def_server;
 
 static void states();
-static char *	cvtResvstate(char *);
+static char *cvtResvstate(char *);
 static int cmp_est_time(struct batch_status *a, struct batch_status *b);
 char *cnvt_est_start_time(char *start_time, int shortform);
+struct timeval last_stat_ts = {0, 0};
+struct batch_status *p_server = NULL;
+int talk_to_fg(int sock, int sd_svr, char **err_op);
 
+int p_header = TRUE;
+char extend[50];
 
 #if !defined(PBS_NO_POSIX_VIOLATION)
 /* defines for alternative display formats */
@@ -108,6 +124,18 @@ char *cnvt_est_start_time(char *start_time, int shortform);
 #define DISPLAY_TRUNC_CHAR '*'
 
 #define NUML    5
+/* variables used by both foreground and background qstats */
+static int alt_opt;
+static int wide;
+static int f_opt, B_opt, Q_opt, how_opt, E_opt;
+static char *queue_name_out = NULL;
+static char *server_name_out=  NULL;
+static char *query_job_list = NULL;
+static char server_out[MAXSERVERNAME] = {0};
+static int hist_enabled = 0;
+static int list_subjobs = 0;
+static int show_expired = 0;
+static char cmd_name[] = "qstat";
 
 static struct attrl basic_attribs[] = {
 	{	&basic_attribs[1],
@@ -162,9 +190,9 @@ static char *output_format_names[] = {"default", "dsv", "json", NULL};
 
 static int  output_format = FORMAT_DEFAULT;
 static char *dsv_delim = "|";
+static char dsv_delim_buf[MAXBUFLEN];
 static char *delimiter = "\n";
 static char *prev_resc_name = NULL;
-static int  first_stat = 1;
 static int conn;
 
 static struct attrl *display_attribs = &basic_attribs[0];
@@ -490,6 +518,7 @@ prt_attr(char *name, char *resource, char *value, int one_line) {
 				printf("    %s = %s", name, show_nonprint_chars(buf));
 			free(buf);
 		} else {
+			char *saveptr = NULL;
 			start = strlen(name) + 7; /* 4 spaces + ' = ' is 7 */
 			printf("    %s", name);
 			if (resource) {
@@ -499,7 +528,7 @@ prt_attr(char *name, char *resource, char *value, int one_line) {
 			printf(" = ");
 			if ((temp = strdup(value)) == NULL)
 				exit_qstat("out of memory");
-			buf = strtok(temp, comma);
+			buf = strtok_r(temp, comma, &saveptr);
 			while (buf) {
 				if ((len = strlen(buf)) + start < CHAR_LINE_LIMIT) {
 					printf("%s", show_nonprint_chars(buf));
@@ -530,7 +559,7 @@ prt_attr(char *name, char *resource, char *value, int one_line) {
 						}
 					}
 				}
-				if ((buf = strtok(NULL, comma)) != NULL) {
+				if ((buf = strtok_r(NULL, comma,  &saveptr)) != NULL) {
 					first = 0;
 					putchar(',');
 				}
@@ -800,6 +829,7 @@ altdsp_statjob(struct batch_status *pstat, struct batch_status *prtheader, int a
 	static char *blank = " -- ";
 	char buf[COMMENT_BUF_SIZE] = {'\0'};
 	int id_len;
+	int skip = 0;
 
 	if (alt_opt & ALT_DISPLAY_T)
 		pstat = bs_isort(pstat, cmp_est_time);
@@ -905,6 +935,7 @@ altdsp_statjob(struct batch_status *pstat, struct batch_status *prtheader, int a
 			}
 		}
 	}
+
 	while (pstat) {
 		exechost = blank;
 		sess   = blank;
@@ -931,6 +962,7 @@ altdsp_statjob(struct batch_status *pstat, struct batch_status *prtheader, int a
 		usecput = 0;
 
 		pat = pstat->attribs;
+		skip = 0;
 
 		while (pat) {
 			if (strcmp(pat->name, ATTR_N) == 0) {
@@ -943,6 +975,10 @@ altdsp_statjob(struct batch_status *pstat, struct batch_status *prtheader, int a
 				trunc_value(usern, SIZEUSER, SIZEUSER_W, wide);
 			} else if (strcmp(pat->name, ATTR_state) == 0) {
 				jstate = pat->value;
+				if ((*jstate == 'F') && (show_expired == 0)) {
+					skip = 1;
+					break;
+				}
 			} else if (strcmp(pat->name, ATTR_queue) == 0) {
 				queuen = pat->value;
 				trunc_value(queuen, SIZEQUEUENAME, PBS_MAXQUEUENAME, wide);
@@ -1018,6 +1054,11 @@ altdsp_statjob(struct batch_status *pstat, struct batch_status *prtheader, int a
 			}
 
 			pat = pat->next;
+		}
+
+		if (skip) {
+			pstat = pstat->next;
+			continue;
 		}
 
 		if (alt_opt & ALT_DISPLAY_T) {
@@ -1332,6 +1373,8 @@ display_statjob(struct batch_status *status, struct batch_status *prtheader, int
 	char long_name[NAMEL + 1] = {'\0'};
 	char *cmdargs = NULL;
 	char *hpcbp_executable;
+	int skip = 0;
+	int  first_stat = 1;
 
 	if (wide) {
 		sprintf(format, "%%-%ds %%-%ds %%-%ds  %%%ds %%%ds %%-%ds\n",
@@ -1378,6 +1421,7 @@ display_statjob(struct batch_status *status, struct batch_status *prtheader, int
 			return 1;
 		first_stat = 0;
 	}
+	
 	p = status;
 	while (p != NULL) {
 		jid = NULL;
@@ -1392,7 +1436,14 @@ display_statjob(struct batch_status *status, struct batch_status *prtheader, int
 		location = NULL;
 		hpcbp_executable = NULL;
 		prev_resc_name = NULL;
+
 		if (full) {
+			state = get_attr(p->attribs, ATTR_state, NULL);
+			if ((*state == 'F') && (show_expired == 0)) {
+				p = p->next;
+				continue;
+			}
+	
 			if (output_format == FORMAT_DSV || output_format == FORMAT_DEFAULT)
 				printf("Job Id: %s%s", p->name, delimiter);
 			else if (output_format == FORMAT_JSON)
@@ -1499,6 +1550,7 @@ display_statjob(struct batch_status *status, struct batch_status *prtheader, int
 				jid = p->name;
 			}
 			a = p->attribs;
+			skip = 0;
 			while (a != NULL) {
 				if (a->name != NULL) {
 					if (strcmp(a->name, ATTR_name) == 0) {
@@ -1581,6 +1633,10 @@ display_statjob(struct batch_status *status, struct batch_status *prtheader, int
 							*c = '\0';
 						}
 						state = a->value;
+						if ((*state == 'F') && (show_expired == 0)) {
+							skip = 1;
+							break;
+						}
 					} else if (strcmp(a->name, ATTR_queue) == 0) {
 						c = a->value;
 						while (*c != '@' && *c != '\0') c++;
@@ -1606,6 +1662,12 @@ display_statjob(struct batch_status *status, struct batch_status *prtheader, int
 				}
 				a = a->next;
 			}
+
+			if (skip) {
+				p = p->next;
+				continue;
+			}
+
 			if (timeu == NULL) timeu = "0";
 			if (how_opt & ALT_DISPLAY_p) {
 				char *pc = percent_cal(state, timeu, timer, wtimu, wtimr, arsct);
@@ -1658,6 +1720,7 @@ display_statque(struct batch_status *status, int prtheader, int full, int alt_op
 	char ext[NUML+1];
 	char *type;
 	char format[80];
+	int  first_stat = 1;
 
 	sprintf(format, "%%-%ds %%%ds %%%ds %%%ds %%%ds %%%ds %%%ds %%%ds %%%ds %%%ds %%%ds %%-%ds\n",
 		NAMEL, NUML, NUML, 3, 3, NUML,
@@ -1815,6 +1878,7 @@ display_statserver(struct batch_status *status, int prtheader, int full, int alt
 	char ext[NUML+1];
 	char *stats;
 	char format[80];
+	int  first_stat = 1;
 
 	sprintf(format, "%%-%ds %%%ds %%%ds %%%ds %%%ds %%%ds %%%ds %%%ds %%%ds %%-%ds\n",
 		NAMEL, NUML, NUML, NUML, NUML, NUML, NUML, NUML, NUML, STATUSL);
@@ -2341,6 +2405,397 @@ tcl_run(int f_opt)
 #endif /* localmod 071 */
 #endif	/* TCL_QSTAT */
 
+
+
+/**
+ * @brief
+ *	Send the cmd opt values for each parameter supported by qsub to the
+ *	background qsub process.
+ *
+ * @param[in]	s - pointer to the windows PIPE or Unix domain socket
+ *
+ * @return int
+ * @retval	-1 - Failure
+ * @retval	 0 - Success
+ *
+ */
+static int
+send_opts(int sock)
+{
+	char buf[20];
+	sprintf(buf, "%d %d %d %d %d %s", f_opt, how_opt, alt_opt, wide, output_format, dsv_delim);
+	return (send_string(sock, buf));
+}
+
+/**
+ * @brief
+ *	Recv the cmd opt values for each parameter supported by qsub from the
+ *	foreground qsub process.
+ *
+ * @param[in]	s - pointer to the windows PIPE or Unix domain socket
+ *
+ * @return int
+ * @retval	-1 - Failure
+ * @retval	 0 - Success
+ *
+ */
+static int
+recv_opts(int sock)
+{
+	char *buf;
+
+	if (recv_dyn_string(sock, &buf) != 0)
+		return -1;
+
+	sscanf(buf, "%d %d %d %d %d %s", &f_opt, &how_opt, &alt_opt, &wide, &output_format, dsv_delim_buf);
+	dsv_delim = dsv_delim_buf;
+	free(buf);
+
+	return 0;
+}
+
+/**
+ * @brief
+ *	Update the objects in the client cache from updates 
+ *  received in the batch status array
+ *
+ * @param[in] p_status - array of batch status structures (updated objects)
+ *
+ * @return int
+ * @retval	-1 - Failure
+ * @retval	 0 - Success
+ * 
+ */
+static int 
+update_cache(struct batch_status *stat_upd)
+{
+	int rc;
+	int full_stat = 0;
+	int array;
+	char *p;
+	char *oper = NULL;
+	struct batch_status *next, *bs, *bs_next;
+
+	if (!stat_upd)
+		return 0;
+
+#ifdef CLI_DEBUG
+	CLI_DBPRT((stderr, "Data received from IFL at update_cache()\n"))
+	debug_print_bs(stat_upd);
+#endif
+
+	if (IS_FULLSTAT(last_stat_ts)) {
+		full_stat = 1;
+		cc_destroy();
+		cc_create();
+	}
+
+	while(stat_upd) {
+		next = stat_upd->next;
+
+		if (full_stat) {
+			oper = "cc_append";
+			rc = cc_append(stat_upd);
+		} else if ((stat_upd->attribs) && (strcmp(stat_upd->attribs->name, "deleted") == 0)) {
+			if ((strstr(stat_upd->name, "[]")))
+				array = 1;	
+			else
+				array = 0;
+
+			bs = cc_get_next(stat_upd->name, NULL); /* get pointer to next bs, before deleting this */
+			do {
+				bs_next = cc_get_next(NULL, bs);
+				oper = "cc_delete";
+				rc = cc_delete(bs);
+				bs = bs_next;
+			} while ((array == 1) && (rc == 0) && (bs) && (p = strstr(bs->name, "[")) && (*(p+1) != ']')); /* if subjob */
+		} else {
+			oper = "cc_update";
+			rc = cc_update(stat_upd);
+		}
+		
+		if (rc != 0) {
+			fprintf(stderr, "Failed to %s job %s cache\n", oper, stat_upd->name);
+			exit(1);
+		}
+		stat_upd = next;			
+	}
+
+#ifdef CLI_DEBUG
+	CLI_DBPRT((stderr, "Object state after update_cache()\n"))
+	debug_print_bs(cc_get_head());
+#endif
+
+	/* return the last stat'd timestamp */
+	last_stat_ts = pbs_get_last_stat_ts();
+	return 0;
+}
+
+/**
+ * @brief
+ *	Add jobs from the cache to the query result 
+ *
+ * @param[out] phead - add jobs to the list
+ * @param[in] query_jobid - job id queried or NULL for all
+ *
+ */
+static void
+add_jobs_from_cache(struct batch_status **phead, char *query_jobid)
+{
+	struct batch_status *rec = NULL;
+	char *p;
+	int is_queried_array;
+	int queried_idlen = 0;
+
+	int is_rec_subjob;
+	int is_rec_expired;
+
+	is_queried_array = (query_jobid == NULL) ? 0 : (strstr(query_jobid, "[]") != NULL);
+	/* if array asked, check if found record is actually a subjob of it still, else break */
+	if (is_queried_array) {
+		p = strchr(query_jobid, '[');
+		queried_idlen = p - query_jobid;
+	}
+
+	while ((rec = cc_get_next(query_jobid, rec))) {
+		if (query_jobid && is_queried_array) {
+			if (memcmp(query_jobid, rec->name, queried_idlen + 1) != 0)
+				break; /* specific array was asked, but rec is not a subjob of that array asked */
+		}
+
+		is_rec_subjob = ((p = strstr(rec->name, "[")) && (*(p+1) != ']'));
+		if (is_rec_subjob && !list_subjobs) {
+			if (query_jobid) {
+				if (is_queried_array)
+					break; /* a specific array was asked, and list_subjobs false, so break */
+				/* if a specific subjob was asked, then allow adding without -t as well */
+			} else
+				continue;  /* alljobs asked, rec is subjob, and list_subjobs false, skip, but continue */
+		}
+
+		p = get_attr(rec->attribs, ATTR_state, NULL);
+		is_rec_expired = (p) ? (*p == 'F') : 0;
+		if (is_rec_expired && !show_expired) {
+			pbs_errno = PBSE_HISTJOBID; /* rec is finished job, and show_expired is false, don't add to results */
+		} else {
+			if (cc_add_list(phead, rec) != 0) {
+				fprintf(stderr, "Out of memory\n");
+				exit(1);
+			}
+		}
+
+		if (query_jobid && !is_queried_array)
+			break; /* specific item asked, and is not an array, so nothing more to do */
+	}
+}
+
+/**
+ * @brief
+ *	build batch_status for the given query
+ *
+ * @param[in] con - the connection fd
+ * @param[in] query_jobids_list - list of jobids queried, or NULL for all
+ * 
+ * @return batch_status - List of qualifying jobs in batch_status list format
+ *
+ */
+static struct batch_status *
+build_resp_from_cache(int con, char *query_jobids_list)
+{
+	struct batch_status *phead = NULL;
+	char *name;
+	char *query_ctx = NULL;
+	
+	CLI_DBPRT((stderr, "build_resp_from_cache(%s) --> ", query_jobids_list))
+
+	pbs_errno = PBSE_NONE;
+
+	if (!query_jobids_list || query_jobids_list[0] == '\0') {
+		add_jobs_from_cache(&phead, NULL);
+	} else {
+		name = strtok_r(query_jobids_list, ",", &query_ctx);
+		while (name) {
+			add_jobs_from_cache(&phead, name);
+			name = strtok_r(NULL, ",", &query_ctx);
+		}
+	}
+
+	/* set errors */
+	if (query_jobids_list && query_jobids_list[0] != '\0' && !phead) {
+		if (pbs_errno == PBSE_NONE)
+			pbs_errno = PBSE_UNKJOBID; /* no job found, set PBSE_UNKJOBID, if not other error is already set */
+		pbs_seterrmsg(con, pbse_to_txt(pbs_errno));
+	}
+
+#ifdef CLI_DEBUG
+	debug_print_bs(phead);
+#endif
+
+	return phead;
+}
+
+/**
+ * @brief
+ *	display qstat output by getting objects from client cache (or from passed status)
+ *  and calling the display routines in a common place
+ * 
+ * @param[in] mode - jobs, queues, server
+ * @param[in] p_status - pointer to list of stat output structures, or NULL (to get from cache)
+ * @param[in] display_attribs - attributes client wants to stat
+ * 
+ */
+void 
+display_output(modelist_t mode, struct batch_status *p_status, struct attrl *display_attribs)
+{
+	delimiter = "\n";
+	p_header = TRUE;
+
+	if(output_format == FORMAT_DSV)
+		delimiter = dsv_delim;
+	else if(output_format == FORMAT_JSON) {
+		time_t timenow;
+		delimiter = "";
+		/* adding prologue to json output. */
+		timenow = time(0);
+		if (add_json_node(JSON_VALUE, JSON_INT, JSON_FULLESCAPE, "timestamp", &timenow) == NULL)
+			exit_qstat("out of memory");
+		if (add_json_node(JSON_VALUE, JSON_STRING, JSON_FULLESCAPE, "pbs_version", PBS_VERSION) == NULL)
+			exit_qstat("out of memory");
+		if (add_json_node(JSON_VALUE, JSON_STRING, JSON_FULLESCAPE, "pbs_server", def_server) == NULL)
+			exit_qstat("out of memory");
+	}
+
+	switch (mode) {
+
+		case JOBS:
+			if (p_status) {
+				if ((alt_opt & ~ALT_DISPLAY_w) != 0 && !(wide && f_opt)) {
+					altdsp_statjob(p_status, p_server, alt_opt, wide, how_opt);
+				} else if (f_opt == 0 || tcl_stat("job", p_status, f_opt))
+					if (display_statjob(p_status, p_server, f_opt, how_opt, alt_opt, wide))
+						exit_qstat("out of memory");
+			}
+			break;
+
+
+		case QUEUES:
+			if (alt_opt & ALT_DISPLAY_q) {
+				altdsp_statque(pbs_server, p_status, alt_opt);
+#ifdef NAS /* localmod 071 */
+			} else if (tcl_stat("queue", p_status, tcl_opt)) {
+#else
+			} else if (tcl_stat("queue", p_status, f_opt)) {
+#endif /* localmod 071 */
+				if (display_statque(p_status, p_header, f_opt, alt_opt))
+					exit_qstat("out of memory");
+			}
+			p_header = FALSE;
+			pbs_statfree(p_status);
+			break;
+
+
+		case SERVERS:
+#ifdef NAS /* localmod 071 */
+			if (tcl_stat("server", p_status, tcl_opt))
+#else
+			if (tcl_stat("server", p_status, f_opt))
+#endif /* localmod 071 */
+				if (display_statserver(p_status, p_header, f_opt, alt_opt))
+					exit_qstat("out of memory");
+			p_header = FALSE;
+			pbs_statfree(p_status);
+			break;
+	}
+
+	if (output_format == FORMAT_JSON) {
+		if (add_json_node(JSON_OBJECT_END, JSON_NULL, JSON_NOVALUE, NULL, NULL) == NULL)
+			exit_qstat("out of memory");
+		generate_json(stdout);
+		free_json_node_list();
+	}
+
+	fflush(stdout);
+	fflush(stderr);
+}
+
+/**
+ * @brief
+ *	A wrapper function to the cnt2server_extend() call where there's
+ *	no 'extend' parameter passed.
+ *
+ * @param[in]	server	- hostname of the pbs server to connect to
+ *
+ * @return      int
+ * @retval      connection      success
+ * @retval	0		fail
+ */
+int
+qstat_connect(char *server, int set_diff_stat)
+{
+	if (set_diff_stat)
+		return (cnt2server_extend(server, QSTAT_DAEMON));
+	else
+		return (cnt2server(server));
+}
+
+/**
+ * @brief
+ * Utility function to check the error from pbs_errno and
+ *	and print the error
+ *
+ * @param[in] conn - the connection fd
+ * @param[in] job_id_out - The job_id query that resulted in this erro
+ *
+ * @return   int - the pbs_errno found from the connection
+ */
+static int 
+check_error(int conn, char *job_id_out)
+{
+	char *errmsg;
+
+	if (pbs_errno == PBSE_UNKJOBID) {
+#ifdef NAS /* localmod 071 */
+		(void)tcl_stat("job", NULL, tcl_opt);
+#else
+		(void)tcl_stat("job", NULL, f_opt);
+#endif /* localmod 071 */
+		if (pbs_errno != PBSE_HISTJOBID)
+			prt_job_err("qstat", conn, job_id_out);
+	} else {
+#ifdef NAS /* localmod 071 */
+		if (p_server) {
+			tcl_stat("serverhdr", p_server, tcl_opt);
+			tcl_stat("resv", p_rsvstat, tcl_opt);
+		}
+		(void)tcl_stat("job", NULL, tcl_opt);
+#else
+		(void)tcl_stat("job", NULL, f_opt);
+#endif /* localmod 071 */
+		if (pbs_errno != PBSE_NONE && pbs_errno != PBSE_HISTJOBID && pbs_errno != PBSE_NOSERVER) {
+			if (pbs_errno == PBSE_ATTRRO && alt_opt & ALT_DISPLAY_T)
+				fprintf(stderr, "qstat: -T option is unavailable.\n");
+			else
+				prt_job_err("qstat", conn, job_id_out);
+		}
+	}
+
+	/*
+		* If it is qstat command and error is PBSE_HISTJOBID, then
+		* handle it separately without using prt_job_err() API as we
+		* are adding some extra message.
+		*/
+	if (pbs_errno == PBSE_HISTJOBID) {
+		errmsg = pbs_geterrmsg(conn);
+		if (errmsg) {
+			fprintf(stderr,
+				"qstat: %s %s, use -x or -H to obtain historical job information\n",
+				job_id_out, errmsg);
+		}
+	}
+
+	return pbs_errno;
+}
+
 int
 main(int argc, char **argv, char **envp) /* qstat */
 {
@@ -2352,10 +2807,11 @@ main(int argc, char **argv, char **envp) /* qstat */
 	char *conflict = "qstat: conflicting options.\n";
 	char *pc;
 	int located = FALSE;
-	char extend[4];
-	int wide=0;
 	int format = 0;
-	time_t timenow;
+	int sock = -1;
+	int set_diff_stat = 0;
+	int bg_up = 0;
+	char *fname = NULL;
 
 #if TCL_QSTAT
 	char option[3];
@@ -2364,26 +2820,18 @@ main(int argc, char **argv, char **envp) /* qstat */
 	char job_id[PBS_MAXCLTJOBID];
 
 	char job_id_out[PBS_MAXCLTJOBID];
-	char server_out[MAXSERVERNAME] = {0};
 	char prev_server[MAXSERVERNAME] = {0};
 	char server_old[MAXSERVERNAME] = "";
 	char rmt_server[MAXSERVERNAME];
 	char destination[PBS_MAXDEST+1];
 
-	char *queue_name_out;
-	char *server_name_out;
-
 	char operand[PBS_MAXCLTJOBID+1];
-	int alt_opt;
-	int f_opt, B_opt, Q_opt, how_opt, E_opt;
-	int p_header = TRUE;
-	int stat_single_job = 0;
 	int new_remote_server = 0;
-	enum { JOBS, QUEUES, SERVERS } mode;
-	struct batch_status *p_status;
-	struct batch_status *p_server = NULL;
+	modelist_t mode;
+	int dest_set = 1;
 	struct attropl *p_atropl = 0;
 	struct attropl *new_atropl;
+	struct batch_status *p_status;
 #ifdef NAS /* localmod 071 */
 	int tcl_opt;
 	struct batch_status *p_rsvstat;
@@ -2392,7 +2840,6 @@ main(int argc, char **argv, char **envp) /* qstat */
 	char *errmsg;
 	char *job_list = NULL;
 	size_t job_list_size = 0;
-	char *query_job_list = NULL;
 
 #if !defined(PBS_NO_POSIX_VIOLATION)
 #ifdef NAS /* localmod 071 */
@@ -2407,7 +2854,6 @@ main(int argc, char **argv, char **envp) /* qstat */
 	/*test for real deal or just version and exit*/
 
 	PRINT_VERSION_AND_EXIT(argc, argv);
-	delay_query();
 	if (initsocketlib())
 		return 1;
 
@@ -2764,31 +3210,27 @@ qstat -B [-f] [-F format] [-D delim] [ server_name... ]\n";
 	added_queue = 0;
 	new_atropl = p_atropl;
 
-	if(output_format == FORMAT_DSV)
-		delimiter = dsv_delim;
-	else if(output_format == FORMAT_JSON) {
-		delimiter = "";
-		/* adding prologue to json output. */
-		timenow = time(0);
-		if (add_json_node(JSON_VALUE, JSON_INT, JSON_FULLESCAPE, "timestamp", &timenow) == NULL)
-			exit_qstat("out of memory");
-		if (add_json_node(JSON_VALUE, JSON_STRING, JSON_FULLESCAPE, "pbs_version", PBS_VERSION) == NULL)
-			exit_qstat("out of memory");
-		if (add_json_node(JSON_VALUE, JSON_STRING, JSON_FULLESCAPE, "pbs_server", def_server) == NULL)
-			exit_qstat("out of memory");
+	if (mode == JOBS) {
+		if (strchr(extend, 't'))
+			list_subjobs = 1; /* update value of list_subjobs based on extend */
+		else
+			list_subjobs = 0;
 	}
 
 	if (optind >= argc) { /* If no arguments, then set defaults */
 		switch (mode) {
 
 			case JOBS:
+				set_diff_stat = 1;
 				server_out[0] = '@';
 				pbs_strncpy(&server_out[1], def_server, sizeof(server_out) - 1);
 				tcl_addarg(ops, server_out);
 
 				job_id_out[0] = '\0';
 				server_out[0] = '\0';
+				
 				goto job_no_args;
+
 			case QUEUES:
 				server_out[0] = '@';
 				pbs_strncpy(&server_out[1], def_server, sizeof(server_out) - 1);
@@ -2797,6 +3239,7 @@ qstat -B [-f] [-F format] [-D delim] [ server_name... ]\n";
 				queue_name_out = NULL;
 				server_out[0] = '\0';
 				goto que_no_args;
+
 			case SERVERS:
 				tcl_addarg(ops, def_server);
 
@@ -2804,18 +3247,24 @@ qstat -B [-f] [-F format] [-D delim] [ server_name... ]\n";
 				goto svr_no_args;
 		}
 	}
-	if (E_opt == 1 && mode == JOBS) {
+
+	if (mode == JOBS) {
 		/* allocate enough memory to store list of job ids */
 		job_list_size = ((argc - 1) * (PBS_MAXCLTJOBID + 1));
 		job_list = calloc(argc - 1, PBS_MAXCLTJOBID + 1);
 		if (job_list == NULL)
 			exit_qstat("out of memory");
 		/* sort all jobs */
-		qsort(&argv[optind], (argc - optind), sizeof(char *), cmp_jobs);
+		if (E_opt == 1)
+			qsort(&argv[optind], (argc - optind), sizeof(char *), cmp_jobs);
 	}
+
 	for (; optind < argc; optind++) {
 
 		located = FALSE;
+		
+		set_diff_stat = 0; /* set diff stat to 0 for each new operand/jobid */
+		bg_up = 0; /* assume bg daemon not up, or exited */
 
 		pbs_strncpy(operand, argv[optind], sizeof(operand));
 		tcl_addarg(ops, operand);
@@ -2824,7 +3273,7 @@ qstat -B [-f] [-F format] [-D delim] [ server_name... ]\n";
 
 			case JOBS:      /* get status of batch jobs */
 				if (pbs_isjobid(operand)) {  /* must be a job-id */
-					stat_single_job = 1;
+					dest_set = 0;
 					pbs_strncpy(job_id, operand, sizeof(job_id));
 					if (get_server(job_id, job_id_out, server_out)) {
 						fprintf(stderr, "qstat: illegally formed job identifier: %s\n", job_id);
@@ -2836,46 +3285,45 @@ qstat -B [-f] [-F format] [-D delim] [ server_name... ]\n";
 						any_failed = 1;
 						break;
 					}
-					if (E_opt == 1) {
-						/* Local Server */
-						if (server_out[0] == '\0' || (strcmp(server_out, def_server) == 0)) {
-							/* This is probably the first job id requested from primary server */
+					/* Local Server */
+					if (server_out[0] == '\0' || (strcmp(server_out, def_server) == 0)) {
+						set_diff_stat = 1;
+						/* This is probably the first job id requested from primary server */
+						if (prev_server[0] == '\0')
+							strcpy(prev_server, def_server);
+						strncat(job_list, job_id_out, job_list_size - strlen(job_list));
+						strncat(job_list, ",", job_list_size - strlen(job_list));
+						if (optind != argc -1)
+							continue;
+						else {
+							free(query_job_list);
+							query_job_list = strdup(job_list);
+							job_list[0] = '\0';
+						}
+					} else {
+						set_diff_stat = 0;
+						/* Remote server but jobs in continuation */
+						if ((prev_server[0] == '\0' ) || (strcmp(server_out, prev_server) == 0)) {
+							/* This is probably the first job id requested and not from primary server */
 							if (prev_server[0] == '\0')
 								pbs_strncpy(prev_server, def_server, sizeof(prev_server));
 							strncat(job_list, job_id_out, job_list_size - strlen(job_list));
 							strncat(job_list, ",", job_list_size - strlen(job_list));
-							if (optind != argc -1)
+							if (optind != argc-1)
 								continue;
 							else {
+								/* It's a new remote server and the only job */
+								new_remote_server = 1;
 								free(query_job_list);
 								query_job_list = strdup(job_list);
 								job_list[0] = '\0';
 							}
-						}
-						else {
-							/* Remote server but jobs in continuation */
-							if ((prev_server[0] == '\0' ) || (strcmp(server_out, prev_server) == 0)) {
-								/* This is probably the first job id requested and not from primary server */
-								if (prev_server[0] == '\0')
-									pbs_strncpy(prev_server, server_out, sizeof(prev_server));
-								strncat(job_list, job_id_out, job_list_size - strlen(job_list));
-								strncat(job_list, ",", job_list_size - strlen(job_list));
-								if (optind != argc-1)
-									continue;
-								else {
-									/* It's a new remote server and the only job */
-									new_remote_server = 1;
-									free(query_job_list);
-									query_job_list = strdup(job_list);
-									job_list[0] = '\0';
-								}
-							} else {
-								/* A new remote server */
-								new_remote_server = 1;
-								free(query_job_list);
-								query_job_list = strdup(job_list);
-								snprintf(job_list, job_list_size, "%s,", job_id_out);
-							}
+						} else {
+							/* A new remote server */
+							new_remote_server = 1;
+							free(query_job_list);
+							query_job_list = strdup(job_list);
+							snprintf(job_list, job_list_size, "%s,", job_id_out);
 						}
 					}
 				} else {  /* must be a destination-id */
@@ -2883,7 +3331,8 @@ qstat -B [-f] [-F format] [-D delim] [ server_name... ]\n";
 						fprintf(stderr, "qstat: Express option can only be used with job ids\n");
 						return 1;
 					}
-					stat_single_job = 0;
+					set_diff_stat = 0;
+					dest_set = 1;
 					pbs_strncpy(destination, operand, sizeof(destination));
 					if (parse_destination_id(destination,
 						&queue_name_out,
@@ -2911,13 +3360,63 @@ qstat -B [-f] [-F format] [-D delim] [ server_name... ]\n";
 					}
 				}
 job_no_args:
+				if (new_atropl)
+					set_diff_stat = 0;
+					
+				CLI_DBPRT((stderr, "pid %d set_diff_stat=%d, query_job_list=%s\n", getpid(), set_diff_stat, query_job_list))
+				if (set_diff_stat) { /* conditions good to set up diff-stat with default server */
+					/*
+					 * Identify the configured tmpdir without calling pbs_loadconf().
+					 * We do not want to incur the cost of parsing the services DB.
+					 */
+					char *tmpdir = pbs_get_tmpdir();
+					if (tmpdir == NULL) {
+						exit_qstat("Failed to determine tmpdir!");
+					}
+
+					fname = get_comm_filename(cmd_name, tmpdir, server_out, ""); 
+					if ((fname) && ((sock = talk_to_bg(fname)) != -1)) {
+						bg_up = 1;
+						/* send queue, server, extend */
+						if ((send_fd(sock, fileno(stdout)) == 0) &&
+							(send_fd(sock, fileno(stderr)) == 0) &&
+							(send_string(sock, queue_name_out) == 0) && 
+							(send_string(sock, server_name_out) == 0) &&
+							(send_string(sock, extend) == 0) &&
+							(send_string(sock, query_job_list) == 0) &&
+							(send_attrl(sock, display_attribs) == 0) &&
+							(send_opts(sock) == 0)) {
+							if (dorecv(sock, (char *) &pbs_errno, sizeof(int)) == 0) {
+								if (!(pbs_errno == PBSE_STALE_DIFFQUERY || pbs_errno == PBSE_FORCE_CLIENT_UPDATE)) {/* we need to retry in case of these */
+
+									if (pbs_errno != PBSE_NONE)
+										any_failed = pbs_errno; /* record the error in this iter */
+
+									close(sock);
+									sock = -1;
+									continue; /* to the next operand */
+								}
+							}
+						}
+						CLI_DBPRT((stderr, "pid %d diffstat but BG dmn returned error rc= %d\n", getpid(), pbs_errno))
+					} else {
+						;
+						CLI_DBPRT((stderr, "pid %d diffstat but failed to talk to bg\n", getpid()))
+					}
+				}
+				/* failed to connect, so reset sock */
+				close(sock);
+				sock = -1;
+
+				CLI_DBPRT((stderr, "pid %d doing regular stat\n", getpid()))
+
 				/* We could have been sent here after p_server was set. Free it. */
 				pbs_statfree(p_server);
 				p_server = NULL;
 				if (E_opt == 1)
-					conn = cnt2server(prev_server);
+					conn = qstat_connect(prev_server, set_diff_stat);
 				else
-					conn = cnt2server(server_out);
+					conn = qstat_connect(server_out, set_diff_stat);
 
 				if (conn <= 0) {
 					fprintf(stderr, "qstat: cannot connect to server %s (errno=%d)\n",
@@ -2952,22 +3451,40 @@ job_no_args:
 					break;
 				}
 
-				/* check the server attribute max_job_sequence_id value */
 				if (p_server != NULL) {
-					int check_seqid_len; /* for dynamic qstat width */
-					check_seqid_len = check_max_job_sequence_id(p_server);
-					if (check_seqid_len == 1) {
-						how_opt |= ALT_DISPLAY_INCR_WIDTH; /* increase column width */
+					char *value;
+					if ((value = get_attr(p_server->attribs, ATTR_max_job_sequence_id, NULL))) {
+						if (strtoul(value, NULL, 10) > PBS_DFLT_MAX_JOB_SEQUENCE_ID)
+							how_opt |= ALT_DISPLAY_INCR_WIDTH; /* increase column width */
 					}
+
+					if ((value = get_attr(p_server->attribs, ATTR_JobHistoryEnable, NULL)) && (strcmp(value, "True") == 0)) {
+						hist_enabled = 1;
+					} /* this is marked once before becoming daemon, so daemon should go down if history settings change */
 				}
 
-				if ((stat_single_job == 1) || (new_atropl == 0)) {
-					if (E_opt == 1)
-						p_status = pbs_statjob(conn, query_job_list, display_attribs, extend);
-					else
-						p_status = pbs_statjob(conn, job_id_out, display_attribs, extend);
+				if (strchr(extend, (int)'x')) /* update value of based on extend */
+					show_expired = 1;
+				else
+					show_expired = 0;
+
+				pbs_errno = PBSE_NONE;
+				if (set_diff_stat) {
+					char buf[100];
+					/* get all jobs first time anyway */
+					sprintf(buf, "%s%s", (hist_enabled) ? "xt" : "t", extend);
+					pbs_errno = PBSE_NONE;
+					p_status = pbs_statjob(conn, NULL, NULL, buf);
+					if (pbs_errno == PBSE_NONE) {
+						update_cache(p_status);
+						p_status = build_resp_from_cache(conn, query_job_list);
+					}
 				} else {
-					p_status = pbs_selstat(conn, new_atropl, NULL, extend);
+					if ((dest_set == 0) || (new_atropl == 0)) {
+						p_status = pbs_statjob(conn, query_job_list, display_attribs, extend);
+					} else {
+						p_status = pbs_selstat(conn, new_atropl, NULL, extend);
+					}
 				}
 
 				if (added_queue) {
@@ -2985,48 +3502,8 @@ job_no_args:
 							strcpy(server_out, rmt_server);
 							goto job_no_args;
 						}
-#ifdef NAS /* localmod 071 */
-						(void)tcl_stat("job", NULL, tcl_opt);
-#else
-						(void)tcl_stat("job", NULL, f_opt);
-#endif /* localmod 071 */
-						if (pbs_errno != PBSE_HISTJOBID) {
-							prt_job_err("qstat", conn, job_id_out);
-							any_failed = pbs_errno;
-						}
-					} else {
-#ifdef NAS /* localmod 071 */
-						if (p_server) {
-							tcl_stat("serverhdr", p_server, tcl_opt);
-							tcl_stat("resv", p_rsvstat, tcl_opt);
-						}
-						(void)tcl_stat("job", NULL, tcl_opt);
-#else
-						(void)tcl_stat("job", NULL, f_opt);
-#endif /* localmod 071 */
-						if (pbs_errno != PBSE_NONE && pbs_errno != PBSE_HISTJOBID && pbs_errno != PBSE_NOSERVER) {
-							if (pbs_errno == PBSE_ATTRRO && alt_opt & ALT_DISPLAY_T)
-								fprintf(stderr, "qstat: -T option is unavailable.\n");
-							else
-								prt_job_err("qstat", conn, job_id_out);
-							any_failed = pbs_errno;
-						}
 					}
-
-					/*
-					 * If it is qstat command and error is PBSE_HISTJOBID, then
-					 * handle it separately without using prt_job_err() API as we
-					 * are adding some extra message.
-					 */
-					if (pbs_errno == PBSE_HISTJOBID) {
-						errmsg = pbs_geterrmsg(conn);
-						if (errmsg) {
-							fprintf(stderr,
-								"qstat: %s %s, use -x or -H to obtain historical job information\n",
-								job_id_out, errmsg);
-						}
-						any_failed = pbs_errno;
-					}
+					any_failed = check_error(conn, job_id_out);
 				} else {
 
 #ifdef NAS /* localmod 071 */
@@ -3041,20 +3518,20 @@ job_no_args:
 							if (display_statjob(p_status, p_server, f_opt, how_opt))
 								exit_qstat("out of memory");
 					}
-#else
-
-					if ((alt_opt & ~ALT_DISPLAY_w) != 0 && !(wide && f_opt)) {
-						altdsp_statjob(p_status, p_server, alt_opt, wide, how_opt);
-					} else if (f_opt == 0 || tcl_stat("job", p_status, f_opt))
-						if (display_statjob(p_status, p_server, f_opt, how_opt, alt_opt, wide))
-							exit_qstat("out of memory");
+#else	
+					display_output(mode, p_status, display_attribs);
 #endif /* localmod 071 */
-					p_header = FALSE;
 					pbs_statfree(p_status);
 				}
-				pbs_statfree(p_server);
-				p_server = NULL;
-				pbs_disconnect(conn);
+
+				if ((set_diff_stat) && (p_status) && (bg_up == 0))
+					go_bg(cmd_name, fname, conn, &talk_to_fg);
+				else {
+					pbs_statfree(p_server);
+					p_server = NULL;
+					pbs_disconnect(conn);
+				}
+								
 				if (E_opt == 1) {
 					free(query_job_list);
 					query_job_list = NULL;
@@ -3104,7 +3581,7 @@ job_no_args:
 						server_out[0] = '\0';
 				}
 que_no_args:
-				conn = cnt2server(server_out);
+				conn = qstat_connect(server_out, set_diff_stat);
 				if (conn <= 0) {
 					fprintf(stderr, "qstat: cannot connect to server %s (errno=%d)\n", def_server, pbs_errno);
 #ifdef NAS /* localmod 071 */
@@ -3134,18 +3611,7 @@ que_no_args:
 						any_failed = pbs_errno;
 					}
 				} else {
-					if (alt_opt & ALT_DISPLAY_q) {
-						altdsp_statque(pbs_server, p_status, alt_opt);
-#ifdef NAS /* localmod 071 */
-					} else if (tcl_stat("queue", p_status, tcl_opt)) {
-#else
-					} else if (tcl_stat("queue", p_status, f_opt)) {
-#endif /* localmod 071 */
-						if(display_statque(p_status, p_header, f_opt, alt_opt))
-							exit_qstat("out of memory");
-					}
-					p_header = FALSE;
-					pbs_statfree(p_status);
+					display_output(mode, p_status, NULL);
 				}
 				pbs_disconnect(conn);
 				break;
@@ -3153,7 +3619,7 @@ que_no_args:
 			case SERVERS:           /* get status of batch servers */
 				pbs_strncpy(server_out, operand, sizeof(server_out));
 svr_no_args:
-				conn = cnt2server(server_out);
+				conn = qstat_connect(server_out, set_diff_stat);
 				if (conn <= 0) {
 					fprintf(stderr, "qstat: cannot connect to server %s (errno=%d)\n",
 						def_server, pbs_errno);
@@ -3184,15 +3650,7 @@ svr_no_args:
 						any_failed = pbs_errno;
 					}
 				} else {
-#ifdef NAS /* localmod 071 */
-					if (tcl_stat("server", p_status, tcl_opt))
-#else
-					if (tcl_stat("server", p_status, f_opt))
-#endif /* localmod 071 */
-						if(display_statserver(p_status, p_header, f_opt, alt_opt))
-							exit_qstat("out of memory");
-					p_header = FALSE;
-					pbs_statfree(p_status);
+					display_output(mode, p_status, NULL);
 				}
 				pbs_disconnect(conn);
 				break;
@@ -3202,12 +3660,7 @@ svr_no_args:
 		if (any_failed == PBSE_PERM)
 			break;
 	}
-	if(output_format == FORMAT_JSON) {
-		if (add_json_node(JSON_OBJECT_END, JSON_NULL, JSON_NOVALUE, NULL, NULL) == NULL)
-			exit_qstat("out of memory");
-		generate_json(stdout);
-		free_json_node_list();
-	}
+
 #ifdef NAS /* localmod 071 */
 	tcl_run(tcl_opt);
 #else
@@ -3439,3 +3892,116 @@ cnvt_est_start_time(char *est_time, int wide)
 
 	return timebuf;
 }
+
+/**
+ * @brief
+ *	callback function called from background process to talk to foreground process
+ *
+ * @param[in] sock - communication fd
+ * @param[in] sd_svr - fd of the server connection
+ * @param[out] err_op - returned error string
+ *
+ * @return error code
+ * @retval 0 - success
+ * @retval 1 - error returned by server
+ * @retval 2 - error in communiaction with foreground
+ *
+ */
+int
+talk_to_fg(int sock, int sd_svr, char **err_op)
+{
+	static time_t last_time = 0;
+	time_t now;
+	int outfd, errfd, rc = 0;
+	struct batch_status *p_status = NULL;
+	static struct attrl *dmn_display_attribs = NULL;
+
+	child_process = 1; /* identify myself as the background daemon */
+
+	/* free data allocated by recv_dyn_string() in previous call */
+	free(queue_name_out);
+	free(server_name_out);
+	free(query_job_list);
+	free(dmn_display_attribs);
+
+	if (((outfd = recv_fd(sock)) == -1) ||
+	    ((errfd = recv_fd(sock)) == -1) ||
+	    (recv_dyn_string(sock, &queue_name_out) != 0) ||
+	    (recv_dyn_string(sock, &server_name_out) != 0) ||
+	    (recv_string(sock, extend, sizeof(extend)) != 0) ||
+	    (recv_dyn_string(sock, &query_job_list) != 0) ||
+	    (recv_attrl(sock, &dmn_display_attribs) != 0) ||
+	    (recv_opts(sock) != 0)) {
+		*err_op = "recv data from foreground";
+		return 2;
+	}
+	display_attribs = dmn_display_attribs;
+
+	dup2(outfd, fileno(stdout));
+	dup2(errfd, fileno(stderr));
+
+	/* 
+	 * dup2() does not close outfd and errfd, merely makes a copy 
+	 * It closes the second argument fd, if valid, but not the first, ever.
+	 * 
+	 * It is crucial to close outfd and errfd, else these will remain open
+	 * else there will be handles open the fg process's stdout and stderr
+	 * Anything waiting for an EOF on those files will hang till the background
+	 * exits!
+	 */
+	close(outfd);
+	close(errfd);
+
+	now = time(0);
+
+	if (strchr(extend, 't')) /* update value of based on extend */
+		list_subjobs = 1; 
+	else
+		list_subjobs = 0;
+
+	if (strchr(extend, (int)'x')) /* update value of based on extend */
+		show_expired = 1;
+	else
+		show_expired = 0;
+
+	pbs_errno = PBSE_NONE;
+
+	if (now - last_time >= STAT_REFRESH_INTERVAL) {
+		char buf[100];
+		last_time = now;
+		/* do qstat diffstat and do avl tree */
+		CLI_DBPRT((stderr, "Refreshing...\n"))
+		sprintf(buf, "%s%s,%ld:%ld", (hist_enabled) ? "xt" : "t", extend, last_stat_ts.tv_sec, last_stat_ts.tv_usec);
+		p_status = pbs_statjob(sd_svr, NULL, NULL, buf);
+		update_cache(p_status);
+	}
+
+	if (pbs_errno == PBSE_NONE) {
+		if (cc_get_head() || query_job_list) {
+			p_status = build_resp_from_cache(sd_svr, query_job_list);	
+			if (!p_status)
+				check_error(conn, query_job_list);
+			else {
+				display_output(JOBS, p_status, display_attribs);
+				pbs_statfree(p_status);
+			}
+		}
+	} else {
+		if (pbs_errno != PBSE_STALE_DIFFQUERY && pbs_errno != PBSE_FORCE_CLIENT_UPDATE) {
+			check_error(sd_svr, "");
+		}
+	}
+
+	if (pbs_errno == PBSE_STALE_DIFFQUERY || pbs_errno == PBSE_FORCE_CLIENT_UPDATE)
+		rc = 1;
+
+	if (dosend(sock, (char *) &pbs_errno, sizeof(int)) != 0) {
+		*err_op = "send data to foreground";
+		rc = 2;
+	}
+	
+	return rc;
+}
+
+
+

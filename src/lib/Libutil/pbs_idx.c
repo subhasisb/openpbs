@@ -272,6 +272,38 @@ pbs_idx_find(void *idx, void **key, void **data, void **ctx)
 	return rc == AVL_IX_OK ? PBS_IDX_RET_OK : PBS_IDX_RET_FAIL;
 }
 
+
+/**
+ * @brief
+ *	find or iterate entry in index
+ *
+ * @param[in] - ctx  - context to be set for iteration
+ *                         can be NULL, if caller doesn't want
+ *                         iteration context
+ *                         if *ctx is not NULL, then this routine
+ *                         will return next entry in index
+ * @param[in/out] - data - data of the entr
+ *
+ * @return int
+ * @retval PBS_IDX_RET_OK   - success
+ * @retval PBS_IDX_RET_FAIL - failure
+ *
+ * @note
+ * 	ctx should be free'd after use, using pbs_idx_free_ctx()
+ *
+ */
+int 
+pbs_idx_update(void *ctx, void *data)
+{
+	iter_ctx *pctx;
+
+	if (ctx != NULL) {
+		pctx = (iter_ctx *) ctx;
+		pctx->pkey->recptr = data;
+	}
+	return 0;
+}
+
 /**
  * @brief
  *	free given iteration context
