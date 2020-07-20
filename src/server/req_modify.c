@@ -435,24 +435,24 @@ find_name_in_svrattrl(svrattrl *plist, char *name)
 int
 modify_job_attr(job *pjob, svrattrl *plist, int perm, int *bad)
 {
-	int	   changed_resc;
-	int	   allow_unkn;
-	long	   i;
+	int changed_resc;
+	int allow_unkn;
+	long i;
 	attribute *newattr;
 	attribute *pre_copy;
 	attribute *attr_save;
 	attribute *pattr;
-	resource  *prc;
-	int	   rc;
-	char	   newstate = -1;
-	int	   newsubstate = -1;
-	long	   newaccruetype = -1;
+	resource *prc;
+	int rc;
+	char newstate = -1;
+	int newsubstate = -1;
+	long newaccruetype = -1;
 
 	if (pjob->ji_qhdr->qu_qs.qu_type == QTYPE_Execution)
 		allow_unkn = -1;
 	else
 		allow_unkn = (int)JOB_ATR_UNKN;
-
+	
 	pattr = pjob->ji_wattr;
 
 	/* call attr_atomic_set to decode and set a copy of the attributes.
@@ -611,6 +611,7 @@ modify_job_attr(job *pjob, svrattrl *plist, int perm, int *bad)
 			}
 			/* ATR_VFLAG_MODCACHE will be included if set */
 			pattr[i].at_flags = pre_copy[i].at_flags;
+			mark_attr_set(&pattr[i]);
 		}
 	}
 
@@ -679,6 +680,8 @@ modify_job_attr(job *pjob, svrattrl *plist, int perm, int *bad)
 	free(newattr);
 	free(pre_copy);
 	attr_atomic_kill(attr_save, job_attr_def, JOB_ATR_LAST);
+
+	update_job_timedlist(pjob);
 	return (0);
 }
 
@@ -881,7 +884,7 @@ void revert_alter_reservation(resc_resv *presv) {
 	presdef->rs_set(&resc2->rs_value, &atemp, SET);
 	presdef->rs_free(&resc->rs_value);
 	set_chunk_sum(&resc2->rs_value, resc_attr);
-	post_attr_set(resc_attr);
+	mark_attr_set(resc_attr);
 	set_rattr_str_slim(presv, RESV_ATR_SchedSelect, get_rattr_str(presv, RESV_ATR_SchedSelect_orig), NULL);
 	free_rattr(presv, RESV_ATR_SchedSelect_orig);
 
@@ -908,7 +911,7 @@ void save_standing_reservation(resc_resv *presv) {
 	if (is_attr_set(standing))
 		return;
 
-	post_attr_set(standing);
+	mark_attr_set(standing);
 
 	presdef = &svr_resc_def[RESC_START_TIME];
 	resc = add_resource_entry(standing, presdef);
@@ -1193,7 +1196,7 @@ req_modifyReservation(struct batch_request *preq)
 				return;
 			}
 			/* walltime can change */
-			post_attr_set(get_rattr(presv, RESV_ATR_resource));
+			mark_attr_set(get_rattr(presv, RESV_ATR_resource));
 		}
 	}
 

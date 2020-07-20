@@ -144,6 +144,27 @@ extern int pbs_idx_find(void *idx, void **key, void **data, void **ctx);
 
 /**
  * @brief
+ *	find or iterate entry in index
+ *
+ * @param[in] - ctx  - context to be set for iteration
+ *                         can be NULL, if caller doesn't want
+ *                         iteration context
+ *                         if *ctx is not NULL, then this routine
+ *                         will return next entry in index
+ * @param[in/out] - data - data of the entr
+ *
+ * @return int
+ * @retval PBS_IDX_RET_OK   - success
+ * @retval PBS_IDX_RET_FAIL - failure
+ *
+ * @note
+ * 	ctx should be free'd after use, using pbs_idx_free_ctx()
+ *
+ */
+extern int pbs_idx_update(void *ctx, void *data);
+
+/**
+ * @brief
  *	free given iteration context
  *
  * @param[in] - ctx - pointer to context for iteration

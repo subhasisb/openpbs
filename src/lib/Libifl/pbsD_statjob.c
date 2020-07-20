@@ -68,3 +68,35 @@ __pbs_statjob(int c, char *id, struct attrl *attrib, char *extend)
 {
 	return PBSD_status_aggregate(c, PBS_BATCH_StatusJob, id, attrib, extend, MGR_OBJ_JOB, NULL);
 }
+
+/* 
+ * global value to store the latest object stat'd from server 
+ * used by client to automatically query from last query
+ */
+static struct timeval g_last_stat_ts;
+
+/**
+ * @brief
+ *	Return the value of the last stat'd timestamp
+ *
+ * @return	timestamp when last stat happened
+ *
+ */
+struct timeval 
+__pbs_get_last_stat_ts()
+{
+	return g_last_stat_ts;
+}
+
+
+/**
+ * @brief
+ *	Sets the value of the last stat'd timestamp
+ *
+ *
+ */
+void
+set_last_stat_ts(struct timeval tv)
+{
+	g_last_stat_ts = tv;
+}

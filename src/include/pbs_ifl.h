@@ -44,14 +44,9 @@ extern "C" {
 #endif
 
 
-/*
- *
- *  pbs_ifl.h
- *
- */
-
 #include <stdio.h>
 #include <time.h>
+#include <sys/time.h>
 
 /* types of attributes: read only, public, all */
 #define TYPE_ATTR_READONLY      1
@@ -443,6 +438,7 @@ enum mgr_obj {
 	MGR_OBJ_PBS_HOOK,	/* PBS Hook     */
 	MGR_OBJ_JOBARRAY_PARENT,	/* Job array parent */
 	MGR_OBJ_SUBJOB,		/* Sub Job */
+	MGR_OBJ_DELETED, 	/* Deleted object */
 	MGR_OBJ_LAST		/* Last entry	*/
 };
 
@@ -454,6 +450,7 @@ enum mgr_obj {
 #define MSG_OUT		1
 #define MSG_ERR		2
 
+#define DEL_OBJ_TIME	1800 /* 30 minutes */
 /* SUSv2 guarantees that host names are limited to 255 bytes */
 #define PBS_MAXHOSTNAME		255	/* max host name length */
 #ifndef MAXPATHLEN
@@ -526,6 +523,7 @@ struct attropl {
 };
 
 struct batch_status {
+	struct batch_status *prev;
 	struct batch_status *next;
 	char *name;
 	struct attrl *attribs;
@@ -579,6 +577,10 @@ enum resv_states { RESV_NONE, RESV_UNCONFIRMED, RESV_CONFIRMED, RESV_WAIT,
 	RESV_BEING_DELETED, RESV_DELETED, RESV_DELETING_JOBS, RESV_DEGRADED,
 	RESV_BEING_ALTERED, RESV_IN_CONFLICT };
 
+/* timeval timestamp comparison macro, is x newer than y */
+#define TS_NEWER(x, y) ((x.tv_sec > y.tv_sec) || ((x.tv_sec == y.tv_sec) && (x.tv_usec > y.tv_usec)))
+#define IS_FULLSTAT(x) ((x).tv_sec == 0)
+
 #ifdef _USRDLL		/* This is only for building Windows DLLs
 			 * and not their static libraries
 			 */
@@ -620,6 +622,8 @@ DECLDIR struct batch_deljob_status *pbs_deljoblist(int, char **, int, char *);
 DECLDIR int pbs_disconnect(int);
 
 DECLDIR char *pbs_geterrmsg(int);
+
+DECLDIR void pbs_seterrmsg(int, char *);
 
 DECLDIR int pbs_holdjob(int, char *, char *, char *);
 
@@ -723,6 +727,8 @@ extern struct batch_deljob_status *pbs_deljoblist(int, char **, int, char *);
 
 extern char *pbs_geterrmsg(int);
 
+extern void pbs_seterrmsg(int, char *);
+
 extern int pbs_holdjob(int, char *, char *, char *);
 
 extern int pbs_loadconf(int);
@@ -786,6 +792,8 @@ extern int pbs_terminate(int, int, char *);
 extern char *pbs_modify_resv(int, char*, struct attropl *, char *);
 
 extern preempt_job_info *pbs_preempt_jobs(int, char **);
+
+extern struct timeval pbs_get_last_stat_ts();
 #endif /* _USRDLL */
 
 /* IFL function pointers */
@@ -801,6 +809,7 @@ extern int (*pfn_pbs_deljob)(int, char *, char *);
 extern struct batch_deljob_status *(*pfn_pbs_deljoblist)(int, char **, int, char *);
 extern int (*pfn_pbs_disconnect)(int);
 extern char *(*pfn_pbs_geterrmsg)(int);
+extern void (*pfn_pbs_seterrmsg)(int, char *);
 extern int (*pfn_pbs_holdjob)(int, char *, char *, char *);
 extern int (*pfn_pbs_loadconf)(int);
 extern char *(*pfn_pbs_locjob)(int, char *, char *);
@@ -832,6 +841,9 @@ extern char *(*pfn_pbs_submit_resv)(int, struct attropl *, char *);
 extern int (*pfn_pbs_delresv)(int, char *, char *);
 extern int (*pfn_pbs_terminate)(int, int, char *);
 extern preempt_job_info *(*pfn_pbs_preempt_jobs)(int, char**);
+extern struct timeval (*pfn_pbs_get_last_stat_ts)();
+extern void free_bs(struct batch_status *bsp);
+extern void free_bs_attribs(struct batch_status *bsp);
 
 #ifdef	__cplusplus
 }

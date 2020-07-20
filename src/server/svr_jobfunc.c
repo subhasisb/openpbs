@@ -261,21 +261,18 @@ svr_enquejob(job *pjob, char *selectspec)
 		return PBSE_INTERNAL;
 	}
 
+	update_job_timedlist(pjob); /* add to the latest jobs list */
+
 	pjcur = (job *)GET_PRIOR(svr_alljobs);
 	while (pjcur) {
 		if (get_jattr_ll(pjob, JOB_ATR_qrank) >= get_jattr_ll(pjcur, JOB_ATR_qrank))
 			break;
 		pjcur = (job *)GET_PRIOR(pjcur->ji_alljobs);
 	}
-	if (pjcur == 0) {
-		/* link first in server's list */
-		insert_link(&svr_alljobs, &pjob->ji_alljobs, pjob,
-			LINK_INSET_AFTER);
-	} else {
-		/* link after 'current' job in server's list */
-		insert_link(&pjcur->ji_alljobs, &pjob->ji_alljobs, pjob,
-			LINK_INSET_AFTER);
-	}
+	if (pjcur == 0)
+		insert_link(&svr_alljobs, &pjob->ji_alljobs, pjob, LINK_INSET_AFTER); /* link first in server's list */
+	else
+		insert_link(&pjcur->ji_alljobs, &pjob->ji_alljobs, pjob, LINK_INSET_AFTER); /* link after 'current' job in server's list */
 
 	server.sv_qs.sv_numjobs++;
 	if (state_num != -1)
@@ -291,15 +288,10 @@ svr_enquejob(job *pjob, char *selectspec)
 			break;
 		pjcur = (job *)GET_PRIOR(pjcur->ji_jobque);
 	}
-	if (pjcur == 0) {
-		/* link first in list */
-		insert_link(&pque->qu_jobs, &pjob->ji_jobque, pjob,
-			LINK_INSET_AFTER);
-	} else {
-		/* link after 'current' job in list */
-		insert_link(&pjcur->ji_jobque, &pjob->ji_jobque, pjob,
-			LINK_INSET_AFTER);
-	}
+	if (pjcur == 0)
+		insert_link(&pque->qu_jobs, &pjob->ji_jobque, pjob, LINK_INSET_AFTER); /* link first in list */
+	else
+		insert_link(&pjcur->ji_jobque, &pjob->ji_jobque, pjob, LINK_INSET_AFTER); /* link after 'current' job in list */
 
 	/* update counts: queue and queue by state */
 
@@ -341,8 +333,18 @@ svr_enquejob(job *pjob, char *selectspec)
 	if (!is_jattr_set(pjob, JOB_ATR_project))
 		set_jattr_str_slim(pjob, JOB_ATR_project, PBS_DEFAULT_PROJECT, NULL);
 
-	/* update any entity count and entity resources usage for the queue */
+	/* if array job and being requeued, update timestamp of any deleted subjobs for diffstat
+	 * SUBHTODO: Why?
+	 */
+	if ((pjob->ji_qs.ji_svrflags & JOB_SVFLG_ArrayJob)) {
+		deleted_obj_t *dobj = GET_NEXT(pjob->ji_ajinfo->subjobs_deleted);
+		while (dobj) {
+			gettimeofday(&dobj->tm_deleted, NULL);
+			dobj = GET_NEXT(dobj->deleted_obj_link);
+		}
+	}
 
+	/* update any entity count and entity resources usage for the queue */
 	if (!(pjob->ji_qs.ji_svrflags & JOB_SVFLG_SubJob) ||
 			(get_sattr_long(SVR_ATR_State) == SV_STATE_INIT))
 		account_entity_limit_usages(pjob, pque, NULL, INCR, ETLIM_ACC_ALL);
@@ -2822,7 +2824,7 @@ Time4occurrenceFinish(resc_resv *presv)
 		resc2 = find_resc_entry(stnd_revert, &svr_resc_def[RESC_SELECT]);
 		free(resc->rs_value.at_val.at_str);
 		resc->rs_value.at_val.at_str = strdup(resc2->rs_value.at_val.at_str);
-		post_attr_set(resc_attr);
+		mark_attr_set(resc_attr);
 		make_schedselect(resc_attr, resc, NULL, get_rattr(presv, RESV_ATR_SchedSelect));
 		set_chunk_sum(&resc->rs_value, resc_attr);
 	} else
@@ -2957,7 +2959,7 @@ Time4occurrenceFinish(resc_resv *presv)
 	atemp.at_type = ATR_TYPE_LONG;
 	atemp.at_val.at_long = presv->ri_qs.ri_duration;
 	rscdef->rs_set(&prsc->rs_value, &atemp, SET);
-	post_attr_set(get_rattr(presv, RESV_ATR_resource));
+	mark_attr_set(get_rattr(presv, RESV_ATR_resource));
 
 	/* Assign the allocated resources to the reservation
 	 * and the reservation to the associated vnodes
@@ -5519,7 +5521,7 @@ recreate_exec_vnode(job *pjob, char *vnodelist, char *keep_select, char *err_msg
 			free_jattr(pjob, JOB_ATR_resource_acct);
 			mark_jattr_not_set(pjob, JOB_ATR_resource_acct);
 		}
-		set_attr_with_attr(&job_attr_def[JOB_ATR_resource_acct], get_jattr(pjob, JOB_ATR_resource_acct), get_jattr(pjob, JOB_ATR_resource), INCR);
+		set_jattr_with_attr(pjob, JOB_ATR_resource_acct, get_jattr(pjob, JOB_ATR_resource), INCR);
 		set_jattr_str_slim(pjob, JOB_ATR_exec_vnode, new_exec_vnode, NULL);
 
 		(void)update_resources_list(pjob, ATTR_l,
@@ -5619,3 +5621,75 @@ action_max_run_subjobs(attribute *pattr, void *pobject, int actmode)
 
 	return PBSE_NONE;
 }
+
+/**
+ * @brief
+ * 	helper function to set asked job to the right place in the jobs list sorted on update time
+ *
+ * @param[in]	pjob - job pointer
+ *
+ * @return	void
+ *
+ * @par MT-Safe: Yes
+ * @par Side Effects: None
+ *
+ */
+static void
+update_job_timedlist_inner(pbs_list_head *head, job *pjob, struct timeval update_tm)
+{
+	job *platest;
+	pbs_list_head hd = *head;
+
+	if (!pjob)
+		return;
+
+	pjob->update_tm = update_tm;
+
+	platest = (job *) GET_PRIOR(hd);
+	if (platest == pjob)
+		return; /* all set */
+
+	log_eventf(PBSEVENT_DEBUG4, PBS_EVENTCLASS_JOB, LOG_DEBUG, pjob->ji_qs.ji_jobid, "Updated job timedlist");
+
+	if (platest == NULL)
+		insert_link(head, &pjob->ji_timed_link, pjob, LINK_INSET_AFTER); /* link first in server's list */
+	else {
+		delete_link(&pjob->ji_timed_link);
+		insert_link(&platest->ji_timed_link, &pjob->ji_timed_link, pjob, LINK_INSET_AFTER); /* link after 'latest' job in server's list */
+	}
+}
+
+#ifndef PBS_MOM
+/**
+ * @brief
+ * 		set this job at the right place in the jobs list sorted on update time
+ *
+ * @param[in]	pjob - job pointer
+ *
+ * @return	void
+ *
+ * @par MT-Safe: Yes
+ * @par Side Effects: None
+ *
+ */
+void
+update_job_timedlist(job *pjob)
+{
+	struct timeval update_tm;
+
+	if (!pjob || pjob->newobj) /* just allocated or initialized */
+		return;
+	
+	gettimeofday(&update_tm, NULL); 
+
+	/* if this is a subjob, we update the timestamp of the parent, and then update + link in the subjob timed list of the parent */
+	if (pjob->ji_qs.ji_svrflags & JOB_SVFLG_SubJob) {
+		if (pjob->ji_parentaj) {
+			update_job_timedlist_inner(&svr_alljobs_timed, pjob->ji_parentaj, update_tm);
+			update_job_timedlist_inner(&pjob->ji_parentaj->ji_ajinfo->subjobs_timed, pjob, update_tm);
+		}
+	} else {
+		update_job_timedlist_inner(&svr_alljobs_timed, pjob, update_tm);
+	}
+}
+#endif

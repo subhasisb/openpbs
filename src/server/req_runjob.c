@@ -583,19 +583,19 @@ req_runjob(struct batch_request *preq)
 
 		if (is_attr_set(&sub_runcount)) {
 			free_jattr(pjobsub, JOB_ATR_runcount);
-			set_attr_with_attr(&job_attr_def[JOB_ATR_runcount], get_jattr(pjobsub, JOB_ATR_runcount), &sub_runcount, SET);
+			set_jattr_with_attr(pjobsub, JOB_ATR_runcount, &sub_runcount, SET);
 			free_attr(job_attr_def, &sub_runcount, JOB_ATR_runcount);
 		}
 
 		if (is_attr_set(&sub_run_version)) {
 			free_jattr(pjobsub, JOB_ATR_run_version);
-			set_attr_with_attr(&job_attr_def[JOB_ATR_run_version], get_jattr(pjobsub, JOB_ATR_run_version), &sub_run_version, SET);
+			set_jattr_with_attr(pjobsub, JOB_ATR_run_version, &sub_run_version, SET);
 			free_attr(job_attr_def, &sub_run_version, JOB_ATR_run_version);
 		}
 
 		if (is_attr_set(&sub_prev_res)) {
 			free_jattr(pjobsub, JOB_ATR_resource);
-			set_attr_with_attr(&job_attr_def[JOB_ATR_resource], get_jattr(pjobsub, JOB_ATR_resource), &sub_prev_res, SET);
+			set_jattr_with_attr(pjobsub, JOB_ATR_resource, &sub_prev_res, SET);
 			free_attr(job_attr_def, &sub_prev_res, JOB_ATR_resource);
 		}
 
@@ -669,7 +669,7 @@ req_runjob(struct batch_request *preq)
 
 			if (is_attr_set(&sub_prev_res)) {
 				free_jattr(pjobsub, JOB_ATR_resource);
-				set_attr_with_attr(&job_attr_def[JOB_ATR_resource], get_jattr(pjobsub, JOB_ATR_resource), &sub_prev_res, SET);
+				set_jattr_with_attr(pjobsub, JOB_ATR_resource, &sub_prev_res, SET);
 				free_attr(job_attr_def, &sub_prev_res, JOB_ATR_resource);
 			}
 

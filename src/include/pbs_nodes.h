@@ -240,13 +240,15 @@ union ndu_ninfo {
 	unsigned int	__nd_int;
 };
 
-
+/* global variable to keep track of the last node deletion timestamp - for diffstat */
+extern struct timeval last_node_purge_ts;
 /*
  * Vnode structure
  */
 struct pbsnode {
 	char *nd_name;		  /* vnode's name */
 	mominfo_t **nd_moms; /* array of parent Moms */
+	pbs_list_link nd_allnodes_timed; /* link used for the update-time sorted list of nodes */
 	int nd_nummoms;		  /* number of Moms */
 	int nd_nummslots;	  /* number of slots in nd_moms */
 	int nd_index;		  /* global node index */
@@ -265,6 +267,7 @@ struct pbsnode {
 	pbs_list_link un_lic_link;		/*Link to unlicense list */
 	int nd_svrflags;	/* server flags */
 	pbs_list_link nd_link;	/* Link to holding svr list in case if this is an alien node */
+	struct timeval update_tm; /* last updated timestamp */
 	attribute nd_attr[ND_ATR_LAST];
 };
 typedef struct pbsnode pbs_node;
@@ -507,6 +510,8 @@ int set_nattr_short_slim(struct pbsnode *pnode, int attr_idx, short val, enum ba
 int is_nattr_set(const struct pbsnode *pnode, int attr_idx);
 void free_nattr(struct pbsnode *pnode, int attr_idx);
 void clear_nattr(struct pbsnode *pnode, int attr_idx);
+void mark_nattr_set(struct pbsnode *pnode, int attr_idx);
+void mark_nattr_not_set(struct pbsnode *pnode, int attr_idx);
 void set_nattr_jinfo(struct pbsnode *pnode, int attr_idx, struct pbsnode *val);
 
 #ifdef	__cplusplus

@@ -103,13 +103,18 @@ common_libs = \
 common_sources = \
 	$(top_srcdir)/src/lib/Libcmds/cmds_common.c
 
+bg_sources = \
+	$(top_srcdir)/src/lib/Libcmds/bg_utils.c
+
 pbsdsh_CPPFLAGS = ${common_cflags}
 pbsdsh_LDADD = ${common_libs}
 pbsdsh_SOURCES = pbsdsh.c ${common_sources}
 
 pbsnodes_CPPFLAGS = ${common_cflags}
-pbsnodes_LDADD = ${common_libs}
-pbsnodes_SOURCES = pbsnodes.c ${common_sources}
+pbsnodes_LDADD = ${common_libs} \
+		-lssl \
+		-lcrypto
+pbsnodes_SOURCES = pbsnodes.c ${common_sources} ${bg_sources}
 
 pbs_attach_CPPFLAGS = ${common_cflags}
 pbs_attach_LDADD = ${common_libs}
@@ -222,8 +227,10 @@ qsig_LDADD = ${common_libs}
 qsig_SOURCES = qsig.c ${common_sources}
 
 qstat_CPPFLAGS = ${common_cflags}
-qstat_LDADD = ${common_libs}
-qstat_SOURCES = qstat.c ${common_sources}
+qstat_LDADD = ${common_libs} \
+		-lssl \
+		-lcrypto
+qstat_SOURCES = qstat.c ${common_sources} ${bg_sources}
 
 qstart_CPPFLAGS = ${common_cflags}
 qstart_LDADD = ${common_libs}
@@ -237,7 +244,7 @@ qsub_CPPFLAGS = ${common_cflags}
 qsub_LDADD = ${common_libs} \
 		-lssl \
 		-lcrypto
-qsub_SOURCES = qsub.c qsub_sup.c ${common_sources}
+qsub_SOURCES = qsub.c qsub_sup.c ${common_sources} ${bg_sources}
 
 qterm_CPPFLAGS = ${common_cflags}
 qterm_LDADD = ${common_libs}

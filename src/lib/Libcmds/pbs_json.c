@@ -352,6 +352,7 @@ add_json_node(JsonNodeType ntype, JsonValueType vtype, JsonEscapeType esc_type, 
 	}
 
 	if (node->value_type == JSON_STRING) {
+		ptr = NULL;
 		if (value != NULL) {
 			ptr = strdup_escape(esc_type, value);
 			if (ptr == NULL) {
@@ -527,5 +528,6 @@ generate_json(FILE * stream) {
 	if (indent != 0)
 		return 1;
 	fprintf(stream, "\n}\n");
+	fflush(stream);
 	return 0;
 }

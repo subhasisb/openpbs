@@ -79,12 +79,16 @@ struct svr_jobid_list {
 #define LARGE_BUF_LEN 4096
 #define MAXSERVERNAME PBS_MAXSERVERNAME+PBS_MAXPORTNUM+2
 #define PBS_DEPEND_LEN 2040
+#define DMN_BUF_SIZE 1024
 
 /* for calling pbs_parse_quote:  to accept whitespace as data or separators */
 #define QMGR_ALLOW_WHITE_IN_VALUE 1
 #define QMGR_NO_WHITE_IN_VALUE    0
 
 #define QDEL_MAIL_SUPPRESS 1000
+#define CLI_DMN_TIMEOUT_SHORT 5
+#define CLI_DMN_TIMEOUT_LONG 300 /* timeout for qsub background process */
+#define STAT_REFRESH_INTERVAL 0
 
 extern int optind, opterr;
 extern char *optarg;
@@ -96,4 +100,36 @@ extern void	prt_error(char *, char *, int);
 extern int	check_max_job_sequence_id(struct batch_status *);
 extern void	set_attr_error_exit(struct attrl **, char *, char *);
 extern void	set_attr_resc_error_exit(struct attrl **, char *, char *, char *);
-extern void     show_svr_inst_fail(int, char *);
+extern void show_svr_inst_fail(int, char *);
+
+/* functions used to communicate data between forground and background daemons */
+char *get_comm_filename(char *cmd, char *tmpdir, char *server_out, char *cred_name);
+int talk_to_bg(char *);
+void go_bg(char *, char *, int, int (*talk_to_fg)(int sock, int sd_svr, char **err_op));
+int dorecv(int, char *, int);
+int dosend(int, char *, int);
+int send_attrl(int, struct attrl *);
+int recv_attrl(int sock, struct attrl **);
+int send_string(int, char *);
+int recv_string(int, char *, int);
+int recv_dyn_string(int, char **);
+int send_fd(int, int);
+int recv_fd(int);
+
+/* client cache related calls */
+int cc_create();
+void cc_destroy();
+int cc_append(struct batch_status *stat_upd);
+int cc_update(struct batch_status *);
+int cc_delete(struct batch_status *stat_upd);
+struct batch_status *cc_get_next(char *name, struct batch_status *last);
+void cc_free_obj_list(struct batch_status *phead);
+struct batch_status *cc_get_head();
+int cc_add_list(struct batch_status **phead, struct batch_status *src);
+void debug_print_bs();
+
+#ifdef CLI_DEBUG
+#define CLI_DBPRT(x) fprintf x;
+#else
+#define CLI_DBPRT(x)
+#endif

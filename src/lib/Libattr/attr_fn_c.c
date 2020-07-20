@@ -99,7 +99,7 @@ decode_c(attribute *patr, char *name, char *rescn, char *val)
 		ATR_UNSET(patr);
 		patr->at_val.at_char = '\0';
 	} else {
-		post_attr_set(patr);
+		mark_attr_set(patr);
 		patr->at_val.at_char = *val;
 	}
 	return (0);
@@ -187,7 +187,7 @@ set_c(attribute *attr, attribute *new, enum batch_op op)
 
 		default:	return (PBSE_INTERNAL);
 	}
-	post_attr_set(attr);
+	mark_attr_set(attr);
 	return (0);
 }
 
@@ -256,7 +256,7 @@ set_attr_c(attribute *pattr, char value, enum batch_op op)
 			return;
 	}
 
-	post_attr_set(pattr);
+	mark_attr_set(pattr);
 }
 
 void
@@ -281,7 +281,7 @@ set_attr_short(attribute *pattr, short value, enum batch_op op)
 			return;
 	}
 
-	post_attr_set(pattr);
+	mark_attr_set(pattr);
 }
 
 /**

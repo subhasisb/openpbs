@@ -875,6 +875,10 @@ main(int argc, char **argv)
 	CLEAR_HEAD(task_list_event);
 	CLEAR_HEAD(svr_queues);
 	CLEAR_HEAD(svr_alljobs);
+	CLEAR_HEAD(svr_alljobs_timed);
+	CLEAR_HEAD(svr_allnodes_timed);
+	CLEAR_HEAD(svr_alljobs_deleted);
+	CLEAR_HEAD(svr_allnodes_deleted);
 	CLEAR_HEAD(svr_newjobs);
 	CLEAR_HEAD(svr_allresvs);
 	CLEAR_HEAD(svr_deferred_req);

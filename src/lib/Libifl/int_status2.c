@@ -80,8 +80,8 @@ PBSD_status_put(int c, int function, char *id, struct attrl *attrib, char *exten
 		if ((rc = is_compose_cmd(c, IS_CMD, msgid)) != DIS_SUCCESS)
 			return rc;
 	}
-
-	if ((rc = encode_DIS_ReqHdr(c, function, pbs_current_user))   ||
+	
+	if ((rc = encode_DIS_ReqHdr(c, function, pbs_current_user)) ||
 		(rc = encode_DIS_Status(c, id, attrib)) ||
 		(rc = encode_DIS_ReqExtend(c, extend))) {
 		if (prot == PROT_TCP) {

@@ -565,9 +565,9 @@ extern char *convert_time(char *);
 extern struct batch_status *bs_isort(struct batch_status *bs,
 	int (*cmp_func)(struct batch_status*, struct batch_status *));
 extern struct batch_status *bs_find(struct batch_status *, const char *);
-extern void init_bstat(struct batch_status *);
+extern struct batch_status *init_bstat();
 extern int frame_psi(psi_t *, char *);
-
+extern struct batch_status *make_stathost_return(int, char *, struct batch_status *);
 
 #endif /* _USRDLL */
 

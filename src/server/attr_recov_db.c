@@ -261,11 +261,9 @@ decode_attr_db(void *parent, pbs_list_head *attr_list, void *padef_idx, struct a
 					if ((act_rc = (padef[index].at_action(&pattr[index], parent, ATR_ACTION_RECOV)))) {
 						log_errf(act_rc, __func__, "Action function failed for %s attr, errn %d", (padef+index)->at_name, act_rc);
 						for ( index++; index <= limit; index++) {
-							while (pal) {
-								tmp_pal = pal->al_sister;
-								free(pal);
-								pal = tmp_pal;
-							}
+							while (pal)
+								pal = pal->al_sister;
+
 							if (index < limit)
 								pal = palarray[index];
 						}

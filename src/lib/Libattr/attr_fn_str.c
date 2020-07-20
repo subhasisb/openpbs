@@ -107,7 +107,7 @@ decode_str(attribute *patr, char *name, char *rescn, char *val)
 		if (patr->at_val.at_str == NULL)
 			return (PBSE_SYSTEM);
 		(void)strcpy(patr->at_val.at_str, val);
-		post_attr_set(patr);
+		mark_attr_set(patr);
 	} else {
 		ATR_UNSET(patr);
 		patr->at_val.at_str = NULL;
@@ -137,14 +137,13 @@ decode_str(attribute *patr, char *name, char *rescn, char *val)
 
 int
 encode_str(const attribute *attr, pbs_list_head *phead, char *atname, char *rsname, int mode, svrattrl **rtnl)
-
 {
 	svrattrl *pal;
 
 	if (!attr)
 		return (-1);
-	if (!(attr->at_flags & ATR_VFLAG_SET) || !attr->at_val.at_str ||
-		(*attr->at_val.at_str == '\0'))
+
+	if (!(attr->at_flags & ATR_VFLAG_SET) || !attr->at_val.at_str || (*attr->at_val.at_str == '\0'))
 		return (0);
 
 	pal = attrlist_create(atname, rsname, (int)strlen(attr->at_val.at_str)+1);
@@ -239,7 +238,7 @@ set_str(attribute *attr, attribute *new, enum batch_op op)
 		default:	return (PBSE_INTERNAL);
 	}
 	if ((attr->at_val.at_str != NULL) && (*attr->at_val.at_str !='\0'))
-		post_attr_set(attr);
+		mark_attr_set(attr);
 	else
 		attr->at_flags &= ~ATR_VFLAG_SET;
 

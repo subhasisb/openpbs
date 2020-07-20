@@ -274,6 +274,20 @@ pbs_geterrmsg(int connect) {
 
 /**
  * @brief
+ *	pass through call to set error message in the connection structure
+ *
+ * @param[in] connect - soket descriptor
+ * @param[in] errmsg - error message to set
+ *
+ */
+void
+pbs_seterrmsg(int connect, char *errmsg) {
+	(*pfn_pbs_seterrmsg)(connect, errmsg);
+}
+
+
+/**
+ * @brief
  *	- Pass-through call to send Hold Job request to the server --
  *	really just an instance of the "manager" request.
  *
@@ -863,4 +877,13 @@ pbs_delresv(int c, char *resv_id, char *extend) {
 int
 pbs_terminate(int c, int manner, char *extend) {
 	return (*pfn_pbs_terminate)(c, manner, extend);
+}
+
+/**
+ * @brief
+ *	-Pass-through call to get the last stat'd object's timestamp
+ */
+struct timeval 
+pbs_get_last_stat_ts() {
+	return (*pfn_pbs_get_last_stat_ts)();
 }

@@ -558,7 +558,7 @@ set_all_state(mominfo_t *pmom, int do_set, unsigned long bits, char *txt,
 			}
 		}
 
-		post_attr_set(get_nattr(pvnd, ND_ATR_state));
+		mark_attr_set(get_nattr(pvnd, ND_ATR_state));
 		pat = get_nattr(pvnd, ND_ATR_Comment);
 
 		/*
@@ -2055,8 +2055,7 @@ stat_update(int stream)
 					free_jattr(pjob, JOB_ATR_resource_acct);
 					mark_jattr_not_set(pjob, JOB_ATR_resource_acct);
 				}
-				set_attr_with_attr(&job_attr_def[JOB_ATR_resource_acct], get_jattr(pjob, JOB_ATR_resource_acct), get_jattr(pjob, JOB_ATR_resource), INCR);
-
+				set_jattr_with_attr(pjob, JOB_ATR_resource_acct, get_jattr(pjob, JOB_ATR_resource), INCR);
 
 				set_jattr_str_slim(pjob, JOB_ATR_exec_host_acct, get_jattr_str(pjob, JOB_ATR_exec_host), NULL);
 
@@ -2571,6 +2570,7 @@ deallocate_job_from_node(char *jobid, struct pbsnode *pnode)
 		return (0);
 	}
 
+	mark_nattr_set(pnode, ND_ATR_jobs);
 	still_has_jobs = 0;
 	for (np = pnode->nd_psn; np; np = np->next) {
 
@@ -3536,6 +3536,7 @@ update2_to_vnode(vnal_t *pvnal, int new, mominfo_t *pmom, int *madenew, int from
 	/* set attributes/resources if they are default */
 
 	pRA = get_nattr(pnode, ND_ATR_ResourceAvail);
+	mark_attr_set(pRA);
 
 	for (i = 0; i < pvnal->vnal_used; i++) {
 		psrp = VNAL_NODENUM(pvnal, i);
@@ -3641,7 +3642,7 @@ update2_to_vnode(vnal_t *pvnal, int new, mominfo_t *pmom, int *madenew, int from
 							/* changes survive */
 							/* server restart */
 							prs->rs_value.at_flags &= ~ATR_VFLAG_DEFLT;
-							post_attr_set(&prs->rs_value);
+							mark_attr_set(&prs->rs_value);
 							if (psrp->vna_val[0] != '\0')
 								prs->rs_value.at_flags |= (ATR_VFLAG_SET|ATR_VFLAG_MODIFY);
 						} else
@@ -3796,9 +3797,8 @@ update2_to_vnode(vnal_t *pvnal, int new, mominfo_t *pmom, int *madenew, int from
 					/* restart */
 
 					pattr->at_flags &= ~ATR_VFLAG_DEFLT;
-					post_attr_set(pattr);
 					if (psrp->vna_val[0] != '\0')
-						pattr->at_flags |= (ATR_VFLAG_SET|ATR_VFLAG_MODIFY);
+						mark_attr_set(pattr);
 					snprintf(log_buffer,
 						sizeof(log_buffer),
 						"Updated vnode %s's "
@@ -4600,6 +4600,8 @@ found:
 				}
 
 				pala = get_nattr(np, ND_ATR_ResourceAvail);
+				mark_attr_set(pala);
+				update_node_timedlist(np);
 
 				prd = &svr_resc_def[RESC_ARCH];
 				prc = find_resc_entry(pala, prd);
@@ -6799,6 +6801,7 @@ set_nodes(void *pobj, int objtype, char *execvnod_in, char **execvnod_out, char 
 		for (i = 0; i < ndindex; ++i) {
 
 			pnode = (phowl+i)->hw_pnd;
+			mark_nattr_set(pnode, ND_ATR_jobs);
 
 			if ((svr_init == TRUE) &&
 			    ((check_job_substate(pjob, JOB_SUBSTATE_SUSPEND) ||
@@ -6916,6 +6919,9 @@ set_nodes(void *pobj, int objtype, char *execvnod_in, char **execvnod_out, char 
 				}
 				tmp_pl->next = presv->ri_pbsnode_list;
 				tmp_pl->vnode = (phowl + i)->hw_pnd;
+				
+				mark_nattr_set(tmp_pl->vnode, ND_ATR_resvs);
+
 				presv->ri_pbsnode_list = tmp_pl;
 				presv->ri_vnodect++;
 				DBPRT(("%s: Adding %s to %s\n", __func__,
@@ -7075,6 +7081,7 @@ free_resvNodes(resc_resv *presv)
 				pnl_next = pnl->next;
 				free(pnl);
 			}
+			
 			presv->ri_pbsnode_list = NULL;
 
 			/* free from provisioning list, if node was in wait_prov */
@@ -7090,6 +7097,9 @@ free_resvNodes(resc_resv *presv)
 
 			DBPRT(("Freeing resvinfo on node %s from reservation %s\n",
 				pnode->nd_name, presv->ri_qs.ri_resvID))
+
+			mark_nattr_set(pnode, ND_ATR_resvs);
+			
 			if (prev == NULL) {
 				pnode->nd_resvp = rinfp->next;
 				free(rinfp);
@@ -7257,6 +7267,8 @@ adj_resc_on_node(char *noden, int aflag, enum batch_op op, resource_def *prdef, 
 	if (op == DECR) {
 		check_for_negative_resource(prdef, presc, noden);
 	}
+	mark_attr_set(pattr);
+	update_node_timedlist(pnode);
 	return rc;
 }
 
@@ -7368,7 +7380,7 @@ update_job_node_rassn(job *pjob, attribute *pexech, enum batch_op op)
 					if (op == DECR) {
 						check_for_negative_resource(prdef, pr, NULL);
 					}
-					post_attr_set(sysru);
+					mark_attr_set(sysru);
 				}
 
 				/* update queue attribute of resources assigned */
@@ -7384,7 +7396,7 @@ update_job_node_rassn(job *pjob, attribute *pexech, enum batch_op op)
 					if (op == DECR) {
 						check_for_negative_resource(prdef, pr, NULL);
 					}
-					post_attr_set(queru);
+					mark_attr_set(queru);
 				}
 
 			}
