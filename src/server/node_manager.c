@@ -6907,11 +6907,20 @@ dealloc_hosts(job  *pjob, char *execvnod_in) {
 void
 free_nodes(job *pjob)
 {
-	char	*pnodespec = pjob->ji_wattr[(int)JOB_ATR_exec_vnode].at_val.at_str;
-	if (!pnodespec)
-		return;
+	char	*pnodespec; 
 
-	dealloc_hosts(pjob, pjob->ji_wattr[(int)JOB_ATR_exec_vnode].at_val.at_str);
+	if (pjob->ji_wattr[(int)JOB_ATR_exec_vnode].at_flags & ATR_VFLAG_SET) {
+		pnodespec = pjob->ji_wattr[(int)JOB_ATR_exec_vnode].at_val.at_str;
+		if (!pnodespec)
+			return;
+	} else {
+			log_event(PBSEVENT_DEBUG2, PBS_EVENTCLASS_JOB, LOG_DEBUG,
+			pjob->ji_qs.ji_jobid,
+			"in free_nodes and no exec_vnode");
+		return;
+	}
+		
+	dealloc_hosts(pjob, pnodespec);
 }
 
 /**
