@@ -117,6 +117,7 @@ static void post_resv_purge(struct work_task *pwt);
 /* Global Data items */
 #ifndef PBS_MOM
 extern struct server   server;
+struct timeval last_job_purge_ts = {0, 0};
 #endif	/* PBS_MOM */
 extern char *msg_abt_err;
 extern char *path_jobs;
@@ -308,6 +309,7 @@ job_alloc(void)
 	(void)memset((char *)pj, (int)0, (size_t)sizeof(job));
 
 	CLEAR_LINK(pj->ji_alljobs);
+	CLEAR_LINK(pj->ji_timed_link);
 	CLEAR_LINK(pj->ji_jobque);
 	CLEAR_LINK(pj->ji_unlicjobs);
 
@@ -457,6 +459,26 @@ free_job_work_tasks(job *pj)
 
 /**
  * @brief
+ * 	free the deleted ids list
+ *
+ * @param[in] phead - the deleted ids list to free
+ *
+ * @return	void
+ */
+void
+free_deleted_id_list(pbs_list_head *phead)
+{
+	deleted_obj_t *dobj;
+
+	while ((dobj = GET_NEXT((*phead)))) {
+		delete_link(&dobj->deleted_obj_link);
+		free(dobj->obj_id);
+		free(dobj);
+	}
+}
+
+/**
+ * @brief
  * 		job_free - free job structure and its various sub-structures
  *
  * @param[in]	pj - pointer to job structure
@@ -498,11 +520,11 @@ job_free(job *pj)
 #endif
 
 #endif
-
+	
 	/* remove any malloc working attribute space */
 
 	for (i = 0; i < (int)JOB_ATR_LAST; i++)
-		free_jattr(pj, i);
+		free_attr(job_attr_def, get_jattr(pj, i), i); /* do not call free_jattr(pj, i) since it keeps updating job timedlist */
 
 #ifndef PBS_MOM
 	{
@@ -520,7 +542,35 @@ job_free(job *pj)
 			bp = (badplace *)GET_NEXT(pj->ji_rejectdest);
 		}
 	}
+
+	delete_link(&pj->ji_timed_link);
+
+	/* append to the global deleted ids list in case of noral jobs */
+	if ((pj->ji_qs.ji_svrflags & JOB_SVFLG_SubJob) == 0)
+		append_deleted_ids(&svr_alljobs_deleted, pj->ji_qs.ji_jobid);
+	else {
+		/* append to the deleted ids list in the parent job in case of subjobs */
+		if (pj->ji_parentaj && pj->ji_parentaj->ji_ajinfo)
+			append_deleted_ids(&pj->ji_parentaj->ji_ajinfo->subjobs_deleted, (char *) uLTostr(get_index_from_jid(pj->ji_qs.ji_jobid), 10) );
+	}
+
 	if (pj->ji_ajinfo) {
+		job *tjob;
+
+		/* if this is itself a array parent, then we need to clear up stuff
+		 * including the deleted id list private to this array
+		 * as well as the subjobs timed list
+		 */
+
+		/* unlink any jobs in the timed subjob list */
+		while ((tjob = GET_NEXT(pj->ji_ajinfo->subjobs_timed))) {
+			tjob->ji_parentaj = NULL;
+			delete_link(&tjob->ji_timed_link);
+		}
+
+		/* clear deleted list in case of array job */
+		free_deleted_id_list(&pj->ji_ajinfo->subjobs_deleted);
+
 		free_range_list(pj->ji_ajinfo->trm_quelist);
 		free(pj->ji_ajinfo);
 		pj->ji_ajinfo = NULL;
@@ -1558,8 +1608,7 @@ update_resources_list(job *pjob, char *res_list_name,
 
 		if ((is_jattr_set(pjob, backup_res_list_index)) == 0) {
 			free_jattr(pjob, backup_res_list_index);
-			set_attr_with_attr(&job_attr_def[backup_res_list_index], get_jattr(pjob, backup_res_list_index), get_jattr(pjob, res_list_index), INCR);
-
+			set_jattr_with_attr(pjob, backup_res_list_index, get_jattr(pjob, res_list_index), INCR);
 		}
 
 		pr = (resource *)GET_NEXT(get_jattr_list(pjob, res_list_index));
@@ -1657,9 +1706,7 @@ update_resources_list(job *pjob, char *res_list_name,
 update_resources_list_error:
 	free_jattr(pjob, backup_res_list_index);
 	mark_jattr_not_set(pjob, backup_res_list_index);
-	set_attr_with_attr(&job_attr_def[res_list_index],
-			get_jattr(pjob, res_list_index),
-			get_jattr(pjob, backup_res_list_index), INCR);
+	set_jattr_with_attr(pjob, res_list_index, get_jattr(pjob, backup_res_list_index), INCR);
 	return (1);
 }
 

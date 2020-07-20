@@ -604,14 +604,14 @@ main(int argc, char **argv)
 			memcpy(&pbs_conf_bak, &pbs_conf, sizeof(struct pbs_config));
 
 			if (pbs_loadconf(1) == 0) {
-				log_err(-1, __func__, "Configuration error, ignoring");
+				log_err(-1, msg_daemonname, "Configuration error, ignoring");
 				memcpy(&pbs_conf, &pbs_conf_bak, sizeof(struct pbs_config));
 			} else {
 				/* restore old pbs.conf */
 				new_logevent = pbs_conf.pbs_comm_log_events;
 				memcpy(&pbs_conf, &pbs_conf_bak, sizeof(struct pbs_config));
 				pbs_conf.pbs_comm_log_events = new_logevent;
-				log_err(-1, __func__, "Processed SIGHUP");
+				log_err(-1, msg_daemonname, "Processed SIGHUP");
 
 				log_event_mask = &pbs_conf.pbs_comm_log_events;
 				tpp_set_logmask(*log_event_mask);

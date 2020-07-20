@@ -161,7 +161,7 @@ decode_time(attribute *patr, char *name, char *rescn, char *val)
 	if (atoi(msec) >= 500)
 		rv++;
 	patr->at_val.at_long = rv;
-	post_attr_set(patr);
+	mark_attr_set(patr);
 	(void)free(workvalsv);
 	return (0);
 

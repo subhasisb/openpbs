@@ -88,7 +88,6 @@
 #include <termios.h>
 #include <assert.h>
 #include <sys/un.h>
-#include <syslog.h>
 #include "pbs_ifl.h"
 #include "cmds.h"
 #include "libpbs.h"
@@ -149,7 +148,7 @@
 #define MAX_QSUB_PREFIX_LEN 32
 #define DMN_REFUSE_EXIT 7 /* return code when daemon can't serve a job and exits */
 
-extern char *msg_force_qsub_update;
+extern char *msg_force_client_update;
 
 #define PBS_DPREFIX_DEFAULT "#PBS"
 #define PBS_O_ENV "PBS_O_" /* prefix for environment variables created by qsub */
@@ -187,13 +186,12 @@ char script_tmp[MAXPATHLEN + 1] = { '\0' }; /* name of script file copy */
 int  sd_svr; /* return from pbs_connect */
 char *display; /* environment variable DISPLAY */
 struct attrl *attrib = NULL; /* Attribute list */
-static struct attrl *attrib_o = NULL; /* Original attribute list, before applying default_qsub_arguments */
 static char dir_prefix[MAX_QSUB_PREFIX_LEN + 1]; /* Directive Prefix, specified by C opt */
 static struct batch_status *ss = NULL;
 static char *dfltqsubargs = NULL; /* Default qsub arguments */
-static char *pbs_hostvar = NULL; /* buffer containing ",PBS_O_HOST=" and host name */
-static int pbs_o_hostsize = sizeof(",PBS_O_HOST=") + 1; /* size of prefix for hostvar */
-
+char *pbs_hostvar = NULL; /* buffer containing ",PBS_O_HOST=" and host name */
+int pbs_hostvar_len = 0;
+static int talk_to_fg(int sock, int sd_svr, char **err_op);
 
 int pid = -1;
 
@@ -203,11 +201,9 @@ int pid = -1;
  */
 int  is_background = 0;
 char *basic_envlist = NULL; /* basic comma-separated environment variables list string */
-char *qsub_envlist = NULL; /* comma-separated variables list string */
 char *v_value = NULL; /* expanded variable list from v opt */
 static int no_background = 0; /* flag to disable backgrounding */
 static char roptarg = 'y'; /* whether the job is rerunnable */
-static char *v_value_o = NULL; /* copy of v_value before set_job_env() */
 static int x11_disp = FALSE; /* whether DISPLAY environment variable is available */
 
 /* state booleans for protecting already-set options */
@@ -252,57 +248,17 @@ int Interact_opt = FALSE;
 int Forwardx11_opt = FALSE;
 int gui_opt = FALSE;
 
-
-/* for saving option booleans */
-static int a_opt_o = FALSE;
-static int c_opt_o = FALSE;
-static int e_opt_o = FALSE;
-static int h_opt_o = FALSE;
-static int j_opt_o = FALSE;
-static int k_opt_o = FALSE;
-static int l_opt_o = FALSE;
-static int m_opt_o = FALSE;
-static int o_opt_o = FALSE;
-static int p_opt_o = FALSE;
-static int q_opt_o = FALSE;
-static int r_opt_o = FALSE;
-static int u_opt_o = FALSE;
-static int v_opt_o = FALSE;
-static int z_opt_o = FALSE;
-static int A_opt_o = FALSE;
-static int C_opt_o = FALSE;
-static int J_opt_o = FALSE;
-static int M_opt_o = FALSE;
-static int N_opt_o = FALSE;
-static int P_opt_o = FALSE;
-static int S_opt_o = FALSE;
-static int V_opt_o = FALSE;
-static int Depend_opt_o = FALSE;
-static int Interact_opt_o = FALSE;
-static int Stagein_opt_o = FALSE;
-static int Stageout_opt_o = FALSE;
-static int Sandbox_opt_o = FALSE;
-static int Grouplist_opt_o = FALSE;
-static int gui_opt_o = FALSE;
-static int Resvstart_opt_o = FALSE;
-static int Resvend_opt_o = FALSE;
-static int pwd_opt_o = FALSE;
-static int cred_opt_o = FALSE;
-static int block_opt_o = FALSE;
-static int relnodes_on_stageout_opt_o = FALSE;
-static int tolerate_node_failures_opt_o = FALSE;
 static int max_run_opt = FALSE;
+
+static char cmd_name[] = "qsub";
 
 extern char **environ;
 
 extern void blockint(int sig);
-extern void do_daemon_stuff();
 extern void enable_gui(void);
 extern void set_sig_handlers(void);
 extern void interactive(void);
-extern int  dorecv(void *, char *, int);
-extern int  dosend(void *, char *, int);
-extern int  daemon_submit(int *, int *);
+extern int  daemon_submit(char *, int *);
 extern int  get_script(FILE *, char *, char *);
 extern int  check_for_background(int, char **);
 
@@ -2212,11 +2168,18 @@ set_job_env(char *basic_vlist, char *current_vlist)
 	if ((basic_vlist == NULL) || (basic_vlist[0] == '\0'))
 		return FALSE;
 
+#ifdef CLI_DEBUG
+	fprintf(stderr, "basic_envlist=[%s]\n", basic_envlist);
+	fprintf(stderr, "v_opt=[%s]\n", v_opt ? v_value : "");
+	fprintf(stderr, "qsub_envlist=[%s]\n", current_vlist);
+	fflush(stderr);
+#endif
 	len += strlen(basic_vlist);
 
 	if (V_opt && (current_vlist != NULL) && (current_vlist[0] != '\0'))
 		len += strlen(current_vlist);
 
+	len += pbs_hostvar_len; /* add PBS_O_HOSTNAME at end, if set */
 	len += len; /* Double it for all the commas, etc. */
 	if ((job_env = (char *) malloc(len)) == NULL) return FALSE;
 	*job_env = '\0';
@@ -2307,12 +2270,19 @@ set_job_env(char *basic_vlist, char *current_vlist)
 	}
 
 final:
-
 	if (V_opt && (current_vlist != NULL) && (current_vlist[0] != '\0'))
 		/* Send every environment variable with the job. */
 		strcat(job_env, current_vlist);
 
+	if (pbs_hostvar)
+		strcat(job_env, pbs_hostvar);
+
 	set_attr_error_exit(&attrib, ATTR_v, job_env);
+
+#ifdef CLI_DEBUG
+	fprintf(stderr, "QSUB: jobenv=[%s]\n", job_env);
+	fflush(stderr);
+#endif
 	free(job_env);
 
 	return TRUE;
@@ -2320,268 +2290,6 @@ final:
 
 /* End of "Environment Variables" functions. */
 
-
-/* The following functions support the "Daemon" capability of qsub. */
-
-/*
- * static buffer and length used by various messages for communication
- * between the qsub foreground and background process
- */
-static char *daemon_buf = NULL;
-static int daemon_buflen = 0;
-
-/**
- * @brief
- *  Resize the static variable daemon_buf.
- *
- * @param bufused - Amount of the buffer already used
- * @param lenreq - Amount of length required by new data
- *
- * @return - Error code
- * @retval - 0 - Success
- * @retval - -1 - Error
- *
- */
-static int
-resize_daemon_buf(int bufused, int lenreq)
-{
-	char *p;
-	int new_buflen = lenreq + bufused;
-
-	if (daemon_buflen < new_buflen) {
-		new_buflen += 1000; /* adding 1000 so that we realloc fewer times */
-		p = realloc(daemon_buf, new_buflen);
-		if (p == NULL) {
-			free(daemon_buf);
-			daemon_buf = NULL;
-			daemon_buflen = 0;
-			return -1;
-		}
-		daemon_buf = p;
-		daemon_buflen = new_buflen;
-	}
-	return 0;
-}
-
-/**
- * @brief
- *	Send the attrl list to the background qsub process. This is the
- * 	attribute list that was created by the foreground process based on
- *	the options that the user has provided to qsub.
- *
- * @param[in]	s - pointer to the windows PIPE or Unix domain socket
- * @parma[in]	attrib - List of attributes created by foreground qsub process
- *
- * @return int
- * @retval	-1 - Failure
- * @retval	 0 - Success
- *
- */
-int
-send_attrl(void *s, struct attrl *attrib)
-{
-	int bufused = 0;
-	int len_n = 0, len_r = 0, len_v = 0;
-	char *p;
-	int lenreq = 0;
-
-	while (attrib) {
-		len_n = strlen(attrib->name) + 1;
-		if (attrib->resource)
-			len_r = strlen(attrib->resource) + 1;
-		else
-			len_r = 0;
-		len_v = strlen(attrib->value) + 1;
-
-		lenreq = len_n + len_r + len_v + 3 * sizeof(int);
-		if (resize_daemon_buf(bufused, lenreq) != 0)
-			return -1;
-
-		/* write the lengths */
-		p = daemon_buf + bufused;
-		memmove(p, &len_n, sizeof(int));
-		p += sizeof(int);
-		memmove(p, &len_r, sizeof(int));
-		p += sizeof(int);
-		memmove(p, &len_v, sizeof(int));
-		p += sizeof(int);
-
-		/* now add the strings */
-		memmove(p, attrib->name, len_n);
-		p += len_n;
-		if (len_r > 0) {
-			memmove(p, attrib->resource, len_r);
-			p += len_r;
-		}
-		memmove(p, attrib->value, len_v);
-		p += len_v;
-
-		bufused += lenreq;
-
-		attrib = attrib->next;
-	}
-	if ((dosend(s, (char *) &bufused, sizeof(int)) != 0) ||
-		(dosend(s, daemon_buf, bufused) != 0))
-		return -1;
-
-	return 0;
-}
-
-/**
- * @brief
- * 	Send a null terminated string to the peer process. Used by backrgound and
- * 	foreground qsub processes to communicate error-strings, job-ids etc.
- *
- * @param[in]	s - pointer to the windows PIPE or Unix domain socket
- * @parma[in]	str - null terminated string to send
- *
- * @return int
- * @retval	-1 - Failure
- * @retval	 0 - Success
- *
- */
-int
-send_string(void *s, char *str)
-{
-	int len = strlen(str) + 1;
-
-	if ((dosend(s, (char *) &len, sizeof(int)) != 0) ||
-		(dosend(s, str, len) != 0))
-		return -1;
-
-	return 0;
-}
-
-/**
- * @brief
- *	Recv the attrl list from the foreground qsub process. This is the
- * 	attribute list that was created by the foreground process based on
- * 	the options that the user has provided to qsub.
- *
- * @param[in]	s - pointer to the windows PIPE or Unix domain socket
- * @parma[in]	attrib - List of attributes created by foreground qsub process
- *
- * @return int
- * @retval	-1 - Failure
- * @retval	 0 - Success
- *
- */
-int
-recv_attrl(void *s, struct attrl **attrib)
-{
-	int recvlen = 0;
-	struct attrl *attr = NULL;
-	char *p;
-	int len_n = 0, len_r = 0, len_v = 0;
-	char *attr_v_val = NULL;
-
-	if (dorecv(s, (char *) &recvlen, sizeof(int)) != 0)
-		return -1;
-	if (resize_daemon_buf(0, recvlen) != 0)
-		return -1;
-
-	if (dorecv(s, daemon_buf, recvlen) != 0)
-		return -1;
-
-	p = daemon_buf;
-	while (p - daemon_buf < recvlen) {
-		memmove(&len_n, p, sizeof(int));
-		p += sizeof(int);
-		memmove(&len_r, p, sizeof(int));
-		p += sizeof(int);
-		memmove(&len_v, p, sizeof(int));
-		p += sizeof(int);
-
-		if (len_r > 0) {
-			/* strings have null character also in daemon_buf */
-			set_attr_resc_error_exit(&attr, p,
-				p + len_n,
-				p + len_n + len_r);
-		} else {
-			/*
-			 * if value is ATTR_v, we need to add PBS_O_HOSTNAME to it
-			 * Since determininig PBS_O_HOSTNAME is expensive, we do it
-			 * once in the background qsub, and add it to the list that comes
-			 * from the front end qsub
-			 */
-			if (strcmp(p, ATTR_v) == 0 && pbs_hostvar != NULL) {
-				int attr_v_len = len_v + strlen(pbs_hostvar) + 1;
-				attr_v_val = malloc(attr_v_len);
-				if (!attr_v_val)
-					return -1;
-				strcpy(attr_v_val, p + len_n);
-				strcat(attr_v_val, pbs_hostvar);
-				set_attr_error_exit(&attr, p, attr_v_val);
-				free(attr_v_val);
-			} else {
-				set_attr_error_exit(&attr, p, p + len_n);
-			}
-		}
-		p += len_n + len_r + len_v;
-	}
-	*attrib = attr;
-	return 0;
-}
-
-/**
- * @brief
- *  Recv a null terminated string from the peer process. Used by backrgound and
- * 	foreground qsub processes to communicate error-strings, job-ids etc.
- *
- * @param[in]	s - pointer to the windows PIPE or Unix domain socket
- * @parma[in]	str - null terminated string to send
- *
- * @return int
- * @retval	-1 - Failure
- * @retval	 0 - Success
- *
- */
-int
-recv_string(void *s, char *str)
-{
-	int len = 0;
-
-	if ((dorecv(s, (char *) &len, sizeof(int)) != 0) ||
-		(dorecv(s, str, len) != 0))
-		return -1;
-
-	return 0;
-}
-
-
-/**
- * @brief
- *  Recv a null terminated string from the peer process. Used by background and
- * 	foreground qsub processes to communicate error-strings, job-ids etc.
- * 	This is like recv_string() except the 'strp' parameter will hold a pointer
- * 	to a newly-malloced string holding the resultant string.
- *
- * @param[in]	s - pointer to the windows PIPE or Unix domain socket
- * @parma[out]	strp - holds a pointer to the newly-malloced string.
- *
- * @return int
- * @retval	-1 - Failure
- * @retval	 0 - Success
- *
- */
-int
-recv_dyn_string(void *s, char **strp)
-{
-	int recvlen = 0;
-
-	if (dorecv(s, (char *) &recvlen, sizeof(int)) != 0)
-		return -1;
-	/* resizes the global 'daemon_buf' array */
-	if (resize_daemon_buf(0, recvlen) != 0)
-		return -1;
-	if (dorecv(s, daemon_buf, recvlen) != 0)
-		return -1;
-
-	*strp = strdup(daemon_buf);
-	if (*strp == NULL)
-		return -1;
-	return 0;
-}
 
 /**
  * @brief
@@ -2596,19 +2304,10 @@ recv_dyn_string(void *s, char **strp)
  *
  */
 int
-send_opts(void *s)
+send_opts(int sock)
 {
-	/*
-	 * we are allocating a fixed size of 100. This is because we know that
-	 * the list of opts to send is going to fit within 100. Specifically, for each
-	 * opt we need 2 characters, and currently we have 35 opts.
-	 * If a new set of opts are added, the buffer space of 100 allocated here
-	 * needs to be double checked.
-	 */
-	if (resize_daemon_buf(0, 100) != 0)
-		return -1;
-
-	sprintf(daemon_buf,
+	char buf[100];
+	sprintf(buf,
 		"%d %d %d %d %d %d %d %d %d %d "
 		"%d %d %d %d %d %d %d %d %d %d "
 		"%d %d %d %d %d %d %d %d %d %d "
@@ -2621,8 +2320,7 @@ send_opts(void *s)
 		Stageout_opt, Sandbox_opt, Grouplist_opt, Resvstart_opt,
 		Resvend_opt, pwd_opt, cred_opt, block_opt, P_opt,
 			relnodes_on_stageout_opt, tolerate_node_failures_opt);
-
-	return (send_string(s, daemon_buf));
+	return (send_string(sock, buf));
 }
 
 /**
@@ -2638,22 +2336,14 @@ send_opts(void *s)
  *
  */
 int
-recv_opts(void *s)
+recv_opts(int sock)
 {
-	/*
-	 * we are allocating a fixed size of 100. This is because we know that
-	 * the list of opts to send is going to fit within 100. Specifically, for each
-	 * opt we need 2 characters, and currently we have 35 opts.
-	 * If a new set of opts are added, the buffer space of 100 allocated here
-	 * needs to be double checked.
-	 */
-	if (resize_daemon_buf(0, 100) != 0)
+	char *buf;
+
+	if (recv_dyn_string(sock, &buf) != 0)
 		return -1;
 
-	if (recv_string(s, daemon_buf) != 0)
-		return -1;
-
-	sscanf(daemon_buf,
+	sscanf(buf,
 		"%d %d %d %d %d %d %d %d %d %d "
 		"%d %d %d %d %d %d %d %d %d %d "
 		"%d %d %d %d %d %d %d %d %d %d "
@@ -2666,6 +2356,8 @@ recv_opts(void *s)
 		&Stageout_opt, &Sandbox_opt, &Grouplist_opt, &Resvstart_opt,
 		&Resvend_opt, &pwd_opt, &cred_opt, &block_opt, &P_opt,
 			&relnodes_on_stageout_opt, &tolerate_node_failures_opt);
+	free(buf);
+
 	return 0;
 }
 
@@ -2785,6 +2477,7 @@ do_connect(char *server_out, char *retmsg)
 {
 	int rc = 0;
 	char host[PBS_MAXHOSTNAME + 1];
+	int pbs_o_hostsize = sizeof(",PBS_O_HOST=") + 1; /* size of prefix for hostvar */
 
 	/* Set single threaded mode */
 	pbs_client_thread_set_single_threaded_mode();
@@ -2824,6 +2517,7 @@ do_connect(char *server_out, char *retmsg)
 	if ((rc = gethostname(host, (sizeof(host) - 1))) == 0) {
 		if ((rc = get_fullhostname(host, host, (sizeof(host) - 1))) == 0) {
 			snprintf(pbs_hostvar, pbs_o_hostsize + PBS_MAXHOSTNAME + 1, ",PBS_O_HOST=%s", host);
+			pbs_hostvar_len = strlen(pbs_hostvar);
 		}
 	}
 	if (rc != 0) {
@@ -2853,7 +2547,7 @@ do_submit(char *retmsg)
 	char *new_jobname = NULL;
 	int rc;
 	char *errmsg;
-	int retries;
+	char *qsub_envlist = NULL; /* comma-separated variables list string */
 
     if (dfltqsubargs != NULL) {
 		/*
@@ -2861,16 +2555,7 @@ do_submit(char *retmsg)
 		 * options set from the job script. CMDLINE-2 means
 		 * "one less than job script priority"
 		 */
-		for (retries = 2; retries > 0; retries--) {
-			rc = do_dir(dfltqsubargs, CMDLINE - 2, retmsg, MAXPATHLEN);
-			if (rc >= 0)
-				break;
-			if (retries == 2) {
-				refresh_dfltqsubargs();
-				if (pbs_errno != PBSE_NONE)
-					return (pbs_errno);
-			}
-		}
+		rc = do_dir(dfltqsubargs, CMDLINE - 2, retmsg, MAXPATHLEN);
 		if (rc != 0)
 			return (rc);
 	}
@@ -2878,12 +2563,11 @@ do_submit(char *retmsg)
 	/*
 	 * get environment variable if -V option is set. Return the code
 	 * DMN_REFUSE_EXIT if -V option is detected in background qsub.
+	 * 
+	 * Its ok to get it here, since with -V option this cannot be the bg qsub
 	 */
-	if (V_opt) {
-		if (is_background)
-			return DMN_REFUSE_EXIT;
+	if (V_opt)
 		qsub_envlist = env_array_to_varlist(environ);
-	}
 
 	/* set_job_env must be done here to pick up -v, -V options passed by default_qsub_arguments */
 	if (!set_job_env(basic_envlist, qsub_envlist)) {
@@ -2896,17 +2580,12 @@ do_submit(char *retmsg)
 
 	/* Send submit request to the server. */
 	pbs_errno = 0;
-	if (cred_buf) {
-		/* A credential was obtained, call the credential version of submit */
-		new_jobname = pbs_submit_with_cred(sd_svr, (struct attropl *) attrib,
-			script_tmp, destination, NULL, cred_type,
-			cred_len, cred_buf);
-	} else {
-		new_jobname = pbs_submit(sd_svr, (struct attropl *) attrib,
-			script_tmp, destination, NULL);
-	}
-	if (new_jobname == NULL) {
+	if (cred_buf)
+		new_jobname = pbs_submit_with_cred(sd_svr, (struct attropl *) attrib, script_tmp, destination, NULL, cred_type, cred_len, cred_buf);
+	else
+		new_jobname = pbs_submit(sd_svr, (struct attropl *) attrib, script_tmp, destination, NULL);
 
+	if (new_jobname == NULL) {
 		if ((err_list = pbs_get_attributes_in_error(sd_svr))) {
 			rc = handle_attribute_errors(err_list, retmsg);
 			if (rc != 0)
@@ -2915,8 +2594,6 @@ do_submit(char *retmsg)
 
 		errmsg = pbs_geterrmsg(sd_svr);
 		if (errmsg != NULL) {
-			if (strcmp(errmsg, msg_force_qsub_update) == 0)
-				return PBSE_FORCE_QSUB_UPDATE;
 			sprintf(retmsg, "qsub: %s\n", errmsg);
 		} else {
 			sprintf(retmsg, "qsub: Error (%d) submitting job\n", pbs_errno);
@@ -2926,108 +2603,13 @@ do_submit(char *retmsg)
 		sprintf(retmsg, "%s", new_jobname);
 		free(new_jobname);
 	}
-	return 0;
-}
-
-/**
- * @brief
- *	Save original values of qsub option variables.
- *
- */
-static void
-save_opts(void)
-{
-	/* save the values */
-	a_opt_o = a_opt;
-	c_opt_o = c_opt;
-	e_opt_o = e_opt;
-	h_opt_o = h_opt;
-	j_opt_o = j_opt;
-	k_opt_o = k_opt;
-	l_opt_o = l_opt;
-	m_opt_o = m_opt;
-	o_opt_o = o_opt;
-	p_opt_o = p_opt;
-	q_opt_o = q_opt;
-	r_opt_o = r_opt;
-	u_opt_o = u_opt;
-	v_opt_o = v_opt;
-	z_opt_o = z_opt;
-	A_opt_o = A_opt;
-	C_opt_o = C_opt;
-	J_opt_o = J_opt;
-	M_opt_o = M_opt;
-	N_opt_o = N_opt;
-	P_opt_o = P_opt;
-	S_opt_o = S_opt;
-	V_opt_o = V_opt;
-	Depend_opt_o = Depend_opt;
-	Interact_opt_o = Interact_opt;
-	Stagein_opt_o = Stagein_opt;
-	Stageout_opt_o = Stageout_opt;
-	Sandbox_opt_o = Sandbox_opt;
-	Grouplist_opt_o = Grouplist_opt;
-	gui_opt_o = gui_opt;
-	Resvstart_opt_o = Resvstart_opt;
-	Resvend_opt_o = Resvend_opt;
-	pwd_opt_o = pwd_opt;
-	cred_opt_o = cred_opt;
-	block_opt_o = block_opt;
-	relnodes_on_stageout_opt_o = relnodes_on_stageout_opt;
-	tolerate_node_failures_opt_o = tolerate_node_failures_opt;
-}
-
-/**
- * @brief
- *	Initialize qsub option variables to their original values.
- *
- */
-static void
-restore_opts(void)
-{
-	/* save the values */
-	a_opt = a_opt_o;
-	c_opt = c_opt_o;
-	e_opt = e_opt_o;
-	h_opt = h_opt_o;
-	j_opt = j_opt_o;
-	k_opt = k_opt_o;
-	l_opt = l_opt_o;
-	m_opt = m_opt_o;
-	o_opt = o_opt_o;
-	p_opt = p_opt_o;
-	q_opt = q_opt_o;
-	r_opt = r_opt_o;
-	u_opt = u_opt_o;
-	v_opt = v_opt_o;
-	z_opt = z_opt_o;
-	A_opt = A_opt_o;
-	C_opt = C_opt_o;
-	J_opt = J_opt_o;
-	M_opt = M_opt_o;
-	N_opt = N_opt_o;
-	P_opt = P_opt_o;
-	S_opt = S_opt_o;
-	V_opt = V_opt_o;
-	Depend_opt = Depend_opt_o;
-	Interact_opt = Interact_opt_o;
-	Stagein_opt = Stagein_opt_o;
-	Stageout_opt = Stageout_opt_o;
-	Sandbox_opt = Sandbox_opt_o;
-	Grouplist_opt = Grouplist_opt_o;
-	Resvstart_opt = Resvstart_opt_o;
-	Resvend_opt = Resvend_opt_o;
-	pwd_opt = pwd_opt_o;
-	cred_opt = cred_opt_o;
-	block_opt = block_opt_o;
-	relnodes_on_stageout_opt = relnodes_on_stageout_opt_o;
-	tolerate_node_failures_opt = tolerate_node_failures_opt_o;
+	return PBSE_NONE;
 }
 
 /**
  * @brief
  *	Helper function to free a list of attributes. This is called from
- *	do_daemon_stuff, since that function loops over for each client request.
+ *	go_bg, since that function loops over for each client request.
  *	No freeing the list of attributes created would result in a lot of
  *	memory leak.
  *
@@ -3052,154 +2634,207 @@ qsub_free_attrl(struct attrl *attrib)
 
 /**
  * @brief
- *	Helper function to duplicate the passed attrl structure.
+ *	callback function called from background process to talk to foreground process
  *
- * @param[in]	attrib - The list of attributes to copy
+ * @param[in] sock - communication fd
+ * @param[in] sd_svr - fd of the server connection
+ * @param[out] err_op - returned error string
  *
- * @return	struct attrl * - the duplicated 'attrib' (malloced).
- * @retval	non-NULL - success.
- * @retval	NULL - failure.
- *
- */
-static struct attrl *
-dup_attrl(struct attrl *attrib)
-{
-	struct attrl *attr = NULL;
-	struct attrl *attr_new = NULL;
-
-	for (attr = attrib; attr != NULL; attr = attr->next) {
-		if (attr->resource != NULL) {
-			/* strings have null character also in buf */
-			set_attr_resc_error_exit(&attr_new, attr->name,
-				attr->resource,
-				attr->value);
-		} else {
-			set_attr_error_exit(&attr_new, attr->name, attr->value);
-		}
-	}
-
-	return attr_new;
-}
-
-/**
- *
- * @brief
- *	The wrapper program to "do_submit()".
- * @par
- *	This attempts up to 'retry' times to do_submit(), when this function
- *	returns PBSE_FORCE_QSUB_UPDATE.
- *
- * @param[in]	retmsg - gets filled with the error message.
- *
- * @return 	int
- * @retval	the return code of do_submit().
- * @retval	if retry time exhausted or any unexpected failure,
- * 		return PBSE_PROTOCOL
+ * @return error code
+ * @retval 0 - success
+ * @retval 1 - error returned by server
+ * @retval 2 - error in communiaction with foreground
  *
  */
-int
-do_submit2(char *rmsg)
+static int
+talk_to_fg(int sock, int sd_svr, char **err_op)
 {
-	int retry; /* do a retry count to prevent infinite loop */
-	int rc;
+	int outfd, errfd, rc = 0;
 
-	rmsg[0] = '\0';
-	/*
-	 * Save the original job attributes/resources (attrib)
-	 * before 'default_qsub_arguments" was applied.
+	/* free data allocated by recv_dyn_string() in previous call */
+	qsub_free_attrl(attrib);
+	attrib = NULL;
+	free(v_value);
+	v_value = NULL;
+	free(basic_envlist);
+	basic_envlist = NULL;
+
+	is_background = 1;
+
+	if (((outfd = recv_fd(sock)) == -1) ||
+	    ((errfd = recv_fd(sock)) == -1) ||
+		(recv_attrl(sock, &attrib) != 0) ||
+		(recv_string(sock, destination, sizeof(destination)) != 0) ||
+		(recv_string(sock, script_tmp, sizeof(script_tmp)) != 0) ||
+		(recv_string(sock, cred_name, sizeof(cred_name)) != 0) ||
+		(recv_dyn_string(sock, &v_value) != 0) ||
+		(recv_dyn_string(sock, &basic_envlist) != 0) ||
+		(recv_string(sock, qsub_cwd, sizeof(qsub_cwd)) != 0) ||
+		(recv_opts(sock) != 0)) {
+		*err_op = "recv data from foreground";
+		return 2;
+	}
+
+	dup2(outfd, fileno(stdout));
+	dup2(errfd, fileno(stderr));
+
+	/* 
+	 * dup2() does not close outfd and errfd, merely makes a copy 
+	 * It closes the second argument fd, if valid, but not the first, ever.
+	 * 
+	 * It is crucial to close outfd and errfd, else these will remain open
+	 * else there will be handles open the fg process's stdout and stderr
+	 * Anything waiting for an EOF on those files will hang till the background
+	 * exits!
 	 */
-	if (attrib != NULL) {
-		if (attrib_o != NULL)
-			qsub_free_attrl(attrib_o);
-		attrib_o = dup_attrl(attrib); /* save attributes list */
-		if (attrib_o == NULL) {
-			snprintf(rmsg, MAXPATHLEN, "Failed to duplicate attributes list.\n");
-			return PBSE_PROTOCOL;
-		}
-	}
-
-	/* original v_value also needs to be saved as it gets mangled inside set_job_env() */
-	if (v_value != NULL) {
-		free(v_value_o);
-		v_value_o = strdup(v_value);
-		if (v_value_o == NULL) {
-			snprintf(rmsg, MAXPATHLEN, "Failed to duplicate original -v value\n");
-			return PBSE_PROTOCOL;
-		}
-	}
+	close(outfd);
+	close(errfd);
 
 	/*
-	 * Need to save original values of qsub option variables,
-	 * as "reset_dfltqsubargs() below could "lose" memory
-	 * of the option variable values. The values are
-	 * needed in case a new "default_qsub_arguments come and
-	 * gets reparsed.
+ 	 * At this point the background qsub daemon has received all the data from the
+	 * foreground. Lets tell the foreground that we have received the data, so that
+	 * if the we crashed at any point after this the foreground should not end up
+	 * submitting a duplicate job. However, if the foreground did not get this intimation,
+	 * then it could go ahead and do a regular job submit.
 	 */
-	save_opts();
-
-	rc = do_submit(rmsg);
-	for (retry = 5; (rc == PBSE_FORCE_QSUB_UPDATE) && (retry > 0); retry--) {
-		/* Let's retry with the new "default_qsub_arguments" */
-		refresh_dfltqsubargs();
-		if (pbs_errno != PBSE_NONE)
-			return (pbs_errno);
-
-		/* Use the original attrib value before the previous "default_qsub_arguments" was applied. */
-		if (attrib_o != NULL) {
-			if (attrib != NULL)
-				qsub_free_attrl(attrib);
-			attrib = dup_attrl(attrib_o);
-			if (attrib == NULL) {
-				snprintf(rmsg, MAXPATHLEN, "Failed to duplicate attributes list\n");
-				return PBSE_PROTOCOL;
-			}
-		}
-
-		/* use original -v value */
-		if (v_value_o != NULL) {
-			free(v_value);
-			v_value = strdup(v_value_o);
-			if (v_value == NULL) {
-				snprintf(rmsg, MAXPATHLEN, "Failed to duplicate -v value\n");
-				return PBSE_PROTOCOL;
-			}
-		}
-
-		restore_opts();
-		rc = do_submit(rmsg);
+	rc = 0;
+	if (dosend(sock, (char *) &rc, sizeof(int)) != 0) {
+		*err_op = "send data to foreground";
+		return 2;
 	}
-	if (retry == 0) {
-		snprintf(rmsg, MAXPATHLEN, "Retry to submit a job exhausted.\n");
-		rc = PBSE_PROTOCOL;
+
+	/* set the current work directory by doing a chdir */
+	if (chdir(qsub_cwd) != 0) {
+		*err_op = "chdir";
+		return 2;
 	}
-	return (rc);
+
+	if (setenv("PWD", qsub_cwd, 1) != 0) {
+		*err_op = "setenv";
+		return 2;
+	}
+
+	rc = do_submit(retmsg);
+	
+	if (send_string(sock, retmsg) != 0) {
+		*err_op = "send data to foreground";
+		return 2;
+	}
+
+	if (dosend(sock, (char *) &rc, sizeof(int)) != 0) {
+		*err_op = "send data to foreground";
+		return 2;
+	}
+	
+	if (cred_buf != NULL) {
+		memset(cred_buf, 0, cred_len);
+		free(cred_buf);
+		cred_buf = NULL;
+	}
+
+	/* Exit the daemon if it can't submit the job */
+	if (rc == PBSE_FORCE_CLIENT_UPDATE)
+		return 1;
+
+	return 0;
 }
 
 /*
  * @brief
- *  Perform a regular submit, without the daemon.
+ *  Try to submit job through daemon. On Unix, the daemon would be created by
+ *  forking during a prior invocation of the qsub command. The foregound qsub
+ *  process tries to send the job to the daemon using Unix domain sockets.
  *
- * @param[in] daemon_up - Indicates whether daemon is running
- * @return    rc        - Error code
+ * @param[in] fname - The communication filename for the unix domain socket
+ * @param[out] do_regular_submit - Indicate whether to do regular submit
+ *
+ * @return int
+ * @retval 0 - Success
+ * @retval 1/-1/pbs_errno - Failure, retmsg paramter is set
+ *
+ */
+int
+daemon_submit(char *fname, int *do_regular_submit)
+{
+	int sock; /* UNIX domain socket for talking to daemon */
+	int rc = 0;
+
+	if ((sock = talk_to_bg(fname)) != -1) {
+		if ((send_fd(sock, fileno(stdout)) == 0) &&
+			(send_fd(sock, fileno(stderr)) == 0) &&
+			(send_attrl(sock, attrib) == 0) &&
+			(send_string(sock, destination) == 0) &&
+			(send_string(sock, script_tmp) == 0) &&
+			(send_string(sock, cred_name) == 0) &&
+			(send_string(sock, v_value?v_value:"") == 0) &&
+			(send_string(sock, basic_envlist) == 0) &&
+			(send_string(sock, qsub_cwd) == 0) &&
+			(send_opts(sock) == 0)) {
+
+			/*
+			 * Read back the first error code from the background,
+			 * which confirms whether the background received our data.
+			 */
+			if (dorecv(sock, (char *) &rc, sizeof(int)) == 0) {
+				/*
+				 * We were able to send data to the background daemon.
+				 * Now, even if we fail to read back response from
+				 * background, we do not want to submit again.
+				 */
+				*do_regular_submit = 0;
+			}
+
+			/* read back response from background daemon */
+			if ((recv_string(sock, retmsg, sizeof(retmsg)) != 0) ||
+				(dorecv(sock, (char *) &rc, sizeof(int)) != 0)) {
+				/*
+				 * Something bad happened, either background submitted
+				 * and failed to send us response, or it failed before
+				 * submitting. If background qsub detects -V option, then
+				 * submit the job through foreground.
+				 */
+				rc = -1;
+				sprintf(retmsg, "Failed to recv data from background qsub\n");
+				/* Error message will be printed in caller */
+			} else if (rc == PBSE_FORCE_CLIENT_UPDATE) {
+				*do_regular_submit = 1;
+			}
+		}
+		/* going down, no need to free stuff */
+		close(sock);
+	}
+
+	return rc;
+}
+
+/*
+ * @brief
+ *  Perform a regular submit, and fork to background if possible
+ * 
+ * @param[in] fname - The communication filename for the unix domain socket
+ * 
+ * @return int
+ * @retval 0 - Success
+ * @retval 1/-1/pbs_errno - Failure, retmsg paramter is set
+ *
  */
 static int
-regular_submit(int daemon_up)
+regular_submit(char *fname)
 {
 	int rc = 0;
 	rc = do_connect(server_out, retmsg);
 	if (rc == 0) {
 		if (sd_svr != -1) {
-			rc = do_submit2(retmsg);
+			rc = do_submit(retmsg);
 		}
 		else
 			rc = -1;
 	}
-	if ((rc == 0) && !(Interact_opt != FALSE || block_opt) && (daemon_up == 0) && (no_background == 0) && !V_opt)
-		do_daemon_stuff();
+	if ((rc == 0) && !(Interact_opt != FALSE || block_opt) && (no_background == 0) && !V_opt)
+		go_bg(cmd_name, fname, sd_svr, &talk_to_fg);
+
 	return rc;
 }
-
-/* End of "Daemon" functions. */
 
 int
 main(int argc, char **argv, char **envp) /* qsub */
@@ -3213,9 +2848,9 @@ main(int argc, char **argv, char **envp) /* qsub */
 	int command_flag = 0;
 	int rc = 0; /* error code for submit */
 	int do_regular_submit = 1; /* used if daemon based submit fails */
-	int daemon_up = 0;
 	char **argv_cpy; /* copy argv for getopt */
 	int i;
+	char *fname = NULL;
 
 	/* Set signal handlers */
 	(void)set_sig_handlers();
@@ -3232,10 +2867,9 @@ main(int argc, char **argv, char **envp) /* qsub */
 	 */
 	tmpdir = pbs_get_tmpdir();
 	if (tmpdir == NULL) {
-		fprintf(stderr, "qsub: Failed to load configuration parameters!\n");
+		fprintf(stderr, "qsub: Failed to determine tmpdir!\n");
 		exit_qsub(2);
 	}
-
 
 	/*
 	 * If qsub command is submitted with arguments, then capture them and
@@ -3304,14 +2938,14 @@ main(int argc, char **argv, char **envp) /* qsub */
 	basic_envlist = job_env_basic();
 	if (basic_envlist == NULL)
 		exit_qsub(3);
-	if (V_opt)
-		qsub_envlist = env_array_to_varlist(envp);
-
+	
 	/*
 	 * Disable backgrounding if we are inside another qsub
 	 */
 	if (getenv(ENV_PBS_JOBID) != NULL)
 		no_background = 1;
+
+	fname = get_comm_filename(cmd_name, tmpdir, server_out, cred_name);
 
 	/*
 	 * In case of interactive jobs, jobs with block=true, or no_background == 1,
@@ -3320,14 +2954,14 @@ main(int argc, char **argv, char **envp) /* qsub */
 	 *
 	 * If all 3 of these options are zero, then try to submit via daemon.
 	 */
-	if ((Interact_opt || block_opt || no_background) == 0) {
+	if ((fname) && ((Interact_opt || block_opt || no_background || V_opt) == 0)) {
 		/* Try to submit jobs using a daemon */
-		rc = daemon_submit(&daemon_up, &do_regular_submit);
+		rc = daemon_submit(fname, &do_regular_submit);
 	}
 
 	if (do_regular_submit == 1)
 		/* submission via daemon was not successful, so do regular submit */
-		rc = regular_submit(daemon_up);
+		rc = regular_submit(fname);
 
 	/* remove temporary job script file */
 	(void)unlink(script_tmp);

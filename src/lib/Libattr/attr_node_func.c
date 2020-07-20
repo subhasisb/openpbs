@@ -429,8 +429,8 @@ vnode_ntype_to_str(int vntype)
  *
  * @return 	int
  * @retval    	< 0	an error encountered; value is negative of an error code
- * @retval    	0	ok, encode happened and svrattrl created and linked in,
- *		     	or nothing to encode
+ * @retval    	1 ok, encode happened and svrattrl created and linked in,
+ * @retval		0 nothing to encode
  *
  */
 int
@@ -472,7 +472,7 @@ encode_ntype(const attribute *pattr, pbs_list_head *ph, char *aname, char *rname
 	if (rtnl)
 		*rtnl = pal;
 
-	return (0);             /*success*/
+	return (1);             /*success*/
 }
 
 
@@ -493,25 +493,24 @@ encode_ntype(const attribute *pattr, pbs_list_head *ph, char *aname, char *rname
  *
  * @return	int
  * @retval	<0	an error encountered; value is negative of an error code
- * @retval	 0	ok, encode happened and svrattrl created and linked in,
- *			or nothing to encode
+ * @retval	 1	ok, encode happened and svrattrl created and linked in,
+ * @reval    0  nothing to encode
  *
  */
 
 int
 encode_jobs(const attribute *pattr, pbs_list_head *ph, char *aname, char *rname, int mode, svrattrl **rtnl)
-
 {
-	svrattrl	*pal;
-	struct jobinfo  *jip;
-	struct pbsnode	*pnode;
-	struct pbssubn 	*psubn;
-	int		i;
-	int		j;
-	int		offset;
-	int		jobcnt;		/*number of jobs using the node     */
-	int		strsize;	/*computed string size		    */
-	char		*job_str;	/*holds comma separated list of jobs*/
+	svrattrl *pal;
+	struct jobinfo *jip;
+	struct pbsnode *pnode;
+	struct pbssubn *psubn;
+	int i;
+	int j;
+	int offset;
+	int jobcnt;	   /*number of jobs using the node     */
+	int strsize;   /*computed string size		    */
+	char *job_str; /*holds comma separated list of jobs*/
 
 	if (!pattr)
 		return (-1);
@@ -579,9 +578,8 @@ encode_jobs(const attribute *pattr, pbs_list_head *ph, char *aname, char *rname,
 	if (rtnl)
 		*rtnl = pal;
 
-	return (0);			/*success*/
+	return (1);			/*success*/
 }
-
 
 /**
  * @brief
@@ -663,7 +661,7 @@ encode_resvs(const attribute *pattr, pbs_list_head *ph, char *aname, char *rname
 	if (rtnl)
 		*rtnl = pal;
 
-	return (0);                  /*success*/
+	return (1);                  /*success*/
 }
 
 /**
@@ -801,7 +799,7 @@ decode_state(attribute *pattr, char *name, char *rescn, char *val)
 
 	if (!rc) {
 		pattr->at_val.at_long = flag;
-		post_attr_set(pattr);
+		mark_attr_set(pattr);
 	}
 
 	if (slen >= 512)		/*buffer on heap, not stack*/
@@ -837,7 +835,7 @@ int
 decode_ntype(attribute *pattr, char *name, char *rescn, char *val)
 {
 	pattr->at_val.at_short = NTYPE_PBS;
-	post_attr_set(pattr);
+	mark_attr_set(pattr);
 
 	return 0;
 }
@@ -874,7 +872,7 @@ decode_sharing(attribute *pattr, char *name, char *rescn, char *val)
 
 	if (!rc) {
 		pattr->at_val.at_long = vns;
-		post_attr_set(pattr);
+		mark_attr_set(pattr);
 	}
 
 	return rc;
@@ -936,7 +934,7 @@ set_node_state(attribute *pattr, attribute *new, enum batch_op op)
 	}
 
 	if (!rc)
-		post_attr_set(pattr);
+		mark_attr_set(pattr);
 
 	return rc;
 }
@@ -988,7 +986,7 @@ set_node_ntype(attribute *pattr, attribute *new, enum batch_op op)
 	}
 
 	if (!rc)
-		post_attr_set(pattr);
+		mark_attr_set(pattr);
 	return rc;
 }
 

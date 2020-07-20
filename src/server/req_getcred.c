@@ -79,6 +79,8 @@ req_connect(struct batch_request *preq)
 	if (preq->rq_extend != NULL) {
 		if (strcmp(preq->rq_extend, QSUB_DAEMON) == 0)
 			conn->cn_authen |= PBS_NET_CONN_FROM_QSUB_DAEMON;
+		else if (strcmp(preq->rq_extend, QSTAT_DAEMON) == 0)
+			conn->cn_authen |= PBS_NET_CONN_FROM_QSTAT_DAEMON;
 	}
 
 	reply_ack(preq);

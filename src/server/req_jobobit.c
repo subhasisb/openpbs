@@ -721,7 +721,7 @@ unset_extra_attributes(job *pjob)
 	if (is_jattr_set(pjob,  JOB_ATR_resource_orig)) {
 		free_jattr(pjob, JOB_ATR_resource);
 		mark_jattr_not_set(pjob, JOB_ATR_resource);
-		set_attr_with_attr(&job_attr_def[(int) JOB_ATR_resource],  get_jattr(pjob, JOB_ATR_resource), get_jattr(pjob, JOB_ATR_resource_orig), INCR);
+		set_jattr_with_attr(pjob, JOB_ATR_resource, get_jattr(pjob, JOB_ATR_resource_orig), INCR);
 
 		free_jattr(pjob, JOB_ATR_resource_orig);
 		mark_jattr_not_set(pjob, JOB_ATR_resource_orig);

@@ -114,6 +114,8 @@ extern int process_topology_info(void **, char *);
 extern void release_lic_for_cray(struct pbsnode *pnode);
 static void remove_node_topology(char *);
 
+struct timeval last_node_purge_ts = {0, 0};
+
 /**
  * @brief
  * 		find_nodebyname() - find a node host by its name
@@ -171,6 +173,57 @@ find_nodebyaddr(pbs_net_t addr)
 
 /**
  * @brief
+ * 	 	encode a node attribute
+ * 
+ * @see
+ * 		status_node
+ * @param[in]	priv - the privacy flags of that attribute
+ * @param[in]	pnode - pointer to the node 
+ * @param[in]	index - index of the attribute in the mom attribute array
+ * @param[in]	phead - 	heads list of svrattrl structs that hang
+ * 							off the brp_attr member of the status sub
+ * 							structure in the request's "reply area"
+ * @param[in]	from_tm - timstamp from which to add updates in case of diffstat
+ *
+ * @return	int
+ * @retval	0		- success
+ * @retval	!= 0	- error
+ */
+int
+encode_node_attrib(int priv, struct pbsnode *pnode, int index, pbs_list_head *phead, struct timeval from_tm)
+{
+	attribute_def *padef = node_attr_def;
+	int rc = 0;
+
+	if ((padef+index)->at_flags & priv) {
+		if (TS_NEWER(pnode->nd_attr[index].update_tm, from_tm)) 
+		{
+			if (is_attr_set(&pnode->nd_attr[index])) {
+				svrattrl *pal;
+				rc = (padef+index)->at_encode(&pnode->nd_attr[index], phead, (padef+index)->at_name, NULL, ATR_ENCODE_CLIENT, NULL);
+				pal = (svrattrl *) GET_PRIOR((*phead));
+				if (pal) {
+					if (from_tm.tv_sec) {
+						log_eventf(PBSEVENT_DEBUG4, PBS_EVENTCLASS_NODE, LOG_DEBUG, pnode->nd_name, 
+							"Adding node attr %s, resc=%s, val=%s", (padef+index)->at_name, pal->al_atopl.resource, pal->al_atopl.value);
+					}
+				}
+			} 
+			
+			if (rc == 0 && from_tm.tv_sec != 0) {
+				if (from_tm.tv_sec) {
+					log_eventf(PBSEVENT_DEBUG4, PBS_EVENTCLASS_NODE, LOG_DEBUG, pnode->nd_name, "Deleted node attr %s", (padef+index)->at_name);
+				}
+				/* attrbute was unset from set (modified bit on), we need to send it over for diffstat anyway */
+				rc = encode_unset(&pnode->nd_attr[index], phead, (padef+index)->at_name, NULL, ATR_ENCODE_CLIENT, NULL);
+			}
+		}
+	}
+	return rc;
+}
+
+/**
+ * @brief
  * 	 	add status of each requested (or all) node-attribute to the status reply.
  *		if a node-attribute is incorrectly specified, *bad is set to the node-attribute's ordinal position.
  * @see
@@ -184,6 +237,8 @@ find_nodebyaddr(pbs_net_t addr)
  * 							off the brp_attr member of the status sub
  * 							structure in the request's "reply area"
  * @param[in]	bad 	- 	if node-attribute error record it's list position here
+ * @param[in]	from_tm - timstamp from which to add updates in case of diffstat
+
  *
  * @return	int
  * @retval	0		- success
@@ -191,7 +246,7 @@ find_nodebyaddr(pbs_net_t addr)
  */
 
 int
-status_nodeattrib(svrattrl *pal, struct pbsnode *pnode, int limit, int priv, pbs_list_head *phead, int *bad)
+status_nodeattrib(svrattrl *pal, struct pbsnode *pnode, int limit, int priv, pbs_list_head *phead, int *bad, struct timeval from_tm)
 {
 	int   rc = 0;		/*return code, 0 == success*/
 	int   index;
@@ -200,6 +255,9 @@ status_nodeattrib(svrattrl *pal, struct pbsnode *pnode, int limit, int priv, pbs
 
 	priv &= ATR_DFLAG_RDACC;  		/* user-client privilege      */
 
+	if (from_tm.tv_sec)
+		log_eventf(PBSEVENT_DEBUG3, PBS_EVENTCLASS_NODE, LOG_DEBUG, pnode->nd_name, "Adding node to diffstat reply"); 
+
 	if (pal) {   /*caller has requested status on specific node-attributes*/
 		nth = 0;
 		while (pal) {
@@ -207,43 +265,26 @@ status_nodeattrib(svrattrl *pal, struct pbsnode *pnode, int limit, int priv, pbs
 			index = find_attr(node_attr_idx, padef, pal->al_name);
 			if (index < 0) {
 				*bad = nth;	/* name in this position not found */
-				rc = PBSE_UNKNODEATR;
 				break;
 			}
-			if ((padef+index)->at_flags & priv) {
-				rc = (padef+index)->at_encode(get_nattr(pnode, index),
-					phead,
-					(padef+index)->at_name, NULL,
-					ATR_ENCODE_CLIENT, NULL);
-				if (rc < 0) {
-					rc = -rc;
-					break;
-				}
-				rc = 0;
+			if (encode_node_attrib(priv, pnode, index, phead, from_tm) == -1) {
+				rc = 1;
+				break;
 			}
 			pal = (svrattrl *)GET_NEXT(pal->al_link);
 		}
-
 	} else {
 		/*
 		 **	non-specific request,
 		 **	return all readable attributes
 		 */
 		for (index = 0; index < limit; index++) {
-			if ((padef+index)->at_flags & priv) {
-				rc = (padef+index)->at_encode(
-					get_nattr(pnode, index),
-					phead, (padef+index)->at_name,
-					NULL, ATR_ENCODE_CLIENT, NULL);
-				if (rc < 0) {
-					rc = -rc;
-					break;
-				}
-				rc = 0;
+			if (encode_node_attrib(priv, pnode, index, phead, from_tm) == -1) {
+				rc = 1;
+				break;
 			}
 		}
 	}
-
 	return (rc);
 }
 
@@ -291,15 +332,16 @@ free_prop_list(struct prop *prop)
 int
 initialize_pbsnode(struct pbsnode *pnode, char *pname, int ntype)
 {
-	int	      i;
-	attribute    *pat1;
-	attribute    *pat2;
+	int i;
+	attribute *pat1;
+	attribute *pat2;
 	resource_def *prd;
 	resource     *presc;
 	char         *svr_inst_id;
 	static char ndgroupid[PBS_MAXHOSTNAME + 3] = {0};
 
 	pnode->nd_name    = pname;
+	CLEAR_LINK(pnode->nd_allnodes_timed);
 	pnode->nd_ntype   = ntype;
 	pnode->nd_nsn     = 0;
 	pnode->nd_nsnfree = 0;
@@ -318,6 +360,8 @@ initialize_pbsnode(struct pbsnode *pnode, char *pname, int ntype)
 		return (PBSE_SYSTEM);
 	pnode->nd_nummslots = 1;
 	CLEAR_LINK(pnode->nd_link);
+	
+	update_node_timedlist(pnode); /* add to the latest nodes list */
 
 	/* first, clear the attributes */
 
@@ -385,7 +429,6 @@ initialize_pbsnode(struct pbsnode *pnode, char *pname, int ntype)
 	}
 
 	/* clear the modify flags */
-
 	for (i=0; i<(int)ND_ATR_LAST; i++)
 		(get_nattr(pnode, i))->at_flags &= ~ATR_VFLAG_MODIFY;
 	return (PBSE_NONE);
@@ -616,6 +659,10 @@ effective_node_delete(struct pbsnode *pnode)
 		pbsndlist[iht - 1]->nd_arr_index--;
 	}
 	svr_totnodes--;
+	
+	delete_link(&pnode->nd_allnodes_timed);
+	append_deleted_ids(&svr_allnodes_deleted, pnode->nd_name);
+
 	free_pnode(pnode);
 
 	if (lic_released)
@@ -645,7 +692,6 @@ setup_notification()
 			continue;
 
 		set_vnode_state(pbsndlist[i], INUSE_DOWN, Nd_State_Or);
-		post_attr_set(get_nattr(pbsndlist[i], ND_ATR_state));
 		for (nmom = 0; nmom < pbsndlist[i]->nd_nummoms; ++nmom) {
 			((pbsndlist[i]->nd_moms[nmom]->mi_dmn_info))->dmn_state |= INUSE_NEED_ADDRS;
 		}
@@ -1989,7 +2035,7 @@ set_node_topology(attribute *new, void *pobj, int op)
 	}
 
 	if (rc == PBSE_NONE)
-		post_attr_set(new);
+		mark_attr_set(new);
 	return rc;
 #endif /* localmod 035 */
 }

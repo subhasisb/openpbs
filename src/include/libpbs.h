@@ -213,6 +213,7 @@ struct batch_reply
 	int brp_count;
 	int brp_type;
 	struct batch_status *last;
+	struct timeval brp_ts; /* timestamp of this response */
 	union {
 		char brp_jid[PBS_MAXSVRJOBID + 1];
 		struct brp_select *brp_select; /* select replies */
@@ -411,6 +412,7 @@ int encode_DIS_JobsList(int sock, char **jobs_list, int numofjobs);
 int get_server_fd_from_jid(int c, char *jobid);
 int multi_svr_op(int fd);
 int get_job_svr_inst_id(int c, char *job_id);
+void set_last_stat_ts(struct timeval);
 
 int pbs_register_sched_msvr_instance(const char *sched_id, int primary_conn_id, int secondary_conn_id);
 void pbs_connect_msvr_instance(svr_conn_t *conn);

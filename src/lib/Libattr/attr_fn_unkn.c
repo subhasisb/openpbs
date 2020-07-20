@@ -127,7 +127,7 @@ decode_unkn(attribute *patr, char *name, char *rescn, char *value)
 		memcpy(entry->al_value, value, valln);
 
 	append_link(&patr->at_val.at_list, &entry->al_link, entry);
-	post_attr_set(patr);
+	mark_attr_set(patr);
 	return (0);
 }
 
@@ -258,7 +258,7 @@ set_unkn(attribute *old, attribute *new, enum batch_op op)
 		append_link(&old->at_val.at_list, &plist->al_link, plist);
 		plist = pnext;
 	}
-	post_attr_set(old);
+	mark_attr_set(old);
 	return (0);
 }
 
@@ -310,4 +310,43 @@ free_unkn(attribute *pattr)
 	}
 	free_null(pattr);
 	CLEAR_HEAD(pattr->at_val.at_list);
+}
+
+/**
+ * @brief
+ *	Encode "unset" into any attribute
+ *  This function is used to encode a empty (unset) attribute for diffstat
+ *
+ * @param[in,out]	patr - the string attribute that holds the decoded value
+ * @param[in]		phead - the list head of encoded attributes
+ * @param[in]		atname - name of the attribue
+ *
+ * @return	int
+ * @retval      0 if success
+ * @retval      > 0 error number if error
+ * @retval      *patr members set
+ */
+int
+encode_unset(const attribute *attr, pbs_list_head *phead, char *atname, char *rsname, int mode, svrattrl **rtnl)
+{
+	svrattrl *pal;
+
+	if (!attr)
+		return (-1);
+
+	pal = attrlist_create(atname, NULL, 0); /* keep space in value for NULL char */
+	if (pal == NULL)
+		return (-1);
+
+	pal->al_value[0] = '\0';
+	pal->al_flags = attr->at_flags;
+	if (phead)
+		append_link(phead, &pal->al_link, pal);
+	if (rtnl)
+		*rtnl = pal;	
+
+	if ((phead == NULL) && (rtnl == NULL))
+		free(pal);
+
+	return (1);
 }

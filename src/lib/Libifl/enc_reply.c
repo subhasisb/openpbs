@@ -111,7 +111,6 @@ encode_DIS_reply_inner(int sock, struct batch_reply *reply)
 		case BATCH_REPLY_CHOICE_Select:
 
 			/* have to send count of number of strings first */
-
 			if ((rc = diswui(sock, reply->brp_count)) != 0)
 				return rc;
 
@@ -133,6 +132,10 @@ encode_DIS_reply_inner(int sock, struct batch_reply *reply)
 			 */
 
 			if ((rc = diswui(sock, reply->brp_count)) != 0)
+				return rc;
+			if ((rc = diswul(sock, reply->brp_ts.tv_sec)) != 0)
+				return rc;
+			if ((rc = diswul(sock, reply->brp_ts.tv_usec)) != 0)
 				return rc;
 			pstat = (struct brp_status *) GET_NEXT(reply->brp_un.brp_status);
 			while (pstat) {

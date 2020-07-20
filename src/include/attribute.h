@@ -181,6 +181,7 @@ struct attribute {
 	unsigned int at_type:ATRVTYPE;	/* type of attribute    */
 	svrattrl    *at_user_encoded;	/* encoded svrattrl form for users*/
 	svrattrl    *at_priv_encoded;	/* encoded svrattrl form for mgr/op*/
+	struct timeval update_tm;	/* attribute update timestamp (usecs) */
 	union  attr_val at_val;		/* the attribute value	*/
 };
 typedef struct attribute attribute;
@@ -377,6 +378,10 @@ extern int  decode_nodes(attribute *, char *, char *, char *);
 extern int  decode_select(attribute *, char *, char *, char *);
 extern int  decode_Mom_list(attribute *, char *, char *, char *);
 
+
+extern int
+encode_unset(const attribute *attr, pbs_list_head *phead, char *atname, 
+					char *rsname, int mode, svrattrl **rtnl);
 extern int encode_b(const attribute *attr, pbs_list_head *phead, char *atname,
 					char *rsname, int mode, svrattrl **rtnl);
 extern int encode_c(const attribute *attr, pbs_list_head *phead, char *atname,
@@ -620,7 +625,7 @@ void set_attr_b(attribute *pattr, long val, enum batch_op op);
 void set_attr_short(attribute *pattr, short value, enum batch_op op);
 void mark_attr_not_set(attribute *attr);
 void mark_attr_set(attribute *attr);
-void post_attr_set(attribute *attr);
+void post_attr_set_unset(attribute *attr);
 
 /* Attr getters */
 char get_attr_c(const attribute *pattr);
@@ -632,6 +637,8 @@ int is_attr_set(const attribute *pattr);
 attribute *_get_attr_by_idx(attribute *list, int attr_idx);
 pbs_list_head get_attr_list(const attribute *pattr);
 void free_attr(attribute_def *attr_def, attribute *pattr, int attr_idx);
+struct attrl *make_subjob_attrs_from_array(struct batch_status *array);
+
 
 /* "type" to pass to acl_check() */
 #define ACL_Host  1

@@ -155,7 +155,7 @@ set_node_ct(resource *pnodesp, attribute *pattr, void *pobj, int type, int actmo
 
 	nn = ctnodes(pnodesp->rs_value.at_val.at_str);
 	pnct->rs_value.at_val.at_long = nn;
-	post_attr_set(&pnct->rs_value);
+	mark_attr_set(&pnct->rs_value);
 
 	/* find the number of cpus specified in the node string */
 
@@ -188,7 +188,7 @@ set_node_ct(resource *pnodesp, attribute *pattr, void *pobj, int type, int actmo
 		/* ncpus is not set or not a new job (qalter being done) */
 		/* force ncpus to the correct thing */
 		pncpus->rs_value.at_val.at_long = nt;
-		post_attr_set(&pncpus->rs_value);
+		mark_attr_set(&pncpus->rs_value);
 	}
 
 

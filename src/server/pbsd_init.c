@@ -1621,7 +1621,7 @@ pbsd_init_reque(job *pjob, int change_state)
 	}
 
 	/* make sure substate attributes match actual value */
-	post_attr_set(get_jattr(pjob, JOB_ATR_substate));
+	mark_attr_set(get_jattr(pjob, JOB_ATR_substate));
 
 	if ((rc = svr_enquejob(pjob, NULL)) == 0) {
 		(void)strcat(logbuf, msg_init_queued);

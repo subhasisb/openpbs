@@ -37,6 +37,7 @@
  * subject to Altair's trademark licensing policies.
  */
 
+#include <pbs_config.h>
 #include "attribute.h"
 #include "job.h"
 #include "pbs_assert.h"

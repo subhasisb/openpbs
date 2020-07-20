@@ -168,41 +168,6 @@ set_log_conf(char *leafname, char *nodename,
 	log_mutex_unlock();
 }
 
-#ifdef WIN32
-/**
- * @brief
- *		gettimeofday - This function returns the current calendar
- *		time as the elapsed time since the epoch in the struct timeval
- *		structure indicated by tp
- *
- * @param[in] - tp - pointer to timeval struct
- * @param[in] - tzp - pointer to timezone struct (not used)
- * @return int
- * @retval -1 - failure
- * @retval 0 - success
- */
-int
-gettimeofday(struct timeval *tp, struct timezone *tzp)
-{
-	FILETIME file_time = {0};
-	ULARGE_INTEGER large_int = {0};
-	/*
- 	 * Microsecond different from "January 1, 1601 (UTC)" to
-  	 * "00:00:00 January 1, 1970" as Windows's FILESYSTEM is represents from
- 	 * "January 1, 1601 (UTC)"
-  	 */
-	static const unsigned __int64 epoch = 116444736000000000ULL;
-
-	GetSystemTimeAsFileTime(&file_time);
-	large_int.LowPart = file_time.dwLowDateTime;
-	large_int.HighPart = file_time.dwHighDateTime;
-	tp->tv_sec = (time_t)((large_int.QuadPart - epoch) / 10000000L);
-	tp->tv_usec = (time_t)((large_int.QuadPart - epoch) % 1000000L);
-	return 0;
-}
-#endif
-
-
 /* External functions called */
 
 /**

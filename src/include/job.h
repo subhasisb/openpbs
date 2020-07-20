@@ -234,6 +234,9 @@ typedef enum histjob_type {
 			 MOM failure.*/
 } histjob_type;
 
+/* global pointer to keep track of when last job purge happened - for diffstat */
+extern struct timeval last_job_purge_ts;
+
 #endif /* SERVER only! */
 
 #ifdef	PBS_MOM
@@ -348,6 +351,8 @@ typedef struct ajinfo {
 	int tkm_subjsct[PBS_NUMJOBSTATE]; /* count of subjobs in various states */
 	int tkm_dsubjsct;		  /* count of deleted subjobs */
 	range *trm_quelist;		  /* pointer to range list */
+	pbs_list_head subjobs_timed; /* timed list of subjobs in this array job */
+	pbs_list_head subjobs_deleted; /* timed list of deleted subjobs of this array job */
 } ajinfo_t;
 
 /*
@@ -428,6 +433,7 @@ struct job {
 	 */
 
 	pbs_list_link ji_alljobs;	     /* links to all jobs in server */
+	pbs_list_link		ji_timed_link; /* time sorted list of jobs - head has latest */
 	pbs_list_link ji_jobque;	     /* SVR: links to jobs in same queue, MOM: links to polled jobs */
 	pbs_list_link ji_unlicjobs;	     /* links to unlicensed jobs */
 	int ji_momhandle;		     /* open connection handle to MOM */
@@ -609,6 +615,8 @@ struct job {
 	attribute ji_wattr[JOB_ATR_LAST]; /* decoded attributes  */
 
 	short newobj; /* newly created job? */
+
+	struct timeval update_tm; /* last updated timestamp */
 };
 
 typedef struct job job;
@@ -1047,6 +1055,7 @@ int set_jattr_ll_slim(job *pjob, int attr_idx, long long val, enum batch_op op);
 int set_jattr_b_slim(job *pjob, int attr_idx, long val, enum batch_op op);
 int set_jattr_c_slim(job *pjob, int attr_idx, char val, enum batch_op op);
 int set_jattr_generic(job *pjob, int attr_idx, char *val, char *rscn, enum batch_op op);
+int set_jattr_with_attr(job *pjob, int attr_idx, attribute *nattr, enum batch_op op);
 int is_jattr_set(const job *pjob, int attr_idx);
 void free_jattr(job *pjob, int attr_idx);
 void mark_jattr_not_set(job *pjob, int attr_idx);
@@ -1130,6 +1139,8 @@ extern void get_jobowner(char *, char *);
 extern struct batch_request *cpy_stage(struct batch_request *, job *, enum job_atr, int);
 extern struct batch_request *cpy_stdfile(struct batch_request *, job *, enum job_atr);
 extern int has_stage(job *);
+extern void update_job_timedlist(job *);
+
 
 #ifdef	__cplusplus
 }

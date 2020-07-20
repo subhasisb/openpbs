@@ -392,7 +392,7 @@ char *msg_et_rsps_q = "would exceed project %s's limit on resource %s in complex
 char *msg_et_rsuq_q = "would exceed user %s's limit on resource %s in queue %s for jobs in 'Q' state";
 char *msg_et_rsus_q = "would exceed user %s's limit on resource %s in complex for jobs in 'Q' state";
 
-char *msg_force_qsub_update =  "force a qsub update";
+char *msg_force_client_update =  "force a client update";
 char *msg_noloopbackif = "Local host does not have loopback interface configured or pingable.";
 
 char *msg_defproject = "%s = %s is also the default project assigned to jobs with unset project attribute";
@@ -571,7 +571,7 @@ struct pbs_err_to_txt pbs_err_to_txt[] = {
 	{PBSE_NOLIMIT_RESOURCE, &msg_nolimit_resc},
 	{PBSE_NORUNALTEREDJOB, &msg_norunalteredjob},
 	{PBSE_NOHISTARRAYSUBJOB, &msg_nohistarrayjob},
-	{PBSE_FORCE_QSUB_UPDATE, &msg_force_qsub_update},
+	{PBSE_FORCE_CLIENT_UPDATE, &msg_force_client_update},
 	{PBSE_SAVE_ERR, &msg_save_err},
 	{PBSE_MOM_INCOMPLETE_HOOK, &msg_mom_incomplete_hook},
 	{PBSE_MOM_REJECT_ROOT_SCRIPTS, &msg_mom_reject_root_scripts},

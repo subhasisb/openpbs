@@ -151,7 +151,7 @@ decode_resc(attribute *patr, char *name, char *rescn, char *val)
 		((resc_access_perm & ATR_DFLAG_ACCESS) != ATR_DFLAG_ACCESS))
 		return (PBSE_ATTRRO);
 
-	post_attr_set(patr);
+	mark_attr_set(patr);
 
 	if ((resc_access_perm & ATR_PERM_ALLOW_INDIRECT) && (*val == '@')) {
 		if (strcmp(rescn, "ncpus") != 0)
@@ -358,7 +358,7 @@ set_resc(attribute *old, attribute *new, enum batch_op op)
 
 		newresc = (resource *)GET_NEXT(newresc->rs_link);
 	}
-	post_attr_set(old);
+	mark_attr_set(old);
 	return (0);
 }
 
@@ -590,7 +590,7 @@ add_resource_entry(attribute *pattr, resource_def *prdef)
 	} else {
 		append_link(&pattr->at_val.at_list, &new->rs_link, new);
 	}
-	post_attr_set(pattr);
+	mark_attr_set(pattr);
 	return (new);
 }
 

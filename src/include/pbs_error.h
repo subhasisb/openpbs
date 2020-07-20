@@ -218,7 +218,7 @@ extern "C" {
 #define PBSE_NORUNALTEREDJOB	     15157 /* cannot run altered/moved job */
 #define PBSE_HISTJOBDELETED	     15158 /* Job was in F or M state . Its history deleted upon request. */
 #define PBSE_NOHISTARRAYSUBJOB	     15159 /* Request invalid for finished array subjob */
-#define PBSE_FORCE_QSUB_UPDATE       15160 /* a qsub action needs to be redone */
+#define PBSE_FORCE_CLIENT_UPDATE       15160 /* a cli action needs to be redone */
 #define PBSE_SAVE_ERR		     15161 /* failed to save job or resv to database */
 #define PBSE_MAX_NO_MINWT	     15162 /* no max walltime w/o min walltime */
 #define PBSE_MIN_GT_MAXWT	     15163 /* min_walltime can not be > max_walltime */
@@ -289,7 +289,7 @@ extern "C" {
 #define PBSE_SCHEDCONNECTED	15230
 #define PBSE_NOTARRAY_ATTR  15231		/* Not an array job */
 #define PBSE_UNKOBJ	15232		/* Named object is not in the list nor in alien cache */
-
+#define PBSE_STALE_DIFFQUERY 15233 /* diff query issued with too old from timestamp */
 
 /* the following structure is used to tie error number      */
 /* with text to be returned to a client, see svr_messages.c */

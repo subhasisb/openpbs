@@ -582,7 +582,8 @@ issue_Drequest(int conn, struct batch_request *request, void (*func)(), struct w
 			rc =  PBSD_status_put(conn,
 				PBS_BATCH_StatusJob,
 				request->rq_ind.rq_status.rq_id,
-				NULL, NULL,
+				NULL,
+				NULL,
 				prot,
 				&msgid);
 			break;
