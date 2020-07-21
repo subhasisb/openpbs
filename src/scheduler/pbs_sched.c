@@ -120,7 +120,6 @@
 int		server_sock;
 int		second_connection = -1;
 fd_set		master_fdset;
-int		entry_to_svr_conns;
 
 #define		START_CLIENTS	10	/* minimum number of clients */
 #define		MAX_PORT_NUM 65535
@@ -155,7 +154,7 @@ extern int do_hard_cycle_interrupt;
 static int	engage_authentication(int);
 static int	send_cycle_end(int);
 static int	socket_to_conn(int, struct sockaddr_in);
-static int	schedule_wrapper(int, int *, fd_set *, int);
+static int	schedule_wrapper(fd_set *, int);
 
 extern char *msg_startup1;
 
@@ -853,7 +852,6 @@ main(int argc, char *argv[])
 	int num_cores;
 	char *endp = NULL;
 	pthread_mutexattr_t attr;
-	int update_svr = 1;
 	int num_cfg_svrs;
 	svr_conn_t **svr_conns = NULL;
 	int svr_inst_idx;
@@ -1400,7 +1398,7 @@ main(int argc, char *argv[])
 				die(0);
 		}
 
-		if (schedule_wrapper(num_cfg_svrs, &update_svr,&read_fdset, opt_no_restart) == 1)
+		if (schedule_wrapper(&read_fdset, opt_no_restart) == 1)
 			go = 0;
 	}
 
@@ -1411,7 +1409,7 @@ main(int argc, char *argv[])
 		}
 
 		/* destroy ch_shards table */
-		for (svr_inst_idx = 0; svr_inst_idx < num_cfg_svrs; svr_inst_idx++) {
+		for (svr_inst_idx = 0; svr_inst_idx < get_current_servers(); svr_inst_idx++) {
 			if (svr_conns[svr_inst_idx])
 				free(svr_conns[svr_inst_idx]);
 		}
@@ -1555,9 +1553,6 @@ send_cycle_end(int socket)
  *		schedule_wrapper - Wrapper function to call schedule which handles both Multiple Servers
  *				   and single server.
  *
- * @param[in]	num_cfg_svrs	-	number of configured servers
- * @param[in]	update_svr	-	pointer to a flag which indicates whether to update sched object
- *					attributes to server
  * @param[in]	read_fdset	-	pointer to read_fdset
  * @param[in]	opt_no_restart	-	option that says no restart
  *
@@ -1566,7 +1561,7 @@ send_cycle_end(int socket)
  * @retval	1	: exit scheduler
  */
 static int
-schedule_wrapper(int num_cfg_svrs, int *update_svr,fd_set *read_fdset, int opt_no_restart)
+schedule_wrapper(fd_set *read_fdset, int opt_no_restart)
 {
 	int svr_inst_idx;
 	int sock_to_check  = -1;
@@ -1574,6 +1569,7 @@ schedule_wrapper(int num_cfg_svrs, int *update_svr,fd_set *read_fdset, int opt_n
 	int alarm_time = 0;
 	char *runjobid = NULL;
 	svr_conn_t **svr_conns = NULL;
+	int num_cfg_svrs = get_current_servers();
 
 	/* Use virtual socket i.e. server_sock when calling get_conn_shards */
 	svr_conns = (svr_conn_t **)get_conn_servers(entry_to_svr_conns);
@@ -1595,14 +1591,15 @@ schedule_wrapper(int num_cfg_svrs, int *update_svr,fd_set *read_fdset, int opt_n
 						errno, __func__);
 			} else {
 				int sched_ret;
+				static int num_svrs_updated = 0;
 
-				if (update_svr != NULL && (*update_svr)) {
+				if (num_svrs_updated < num_cfg_svrs) {
 					/* update sched object attributes on server */
-					if (update_svr_schedobj(svr_conns[0]->sd, cmd, alarm_time) == 0) {
+					if (update_svr_schedobj(sock_to_check, cmd, alarm_time) == 0) {
 						close_server_conn(svr_inst_idx);
 						continue;
 					}
-					*update_svr = 0;
+					num_svrs_updated++;
 				}
 
 
@@ -1627,7 +1624,7 @@ schedule_wrapper(int num_cfg_svrs, int *update_svr,fd_set *read_fdset, int opt_n
 #endif /* localmod 031 */
 
 				/* magic happens here */				
-				sched_ret = schedule(cmd, svr_conns[0]->sd, runjobid);
+				sched_ret = schedule(cmd, entry_to_svr_conns, runjobid);
 				if (sched_ret != 0 ) {
 					close_server_conn(svr_inst_idx);
 
