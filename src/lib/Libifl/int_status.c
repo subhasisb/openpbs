@@ -277,17 +277,23 @@ assess_type(char *val, int *type, double *val_double, long *val_long, char *val_
 	}
 }
 
+struct attrl_holder {
+	struct attrl *atr_list;
+	struct attrl_holder *next;
+};
+
 static void
-accumulate_values(struct attrl *a, struct attrl *b)
+accumulate_values(struct attrl_holder *a, struct attrl *b, struct attrl *orig)
 {
 	double val_double = 0;
 	long val_long = 0;
 	char val_str[20];
 	char *pc;
 	int type = -1;
-	struct attrl *cur;
+	struct attrl_holder *itr;
 	struct attribute attr;
 	struct attribute new;
+	struct attrl *cur;
 	char buf[32];
 
 	if (!a || !b || !b->resource || *b->resource == '\0' || !b->value || *b->value == '\0')
@@ -298,9 +304,9 @@ accumulate_values(struct attrl *a, struct attrl *b)
 	if (type == STRING)
 		return;
 
-	for (cur = a; cur; cur = cur->next) {
-		if (cur->name && !strcmp(cur->name, ATTR_rescassn) &&
-		    cur->resource && !strcmp(cur->resource, b->resource)) {
+	for (itr = a; itr && itr->atr_list; itr = itr->next) {
+		cur = itr->atr_list;
+		if (cur->resource && !strcmp(cur->resource, b->resource)) {
 			switch (type) {
 			case DOUBLE:
 				val_double += strtod(cur->value, &pc);
@@ -325,25 +331,49 @@ accumulate_values(struct attrl *a, struct attrl *b)
 		}
 	}
 	/* value exists in next but not in cur. Create it */
-	if (!cur) {
+	if (!itr) {
 		struct attrl *at = dup_attrl(b);
-		for (cur = a; cur->next; cur = cur->next)
+		for (cur = orig; cur->next; cur = cur->next)
 			;
 		cur->next = at;
 	}
 }
 
 static void
-aggr_resc_ct(struct batch_status *cur, struct batch_status *nxt)
+aggr_resc_ct(struct batch_status *st1, struct batch_status *st2)
 {
+	struct attrl *a = NULL;
 	struct attrl *b = NULL;
+	struct attrl_holder *resc_assn = NULL;
+	struct attrl_holder *cur = NULL;
+	struct attrl_holder *nxt = NULL;
 
-	if (!cur || !nxt)
+	if (!st1 || !st2)
 		return;
 
-	for (b = nxt->attribs; b; b = b->next) {
+	/* In the first pass gather all resources assigned attr from st1
+		so we do not have to loop through all attributes */
+	for (a = st1->attribs; a; a = a->next) {
+		if (a->name && strcmp(a->name, ATTR_rescassn) == 0) {
+			nxt = malloc(sizeof(struct attrl_holder));
+			nxt->atr_list = a;
+			nxt->next = NULL;
+			if (cur) {
+				cur->next = nxt;
+				cur = cur->next;
+			} else
+				resc_assn = cur = nxt;
+		}
+	}
+
+	for (b = st2->attribs; b; b = b->next) {
 		if (b->name && strcmp(b->name, ATTR_rescassn) == 0)
-			accumulate_values(cur->attribs, b);
+			accumulate_values(resc_assn, b, st1->attribs);
+	}
+
+	for (cur = resc_assn; cur; cur = cur->next) {
+		nxt = cur->next;
+		free(cur);
 	}
 }
 
