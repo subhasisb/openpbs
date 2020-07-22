@@ -55,14 +55,14 @@
 
 static struct batch_status *alloc_bs();
 
-#define TRANSIT_STATE 0
-#define QUEUE_STATE 1
-#define HELD_STATE 2
-#define WAIT_STATE 3
-#define RUN_STATE 4
-#define EXITING_STATE 5
-#define BEGUN_STATE 6
-#define MAX_STATE 7
+enum state { TRANSIT_STATE,
+	     QUEUE_STATE,
+	     HELD_STATE,
+	     WAIT_STATE,
+	     RUN_STATE,
+	     EXITING_STATE,
+	     BEGUN_STATE,
+	     MAX_STATE };
 
 static char *statename[] = { "Transit", "Queued", "Held", "Waiting",
 		"Running", "Exiting", "Begun"};
@@ -80,32 +80,25 @@ decode_states(char *string, long *count)
 {
 	char *c, *s;
 	long *d;
+	int i;
 
 	c = string;
 	while (isspace(*c) && *c != '\0')
 		c++;
-	while (*c != '\0') {
+	while (c && *c != '\0') {
 		s = c;
-		while ((*c != ':') && (*c != '\0'))
-			c++;
-		if (*c == '\0')
+		if ((c = strchr(s, ':')) == NULL)
 			break;
 		*c = '\0';
 		d = NULL;
-		if (strcmp(s, statename[QUEUE_STATE]) == 0)
-			d = &count[QUEUE_STATE];
-		else if (strcmp(s, statename[RUN_STATE]) == 0)
-			d = &count[RUN_STATE];
-		else if (strcmp(s, statename[HELD_STATE]) == 0)
-			d = &count[HELD_STATE];
-		else if (strcmp(s, statename[WAIT_STATE]) == 0)
-			d = &count[WAIT_STATE];
-		else if (strcmp(s, statename[TRANSIT_STATE]) == 0)
-			d = &count[TRANSIT_STATE];
-		else if (strcmp(s, statename[EXITING_STATE]) == 0)
-			d = &count[EXITING_STATE];
-		else if (strcmp(s, statename[BEGUN_STATE]) == 0)
-			d = &count[BEGUN_STATE];
+
+		for (i = 0; i < MAX_STATE; i++) {
+			if (strcmp(s, statename[i]) == 0) {
+				d = &count[i];
+				break;
+			}
+		}
+		*c = ':';
 		c++;
 		if (d) {
 			s = c;
@@ -120,16 +113,19 @@ decode_states(char *string, long *count)
 }
 
 static void
-encode_states(char *buf, long *cur, long *nxt)
+encode_states(char **val, long *cur, long *nxt)
 {
 	int index;
 	int len = 0;
+	char buf[256];
 
 	buf[0] = '\0';
 	for (index = 0; index < MAX_STATE; index++) {
 		len += sprintf(buf + len, "%s:%ld ", statename[index],
-			      cur[index] + nxt[index]);
+			       cur[index] + nxt[index]);
 	}
+	free(*val);
+	*val = strdup(buf);
 }
 
 /**
@@ -243,7 +239,7 @@ aggr_job_ct(struct batch_status *cur, struct batch_status *nxt)
 	}
 
 	if (a && b)
-		encode_states(a->value, cur_st_ct, nxt_st_ct);
+		encode_states(&a->value, cur_st_ct, nxt_st_ct);
 	if (tot_jobs_attr)
 		sprintf(tot_jobs_attr, "%ld", tot_jobs);
 }
@@ -254,7 +250,7 @@ aggr_job_ct(struct batch_status *cur, struct batch_status *nxt)
 #define SIZE 3
 
 static void
-assess_type(char *val, int *type, double *val_double, long *val_long, char *val_str)
+assess_type(char *val, int *type, double *val_double, long *val_long)
 {
 	char *pc;
 
@@ -270,10 +266,9 @@ assess_type(char *val, int *type, double *val_double, long *val_long, char *val_
 			*type = STRING;
 	}
 	if (*type == STRING) {
-		if ((*pc == 'k' || *pc == 'm' || *pc == 'g' || *pc == 't' || *pc == 'p') && pc[1] == 'b') {
+		if (!strcasecmp(pc, "kb") || !strcasecmp(pc, "mb") || !strcasecmp(pc, "gb") ||
+		    !strcasecmp(pc, "tb") || !strcasecmp(pc, "pb"))
 			*type = SIZE;
-			*val_long = strtol(val, &pc, 10);
-		}
 	}
 }
 
@@ -287,7 +282,6 @@ accumulate_values(struct attrl_holder *a, struct attrl *b, struct attrl *orig)
 {
 	double val_double = 0;
 	long val_long = 0;
-	char val_str[20];
 	char *pc;
 	int type = -1;
 	struct attrl_holder *itr;
@@ -299,7 +293,7 @@ accumulate_values(struct attrl_holder *a, struct attrl *b, struct attrl *orig)
 	if (!a || !b || !b->resource || *b->resource == '\0' || !b->value || *b->value == '\0')
 		return;
 
-	assess_type(b->value, &type, &val_double, &val_long, val_str);
+	assess_type(b->value, &type, &val_double, &val_long);
 
 	if (type == STRING)
 		return;
@@ -317,7 +311,7 @@ accumulate_values(struct attrl_holder *a, struct attrl *b, struct attrl *orig)
 				sprintf(buf, "%ld", val_long);
 				break;
 			case SIZE:
-				decode_size(&attr, NULL, NULL, val_str);
+				decode_size(&attr, NULL, NULL, b->value);
 				decode_size(&new, NULL, NULL, cur->value);
 				set_size(&attr, &new, INCR);
 				from_size(&attr.at_val.at_size, buf);
@@ -325,8 +319,7 @@ accumulate_values(struct attrl_holder *a, struct attrl *b, struct attrl *orig)
 				break;
 			}
 			free(cur->value);
-			cur->value = malloc(strlen(buf) + 1);
-			strcpy(cur->value, buf);
+			cur->value = strdup(buf);
 			break;
 		}
 	}

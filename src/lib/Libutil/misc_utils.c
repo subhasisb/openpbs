@@ -2211,6 +2211,12 @@ get_current_servers()
 	return pbs_conf.pbs_current_servers;
 }
 
+/**
+ * @brief
+ *	rand_num - returns a random number.
+ * 	This function will seed using micro second if already not seeded
+ *
+ */
 int
 rand_num()
 {
