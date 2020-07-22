@@ -326,6 +326,10 @@ close_server_conn(int index_to_shards)
 			/* unlock the connection level lock */
 			svr_conns[index_to_shards]->sd = -1;
 			if (svr_conns[index_to_shards]->secondary_sd >= 0) {
+				/* We no need to call close_tcp_connection() once again on secondary connection
+				   It is because PBS_BATCH_Disconnect is sent as part of close_tcp_connection on primary.
+				   The other reason is Server is just expecting only end of cycle on secondary connection 
+				*/ 
 				CS_close_socket(svr_conns[index_to_shards]->secondary_sd);
 				CLOSESOCKET(svr_conns[index_to_shards]->secondary_sd);
 				dis_destroy_chan(svr_conns[index_to_shards]->secondary_sd);
