@@ -120,7 +120,6 @@
 int		server_sock;
 int		second_connection = -1;
 fd_set		master_fdset;
-int		entry_to_svr_conns;
 
 #define		START_CLIENTS	10	/* minimum number of clients */
 #define		MAX_PORT_NUM 65535
@@ -155,7 +154,7 @@ extern int do_hard_cycle_interrupt;
 static int	engage_authentication(int);
 static int	send_cycle_end(int);
 static int	socket_to_conn(int, struct sockaddr_in);
-static int	schedule_wrapper(int, int *, fd_set *, int);
+static int	schedule_wrapper(fd_set *, int);
 
 extern char *msg_startup1;
 
@@ -322,15 +321,20 @@ close_server_conn(int index_to_shards)
 			svr_conns[index_to_shards]->state == SVR_CONN_STATE_CONNECTED) {
 		FD_CLR(svr_conns[index_to_shards]->sd , &master_fdset);
 
-		if (svr_conns[index_to_shards]->secondary_sd >= 0) {
-			close_tcp_connection(svr_conns[index_to_shards]->secondary_sd);
-			/* unlock the connection level lock */
-			svr_conns[index_to_shards]->secondary_sd = -1;
-		}
 		if (svr_conns[index_to_shards]->sd >= 0) {
 			close_tcp_connection(svr_conns[index_to_shards]->sd);
 			/* unlock the connection level lock */
 			svr_conns[index_to_shards]->sd = -1;
+			if (svr_conns[index_to_shards]->secondary_sd >= 0) {
+				/* We no need to call close_tcp_connection() once again on secondary connection
+				   It is because PBS_BATCH_Disconnect is sent as part of close_tcp_connection on primary.
+				   The other reason is Server is just expecting only end of cycle on secondary connection 
+				*/ 
+				CS_close_socket(svr_conns[index_to_shards]->secondary_sd);
+				CLOSESOCKET(svr_conns[index_to_shards]->secondary_sd);
+				dis_destroy_chan(svr_conns[index_to_shards]->secondary_sd);
+				svr_conns[index_to_shards]->secondary_sd = -1;
+			}
 		}
 		svr_conns[index_to_shards]->state = SVR_CONN_STATE_DOWN;
 		pbs_client_thread_unlock_connection(entry_to_svr_conns);
@@ -852,7 +856,6 @@ main(int argc, char *argv[])
 	int num_cores;
 	char *endp = NULL;
 	pthread_mutexattr_t attr;
-	int update_svr = 1;
 	int num_cfg_svrs;
 	svr_conn_t **svr_conns = NULL;
 	int svr_inst_idx;
@@ -1399,7 +1402,7 @@ main(int argc, char *argv[])
 				die(0);
 		}
 
-		if (schedule_wrapper(num_cfg_svrs, &update_svr,&read_fdset, opt_no_restart) == 1)
+		if (schedule_wrapper(&read_fdset, opt_no_restart) == 1)
 			go = 0;
 	}
 
@@ -1410,7 +1413,7 @@ main(int argc, char *argv[])
 		}
 
 		/* destroy ch_shards table */
-		for (svr_inst_idx = 0; svr_inst_idx < num_cfg_svrs; svr_inst_idx++) {
+		for (svr_inst_idx = 0; svr_inst_idx < get_current_servers(); svr_inst_idx++) {
 			if (svr_conns[svr_inst_idx])
 				free(svr_conns[svr_inst_idx]);
 		}
@@ -1496,7 +1499,8 @@ socket_to_conn(int sock, struct sockaddr_in saddr_in)
 		}
 
 		strcpy(svr_conns[svr_conn_index]->host_name, phe->h_name);
-		svr_conns[svr_conn_index]->state = SVR_CONN_STATE_CONNECTED;
+		/* We will wait to mark this as connected until we get secondary connection */
+		svr_conns[svr_conn_index]->state = SVR_CONN_STATE_DOWN;
 		svr_conns[svr_conn_index]->state_change_time = time(0);
 		strcpy(svr_conns[svr_conn_index]->svr_id, svr_id);
 	}
@@ -1506,8 +1510,10 @@ socket_to_conn(int sock, struct sockaddr_in saddr_in)
 	if (svr_conns[svr_conn_index]->sd == -1) {
 		svr_conns[svr_conn_index]->sd = sock;
 		FD_SET(sock, &master_fdset);
-	} else
+	} else {
 		svr_conns[svr_conn_index]->secondary_sd = sock;
+		svr_conns[svr_conn_index]->state = SVR_CONN_STATE_CONNECTED;
+	}
 
 	return 0;
 }
@@ -1551,9 +1557,6 @@ send_cycle_end(int socket)
  *		schedule_wrapper - Wrapper function to call schedule which handles both Multiple Servers
  *				   and single server.
  *
- * @param[in]	num_cfg_svrs	-	number of configured servers
- * @param[in]	update_svr	-	pointer to a flag which indicates whether to update sched object
- *					attributes to server
  * @param[in]	read_fdset	-	pointer to read_fdset
  * @param[in]	opt_no_restart	-	option that says no restart
  *
@@ -1562,7 +1565,7 @@ send_cycle_end(int socket)
  * @retval	1	: exit scheduler
  */
 static int
-schedule_wrapper(int num_cfg_svrs, int *update_svr,fd_set *read_fdset, int opt_no_restart)
+schedule_wrapper(fd_set *read_fdset, int opt_no_restart)
 {
 	int svr_inst_idx;
 	int sock_to_check  = -1;
@@ -1570,6 +1573,7 @@ schedule_wrapper(int num_cfg_svrs, int *update_svr,fd_set *read_fdset, int opt_n
 	int alarm_time = 0;
 	char *runjobid = NULL;
 	svr_conn_t **svr_conns = NULL;
+	int num_cfg_svrs = get_current_servers();
 
 	/* Use virtual socket i.e. server_sock when calling get_conn_shards */
 	svr_conns = (svr_conn_t **)get_conn_servers(entry_to_svr_conns);
@@ -1591,15 +1595,15 @@ schedule_wrapper(int num_cfg_svrs, int *update_svr,fd_set *read_fdset, int opt_n
 						errno, __func__);
 			} else {
 				int sched_ret;
+				static int num_svrs_updated = 0;
 
-				if (update_svr != NULL && (*update_svr)) {
+				if (num_svrs_updated < num_cfg_svrs) {
 					/* update sched object attributes on server */
-					if (update_svr_schedobj(svr_conns[0]->sd, cmd, alarm_time) == 0) {
-						send_cycle_end(second_connection);
+					if (update_svr_schedobj(sock_to_check, cmd, alarm_time) == 0) {
 						close_server_conn(svr_inst_idx);
 						continue;
 					}
-					*update_svr = 0;
+					num_svrs_updated++;
 				}
 
 
@@ -1624,9 +1628,8 @@ schedule_wrapper(int num_cfg_svrs, int *update_svr,fd_set *read_fdset, int opt_n
 #endif /* localmod 031 */
 
 				/* magic happens here */				
-				sched_ret = schedule(cmd, svr_conns[0]->sd, runjobid);
+				sched_ret = schedule(cmd, entry_to_svr_conns, runjobid);
 				if (sched_ret != 0 ) {
-					send_cycle_end(second_connection);
 					close_server_conn(svr_inst_idx);
 
 					if (sigprocmask(SIG_SETMASK, &oldsigs, NULL) == -1)

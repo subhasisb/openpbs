@@ -3013,7 +3013,7 @@ set_validate_sched_attrs(int connector)
 
 	/* Stat the scheduler to get details of sched */
 
-	all_ss = pbs_statsched(connector, NULL, NULL);
+	all_ss = pbs_statsched(entry_to_svr_conns, NULL, NULL);
 	ss = bs_find(all_ss, sc_name);
 
 	if (ss == NULL) {
