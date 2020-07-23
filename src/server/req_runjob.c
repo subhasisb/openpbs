@@ -294,7 +294,7 @@ need_to_run_elsewhere(struct batch_request *preq)
 	if (!preq->rq_extend)
 		return FALSE;
 
-	strncpy(destination, preq->rq_extend, sizeof(destination));
+	strncpy(destination, preq->rq_extend, sizeof(destination) - 1);
 	if ((pc = strchr(destination, ':')) != NULL)
 		*pc = '\0';
 	if (strcmp(destination, pbs_conf.pbs_server_name))

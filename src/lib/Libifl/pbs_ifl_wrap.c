@@ -7967,7 +7967,7 @@ extern "C" {
       size_t size = strlen(name)+1;
       gv->name = (char *)malloc(size);
       if (gv->name) {
-        memcpy(gv->name, name, size);
+        memcpy(gv->name, name, size - 1);
         gv->get_attr = get_attr;
         gv->set_attr = set_attr;
         gv->next = v->vars;
