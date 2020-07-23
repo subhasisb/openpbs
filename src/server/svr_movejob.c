@@ -852,7 +852,7 @@ send_job(job *jobp, pbs_net_t hostaddr, int port, int move_type,
 			pqjatr = &((svrattrl *)GET_NEXT(attrl))->al_atopl;
 			if (PBSD_queuejob(con, jobp->ji_qs.ji_jobid, destin, pqjatr, NULL, PROT_TCP, NULL, NULL) == 0) {
 				if (pbs_errno == PBSE_JOBEXIST &&
-					move_type == MOVE_TYPE_Exec) {
+					(move_type == MOVE_TYPE_Exec || move_type == MOVE_TYPE_Move_Run)) {
 					/* already running, mark it so */
 					log_event(PBSEVENT_ERROR, PBS_EVENTCLASS_JOB, LOG_INFO, jobp->ji_qs.ji_jobid, "Mom reports job already running");
 					exit(SEND_JOB_OK);
@@ -922,7 +922,7 @@ send_job(job *jobp, pbs_net_t hostaddr, int port, int move_type,
 			jobp->ji_qs.ji_substate = JOB_SUBSTATE_TRNOUTCM;
 		}
 
-		if (preq->rq_type == PBS_BATCH_MoveJob && preq->rq_ind.rq_move.run_exec_vnode)
+		if (move_type == MOVE_TYPE_Move_Run)
 			ret = PBSD_commit_and_run(con, job_id, preq->rq_ind.rq_move.run_exec_vnode);
 		else
 			ret = PBSD_commit(con, job_id, PROT_TCP, NULL);
@@ -1042,7 +1042,11 @@ net_move(job *jobp, struct batch_request *req)
 
 	get_hostaddr_port_from_svr(jobp->ji_qs.ji_destin, &hostaddr, &port);
 
-	if (req) {
+	if (req && req->rq_type == PBS_BATCH_MoveJob && req->rq_ind.rq_move.run_exec_vnode) {
+		move_type = MOVE_TYPE_Move_Run;
+		post_func = post_movejob;
+		data      = req;
+	} else if (req) {
 		/* note, in this case, req is the orginal Move Request */
 		move_type = MOVE_TYPE_Move;
 		post_func = post_movejob;

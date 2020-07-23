@@ -2210,3 +2210,24 @@ get_current_servers()
 {
 	return pbs_conf.pbs_current_servers;
 }
+
+/**
+ * @brief
+ *	rand_num - returns a random number.
+ * 	This function will seed using micro second if already not seeded
+ *
+ */
+int
+rand_num()
+{
+	static int seeded = 0;
+	struct timeval tv;
+
+	if (!seeded) {
+		gettimeofday(&tv, NULL);
+		srand(1000000 * tv.tv_sec + tv.tv_usec); /* seed the random generator */
+		seeded = 1;
+	}
+
+	return rand();
+}

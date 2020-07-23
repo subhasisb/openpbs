@@ -46,12 +46,87 @@
 
 #include <string.h>
 #include <stdio.h>
+#include <ctype.h>
 #include "libpbs.h"
 #include "pbs_ecl.h"
 #include "libutil.h"
+#include "attribute.h"
 
 
 static struct batch_status *alloc_bs();
+
+enum state { TRANSIT_STATE,
+	     QUEUE_STATE,
+	     HELD_STATE,
+	     WAIT_STATE,
+	     RUN_STATE,
+	     EXITING_STATE,
+	     BEGUN_STATE,
+	     MAX_STATE };
+
+static char *statename[] = { "Transit", "Queued", "Held", "Waiting",
+		"Running", "Exiting", "Begun"};
+
+/**
+ * @brief
+ *	decoded state attribute to count array
+ *
+ * @param[in] string - string holding state of job
+ * @param[out] count    - count array having job per state
+ *
+ */
+static void
+decode_states(char *string, long *count)
+{
+	char *c, *s;
+	long *d;
+	int i;
+
+	c = string;
+	while (isspace(*c) && *c != '\0')
+		c++;
+	while (c && *c != '\0') {
+		s = c;
+		if ((c = strchr(s, ':')) == NULL)
+			break;
+		*c = '\0';
+		d = NULL;
+
+		for (i = 0; i < MAX_STATE; i++) {
+			if (strcmp(s, statename[i]) == 0) {
+				d = &count[i];
+				break;
+			}
+		}
+		*c = ':';
+		c++;
+		if (d) {
+			s = c;
+			*d = strtol(s, &c, 10);
+			if (*c != '\0')
+				c++;
+		} else {
+			while (*c != ' ' && *c != '\0')
+				c++;
+		}
+	}
+}
+
+static void
+encode_states(char **val, long *cur, long *nxt)
+{
+	int index;
+	int len = 0;
+	char buf[256];
+
+	buf[0] = '\0';
+	for (index = 0; index < MAX_STATE; index++) {
+		len += sprintf(buf + len, "%s:%ld ", statename[index],
+			       cur[index] + nxt[index]);
+	}
+	free(*val);
+	*val = strdup(buf);
+}
 
 /**
  * @brief
@@ -80,8 +155,7 @@ random_srv_conn(svr_conn_t **svr_connections)
 {
 	int ind = 0;
 
-	srand(time(0));
-	ind =  rand() % get_current_servers();
+	ind =  rand_num() % get_current_servers();
 
 	if (svr_connections[ind] && svr_connections[ind]->state == SVR_CONN_STATE_CONNECTED)
 		return svr_connections[ind]->sd;
@@ -123,6 +197,201 @@ PBSD_status(int c, int function, char *objid, struct attrl *attrib, char *extend
 
 	/* get the status reply */
 	return (PBSD_status_get(c));
+}
+
+static void
+aggr_job_ct(struct batch_status *cur, struct batch_status *nxt)
+{
+	long cur_st_ct[MAX_STATE] = {0};
+	long nxt_st_ct[MAX_STATE] = {0};
+	struct attrl *a = NULL;
+	struct attrl *b = NULL;
+	char *tot_jobs_attr = NULL;
+	long tot_jobs = 0;
+	char *endp;
+	int found;
+
+	if (!cur || !nxt)
+		return;
+
+	for (a = cur->attribs, found = 0; a; a = a->next) {
+		if (a->name && strcmp(a->name, ATTR_count) == 0) {
+			decode_states(a->value, cur_st_ct);
+			found++;
+		} else if (a->name && strcmp(a->name, ATTR_total) == 0) {
+			tot_jobs_attr = a->value;
+			tot_jobs += strtol(a->value, &endp, 10);
+			found++;
+		}
+		if (found == 2)
+			break;
+	}
+	for (b = nxt->attribs, found = 0; b; b = b->next) {
+		if (b->name && strcmp(b->name, ATTR_count) == 0) {
+			decode_states(b->value, nxt_st_ct);
+			found++;
+		} else if (b->name && strcmp(b->name, ATTR_total) == 0) {
+			tot_jobs += strtol(b->value, &endp, 10);
+			found++;
+		}
+		if (found == 2)
+			break;
+	}
+
+	if (a && b)
+		encode_states(&a->value, cur_st_ct, nxt_st_ct);
+	if (tot_jobs_attr)
+		sprintf(tot_jobs_attr, "%ld", tot_jobs);
+}
+
+#define DOUBLE 0
+#define LONG 1
+#define STRING 2
+#define SIZE 3
+
+static void
+assess_type(char *val, int *type, double *val_double, long *val_long)
+{
+	char *pc;
+
+	if (strchr(val, '.')) {
+		if ((*val_double = strtod(val, &pc)))
+			*type = DOUBLE;
+		else if (pc && *pc != '\0')
+			*type = STRING;
+	} else {
+		if ((*val_long = strtol(val, &pc, 10)))
+			*type = LONG;
+		else if (pc && *pc != '\0')
+			*type = STRING;
+	}
+	if (*type == STRING) {
+		if (!strcasecmp(pc, "kb") || !strcasecmp(pc, "mb") || !strcasecmp(pc, "gb") ||
+		    !strcasecmp(pc, "tb") || !strcasecmp(pc, "pb"))
+			*type = SIZE;
+	}
+}
+
+struct attrl_holder {
+	struct attrl *atr_list;
+	struct attrl_holder *next;
+};
+
+static void
+accumulate_values(struct attrl_holder *a, struct attrl *b, struct attrl *orig)
+{
+	double val_double = 0;
+	long val_long = 0;
+	char *pc;
+	int type = -1;
+	struct attrl_holder *itr;
+	struct attribute attr;
+	struct attribute new;
+	struct attrl *cur;
+	char buf[32];
+
+	if (!a || !b || !b->resource || *b->resource == '\0' || !b->value || *b->value == '\0')
+		return;
+
+	assess_type(b->value, &type, &val_double, &val_long);
+
+	if (type == STRING)
+		return;
+
+	for (itr = a; itr && itr->atr_list; itr = itr->next) {
+		cur = itr->atr_list;
+		if (cur->resource && !strcmp(cur->resource, b->resource)) {
+			switch (type) {
+			case DOUBLE:
+				val_double += strtod(cur->value, &pc);
+				sprintf(buf, "%f", val_double);
+				break;
+			case LONG:
+				val_long += strtol(cur->value, &pc, 10);
+				sprintf(buf, "%ld", val_long);
+				break;
+			case SIZE:
+				decode_size(&attr, NULL, NULL, b->value);
+				decode_size(&new, NULL, NULL, cur->value);
+				set_size(&attr, &new, INCR);
+				from_size(&attr.at_val.at_size, buf);
+			default:
+				break;
+			}
+			free(cur->value);
+			cur->value = strdup(buf);
+			break;
+		}
+	}
+	/* value exists in next but not in cur. Create it */
+	if (!itr) {
+		struct attrl *at = dup_attrl(b);
+		for (cur = orig; cur->next; cur = cur->next)
+			;
+		cur->next = at;
+	}
+}
+
+static void
+aggr_resc_ct(struct batch_status *st1, struct batch_status *st2)
+{
+	struct attrl *a = NULL;
+	struct attrl *b = NULL;
+	struct attrl_holder *resc_assn = NULL;
+	struct attrl_holder *cur = NULL;
+	struct attrl_holder *nxt = NULL;
+
+	if (!st1 || !st2)
+		return;
+
+	/* In the first pass gather all resources assigned attr from st1
+		so we do not have to loop through all attributes */
+	for (a = st1->attribs; a; a = a->next) {
+		if (a->name && strcmp(a->name, ATTR_rescassn) == 0) {
+			nxt = malloc(sizeof(struct attrl_holder));
+			nxt->atr_list = a;
+			nxt->next = NULL;
+			if (cur) {
+				cur->next = nxt;
+				cur = cur->next;
+			} else
+				resc_assn = cur = nxt;
+		}
+	}
+
+	for (b = st2->attribs; b; b = b->next) {
+		if (b->name && strcmp(b->name, ATTR_rescassn) == 0)
+			accumulate_values(resc_assn, b, st1->attribs);
+	}
+
+	for (cur = resc_assn; cur; cur = cur->next) {
+		nxt = cur->next;
+		free(cur);
+	}
+}
+
+static void
+aggregate_queue(struct batch_status *sv1, struct batch_status *sv2)
+{
+	struct batch_status *a = NULL;
+	struct batch_status *b = NULL;
+
+	for (b = sv2; b; b = b->next) {
+		for (a = sv1; a; a = a->next) {
+			if (a->name && b->name && !strcmp(a->name, b->name)) {
+				aggr_job_ct(a, b);
+				aggr_resc_ct(a, b);
+				break;
+			}
+		}
+	}
+}
+
+static void
+aggregate_svr(struct batch_status *sv1, struct batch_status *sv2)
+{
+	aggr_job_ct(sv1, sv2);
+	aggr_resc_ct(sv1, sv2);
 }
 
 /**
@@ -177,8 +446,21 @@ PBSD_status_aggregate(int c, int cmd, char *id, struct attrl *attrib, char *exte
 				ret = next;
 				cur = next->last;
 			} else {
-				cur->next = next;
-				cur = next->last;
+				switch(parent_object) {
+					case MGR_OBJ_SERVER:
+						aggregate_svr(ret, next);
+						pbs_statfree(next);
+						next = NULL;
+						break;
+					case MGR_OBJ_QUEUE:
+						aggregate_queue(ret, next);
+						pbs_statfree(next);
+						next = NULL;
+						break;
+					default:
+						cur->next = next;
+						cur = next->last;
+				}
 			}
 		}
 

@@ -3141,7 +3141,7 @@ svr_no_args:
 					any_failed = connect;
 					break;
 				}
-				p_status = pbs_statserver(connect, NULL, NULL);
+				p_status = pbs_statserver(connect, NULL, "full");
 				if (p_status == NULL) {
 					if (pbs_errno) {
 						errmsg = pbs_geterrmsg(connect);

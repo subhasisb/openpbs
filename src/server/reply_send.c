@@ -77,6 +77,7 @@
 #include "pbs_nodes.h"
 #include "svrfunc.h"
 #include "tpp.h"
+#include "pbs_sched.h"
 
 
 /* External Globals */
@@ -279,10 +280,21 @@ reply_send(struct batch_request *request)
 	struct work_task   *ptask;
 #endif	/* PBS_MOM */
 	int		    rc = 0;
-	int		    sfds = request->rq_conn;		/* socket */
+	int		    sfds;
+	int rq_type;
 
-	if (request && (request->rq_type == PBS_BATCH_ModifyJob_Async ||
-			request->rq_type == PBS_BATCH_AsyrunJob)) {
+	if (request == NULL)
+		return 0;
+
+	sfds = request->rq_conn;
+	rq_type = request->rq_type;
+
+#ifndef PBS_MOM
+	if (request->rq_type == PBS_BATCH_MoveJob && find_sched_from_sock(request->rq_conn))
+		rq_type = request->rq_ind.rq_move.orig_rq_type;
+#endif
+
+	if (rq_type == PBS_BATCH_ModifyJob_Async || rq_type == PBS_BATCH_AsyrunJob) {
 		free_br(request);
 		return 0;
 	}
@@ -366,10 +378,19 @@ reply_send(struct batch_request *request)
 void
 reply_ack(struct batch_request *preq)
 {
+	int rq_type;
+
 	if (preq == NULL)
 		return;
 
-	if (preq->rq_type == PBS_BATCH_ModifyJob_Async || preq->rq_type == PBS_BATCH_AsyrunJob) {
+	rq_type = preq->rq_type;
+
+#ifndef PBS_MOM
+	if (preq->rq_type == PBS_BATCH_MoveJob && find_sched_from_sock(preq->rq_conn))
+		rq_type = preq->rq_ind.rq_move.orig_rq_type;
+#endif
+
+	if (rq_type == PBS_BATCH_ModifyJob_Async || rq_type == PBS_BATCH_AsyrunJob) {
 		free_br(preq);
 		return;
 	}
@@ -452,11 +473,18 @@ req_reject(int code, int aux, struct batch_request *preq)
 {
 	int   evt_type;
 	char  msgbuf[ERR_MSG_SIZE];
+	int rq_type;
 
 	if (preq == NULL)
 		return;
 
-	if (preq->rq_type == PBS_BATCH_ModifyJob_Async || preq->rq_type == PBS_BATCH_AsyrunJob) {
+	rq_type = preq->rq_type;
+#ifndef PBS_MOM
+	if (preq->rq_type == PBS_BATCH_MoveJob && find_sched_from_sock(preq->rq_conn))
+		rq_type = preq->rq_ind.rq_move.orig_rq_type;
+#endif
+
+	if (rq_type == PBS_BATCH_ModifyJob_Async || rq_type == PBS_BATCH_AsyrunJob) {
 		free_br(preq);
 		return;
 	}

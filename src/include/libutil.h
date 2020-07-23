@@ -356,3 +356,5 @@ int get_max_servers(void);
  * Getter function to get the number of currently configured servers.
  */
 extern int get_current_servers();
+
+extern int rand_num();
