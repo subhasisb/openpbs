@@ -60,11 +60,10 @@
 
 static int PBSD_select_put(int, int, struct attropl *, struct attrl *, char *);
 
-struct job_list {
-	char **jobs;
-	size_t buf_size;
-	size_t used_size;
-	size_t last_index;
+struct reply_list {
+	struct batch_reply *reply;
+	struct reply_list *next;
+	struct reply_list *last;
 };
 
 /**
@@ -80,16 +79,9 @@ struct job_list {
  *
  */
 static void
-PBSD_select_get(int c, struct job_list *jlist)
+PBSD_select_get(int c, struct reply_list **rlist)
 {
-	int   i;
 	struct batch_reply *reply;
-	int   njobs;
-	char *sp;
-	int   stringtot;
-	size_t totsize;
-	struct brp_select *sr;
-	char **retval = NULL;
 
 	/* read reply from stream */
 
@@ -97,61 +89,77 @@ PBSD_select_get(int c, struct job_list *jlist)
 	if (reply == NULL) {
 		pbs_errno = PBSE_PROTOCOL;
 	} else if (reply->brp_choice != BATCH_REPLY_CHOICE_NULL &&
-		reply->brp_choice != BATCH_REPLY_CHOICE_Text &&
-		reply->brp_choice != BATCH_REPLY_CHOICE_Select) {
+		   reply->brp_choice != BATCH_REPLY_CHOICE_Text &&
+		   reply->brp_choice != BATCH_REPLY_CHOICE_Select) {
 		pbs_errno = PBSE_PROTOCOL;
 	} else if (get_conn_errno(c) == 0) {
-		/* process the reply -- first, build a linked
-		 list of the strings we extract from the reply, keeping
-		 track of the amount of space used...
-		 */
-		stringtot = 0;
-		njobs = 0;
-		sr = reply->brp_un.brp_select;
-		while (sr != NULL) {
-			stringtot += strlen(sr->brp_jobid) + 1;
-			njobs++;
-			sr = sr->brp_next;
-		}
-		/* ...then copy all the strings into one of "Bob's
-		 structures", freeing all strings we just allocated...
-		 */
-
-		totsize = stringtot + (njobs + 1) * (sizeof(char *));
-
-		if (!jlist->jobs) {
-			retval = (char **)malloc(totsize);
-			jlist->jobs = retval;
-			jlist->buf_size = totsize;
-		} else if (jlist->used_size + totsize > jlist->buf_size) {
-			jlist->buf_size = jlist->buf_size + totsize * 2;
-			retval = (char **) realloc(jlist->jobs, jlist->buf_size);
-			if (!retval)
-				free(jlist->jobs);
-			jlist->jobs = retval;
-		}
-		if (retval == NULL) {
-			jlist->jobs = NULL;
-			pbs_errno = PBSE_SYSTEM;
+		if (reply->brp_un.brp_select == NULL) {
 			PBSD_FreeReply(reply);
 			return;
 		}
-	
-		retval += jlist->last_index;
-		sr = reply->brp_un.brp_select;
-		sp = (char *)retval + (njobs + 1) * sizeof(char *);
-		for (i = 0; i < njobs; i++) {
-			retval[i] = sp;
-			strcpy(sp, sr->brp_jobid);
-			sp += strlen(sp) + 1;
-			sr = sr->brp_next;
+
+		struct reply_list *new = malloc(sizeof(struct reply_list));
+		new->reply = reply;
+		new->next = NULL;
+		new->last = new;
+		if (*rlist) {
+			(*rlist)->last->next = new;
+			(*rlist)->last = new;
+		} else
+			*rlist = new;
+	}
+}
+
+char **
+reply_to_jobarray(struct reply_list *rlist) {
+	int i;
+	int   njobs;
+	char *sp;
+	int   stringtot;
+	size_t totsize;
+	char **retval = NULL;
+	struct reply_list *cur;
+	struct brp_select *sr = NULL;
+
+	if (!rlist)
+		return NULL;
+
+	stringtot = 0;
+	njobs = 0;
+	cur = rlist;
+	sr = cur->reply->brp_un.brp_select;
+	while (sr) {
+		stringtot += strlen(sr->brp_jobid) + 1;
+		njobs++;
+		sr = sr->brp_next;
+		if (!sr && cur->next) {
+			cur = cur->next;
+			sr = cur->reply->brp_un.brp_select;
 		}
-		retval[i] = NULL;
-		jlist->used_size += totsize;
-		jlist->last_index = i;
 	}
 
-	PBSD_FreeReply(reply);
+	totsize = stringtot + (njobs + 1) * (sizeof(char *));
+	retval = (char **)malloc(totsize);
+	if (retval == NULL) {
+		pbs_errno = PBSE_SYSTEM;
+		return NULL;
+	}
+	cur = rlist;
+	sr = cur->reply->brp_un.brp_select;
+	sp = (char *)retval + (njobs + 1) * sizeof(char *);
+	for (i = 0; i < njobs; i++) {
+		retval[i] = sp;
+		strcpy(sp, sr->brp_jobid);
+		sp += strlen(sp) + 1;
+		sr = sr->brp_next;
+		if (!sr && cur->next) {
+			cur = cur->next;
+			sr = cur->reply->brp_un.brp_select;
+		}
+	}
+	retval[i] = NULL;
+
+	return retval;
 }
 
 /**
@@ -174,7 +182,8 @@ __pbs_selectjob(int c, struct attropl *attrib, char *extend)
 	char **ret = NULL;
 	int i;
 	svr_conn_t *svr_connections;
-	struct job_list jlist = {0};
+	struct reply_list *rlist = NULL;
+	struct reply_list *cur;
 
 	if ((svr_connections = get_conn_servers()) == NULL)
 		return NULL;
@@ -185,7 +194,7 @@ __pbs_selectjob(int c, struct attropl *attrib, char *extend)
 
 	/* first verify the attributes, if verification is enabled */
 	if (pbs_verify_attributes(random_srv_conn(svr_connections), PBS_BATCH_SelectJobs, MGR_OBJ_JOB,
-		MGR_CMD_NONE, attrib))
+				  MGR_CMD_NONE, attrib))
 		return NULL;
 
 	for (i = 0; i < get_num_servers(); i++) {
@@ -197,20 +206,26 @@ __pbs_selectjob(int c, struct attropl *attrib, char *extend)
 		/* lock pthread mutex here for this connection */
 		/* blocking call, waits for mutex release */
 		if (pbs_client_thread_lock_connection(c) != 0)
-			return NULL;
+			goto done;
 
 		if (PBSD_select_put(c, PBS_BATCH_SelectJobs, attrib, NULL, extend) == 0)
-			PBSD_select_get(c, &jlist);
+			PBSD_select_get(c, &rlist);
 
 		/* unlock the thread lock and update the thread context data */
-		if (pbs_client_thread_unlock_connection(c) != 0) {
-			/* Even though ret is a char **, PBSD_select_get() allocated all its memory in one malloc() */
-			free(ret);
-			return NULL;
-		}
+		if (pbs_client_thread_unlock_connection(c) != 0)
+			goto done;
 	}
 
-	return jlist.jobs;
+done:
+	ret = reply_to_jobarray(rlist);
+	while (rlist) {
+		PBSD_FreeReply(rlist->reply);
+		cur = rlist;
+		rlist = rlist->next;
+		free(cur);
+	}
+
+	return ret;
 }
 
 /**

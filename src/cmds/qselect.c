@@ -559,7 +559,8 @@ main(int argc, char **argv, char **envp) /* qselect */
 			server_out[sizeof(server_out) - 1] = '\0';
 		} else	/* User didn't specify a server, talk to all */
 			setenv(MULTI_SERVER, "ENABLED", 1);
-	}
+	} else
+		setenv(MULTI_SERVER, "ENABLED", 1);
 
 	/*perform needed security library initializations (including none)*/
 	if (CS_client_init() != CS_SUCCESS) {

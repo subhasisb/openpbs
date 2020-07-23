@@ -260,15 +260,13 @@ assess_type(char *val, int *type, double *val_double, long *val_long)
 		else if (pc && *pc != '\0')
 			*type = STRING;
 	} else {
-		if ((*val_long = strtol(val, &pc, 10)))
+		if ((*val_long = strtol(val, &pc, 10))) {
 			*type = LONG;
-		else if (pc && *pc != '\0')
+			if (pc && (!strcasecmp(pc, "kb") || !strcasecmp(pc, "mb") || !strcasecmp(pc, "gb") ||
+			    !strcasecmp(pc, "tb") || !strcasecmp(pc, "pb")))
+				*type = SIZE;
+		} else if (pc && *pc != '\0')
 			*type = STRING;
-	}
-	if (*type == STRING) {
-		if (!strcasecmp(pc, "kb") || !strcasecmp(pc, "mb") || !strcasecmp(pc, "gb") ||
-		    !strcasecmp(pc, "tb") || !strcasecmp(pc, "pb"))
-			*type = SIZE;
 	}
 }
 
@@ -290,7 +288,7 @@ accumulate_values(struct attrl_holder *a, struct attrl *b, struct attrl *orig)
 	struct attrl *cur;
 	char buf[32];
 
-	if (!a || !b || !b->resource || *b->resource == '\0' || !b->value || *b->value == '\0')
+	if (!b || !b->resource || *b->resource == '\0' || !b->value || *b->value == '\0')
 		return;
 
 	assess_type(b->value, &type, &val_double, &val_long);
@@ -364,7 +362,7 @@ aggr_resc_ct(struct batch_status *st1, struct batch_status *st2)
 			accumulate_values(resc_assn, b, st1->attribs);
 	}
 
-	for (cur = resc_assn; cur; cur = cur->next) {
+	for (cur = resc_assn; cur; cur = nxt) {
 		nxt = cur->next;
 		free(cur);
 	}
