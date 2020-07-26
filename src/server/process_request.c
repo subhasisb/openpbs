@@ -326,7 +326,6 @@ process_request(int sfds)
 		req_reject(PBSE_BADHOST, 0, request);
 		return;
 	}
-
 	/*
 	 * Read in the request and decode it to the internal request structure.
 	 */
@@ -1099,6 +1098,7 @@ struct batch_request *alloc_br(int type)
 		req->tpp_ack = 1; /* enable acks to be passed by tpp by default */
 		req->prot = PROT_TCP; /* not tpp by default */
 		req->tppcmd_msgid = NULL; /* NULL msgid to boot */
+		req->rq_reply.brp_is_part = 0;
 		req->rq_reply.brp_choice = BATCH_REPLY_CHOICE_NULL;
 		append_link(&svr_requests, &req->rq_link, req);
 	}
@@ -1606,4 +1606,3 @@ get_servername(unsigned int *port)
 
 	return name;
 }
-

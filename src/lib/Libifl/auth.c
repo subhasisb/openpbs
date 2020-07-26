@@ -629,7 +629,6 @@ _handle_client_handshake(int fd, char *hostname, char *method, int for_encrypt, 
 		}
 
 		if (len_in) {
-			free(data_in);
 			data_in = NULL;
 			len_in = 0;
 		}
@@ -657,20 +656,17 @@ _handle_client_handshake(int fd, char *hostname, char *method, int for_encrypt, 
 				len_in = ebufsz;
 			strncpy(ebuf, (char *)data_in, len_in);
 			ebuf[len_in] = '\0';
-			free(data_in);
 			pbs_errno = PBSE_BADCRED;
 			return -1;
 		}
 
 		if ((is_handshake_done == 0 && type != AUTH_CTX_DATA) || (is_handshake_done == 1 && type != AUTH_CTX_OK)) {
-			free(data_in);
 			snprintf(ebuf, ebufsz, "incorrect auth token type");
 			pbs_errno = PBSE_SYSTEM;
 			return -1;
 		}
 
 		if (type == AUTH_CTX_OK) {
-			free(data_in);
 			data_in = NULL;
 			len_in = 0;
 		}
@@ -730,29 +726,34 @@ make_auth_config(char *auth_method, char *encrypt_method, char *exec_path, char 
 {
 	pbs_auth_config_t *config = NULL;
 
-	config = (pbs_auth_config_t *)calloc(1, sizeof(pbs_auth_config_t));
-	if (config == NULL) {
+	config = (pbs_auth_config_t *)malloc(sizeof(pbs_auth_config_t));
+	if (config == NULL)
 		return NULL;
-	}
 
 	config->auth_method = strdup(auth_method);
 	if (config->auth_method == NULL) {
-		free_auth_config(config);
+		free(config);
 		return NULL;
 	}
 	config->encrypt_method = strdup(encrypt_method);
 	if (config->encrypt_method == NULL) {
-		free_auth_config(config);
+		free(config->auth_method);
+		free(config);
 		return NULL;
 	}
 	config->pbs_exec_path = strdup(exec_path);
 	if (config->pbs_exec_path == NULL) {
-		free_auth_config(config);
+		free(config->auth_method);
+		free(config->encrypt_method);
+		free(config);
 		return NULL;
 	}
 	config->pbs_home_path = strdup(home_path);
 	if (config->pbs_home_path == NULL) {
-		free_auth_config(config);
+		free(config->auth_method);
+		free(config->encrypt_method);
+		free(config->pbs_exec_path);
+		free(config);
 		return NULL;
 	}
 	config->logfunc = logger;
@@ -776,60 +777,54 @@ make_auth_config(char *auth_method, char *encrypt_method, char *exec_path, char 
 int
 engage_client_auth(int fd, char *hostname, int port, char *ebuf, size_t ebufsz)
 {
-	int rc = -1;
-	pbs_auth_config_t *config = make_auth_config(pbs_conf.auth_method,
-							pbs_conf.encrypt_method,
-							pbs_conf.pbs_exec_path,
-							pbs_conf.pbs_home_path,
-							NULL);
+	int rc;
+	static pbs_auth_config_t *config = NULL;
 
 	if (config == NULL) {
-		snprintf(ebuf, ebufsz, "Out of memory in %s!", __func__);
-		pbs_errno = PBSE_SYSTEM;
-		return -1;
+		config = make_auth_config(pbs_conf.auth_method,
+					  pbs_conf.encrypt_method,
+					  pbs_conf.pbs_exec_path,
+					  pbs_conf.pbs_home_path,
+					  NULL);
+		if (config == NULL) {
+			snprintf(ebuf, ebufsz, "Out of memory in %s!", __func__);
+			pbs_errno = PBSE_SYSTEM;
+			return -1;
+		}
 	}
 
 	if (strcmp(pbs_conf.auth_method, AUTH_RESVPORT_NAME) == 0) {
-		if ((rc = CS_client_auth(fd)) == CS_SUCCESS) {
-			free_auth_config(config);
+		if ((rc = CS_client_auth(fd)) == CS_SUCCESS)
 			return (0);
-		}
 
 		if (rc == CS_AUTH_USE_IFF) {
 			if (_invoke_pbs_iff(fd, hostname, port, ebuf, ebufsz) != 0) {
 				snprintf(ebuf, ebufsz, "Unable to authenticate connection (%s:%d)", hostname, port);
-				free_auth_config(config);
 				return -1;
 			}
 		}
 	} else {
 		if (tcp_send_auth_req(fd, 0, pbs_current_user, pbs_conf.auth_method, pbs_conf.encrypt_method) != 0) {
 			snprintf(ebuf, ebufsz, "Failed to send auth request");
-			free_auth_config(config);
 			return -1;
 		}
 	}
 
 	if (pbs_conf.encrypt_method[0] != '\0') {
 		rc = _handle_client_handshake(fd, hostname, pbs_conf.encrypt_method, FOR_ENCRYPT, config, ebuf, ebufsz);
-		if (rc != 0) {
-			free_auth_config(config);
+		if (rc != 0)
 			return rc;
-		}
 	}
 
 	if (strcmp(pbs_conf.auth_method, AUTH_RESVPORT_NAME) != 0) {
 		if (strcmp(pbs_conf.auth_method, pbs_conf.encrypt_method) != 0) {
-			rc = _handle_client_handshake(fd, hostname, pbs_conf.auth_method, FOR_AUTH, config, ebuf, ebufsz);
-			free_auth_config(config);
-			return rc;
+			return _handle_client_handshake(fd, hostname, pbs_conf.auth_method, FOR_AUTH, config, ebuf, ebufsz);
 		} else {
 			transport_chan_set_ctx_status(fd, transport_chan_get_ctx_status(fd, FOR_ENCRYPT), FOR_AUTH);
 			transport_chan_set_authdef(fd, transport_chan_get_authdef(fd, FOR_ENCRYPT), FOR_AUTH);
 			transport_chan_set_authctx(fd, transport_chan_get_authctx(fd, FOR_ENCRYPT), FOR_AUTH);
 		}
 	}
-	free_auth_config(config);
 	return 0;
 }
 
@@ -852,8 +847,8 @@ engage_client_auth(int fd, char *hostname, int port, char *ebuf, size_t ebufsz)
 int
 engage_server_auth(int fd, char *hostname, char *clienthost, int for_encrypt, char *ebuf, size_t ebufsz)
 {
-	void *authctx = NULL;
-	auth_def_t *authdef = NULL;
+	void *authctx;
+	auth_def_t *authdef;
 	void *data_in = NULL;
 	size_t len_in = 0;
 	void *data_out = NULL;
@@ -897,7 +892,6 @@ engage_server_auth(int fd, char *hostname, char *clienthost, int for_encrypt, ch
 	if (type != AUTH_CTX_DATA) {
 		snprintf(ebuf, ebufsz, "received incorrect auth token");
 		pbs_errno = PBSE_SYSTEM;
-		free(data_in);
 		return -1;
 	}
 
@@ -915,11 +909,8 @@ engage_server_auth(int fd, char *hostname, char *clienthost, int for_encrypt, ch
 			(void)transport_send_pkt(fd, AUTH_ERR_DATA, "Unknown auth error", strlen("Unknown auth error"));
 		}
 		pbs_errno = PBSE_SYSTEM;
-		free(data_in);
 		return -1;
 	}
-
-	free(data_in);
 
 	if (len_out > 0) {
 		if (transport_send_pkt(fd, AUTH_CTX_DATA, data_out, len_out) <= 0) {
