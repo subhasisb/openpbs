@@ -298,8 +298,6 @@ extern "C" {
 #define ATTR_NodeGroupKey	"node_group_key"
 #define ATTR_dfltqdelargs	"default_qdel_arguments"
 #define ATTR_dfltqsubargs       "default_qsub_arguments"
-#define ATTR_rpp_retry		"rpp_retry"
-#define ATTR_rpp_highwater	"rpp_highwater"
 #define ATTR_pbs_license_info	"pbs_license_info"
 #define ATTR_license_min	"pbs_license_min"
 #define ATTR_license_max	"pbs_license_max"

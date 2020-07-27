@@ -38,20 +38,11 @@
  */
 
 /**
- * @file	pbs_log.c
+ * 
  * @brief
- * pbs_log.c - contains functions to log error and event messages to
+ *  contains functions to log error and event messages to
  *	the log file.
  *
- * @par Functions included are:
- *	log_open()
- *	log_open_main()
- *	log_err()
- *	log_joberr()
- *	log_record()
- *	log_close()
- *	log_add_debug_info()
- *	log_add_if_info()
  */
 
 
@@ -140,11 +131,19 @@ static unsigned int syslogfac = 0;
 static unsigned int syslogsvr = 3;
 static unsigned int pbs_log_highres_timestamp = 0;
 
+void log_init(void);
+int log_mutex_lock();
+int log_mutex_unlock();
+
 void
 set_log_conf(char *leafname, char *nodename,
 		unsigned int islocallog, unsigned int sl_fac, unsigned int sl_svr,
 		unsigned int log_highres)
 {
+	pthread_once(&log_once_ctl, log_init); /* initialize mutex once */
+
+	log_mutex_lock();
+
 	if (leafname) {
 		strncpy(pbs_leaf_name, leafname, PBS_MAXHOSTNAME);
 		pbs_leaf_name[PBS_MAXHOSTNAME] = '\0';
@@ -159,6 +158,9 @@ set_log_conf(char *leafname, char *nodename,
 	syslogfac = sl_fac;
 	syslogsvr = sl_svr;
 	pbs_log_highres_timestamp = log_highres;
+
+
+	log_mutex_unlock();
 }
 
 #ifdef WIN32

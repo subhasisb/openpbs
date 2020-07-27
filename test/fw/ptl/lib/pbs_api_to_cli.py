@@ -232,8 +232,6 @@ api_to_cli = {
     ATTR_NodeGroupKey: 'node_group_key',
     ATTR_dfltqdelargs: 'default_qdel_arguments',
     ATTR_dfltqsubargs: 'default_qsub_arguments',
-    ATTR_rpp_retry: 'rpp_retry',
-    ATTR_rpp_highwater: 'rpp_highwater',
     ATTR_pbs_license_info: 'pbs_license_info',
     ATTR_license_min: 'pbs_license_min',
     ATTR_license_max: 'pbs_license_max',

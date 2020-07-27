@@ -365,24 +365,6 @@ int        actmode;
 }
 
 int
-set_rpp_retry(pattr, pobj, actmode)
-attribute *pattr;
-void      *pobj;
-int	   actmode;
-{
-	return PBSE_NONE;
-}
-
-int
-set_rpp_highwater(pattr, pobj, actmode)
-attribute *pattr;
-void      *pobj;
-int	   actmode;
-{
-	return PBSE_NONE;
-}
-
-int
 is_valid_resource(attribute *pattr, void *pobject, int actmode)
 {
 

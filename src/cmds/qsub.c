@@ -91,6 +91,9 @@
 #include <sys/un.h>
 #include <syslog.h>
 #endif
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #include "pbs_ifl.h"
 #include "cmds.h"
@@ -121,16 +124,6 @@
 #ifndef NAS /* localmod 004 */
 #undef DEBUG
 #endif /* localmod 004 */
-
-#ifdef DEBUG
-#ifdef NAS /* localmod 004 */
-#define DBPRT(x)	fprintf x;
-#else
-#define DBPRT(x)	printf x;
-#endif /* localmod 004 */
-#else
-#define DBPRT(x)
-#endif
 
 #if defined(HAVE_SYS_IOCTL_H)
 #include <sys/ioctl.h>

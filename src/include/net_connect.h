@@ -95,7 +95,7 @@ typedef unsigned long pbs_net_t;        /* for holding host addresses */
 /*
  **	Types of Inter Server messages (between Server and Mom).
  */
-#define IS_NULL                         0
+#define IS_NULL                         0 /* unused */
 #define IS_CLUSTER_ADDRS                1
 #define IS_UPDATE                       2
 #define IS_RESCUSED                     3

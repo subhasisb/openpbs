@@ -101,7 +101,6 @@ struct pbs_config pbs_conf = {
 	NULL,					/* pbs_home_path */
 	NULL,					/* pbs_exec_path */
 	NULL,					/* pbs_server_name */
-	NULL,					/* PBS server id */
 	0,						/* single pbs server instance by default */
 	NULL,					/* pbs_server_instances */
 	NULL,					/* scp_path */
@@ -122,9 +121,8 @@ struct pbs_config pbs_conf = {
 	NULL,					/* pbs_smtp_server_name */
 	1, 					/* use compression by default with TCP */
 	1,					/* use mcast by default with TCP */
-	0,					/* force fault tolerant comm disabled by default */
 	NULL,					/* default leaf name */
-	NULL,					/* for leaf, default communication routers list */
+	NULL,					/* for leaf, default communication router */
 	NULL,					/* default router name */
 	NULL,					/* for router, default communication routers list */
 	0,					/* default comm logevent mask */
@@ -529,19 +527,15 @@ __pbs_loadconf(int reload)
 				if (sscanf(conf_value, "%u", &uvalue) == 1)
 					pbs_conf.pbs_use_mcast = ((uvalue > 0) ? 1 : 0);
 			}
-			else if (!strcmp(conf_name, PBS_CONF_FORCE_FT_COMM)) {
-				if (sscanf(conf_value, "%u", &uvalue) == 1)
-					pbs_conf.pbs_use_ft = ((uvalue > 0) ? 1 : 0);
-			}
 			else if (!strcmp(conf_name, PBS_CONF_LEAF_NAME)) {
 				if (pbs_conf.pbs_leaf_name)
 					free(pbs_conf.pbs_leaf_name);
 				pbs_conf.pbs_leaf_name = strdup(conf_value);
 			}
-			else if (!strcmp(conf_name, PBS_CONF_LEAF_ROUTERS)) {
-				if (pbs_conf.pbs_leaf_routers)
-					free(pbs_conf.pbs_leaf_routers);
-				pbs_conf.pbs_leaf_routers = strdup(conf_value);
+			else if (!strcmp(conf_name, PBS_CONF_LEAF_ROUTER)) {
+				if (pbs_conf.pbs_leaf_router)
+					free(pbs_conf.pbs_leaf_router);
+				pbs_conf.pbs_leaf_router = strdup(conf_value);
 			}
 			else if (!strcmp(conf_name, PBS_CONF_COMM_NAME)) {
 				if (pbs_conf.pbs_comm_name)
@@ -822,19 +816,15 @@ __pbs_loadconf(int reload)
 		if (sscanf(gvalue, "%u", &uvalue) == 1)
 			pbs_conf.pbs_use_mcast = ((uvalue > 0) ? 1 : 0);
 	}
-	if ((gvalue = getenv(PBS_CONF_FORCE_FT_COMM)) != NULL) {
-		if (sscanf(gvalue, "%u", &uvalue) == 1)
-			pbs_conf.pbs_use_ft = ((uvalue > 0) ? 1 : 0);
-	}
 	if ((gvalue = getenv(PBS_CONF_LEAF_NAME)) != NULL) {
 		if (pbs_conf.pbs_leaf_name)
 			free(pbs_conf.pbs_leaf_name);
 		pbs_conf.pbs_leaf_name = strdup(gvalue);
 	}
-	if ((gvalue = getenv(PBS_CONF_LEAF_ROUTERS)) != NULL) {
-		if (pbs_conf.pbs_leaf_routers)
-			free(pbs_conf.pbs_leaf_routers);
-		pbs_conf.pbs_leaf_routers = strdup(gvalue);
+	if ((gvalue = getenv(PBS_CONF_LEAF_ROUTER)) != NULL) {
+		if (pbs_conf.pbs_leaf_router)
+			free(pbs_conf.pbs_leaf_router);
+		pbs_conf.pbs_leaf_router = strdup(gvalue);
 	}
 	if ((gvalue = getenv(PBS_CONF_COMM_NAME)) != NULL) {
 		if (pbs_conf.pbs_comm_name)
@@ -1074,24 +1064,24 @@ __pbs_loadconf(int reload)
 	pbs_conf.pbs_tmpdir = pbs_get_tmpdir();
 
 	/* if routers has null value populate with server name as the default */
-	if (pbs_conf.pbs_leaf_routers == NULL) {
+	if (pbs_conf.pbs_leaf_router == NULL) {
 		if (pbs_conf.pbs_primary && pbs_conf.pbs_secondary) {
-			pbs_conf.pbs_leaf_routers = malloc(strlen(pbs_conf.pbs_primary) + strlen(pbs_conf.pbs_secondary) + 2);
-			if (pbs_conf.pbs_leaf_routers == NULL) {
+			pbs_conf.pbs_leaf_router = malloc(strlen(pbs_conf.pbs_primary) + strlen(pbs_conf.pbs_secondary) + 2);
+			if (pbs_conf.pbs_leaf_router == NULL) {
 				fprintf(stderr, "Out of memory\n");
 				goto err;
 			}
-			sprintf(pbs_conf.pbs_leaf_routers, "%s,%s", pbs_conf.pbs_primary, pbs_conf.pbs_secondary);
+			sprintf(pbs_conf.pbs_leaf_router, "%s,%s", pbs_conf.pbs_primary, pbs_conf.pbs_secondary);
 		} else {
 			if (pbs_conf.pbs_server_host_name) {
-				pbs_conf.pbs_leaf_routers = strdup(pbs_conf.pbs_server_host_name);
+				pbs_conf.pbs_leaf_router = strdup(pbs_conf.pbs_server_host_name);
 			} else if (pbs_conf.pbs_server_name) {
-				pbs_conf.pbs_leaf_routers = strdup(pbs_conf.pbs_server_name);
+				pbs_conf.pbs_leaf_router = strdup(pbs_conf.pbs_server_name);
 			} else {
 				fprintf(stderr, "PBS server undefined\n");
 				goto err;
 			}
-			if (pbs_conf.pbs_leaf_routers == NULL) {
+			if (pbs_conf.pbs_leaf_router == NULL) {
 				fprintf(stderr, "Out of memory\n");
 				goto err;
 			}

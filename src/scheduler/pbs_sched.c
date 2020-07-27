@@ -1345,7 +1345,7 @@ main(int argc, char *argv[])
 	}
 
 	/* set tpp config */
-	rc = set_tpp_config(NULL, &pbs_conf, &tpp_conf, nodename, sched_port, pbs_conf.pbs_leaf_routers);
+	rc = set_tpp_config(&pbs_conf, &tpp_conf, nodename, sched_port, pbs_conf.pbs_leaf_router);
 	free(nodename);
 
 	if (rc == -1) {

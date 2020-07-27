@@ -8472,8 +8472,6 @@ SWIG_init(void) {
   SWIG_Python_SetConstant(d, "ATTR_NodeGroupKey",SWIG_FromCharPtr("node_group_key"));
   SWIG_Python_SetConstant(d, "ATTR_dfltqdelargs",SWIG_FromCharPtr("default_qdel_arguments"));
   SWIG_Python_SetConstant(d, "ATTR_dfltqsubargs",SWIG_FromCharPtr("default_qsub_arguments"));
-  SWIG_Python_SetConstant(d, "ATTR_rpp_retry",SWIG_FromCharPtr("rpp_retry"));
-  SWIG_Python_SetConstant(d, "ATTR_rpp_highwater",SWIG_FromCharPtr("rpp_highwater"));
   SWIG_Python_SetConstant(d, "ATTR_pbs_license_info",SWIG_FromCharPtr("pbs_license_info"));
   SWIG_Python_SetConstant(d, "ATTR_license_min",SWIG_FromCharPtr("pbs_license_min"));
   SWIG_Python_SetConstant(d, "ATTR_license_max",SWIG_FromCharPtr("pbs_license_max"));

@@ -1011,7 +1011,7 @@ be_secondary(time_t delay)
 	takeov_on_nocontact = hd_time + (60 * 5) + secondary_delay;
 
 #ifndef DEBUG
-	pbs_close_stdfiles();	/* set stdin/stdout/stderr to /dev/null */
+	//pbs_close_stdfiles();	/* set stdin/stdout/stderr to /dev/null */
 #endif	/* DEBUG */
 
 	/*
