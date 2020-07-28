@@ -312,8 +312,8 @@ assess_type(char *val, int *type, double *val_double, long *val_long)
 		if (!pc || *pc == '\0')
 			*type = LONG;
 		else if (pc && (!strcasecmp(pc, "kb") || !strcasecmp(pc, "mb") || !strcasecmp(pc, "gb") ||
-			    !strcasecmp(pc, "tb") || !strcasecmp(pc, "pb")))
-				*type = SIZE;
+				!strcasecmp(pc, "tb") || !strcasecmp(pc, "pb")))
+			*type = SIZE;
 		else
 			*type = STRING;
 	}
@@ -335,6 +335,32 @@ struct attrl_holder {
  * 
  * @return void
  */
+static void
+swap(struct batch_status **a, struct batch_status **b)
+{
+	struct batch_status *tmp;
+
+	tmp = *a;
+	*a = *b;
+	*b = tmp;
+}
+
+static void
+append_attrib(struct attrl *orig, struct attrl *other, char *attr_name)
+{
+	struct attrl *cur;
+
+	struct attrl *at = dup_attrl(other);
+	for (cur = orig; cur->next; cur = cur->next) {
+		if (attr_name && !strcmp(cur->next->name, attr_name))
+			break;
+	}
+	
+	struct attrl *tmp = cur->next;
+	cur->next = at;
+	at->next = tmp;
+}
+
 static void
 accumulate_values(struct attrl_holder *a, struct attrl *b, struct attrl *orig)
 {
@@ -382,12 +408,8 @@ accumulate_values(struct attrl_holder *a, struct attrl *b, struct attrl *orig)
 		}
 	}
 	/* value exists in next but not in cur. Create it */
-	if (!itr) {
-		struct attrl *at = dup_attrl(b);
-		for (cur = orig; cur->next; cur = cur->next)
-			;
-		cur->next = at;
-	}
+	if (!itr)
+		append_attrib(orig, b, NULL);
 }
 
 /**
@@ -492,9 +514,238 @@ aggregate_queue(struct batch_status *sv1, struct batch_status **sv2)
 				break;
 			}
 		}
-
 		if (!a)
 			append_bs(a, b, prev_b, sv1, sv2);
+	}
+}
+
+static void
+encode_job_list(char **val, char *nxt, int *cpus)
+{
+	char *buf = NULL;
+	int buf_sz = 0;
+	int cpu = 0;
+	char *pc;
+	char **arr;
+	int i;
+	char *job;
+	int len = 0;
+
+	if (!nxt)
+		return;
+
+	if (!val) {
+		if ((pc = strrchr(nxt, '/')) != NULL)
+			*cpus = strtol(pc+1, &pc, 10);
+		return;
+	}
+
+	len = strlen(*val) + 1;
+	buf_sz = 2 * len;
+	buf = malloc(buf_sz);
+	strcpy(buf, *val);
+	if ((pc = strrchr(buf, '/')) != NULL) {
+		cpu = strtol(pc+1, &pc, 10);
+	}
+
+	arr = break_comma_list(nxt);
+	for (i = 0; arr && arr[i]; i++) {
+		job = arr[i];
+		if (buf_sz < len + strlen(job) + 4) {
+			char *tmp = realloc(buf, sizeof(buf_sz * 2));
+			if (!tmp) {
+				free(buf);
+				free_string_array(arr);
+				pbs_errno = PBSE_SYSTEM;
+				return;
+			}
+			buf_sz *= 2;
+			buf = tmp;
+		}
+		if ((pc = strrchr(job, '/')) != NULL) {
+			*(pc + 1) = '\0';
+			len += sprintf(buf + len, ", %s%d", job, ++cpu);
+		}
+	}
+
+	free(*val);
+	*val = buf;
+	free_string_array(arr);
+	*cpus = cpu + 1;
+}
+
+static void
+encode_resv_list(char **val, char *nxt)
+{
+	char *buf;
+
+	if (!val || !nxt)
+		return;
+
+	pbs_asprintf(&buf, "%s, %s", *val, nxt);
+	free(*val);
+	*val = buf;
+}
+
+#define SERVER_FOUND "server"
+
+static void
+encode_node_state(char **state_a, char *state_b, int cpus, int tot_cpus)
+{
+	char buf[1024] = "";
+	char **arr;
+	int i;
+
+	if (strcmp(*state_a, ND_free))
+		strcpy(buf, *state_a);
+
+	if (cpus + 1 >= tot_cpus) {
+		if (!strcmp(*state_a, ND_free))
+			strcpy(buf, ND_jobbusy);
+		else
+			sprintf(buf, "%s, %s", *state_a, ND_jobbusy);
+	}
+
+	if (strstr(state_b, "exclusive")) {
+		arr = break_comma_list(state_b);
+		for (i = 0; arr && arr[i]; i++) {
+			if (strstr(arr[i], "exclusive")) {
+				if (*buf)
+					sprintf(buf + strlen(buf), ", %s", arr[i]);
+				else
+					strcpy(buf, arr[i]);
+			}
+		}
+		free_string_array(arr);
+	}
+
+	if (*buf) {
+		free(*state_a);
+		*state_a = strdup(buf);
+	}
+}
+
+static void
+aggr_node_attrs(struct batch_status *cur, struct batch_status *nxt)
+{
+	char **job_list = NULL;
+	char **resv_list = NULL;
+	struct attrl *a = NULL;
+	struct attrl *b = NULL;
+	int found = 0;
+	int cpus = 0;
+	char *state_a = NULL;
+	char *state_b = NULL;
+	int tot_cpus = 0;
+	char *pc;
+
+	if (!cur || !nxt)
+		return;
+
+	if (cur->text && !strcmp(cur->text, SERVER_FOUND))
+		found++;
+
+	for (a = cur->attribs; a; a = a->next) {
+		if (a->name && !strcmp(a->name, ATTR_NODE_jobs)) {
+			job_list = &a->value;
+			found++;
+		} else if (a->name && !strcmp(a->name, ATTR_NODE_resvs)) {
+			resv_list = &a->value;
+			found++;
+		} else if (!cur->text && !strcmp(a->name, ATTR_server)) {
+			cur->text = SERVER_FOUND;
+			found++;
+		} else if (a->name && !strcmp(a->name, ATTR_NODE_state)) {
+			state_a = a->value;
+			found++;
+		} else if (a->name && a->resource &&
+			   !strcmp(a->name, ATTR_rescavail) &&
+			   !strcmp(a->resource, "ncpus")) {
+			tot_cpus = strtol(a->value, &pc, 10);
+			found++;
+		}
+		if (found == 5)
+			break;
+	}
+	for (b = nxt->attribs, found = 0; b; b = b->next) {
+		if (b->name && !strcmp(b->name, ATTR_NODE_jobs)) {
+			if (!job_list)
+				append_attrib(cur->attribs, b, ATTR_rescavail);
+			encode_job_list(job_list, b->value, &cpus);
+			found++;
+		} else if (b->name && !strcmp(b->name, ATTR_NODE_resvs)) {
+			if (!resv_list)
+				append_attrib(cur->attribs, b, ATTR_rescavail);
+			else
+				encode_resv_list(resv_list, b->value);
+			found++;
+		} else if (b->name && !strcmp(b->name, ATTR_NODE_state)) {
+			state_b = b->value;
+			found++;
+		}
+		if (found == 3)
+			break;
+	}
+
+	if (cur->text && !strcmp(cur->text, SERVER_FOUND))
+		encode_node_state(&state_a, state_b, cpus, tot_cpus);
+}
+
+static int
+swap_needed(struct batch_status *cur, struct batch_status *nxt)
+{
+	struct attrl *a = NULL;
+
+	if (!cur || !nxt)
+		return 0;
+
+	if (cur->text && !strcmp(cur->text, SERVER_FOUND))
+		return 0;
+
+	for (a = cur->attribs; a; a = a->next) {
+		if (a->name && strcmp(a->name, ATTR_server) == 0) {
+			return 0;
+		}
+	}
+
+	return 1;
+}
+
+static void
+set_prev_link(struct batch_status **sv, struct batch_status *prev, struct batch_status *cur)
+{
+	if (prev) {
+		prev->next = cur;
+		prev->last = cur;
+	} else
+		*sv = cur;
+}
+
+static void
+aggregate_node(struct batch_status **sv1, struct batch_status **sv2)
+{
+	struct batch_status *a = NULL;
+	struct batch_status *b = NULL;
+	struct batch_status *prev_b = NULL;
+	struct batch_status *prev_a = NULL;
+
+	for (b = *sv2; b; prev_b = b, b = b->next) {
+		for (a = *sv1; a; prev_a = a, a = a->next) {
+			if (a->name && b->name && !strcmp(a->name, b->name)) {
+				if (swap_needed(a, b)) {
+					swap(&a->next, &b->next);
+					swap(&a, &b);
+					set_prev_link(sv1, prev_a, a);
+					set_prev_link(sv2, prev_b, b);
+				}
+				aggr_node_attrs(a, b);
+				aggr_resc_ct(a, b);
+				break;
+			}
+		}
+
+		if (!a)
+			append_bs(a, b, prev_b, *sv1, sv2);
 	}
 }
 
@@ -512,6 +763,20 @@ aggregate_svr(struct batch_status *sv1, struct batch_status *sv2)
 {
 	aggr_job_ct(sv1, sv2);
 	aggr_resc_ct(sv1, sv2);
+}
+
+static void
+clean_final_list(struct batch_status *ret, int parent_object)
+{
+	struct batch_status *cur = NULL;
+
+	switch (parent_object) {
+	case MGR_OBJ_NODE:
+		for (cur = ret; cur; cur = cur->next) {
+			if (cur->text)
+				cur->text = NULL;
+		}
+	}
 }
 
 /**
@@ -576,6 +841,11 @@ PBSD_status_aggregate(int c, int cmd, char *id, struct attrl *attrib, char *exte
 						pbs_statfree(next);
 						next = NULL;
 						break;
+					case MGR_OBJ_NODE:
+						aggregate_node(&ret, &next);
+						pbs_statfree(next);
+						next = NULL;
+						break;
 					default:
 						cur->next = next;
 						cur = next->last;
@@ -587,6 +857,8 @@ PBSD_status_aggregate(int c, int cmd, char *id, struct attrl *attrib, char *exte
 		if (pbs_client_thread_unlock_connection(c) != 0)
 			return NULL;
 	}
+
+	clean_final_list(ret, parent_object);
 
 	return ret;
 }

@@ -172,6 +172,32 @@ pbs_net_t addr;
 	return NULL;
 }
 
+int
+node_stat_be_served(struct pbsnode *pnode)
+{
+	struct pbssubn *psubn;
+	struct jobinfo *jip;
+	struct resvinfo *rip;
+
+	if (pnode->nd_attr[ND_ATR_at_server].at_flags & ATR_VFLAG_SET)
+		return 1;
+
+	if ((pnode->nd_attr[ND_ATR_jobs].at_flags & ATR_VFLAG_SET) &&
+	    pnode->nd_attr[ND_ATR_jobs].at_val.at_jinfo) {
+		for (psubn = pnode->nd_psn; psubn; psubn = psubn->next)
+			for (jip = psubn->jobs; jip; jip = jip->next)
+				return 1;
+	}
+
+	if ((pnode->nd_attr[ND_ATR_resvs].at_flags & ATR_VFLAG_SET) &&
+	    pnode->nd_attr[ND_ATR_resvs].at_val.at_jinfo) {
+		for (rip = pnode->nd_resvp; rip; rip = rip->next)
+			return 1;
+	}
+
+	return 0;
+}
+
 /**
  * @brief
  * 	 	add status of each requested (or all) node-attribute to the status reply.
@@ -350,9 +376,6 @@ initialize_pbsnode(struct pbsnode *pnode, char *pname, int ntype)
 	pnode->nd_attr[(int)ND_ATR_Sharing].at_val.at_long = (long)VNS_DFLT_SHARED;
 	pnode->nd_attr[(int)ND_ATR_Sharing].at_flags =
 		ATR_VFLAG_SET|ATR_VFLAG_DEFLT;
-
-	/* Set the 'server' attribute on the node */
-	node_attr_def[ND_ATR_at_server].at_decode(&pnode->nd_attr[ND_ATR_at_server], NULL, NULL, pbs_server_name);
 
 	pat1 = &pnode->nd_attr[(int)ND_ATR_ResourceAvail];
 	pat2 = &pnode->nd_attr[(int)ND_ATR_ResourceAssn];

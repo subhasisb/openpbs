@@ -145,6 +145,7 @@ extern char *msg_noloopbackif;
 extern char *msg_job_end_stat;
 extern char *msg_daemonname;
 extern char *msg_new_inventory_mom;
+extern char *pbs_server_name;
 extern pbs_list_head	svr_allhooks;
 
 extern void is_vnode_prov_done(char *); /* for provisioning */
@@ -645,6 +646,19 @@ set_all_state(mominfo_t *pmom, int do_set, unsigned long bits, char *txt,
 			}
 
 		}
+	}
+}
+
+static void
+set_srv_attr_on_nodes(mominfo_t *pmom)
+{
+	int		nchild;
+	struct pbsnode *pnode;
+	mom_svrinfo_t  *psvrmom = (mom_svrinfo_t *)(pmom->mi_data);
+
+	for (nchild = 0; nchild < psvrmom->msr_numvnds; ++nchild) {
+		pnode = psvrmom->msr_children[nchild];
+		node_attr_def[ND_ATR_at_server].at_decode(&pnode->nd_attr[ND_ATR_at_server], NULL, NULL, pbs_server_name);
 	}
 }
 
@@ -4736,6 +4750,7 @@ found:
 
 			set_all_state(pmom, 0, INUSE_DOWN| INUSE_INIT,
 				NULL, Set_All_State_Regardless);
+			set_srv_attr_on_nodes(pmom);
 
 			/* log a node up message only if it was not marked
 			 * as "markeddown" by TPP layer due to broken connection

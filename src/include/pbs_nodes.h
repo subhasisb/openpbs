@@ -427,6 +427,7 @@ extern	int	chk_vnode_pool(attribute *, void *, int);
 extern	void	free_pnode(struct pbsnode *);
 extern	int	save_nodes_db(int, void *);
 extern void	propagate_socket_licensing(mominfo_t *);
+extern int	node_stat_be_served(struct pbsnode *);
 
 extern char *msg_daemonname;
 

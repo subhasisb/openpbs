@@ -645,6 +645,9 @@ status_node(struct pbsnode *pnode, struct batch_request *preq, pbs_list_head *ps
 	if ((preq->rq_perm & ATR_DFLAG_RDACC) == 0)
 		return (PBSE_PERM);
 
+	if (!node_stat_be_served(pnode))
+		return 0;
+
 	/* sync state attribute with nd_state */
 
 	if (pnode->nd_state != pnode->nd_attr[(int)ND_ATR_state].at_val.at_long) {
