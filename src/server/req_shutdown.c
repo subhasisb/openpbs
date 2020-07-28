@@ -272,7 +272,7 @@ req_shutdown(struct batch_request *preq)
 		(void)failover_send_shutdown(FAILOVER_SecdShutdown);
 
 	if (shutdown_who & SHUT_WHO_SCHED)
-		(void)contact_sched(SCH_QUIT, NULL, dflt_scheduler, CONN_SCHED_PRIMARY);	/* tell scheduler to quit */
+		(void)contact_sched(SCH_QUIT, NULL, dflt_scheduler, CONN_SCHED_SECONDARY);	/* tell scheduler to quit */
 
 	if (shutdown_who & SHUT_WHO_SECDONLY) {
 		reply_ack(preq);

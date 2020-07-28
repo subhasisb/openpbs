@@ -1532,7 +1532,7 @@ try_db_again:
 			/* Bring up scheduler here */
 			pbs_scheduler_addr = get_hostaddr(pbs_conf.pbs_secondary);
 			dflt_scheduler->pbs_scheduler_addr = pbs_scheduler_addr;
-			if (contact_sched(SCH_SCHEDULE_NULL, NULL, dflt_scheduler, CONN_SCHED_PRIMARY) < 0) {
+			if (contact_sched(SCH_SCHEDULE_NULL, NULL, dflt_scheduler, CONN_SCHED_SECONDARY) < 0) {
 				char **workenv;
 				char schedcmd[MAXPATHLEN + 1];
 				/* save the current, "safe", environment.
@@ -1797,7 +1797,7 @@ try_db_again:
 	/* if brought up the Secondary Scheduler, take it down */
 
 	if (brought_up_alt_sched == 1)
-		(void)contact_sched(SCH_QUIT, NULL,  dflt_scheduler, CONN_SCHED_PRIMARY);
+		(void)contact_sched(SCH_QUIT, NULL,  dflt_scheduler, CONN_SCHED_SECONDARY);
 
 	/* if Moms are to to down as well, tell them */
 

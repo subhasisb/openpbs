@@ -380,7 +380,7 @@ schedule_high(pbs_sched *psched)
 		return -1;
 
 	if (psched->sched_cycle_started == 0) {
-		if ((s = contact_sched(psched->svr_do_sched_high, NULL, psched, CONN_SCHED_PRIMARY)) < 0) {
+		if ((s = contact_sched(psched->svr_do_sched_high, NULL, psched, CONN_SCHED_SECONDARY)) < 0) {
 			set_sched_state(psched, SC_DOWN);
 			return -1;
 		}
@@ -449,7 +449,7 @@ schedule_jobs(pbs_sched *psched)
 			pdefr = (struct deferred_request *)GET_NEXT(pdefr->dr_link);
 		}
 
-		if ((s = contact_sched(cmd, jid,  psched, CONN_SCHED_PRIMARY)) < 0) {
+		if ((s = contact_sched(cmd, jid,  psched, CONN_SCHED_SECONDARY)) < 0) {
 			set_sched_state(psched, SC_DOWN);
 			return -1;
 		}
