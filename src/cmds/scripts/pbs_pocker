@@ -155,6 +155,7 @@ RUN set -ex \\
     && ../configure CFLAGS="-g -O2 -Wall -Werror" --prefix=/opt/pbs --enable-ptl --with-swig=/usr/local \\
     && make -j12 \\
     && make -j12 install \\
+    && chmod 4755 /opt/pbs/sbin/pbs_iff /opt/pbs/sbin/pbs_rcp \\
     && cd / \\
     && rm -rf /pbssrc
 __PP_DF__
