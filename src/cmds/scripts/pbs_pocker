@@ -7,6 +7,8 @@ NO_VNODE_PER_MOM=0
 NO_CPUS_PER_VNODE=0
 SVRS_INSTANCES=
 NEW_SVRS=
+WHICH_IMG=
+HOME_DIR_BASE=default
 
 cur_dir=$(pwd)
 TMP_DIR=${TMP_DIR:-/tmp}
@@ -103,7 +105,7 @@ function _build_pbs_base_image() {
             echo "PBS Source is changed and containers are running, please run '$0 -d' first"
             exit 1
         fi
-        docker rmi pbs:base &>/dev/null
+        docker rmi pbs:base pbs-debug:base &>/dev/null
     else
         _cur_md5=$(git ls-files | xargs md5sum | md5sum | awk '{ print $1 }')
     fi
@@ -113,21 +115,28 @@ function _build_pbs_base_image() {
 #!/bin/bash
 
 /usr/sbin/sshd
-
-if [ "x\$1" == "xserver" ]; then
+if [ "x\$2" == "xserver" ]; then
     /opt/pbs/libexec/pbs_postinstall
-    if [ "x\$2" != "x" ]; then
-        echo "PBS_SERVER_INSTANCES=\$2" >> /etc/pbs.conf
-    fi
-elif [ "x\$1" == "xmom" ]; then
-    PBS_SERVER=\$2 /opt/pbs/libexec/pbs_postinstall execution
     if [ "x\$3" != "x" ]; then
         echo "PBS_SERVER_INSTANCES=\$3" >> /etc/pbs.conf
+    fi
+elif [ "x\$2" == "xmom" ]; then
+    PBS_SERVER=\$3 /opt/pbs/libexec/pbs_postinstall execution
+    if [ "x\$4" != "x" ]; then
+        echo "PBS_SERVER_INSTANCES=\$4" >> /etc/pbs.conf
     fi
 else
     exec /bin/bash
 fi
 echo "PBS_LOG_HIGHRES_TIMESTAMP=1" >> /etc/pbs.conf
+if [ "x\$1" != "default" ]; then
+    cat /etc/pbs.conf | grep -v PBS_HOME > /tmp/tconf
+    echo "PBS_HOME=\$1/pbs/\$(hostname -s)" >> /tmp/tconf
+    mv /tmp/tconf /etc/pbs.conf
+    mkdir -p \$1/pbs
+    rm -rf \$1/pbs/\$(hostname -s)
+    mv /var/spool/pbs \$1/pbs/\$(hostname -s)
+fi
 /opt/pbs/libexec/pbs_init.d start
 exec /bin/bash
 __PP_DE__
@@ -163,6 +172,41 @@ __PP_DF__
     docker build --force-rm --rm \
         -f ${TMP_DIR}/pp_dockerfile \
         -t pbs:base \
+        --label pbs-pocker=1 \
+        --label pbs-src-md5=${_cur_md5} \
+        .
+    if [ $? -ne 0 ]; then
+        rm -f ${TMP_DIR}/pp_dockerfile ${cur_dir}/docker-entrypoint ${cur_dir}/update-svrs
+        echo "pbs base image build failed"
+        exit 1
+    fi
+
+    rm -f ${TMP_DIR}/pp_dockerfile
+
+    cat >${TMP_DIR}/pp_dockerfile<<__PP_DF__
+FROM pbs-pocker:base
+ENTRYPOINT [ "/docker-entrypoint" ]
+COPY . /pbssrc
+RUN set -ex \\
+    && cd /pbssrc \\
+    && cp ./update-svrs /update-svrs \\
+    && cp ./docker-entrypoint /docker-entrypoint \\
+    && chmod +x /docker-entrypoint /update-svrs \\
+    && ( [ -f Makefile ] && make distclean || true ) \\
+    && ./autogen.sh \\
+    && mkdir target \\
+    && cd target \\
+    && ../configure CFLAGS="-g -O0 -Wall -Werror" --prefix=/opt/pbs --enable-ptl --with-swig=/usr/local \\
+    && make -j12 \\
+    && make -j12 install \\
+    && chmod 4755 /opt/pbs/sbin/pbs_iff /opt/pbs/sbin/pbs_rcp \\
+    && cd / \\
+    && rm -rf /pbssrc
+__PP_DF__
+
+    docker build --force-rm --rm \
+        -f ${TMP_DIR}/pp_dockerfile \
+        -t pbs-debug:base \
         --label pbs-pocker=1 \
         --label pbs-src-md5=${_cur_md5} \
         .
@@ -219,7 +263,7 @@ function __set_svr_insts() {
 
 function _setup_svrs() {
     local _cur_svrs=$(docker ps -f label=pbs-pocker=1 -f label=server=1 -q | wc -l)
-    local _svrs=${NO_SVRS} _moms _svrn
+    local _svrs=${NO_SVRS} _moms _svrn _varg=""
 
     _cur_svrs=${_cur_svrs//[[:space:]]/}
 
@@ -233,6 +277,10 @@ function _setup_svrs() {
         _svrs=1
     fi
 
+    if [ "x${HOME_DIR_BASE}" != "xdefault" ]; then
+        _varg="-v ${HOME_DIR_BASE}:${HOME_DIR_BASE}"
+    fi
+
     for i in $(seq $(( _cur_svrs + 1)) 1 $((_cur_svrs + _svrs)))
     do
         _svrn=pbs-server-${i}
@@ -243,7 +291,8 @@ function _setup_svrs() {
             --label server=1 \
             -h ${_svrn} \
             --name ${_svrn} \
-            pbs:base server ${SVRS_INSTANCES} >/dev/null
+            ${_varg} \
+            pbs${WHICH_IMG}:base ${HOME_DIR_BASE} server ${SVRS_INSTANCES} >/dev/null
         if [ $? -ne 0 ]; then
             echo "Failed to start ${_svrn}"
             exit 1
@@ -334,10 +383,14 @@ function __vnodes_on_mom() {
 }
 
 function __setup_mom_helper() {
-    local _svr=$1 _cmd _vnodes _momn _svrn=pbs-server-$1
+    local _svr=$1 _cmd _vnodes _momn _svrn=pbs-server-$1 _varg=""
     local _cur_moms=$(docker ps -f label=pbs-pocker=1 -f label=svron=${_svr} -f label=mom=1 -q | wc -l)
 
     _cur_moms=${_cur_moms//[[:space:]]/}
+
+    if [ "x${HOME_DIR_BASE}" != "xdefault" ]; then
+        _varg="-v ${HOME_DIR_BASE}:${HOME_DIR_BASE}"
+    fi
 
     for i in $(seq $(( _cur_moms + 1)) 1 $(( _cur_moms + NO_MOMS_PER_SVR)))
     do
@@ -350,7 +403,8 @@ function __setup_mom_helper() {
             --label svron=${_svr} \
             -h ${_momn} \
             --name ${_momn} \
-            pbs:base mom ${_svrn} ${SVRS_INSTANCES} >/dev/null
+            ${_varg} \
+            pbs${WHICH_IMG}:base ${HOME_DIR_BASE} mom ${_svrn} ${SVRS_INSTANCES} >/dev/null
         if [ $? -ne 0 ]; then
             echo "Failed to start ${_momn}"
             exit 1
@@ -469,6 +523,8 @@ function usage() {
     echo "              If only -m provided then <count> will be set on all vnodes on all new moms"
     echo "              If only -s provided then this will be ignored"
     echo "-d          - Delete containers created by this script"
+    echo "-H <dir>    - Use <dir> as base directory for PBS_HOME"
+    echo "-g          - Use debug version of PBS"
     echo
     echo "Examples:"
     echo
@@ -542,6 +598,21 @@ function parse_params() {
                 NO_CPUS_PER_VNODE=$2
                 shift 2
             ;;
+            -H)
+                if [ "x$2" == "x" ]; then
+                    echo "Option -H needs path to dir!"
+                    usage
+                    exit 1
+                fi
+                if [ ! -d "$2" ]; then
+                    echo "Given path in -H doesn't exists: $2"
+                    usage
+                    exit 1
+                fi
+                HOME_DIR_BASE="$2"
+                shift 2
+            ;;
+            -g) WHICH_IMG="-debug"; shift 1;;
             -d) DELETE_CLUSTER=1; shift 1;;
             -h) usage; exit 0;;
             *) echo "Invalid option: $1"; exit 1;;
