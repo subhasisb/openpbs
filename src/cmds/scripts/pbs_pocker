@@ -129,7 +129,7 @@ else
     exec /bin/bash
 fi
 echo "PBS_LOG_HIGHRES_TIMESTAMP=1" >> /etc/pbs.conf
-if [ "x\$1" != "default" ]; then
+if [ "x\$1" != "xdefault" ]; then
     cat /etc/pbs.conf | grep -v PBS_HOME > /tmp/tconf
     echo "PBS_HOME=\$1/pbs/\$(hostname -s)" >> /tmp/tconf
     mv /tmp/tconf /etc/pbs.conf
