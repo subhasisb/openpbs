@@ -56,7 +56,7 @@ RUN set -ex \\
     && useradd -K UMASK=0022 -m -s /bin/bash -u 11000 -g tstgrp00 -G tstgrp00 tstusr00 \\
     && useradd -K UMASK=0022 -m -s /bin/bash -u 11001 -g tstgrp00 -G tstgrp00 tstusr01 \\
     && ONLY_INSTALL_DEPS=1 /pbssrc/ci/do.sh \\
-    && dnf install -y openssh-server passwd \\
+    && dnf install -y openssh-server passwd bc gdb valgrind \\
     && echo 'Defaults  always_set_home' > /etc/sudoers.d/pbs \\
     && echo 'Defaults  !requiretty' >> /etc/sudoers.d/pbs \\
     && echo 'ALL ALL=(ALL)  NOPASSWD: ALL' >> /etc/sudoers.d/pbs \\
@@ -120,11 +120,17 @@ if [ "x\$2" == "xserver" ]; then
     if [ "x\$3" != "x" ]; then
         echo "PBS_SERVER_INSTANCES=\$3" >> /etc/pbs.conf
     fi
+    if [ "x\$(hostname -s)" != "xpbs-server-1" ]; then
+        sed -i "s;PBS_START_SCHED=.*;PBS_START_SCHED=0;" /etc/pbs.conf
+        sed -i "s;PBS_START_COMM=.*;PBS_START_COMM=0;" /etc/pbs.conf
+        echo "PBS_LEAF_ROUTERS=pbs-server-1" >> /etc/pbs.conf
+    fi
 elif [ "x\$2" == "xmom" ]; then
     PBS_SERVER=\$3 /opt/pbs/libexec/pbs_postinstall execution
     if [ "x\$4" != "x" ]; then
         echo "PBS_SERVER_INSTANCES=\$4" >> /etc/pbs.conf
     fi
+    echo "PBS_LEAF_ROUTERS=pbs-server-1" >> /etc/pbs.conf
 else
     exec /bin/bash
 fi
@@ -158,6 +164,7 @@ RUN set -ex \\
     && cp ./docker-entrypoint /docker-entrypoint \\
     && chmod +x /docker-entrypoint /update-svrs \\
     && ( [ -f Makefile ] && make distclean || true ) \\
+    && rm -rf target \\
     && ./autogen.sh \\
     && mkdir target \\
     && cd target \\
@@ -193,6 +200,7 @@ RUN set -ex \\
     && cp ./docker-entrypoint /docker-entrypoint \\
     && chmod +x /docker-entrypoint /update-svrs \\
     && ( [ -f Makefile ] && make distclean || true ) \\
+    && rm -rf target \\
     && ./autogen.sh \\
     && mkdir target \\
     && cd target \\
@@ -310,6 +318,8 @@ function _setup_svrs() {
             docker exec -it -e PBS_SERVER_INSTANCES=${_svrn} ${_svrn} /opt/pbs/bin/qstat &>/dev/null
             if [ $? -eq 0 ]; then
                 echo "${_svrn} up"
+                docker exec -it -e PBS_SERVER_INSTANCES=${_svrn} ${_svrn} /opt/pbs/bin/qmgr -c "s s flatuid=1" &>/dev/null
+                docker exec -it -e PBS_SERVER_INSTANCES=${_svrn} ${_svrn} /opt/pbs/bin/qmgr -c "s sched sched_host = pbs-server-1" &>/dev/null
                 break
             else
                 sleep 1
@@ -433,6 +443,10 @@ function _setup_moms() {
     local _cur_svrs=$(docker ps -f label=pbs-pocker=1 -f label=server=1 -q | wc -l)
 
     _cur_svrs=${_cur_svrs//[[:space:]]/}
+
+    if [ ${_cur_svrs} -eq 1 ]; then
+       __setup_mom_helper 1
+    fi
 
     if [ ${NO_SVRS} -eq 0 ]; then
         for j in $(seq 1 1 ${_cur_svrs})
