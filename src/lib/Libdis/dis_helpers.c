@@ -777,54 +777,6 @@ dis_puts(int fd, const char *str, size_t ct)
 
 /**
  * @brief
- * 	disr_commit - dis support routine to commit/uncommit read data
- *
- * @param[in] fd - file descriptor
- * @param[in] commit_flag - indication for commit or uncommit
- *
- * @return int
- *
- * @retval 0 - success
- * @retval -1 - error
- *
- * @par Side Effects:
- *	None
- *
- * @par MT-safe: Yes
- *
- */
-int
-disr_commit(int fd, int commit_flag)
-{
-	return 0;
-}
-
-/**
- * @brief
- * 	disw_commit - dis support routine to commit/uncommit write data
- *
- * @param[in] fd - file descriptor
- * @param[in] commit_flag - indication for commit or uncommit
- *
- * @return int
- *
- * @retval 0 - success
- * @retval -1 - error
- *
- * @par Side Effects:
- *	None
- *
- * @par MT-safe: Yes
- *
- */
-int
-disw_commit(int fd, int commit_flag)
-{
-	return 0;
-}
-
-/**
- * @brief
  *	flush dis write buffer
  *
  *	Writes "committed" data in buffer to file descriptor,

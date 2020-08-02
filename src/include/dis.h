@@ -234,8 +234,6 @@ int disr_skip(int, size_t);
 int dis_getc(int);
 int dis_gets(int, char *, size_t);
 int dis_puts(int, const char *, size_t);
-int disr_commit(int, int);
-int disw_commit(int, int);
 int dis_flush(int);
 void dis_setup_chan(int, pbs_tcp_chan_t * (*)(int));
 void dis_destroy_chan(int);
