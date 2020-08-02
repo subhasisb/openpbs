@@ -55,9 +55,7 @@
 
 static pbs_dis_buf_t *dis_get_readbuf(int);
 static pbs_dis_buf_t *dis_get_writebuf(int);
-static int __transport_read(int, int);
-static void dis_pack_buf(pbs_dis_buf_t *);
-static int dis_resize_buf(pbs_dis_buf_t *, size_t, int);
+static int dis_resize_buf(pbs_dis_buf_t *, size_t);
 static int transport_chan_is_encrypted(int);
 
 /**
@@ -285,25 +283,25 @@ __send_pkt(int fd, pbs_dis_buf_t *tp, int encrypt_done)
 		if (authdef == NULL || authdef->encrypt_data == NULL)
 			return -1;
 
-		if (authdef->encrypt_data(authctx, (void *)(tp->tdis_thebuf + PKT_HDR_SZ), tp->tdis_trail - PKT_HDR_SZ, &data_out, &len_out) != 0)
+		if (authdef->encrypt_data(authctx, (void *)(tp->tdis_data + PKT_HDR_SZ), tp->tdis_len - PKT_HDR_SZ, &data_out, &len_out) != 0)
 			return -1;
 
-		dis_resize_buf(tp, len_out + PKT_HDR_SZ, 0);
-		memcpy(tp->tdis_thebuf + PKT_HDR_SZ, data_out, len_out);
+		dis_resize_buf(tp, len_out + PKT_HDR_SZ);
+		memcpy((void *)(tp->tdis_data + PKT_HDR_SZ), data_out, len_out);
 		free(data_out);
-		tp->tdis_lead = tp->tdis_trail = len_out + PKT_HDR_SZ;
+		tp->tdis_len = len_out + PKT_HDR_SZ;
 	}
 
-	i = htonl(tp->tdis_trail - PKT_HDR_SZ);
-	memcpy((void *) (tp->tdis_thebuf + PKT_HDR_SZ - sizeof(int)), &i, sizeof(int));
+	i = htonl(tp->tdis_len - PKT_HDR_SZ);
+	memcpy((void *) (tp->tdis_data + PKT_HDR_SZ - sizeof(int)), &i, sizeof(int));
 
-	i = transport_send(fd, (void *) tp->tdis_thebuf, tp->tdis_trail);
+	i = transport_send(fd, (void *) tp->tdis_data, tp->tdis_len);
 	if (i < 0)
 		return i;
-	if (i != tp->tdis_trail)
+	if (i != tp->tdis_len)
 		return -1;
-
-	return tp->tdis_trail;
+	dis_clear_buf(tp);
+	return i + PKT_HDR_SZ;
 }
 
 /**
@@ -333,15 +331,15 @@ int
 transport_send_pkt(int fd, int type, void *data_in, size_t len_in)
 {
 	pbs_dis_buf_t *tp;
-	int i;
 
 	if (data_in == NULL || len_in == 0 || (tp = dis_get_writebuf(fd)) == NULL)
 		return -1;
 
 	dis_clear_buf(tp);
-	dis_resize_buf(tp, len_in + PKT_HDR_SZ, 1);
-	strcpy(tp->tdis_thebuf, PKT_MAGIC);
-	*(tp->tdis_thebuf + PKT_MAGIC_SZ) = (char) type;
+	dis_resize_buf(tp, len_in + PKT_HDR_SZ);
+	strcpy(tp->tdis_data, PKT_MAGIC);
+	*(tp->tdis_data + PKT_MAGIC_SZ) = (char) type;
+	tp->tdis_pos = tp->tdis_data + PKT_HDR_SZ;
 
 	if (transport_chan_is_encrypted(fd)) {
 		void *authctx = transport_chan_get_authctx(fd, FOR_ENCRYPT);
@@ -355,19 +353,17 @@ transport_send_pkt(int fd, int type, void *data_in, size_t len_in)
 		if (authdef->encrypt_data(authctx, data_in, len_in, &data_out, &len_out) != 0)
 			return -1;
 
-		dis_resize_buf(tp, len_out + PKT_HDR_SZ, 0);
-		memcpy(tp->tdis_thebuf + PKT_HDR_SZ, data_out, len_out);
+		dis_resize_buf(tp, len_out + PKT_HDR_SZ);
+		memcpy(tp->tdis_pos, data_out, len_out);
 		free(data_out);
-		tp->tdis_trail = len_out;
+		tp->tdis_len = len_out;
 	} else {
-		memcpy(tp->tdis_thebuf + PKT_HDR_SZ, data_in, len_in);
-		tp->tdis_trail = len_in;
+		memcpy(tp->tdis_pos, data_in, len_in);
+		tp->tdis_len = len_in;
 	}
-	tp->tdis_trail += PKT_HDR_SZ;
+	tp->tdis_len += PKT_HDR_SZ;
 
-	i = __send_pkt(fd, tp, 1);
-	dis_clear_buf(tp);
-	return i;
+	return __send_pkt(fd, tp, 1);
 }
 
 /**
@@ -395,7 +391,7 @@ static int
 __recv_pkt(int fd, int *type, pbs_dis_buf_t *tp)
 {
 	int i;
-	size_t data_in_sz;
+	size_t datasz;
 	char pkthdr[PKT_HDR_SZ];
 
 	i = transport_recv(fd, (void *) &pkthdr, PKT_HDR_SZ);
@@ -408,35 +404,32 @@ __recv_pkt(int fd, int *type, pbs_dis_buf_t *tp)
 
 	*type = (int) pkthdr[PKT_MAGIC_SZ];
 	memcpy(&i, (void *) &(pkthdr[PKT_HDR_SZ - sizeof(int)]), sizeof(int));
-	data_in_sz = ntohl(i);
-	if (data_in_sz <= 0)
+	datasz = ntohl(i);
+	if (datasz <= 0)
 		return -1;
-	dis_resize_buf(tp, data_in_sz, 0);
-
-	i = transport_recv(fd, &(tp->tdis_thebuf[tp->tdis_eod]), data_in_sz);
-	if (i != data_in_sz)
+	dis_resize_buf(tp, datasz);
+	i = transport_recv(fd, tp->tdis_data, datasz);
+	if (i != datasz)
 		return (i < 0 ? i : -1);
 
 	if (transport_chan_is_encrypted(fd)) {
 		void *data;
-		size_t datasz;
 		void *authctx = transport_chan_get_authctx(fd, FOR_ENCRYPT);
 		auth_def_t *authdef = transport_chan_get_authdef(fd, FOR_ENCRYPT);
 
 		if (authdef == NULL || authdef->decrypt_data == NULL)
 			return -1;
 
-		if (authdef->decrypt_data(authctx, &(tp->tdis_thebuf[tp->tdis_eod]), data_in_sz, &data, &datasz) != 0)
+		if (authdef->decrypt_data(authctx, tp->tdis_data, i, &data, &datasz) != 0)
 			return -1;
 
-		dis_resize_buf(tp, datasz, 0);
-		memcpy(&(tp->tdis_thebuf[tp->tdis_eod]), data, datasz);
-		free(data);
-		tp->tdis_eod += datasz;
+		free(tp->tdis_data);
+		tp->tdis_data = data;
+		tp->tdis_bufsize = datasz;
 		i = datasz;
-	} else {
-		tp->tdis_eod += data_in_sz;
 	}
+	tp->tdis_pos = tp->tdis_data;
+	tp->tdis_len = i;
 	return i;
 }
 
@@ -481,8 +474,8 @@ transport_recv_pkt(int fd, int *type, void **data_out, size_t *len_out)
 	i = __recv_pkt(fd, type, tp);
 	if (i <= 0)
 		return i;
-	*data_out = (void *) tp->tdis_thebuf;
-	*len_out = tp->tdis_eod;
+	*data_out = (void *) tp->tdis_data;
+	*len_out = i;
 	dis_clear_buf(tp);
 	return *len_out;
 }
@@ -539,43 +532,12 @@ dis_get_writebuf(int fd)
 
 /**
  * @brief
- * 	dis_pack_buf - pack existing data into front of dis buffer
- *
- *	Moves "uncommited" data to front of dis buffer and adjusts counters.
- *
- * @param[in] tp - dis buffer to pack
- *
- * @return void
- *
- * @par Side Effects:
- *	None
- *
- * @par MT-safe: Yes
- *
- */
-static void
-dis_pack_buf(pbs_dis_buf_t *tp)
-{
-	size_t start = tp->tdis_trail;
-
-	if (start != 0) {
-		/* must use memmove as data may overlap */
-		memmove(tp->tdis_thebuf, (void *)(tp->tdis_thebuf + start), tp->tdis_eod - start);
-		tp->tdis_lead -= start;
-		tp->tdis_trail -= start;
-		tp->tdis_eod -= start;
-	}
-}
-
-/**
- * @brief
  * 	dis_resize_buf - resize given dis buffer to appropriate size based on given needed
  *
  * 	if use_lead is true then it will use tdis_lead to calculate new size else tdis_eod
  *
  * @param[in] tp - dis buffer to pack
  * @param[in] needed - min needed buffer size
- * @param[in] use_lead - use tdis_lead or tdis_eod to calculate new size
  *
  * @return int
  *
@@ -589,33 +551,17 @@ dis_pack_buf(pbs_dis_buf_t *tp)
  *
  */
 static int
-dis_resize_buf(pbs_dis_buf_t *tp, size_t needed, int use_lead)
+dis_resize_buf(pbs_dis_buf_t *tp, size_t needed)
 {
-	size_t len;
-	size_t dlen;
-	char *tmpcp;
-
-	if (use_lead)
-		dlen = tp->tdis_lead;
-	else
-		dlen = tp->tdis_eod;
-	len = tp->tdis_bufsize - dlen;
-	if (needed > len) {
-		size_t ru = 0;
-		size_t newsz = 0;
-		if (use_lead) {
-			ru = needed + tp->tdis_lead;
-		} else {
-			ru = needed + tp->tdis_lead + tp->tdis_eod;
-		}
-		ru = ru / PBS_DIS_BUFSZ;
-		newsz = (ru + 1) * PBS_DIS_BUFSZ;
-		tmpcp = (char *) realloc(tp->tdis_thebuf, sizeof(char) * newsz);
+	if ((tp->tdis_len + needed) >= tp->tdis_bufsize) {
+		int offset = tp->tdis_pos - tp->tdis_data;
+		char *tmpcp = (char *) realloc(tp->tdis_data, tp->tdis_bufsize + needed + PBS_DIS_BUFSZ);
 		if (tmpcp == NULL) {
 			return -1; /* realloc failed */
 		} else {
-			tp->tdis_thebuf = tmpcp;
-			tp->tdis_bufsize = newsz;
+			tp->tdis_data = tmpcp;
+			tp->tdis_bufsize = tp->tdis_bufsize + needed + PBS_DIS_BUFSZ;
+			tp->tdis_pos = tp->tdis_data + offset;
 		}
 	}
 	return 0;
@@ -639,9 +585,8 @@ dis_resize_buf(pbs_dis_buf_t *tp, size_t needed, int use_lead)
 void
 dis_clear_buf(pbs_dis_buf_t *tp)
 {
-	tp->tdis_lead = 0;
-	tp->tdis_trail = 0;
-	tp->tdis_eod = 0;
+	tp->tdis_pos = tp->tdis_data;
+	tp->tdis_len = 0;
 }
 
 /**
@@ -689,43 +634,13 @@ disr_skip(int fd, size_t ct)
 
 	if (tp == NULL)
 		return 0;
-	if (tp->tdis_lead - tp->tdis_eod < ct)
-		ct = tp->tdis_lead - tp->tdis_eod;
-	tp->tdis_lead += ct;
+	if (ct > tp->tdis_len)
+		dis_clear_buf(tp);
+	else {
+		tp->tdis_pos += ct;
+		tp->tdis_len -= ct;
+	}
 	return (int) ct;
-}
-
-/**
- * @brief
- * 	__transport_read - read data from connection to "fill" the buffer
- *	Update the various buffer pointers.
- *
- * @param[in] fd - socket descriptor
- * @param[in] need - needed bytes (used only for connection from old client)
- *
- * @return	int
- *
- * @retval	>0 	number of characters read
- * @retval	0 	if EOD (no data currently avalable)
- * @retval	-1 	if error
- * @retval	-2 	if EOF (stream closed)
- *
- * @par Side Effects:
- *	None
- *
- * @par MT-safe: Yes
- *
- */
-static int
-__transport_read(int fd, int need)
-{
-	int unused;
-	pbs_dis_buf_t *tp = dis_get_readbuf(fd);
-
-	if (tp == NULL)
-		return -1;
-	dis_pack_buf(tp);
-	return __recv_pkt(fd, &unused, tp);
 }
 
 /**
@@ -750,16 +665,24 @@ int
 dis_getc(int fd)
 {
 	pbs_dis_buf_t *tp = dis_get_readbuf(fd);
+	int c;
 
 	if (tp == NULL)
 		return -1;
-	if (tp->tdis_lead >= tp->tdis_eod) {
+	if (tp->tdis_len <= 0) {
 		/* not enought data, try to get more */
-		int x = __transport_read(fd, 1);
-		if (x <= 0)
-			return ((x == -2) ? -2 : -1); /* Error or EOF */
+		int unused;
+
+		dis_clear_buf(tp);
+		if ((c = __recv_pkt(fd, &unused, tp)) <= 0) {
+			dis_clear_buf(tp);
+			return c;  /* Error or EOF */
+		}
 	}
-	return ((int) tp->tdis_thebuf[tp->tdis_lead++]);
+	c = *tp->tdis_pos;
+	tp->tdis_pos++;
+	tp->tdis_len--;
+	return c;
 }
 
 /**
@@ -792,14 +715,20 @@ dis_gets(int fd, char *str, size_t ct)
 		*str = '\0';
 		return -1;
 	}
-	while (tp->tdis_eod - tp->tdis_lead < ct) {
+	if (tp->tdis_len <= 0) {
 		/* not enought data, try to get more */
-		int x = __transport_read(fd, ct);
-		if (x <= 0)
-			return x; /* Error or EOF */
+		int unused;
+		int c;
+
+		dis_clear_buf(tp);
+		if ((c = __recv_pkt(fd, &unused, tp)) <= 0) {
+			dis_clear_buf(tp);
+			return c;  /* Error or EOF */
+		}
 	}
-	(void) memcpy(str, &tp->tdis_thebuf[tp->tdis_lead], ct);
-	tp->tdis_lead += ct;
+	(void) memcpy(str, tp->tdis_pos, ct);
+	tp->tdis_pos += ct;
+	tp->tdis_len -= ct;
 	return (int) ct;
 }
 
@@ -830,17 +759,19 @@ dis_puts(int fd, const char *str, size_t ct)
 
 	if (tp == NULL)
 		return -1;
-	if (tp->tdis_lead == 0) {
-		if (dis_resize_buf(tp, ct + PKT_HDR_SZ, 1) != 0)
+	if (tp->tdis_len <= 0) {
+		if (dis_resize_buf(tp, ct + PKT_HDR_SZ) != 0)
 			return -1;
-		strcpy(tp->tdis_thebuf, PKT_MAGIC);
-		tp->tdis_lead += PKT_HDR_SZ;
+		strcpy(tp->tdis_data, PKT_MAGIC);
+		tp->tdis_pos = tp->tdis_data + PKT_HDR_SZ;
+		tp->tdis_len = PKT_HDR_SZ;
 	} else {
-		if (dis_resize_buf(tp, ct, 1) != 0)
+		if (dis_resize_buf(tp, ct) != 0)
 			return -1;
 	}
-	(void) memcpy(&tp->tdis_thebuf[tp->tdis_lead], str, ct);
-	tp->tdis_lead += ct;
+	(void) memcpy(tp->tdis_pos, str, ct);
+	tp->tdis_pos += ct;
+	tp->tdis_len += ct;
 	return ct;
 }
 
@@ -865,17 +796,6 @@ dis_puts(int fd, const char *str, size_t ct)
 int
 disr_commit(int fd, int commit_flag)
 {
-	pbs_dis_buf_t *tp = dis_get_readbuf(fd);
-
-	if (tp == NULL)
-		return -1;
-	if (commit_flag) {
-		/* commit by moving trailing up */
-		tp->tdis_trail = tp->tdis_lead;
-	} else {
-		/* uncommit by moving leading back */
-		tp->tdis_lead = tp->tdis_trail;
-	}
 	return 0;
 }
 
@@ -900,17 +820,6 @@ disr_commit(int fd, int commit_flag)
 int
 disw_commit(int fd, int commit_flag)
 {
-	pbs_dis_buf_t *tp = dis_get_writebuf(fd);
-
-	if (tp == NULL)
-		return -1;
-	if (commit_flag) {
-		/* commit by moving trailing up */
-		tp->tdis_trail = tp->tdis_lead;
-	} else {
-		/* uncommit by moving leading back */
-		tp->tdis_lead = tp->tdis_trail;
-	}
 	return 0;
 }
 
@@ -941,12 +850,11 @@ dis_flush(int fd)
 
 	if (tp == NULL)
 		return -1;
-	if (tp->tdis_trail == 0)
+	if (tp->tdis_len == 0)
 		return 0;
 	if (__send_pkt(fd, tp, 0) <= 0)
 		return -1;
-	tp->tdis_eod = tp->tdis_lead;
-	dis_pack_buf(tp);
+	dis_clear_buf(tp);
 	return 0;
 }
 
@@ -990,13 +898,13 @@ dis_destroy_chan(int fd)
 			chan->auths[FOR_ENCRYPT].def = NULL;
 			chan->auths[FOR_ENCRYPT].ctx_status = AUTH_STATUS_UNKNOWN;
 		}
-		if (chan->readbuf.tdis_thebuf) {
-			free(chan->readbuf.tdis_thebuf);
-			chan->readbuf.tdis_thebuf = NULL;
+		if (chan->readbuf.tdis_data) {
+			free(chan->readbuf.tdis_data);
+			chan->readbuf.tdis_data = NULL;
 		}
-		if (chan->writebuf.tdis_thebuf) {
-			free(chan->writebuf.tdis_thebuf);
-			chan->writebuf.tdis_thebuf = NULL;
+		if (chan->writebuf.tdis_data) {
+			free(chan->writebuf.tdis_data);
+			chan->writebuf.tdis_data = NULL;
 		}
 		free(chan);
 		transport_set_chan(fd, NULL);
@@ -1032,12 +940,8 @@ dis_setup_chan(int fd, pbs_tcp_chan_t *(*inner_transport_get_chan)(int) )
 			return;
 		chan = (pbs_tcp_chan_t *) calloc(1, sizeof(pbs_tcp_chan_t));
 		assert(chan != NULL);
-		chan->readbuf.tdis_thebuf = malloc(PBS_DIS_BUFSZ);
-		assert(chan->readbuf.tdis_thebuf != NULL);
-		chan->readbuf.tdis_bufsize = PBS_DIS_BUFSZ;
-		chan->writebuf.tdis_thebuf = malloc(PBS_DIS_BUFSZ);
-		assert(chan->writebuf.tdis_thebuf != NULL);
-		chan->writebuf.tdis_bufsize = PBS_DIS_BUFSZ;
+		dis_resize_buf(&(chan->readbuf), PBS_DIS_BUFSZ);
+		dis_resize_buf(&(chan->writebuf), PBS_DIS_BUFSZ);
 		rc = transport_set_chan(fd, chan);
 		assert(rc == 0);
 	}

@@ -209,11 +209,10 @@ extern void DIS_tcp_funcs();
 #define DIS_READ_BUF 1
 
 typedef struct pbs_dis_buf {
-	size_t tdis_lead;
-	size_t tdis_trail;
-	size_t tdis_eod;
 	size_t tdis_bufsize;
-	char *tdis_thebuf;
+	size_t tdis_len;
+	char *tdis_pos;
+	char *tdis_data;
 } pbs_dis_buf_t;
 
 typedef struct pbs_tcp_auth_data {
