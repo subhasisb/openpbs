@@ -301,7 +301,7 @@ __send_pkt(int fd, pbs_dis_buf_t *tp, int encrypt_done)
 	if (i != tp->tdis_len)
 		return -1;
 	dis_clear_buf(tp);
-	return i + PKT_HDR_SZ;
+	return i;
 }
 
 /**
@@ -394,6 +394,7 @@ __recv_pkt(int fd, int *type, pbs_dis_buf_t *tp)
 	size_t datasz;
 	char pkthdr[PKT_HDR_SZ];
 
+	dis_clear_buf(tp);
 	i = transport_recv(fd, (void *) &pkthdr, PKT_HDR_SZ);
 	if (i != PKT_HDR_SZ)
 		return (i < 0 ? i : -1);
@@ -426,11 +427,10 @@ __recv_pkt(int fd, int *type, pbs_dis_buf_t *tp)
 		free(tp->tdis_data);
 		tp->tdis_data = data;
 		tp->tdis_bufsize = datasz;
-		i = datasz;
 	}
 	tp->tdis_pos = tp->tdis_data;
-	tp->tdis_len = i;
-	return i;
+	tp->tdis_len = datasz;
+	return datasz;
 }
 
 /**
@@ -470,7 +470,6 @@ transport_recv_pkt(int fd, int *type, void **data_out, size_t *len_out)
 
 	if (tp == NULL)
 		return -1;
-	dis_clear_buf(tp);
 	i = __recv_pkt(fd, type, tp);
 	if (i <= 0)
 		return i;
@@ -554,7 +553,7 @@ static int
 dis_resize_buf(pbs_dis_buf_t *tp, size_t needed)
 {
 	if ((tp->tdis_len + needed) >= tp->tdis_bufsize) {
-		int offset = tp->tdis_pos - tp->tdis_data;
+		int offset = tp->tdis_len > 0 ? (tp->tdis_pos - tp->tdis_data) : 0;
 		char *tmpcp = (char *) realloc(tp->tdis_data, tp->tdis_bufsize + needed + PBS_DIS_BUFSZ);
 		if (tmpcp == NULL) {
 			return -1; /* realloc failed */
@@ -715,18 +714,21 @@ dis_gets(int fd, char *str, size_t ct)
 		*str = '\0';
 		return -1;
 	}
+	if (ct == 0) {
+		*str = '\0';
+		return ct;
+	}
 	if (tp->tdis_len <= 0) {
 		/* not enought data, try to get more */
 		int unused;
 		int c;
 
-		dis_clear_buf(tp);
 		if ((c = __recv_pkt(fd, &unused, tp)) <= 0) {
 			dis_clear_buf(tp);
 			return c;  /* Error or EOF */
 		}
 	}
-	(void) memcpy(str, tp->tdis_pos, ct);
+	memcpy(str, tp->tdis_pos, ct);
 	tp->tdis_pos += ct;
 	tp->tdis_len -= ct;
 	return (int) ct;
@@ -769,7 +771,7 @@ dis_puts(int fd, const char *str, size_t ct)
 		if (dis_resize_buf(tp, ct) != 0)
 			return -1;
 	}
-	(void) memcpy(tp->tdis_pos, str, ct);
+	memcpy(tp->tdis_pos, str, ct);
 	tp->tdis_pos += ct;
 	tp->tdis_len += ct;
 	return ct;
@@ -806,7 +808,6 @@ dis_flush(int fd)
 		return 0;
 	if (__send_pkt(fd, tp, 0) <= 0)
 		return -1;
-	dis_clear_buf(tp);
 	return 0;
 }
 
