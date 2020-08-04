@@ -210,6 +210,7 @@ aggr_job_ct(struct batch_status *cur, struct batch_status *nxt)
 	long tot_jobs = 0;
 	char *endp;
 	int found;
+	char **orig_st_ct = NULL;
 
 	if (!cur || !nxt)
 		return;
@@ -217,6 +218,7 @@ aggr_job_ct(struct batch_status *cur, struct batch_status *nxt)
 	for (a = cur->attribs, found = 0; a; a = a->next) {
 		if (a->name && strcmp(a->name, ATTR_count) == 0) {
 			decode_states(a->value, cur_st_ct);
+			orig_st_ct = &a->value;
 			found++;
 		} else if (a->name && strcmp(a->name, ATTR_total) == 0) {
 			tot_jobs_attr = a->value;
@@ -238,8 +240,8 @@ aggr_job_ct(struct batch_status *cur, struct batch_status *nxt)
 			break;
 	}
 
-	if (a && b)
-		encode_states(&a->value, cur_st_ct, nxt_st_ct);
+	if (orig_st_ct)
+		encode_states(orig_st_ct, cur_st_ct, nxt_st_ct);
 	if (tot_jobs_attr)
 		sprintf(tot_jobs_attr, "%ld", tot_jobs);
 }
@@ -260,12 +262,13 @@ assess_type(char *val, int *type, double *val_double, long *val_long)
 		else if (pc && *pc != '\0')
 			*type = STRING;
 	} else {
-		if ((*val_long = strtol(val, &pc, 10))) {
+		*val_long = strtol(val, &pc, 10);
+		if (!pc || *pc == '\0')
 			*type = LONG;
-			if (pc && (!strcasecmp(pc, "kb") || !strcasecmp(pc, "mb") || !strcasecmp(pc, "gb") ||
+		else if (pc && (!strcasecmp(pc, "kb") || !strcasecmp(pc, "mb") || !strcasecmp(pc, "gb") ||
 			    !strcasecmp(pc, "tb") || !strcasecmp(pc, "pb")))
 				*type = SIZE;
-		} else if (pc && *pc != '\0')
+		else
 			*type = STRING;
 	}
 }
@@ -369,12 +372,30 @@ aggr_resc_ct(struct batch_status *st1, struct batch_status *st2)
 }
 
 static void
-aggregate_queue(struct batch_status *sv1, struct batch_status *sv2)
+append_bs(struct batch_status *a, struct batch_status *b, struct batch_status *prev, struct batch_status *sv1, struct batch_status **sv2)
+{
+	if (!a) {
+		for (a = sv1; a->next; a = a->next)
+			;
+		a->next = b;
+		if (prev) {
+			prev->next = b->next;
+			prev->last = b->last;
+		} else {
+			*sv2 = b->next;
+		}
+		b->next = NULL;
+	}
+}
+
+static void
+aggregate_queue(struct batch_status *sv1, struct batch_status **sv2)
 {
 	struct batch_status *a = NULL;
 	struct batch_status *b = NULL;
+	struct batch_status *prev_b = NULL;
 
-	for (b = sv2; b; b = b->next) {
+	for (b = *sv2; b; prev_b = b, b = b->next) {
 		for (a = sv1; a; a = a->next) {
 			if (a->name && b->name && !strcmp(a->name, b->name)) {
 				aggr_job_ct(a, b);
@@ -382,6 +403,9 @@ aggregate_queue(struct batch_status *sv1, struct batch_status *sv2)
 				break;
 			}
 		}
+
+		if (!a)
+			append_bs(a, b, prev_b, sv1, sv2);
 	}
 }
 
@@ -450,7 +474,7 @@ PBSD_status_aggregate(int c, int cmd, char *id, struct attrl *attrib, char *exte
 						next = NULL;
 						break;
 					case MGR_OBJ_QUEUE:
-						aggregate_queue(ret, next);
+						aggregate_queue(ret, &next);
 						pbs_statfree(next);
 						next = NULL;
 						break;
