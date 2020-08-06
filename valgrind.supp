@@ -641,7 +641,7 @@
 {
    From PBS - Suppress intentional unfreed memory of auth struct inside global tpp_conf struct
    Memcheck:Leak
-   fun:calloc
+   fun:malloc
    fun:make_auth_config
    fun:set_tpp_config
    fun:main
@@ -669,5 +669,40 @@
    fun:calloc
    fun:tpp_get_tls
    fun:work
+   ...
+}
+{
+   From PBS - Suppress uninitialized job fs structure in mom
+   Memcheck:Param
+   write(buf)
+   ...
+   fun:job_save_fs
+   ...
+}
+{
+   From PBS - Suppress hook allocated buffer
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:malloc
+   fun:hook_alloc
+   fun:hook_recov
+   ...
+}
+{
+   From PBS - Suppress hook allocated buffer
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:malloc
+   fun:hook_alloc
+   fun:mgr_hook_create
+   ...
+}
+{
+   From PBS - Suppress uninitialized DIS buffer
+   Memcheck:Param
+   write(buf)
+   ...
+   fun:__send_pkt
+   fun:dis_flush
    ...
 }

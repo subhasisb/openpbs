@@ -52,9 +52,6 @@
 #include "libutil.h"
 #include "attribute.h"
 
-
-static struct batch_status *alloc_bs();
-
 enum state { TRANSIT_STATE,
 	     QUEUE_STATE,
 	     HELD_STATE,
@@ -159,7 +156,7 @@ random_srv_conn(svr_conn_t *svr_connections)
 
 	if (svr_connections[ind].state == SVR_CONN_STATE_CONNECTED)
 		return svr_connections[ind].sd;
-		
+
 	return get_available_conn(svr_connections);
 }
 
@@ -530,21 +527,8 @@ PBSD_status_random(int c, int cmd, char *id, struct attrl *attrib, char *extend,
 struct batch_status *
 PBSD_status_get(int c, int svr_index)
 {
-	struct brp_cmdstat  *stp; /* pointer to a returned status record */
-	struct batch_status *bsp  = NULL;
 	struct batch_status *rbsp = NULL;
 	struct batch_reply  *reply;
-	int i;
-	struct attrl *pat;
-	svr_conn_t *svr_conns;
-	int from_sched = 0;
-
-	svr_conns = get_conn_servers();
-	if (svr_conns == NULL)
-		return NULL;
-
-	if ((svr_index != -1) && (svr_conns[svr_index].secondary_sd != -1))
-		from_sched = 1;
 
 	/* read reply from stream into presentation element */
 
@@ -556,92 +540,9 @@ PBSD_status_get(int c, int svr_index)
 		reply->brp_choice != BATCH_REPLY_CHOICE_Status) {
 		pbs_errno = PBSE_PROTOCOL;
 	} else if (get_conn_errno(c) == 0) {
-		/* have zero or more attrl structs to decode here */
-		stp = reply->brp_un.brp_statc;
-		i = 0;
-		pbs_errno = 0;
-		while (stp != NULL) {
-			if (i++ == 0) {
-				rbsp = bsp = alloc_bs();
-				if (bsp == NULL) {
-					pbs_errno = PBSE_SYSTEM;
-					break;
-				}
-			} else {
-				bsp->next = alloc_bs();
-				bsp = bsp->next;
-				if (bsp == NULL) {
-					pbs_errno = PBSE_SYSTEM;
-					break;
-				}
-			}
-			if ((bsp->name = strdup(stp->brp_objname)) == NULL) {
-				pbs_errno = PBSE_SYSTEM;
-				break;
-			}
-			bsp->attribs = stp->brp_attrl;
-			if (stp->brp_attrl)
-				stp->brp_attrl = 0;
-			bsp->next = NULL;
-			rbsp->last = bsp;
-
-			if (from_sched) {
-				/*Add server_idx attribute */
-				pat = new_attrl();
-				if (pat == NULL) {
-					pbs_errno = PBSE_SYSTEM;
-					return NULL;
-				}
-				pat->name = strdup(ATTR_server_index);
-				if (pat->name == NULL) {
-					pbs_errno = PBSE_SYSTEM;
-					free_attrl(pat);
-					return NULL;
-				}
-
-				/* Memory of 3 bytes because we at most can have 99 servers.  So to represent this in string
-				we need an array of len 2 for server index + 1 for NULL char */
-				pat->value = malloc(3);
-				if (pat->value == NULL) {
-					pbs_errno = PBSE_SYSTEM;
-					free_attrl(pat);
-					free(pat->name);
-					return NULL;
-				}
-				
-				snprintf(pat->value, 3, "%d", svr_index);
-				
-				pat->next = bsp->attribs;			
-				bsp->attribs = pat;					
-			}
-
-			stp = stp->brp_stlink;
-		}
-		if (pbs_errno) {
-			pbs_statfree(rbsp);
-			rbsp = NULL;
-		}
+		rbsp = reply->brp_un.brp_statc;
+		reply->brp_un.brp_statc = NULL;
 	}
 	PBSD_FreeReply(reply);
 	return rbsp;
-}
-
-/**
- * @brief
- *	Allocate a batch status reply structure
- */
-static struct batch_status *
-alloc_bs()
-{
-	struct batch_status *bsp;
-
-	bsp = (struct batch_status *)malloc(sizeof(struct batch_status));
-	if (bsp) {
-
-		bsp->next = NULL;
-		bsp->name = NULL;
-		bsp->attribs = NULL;
-		bsp->text = NULL;
-	}
-	return bsp;
 }

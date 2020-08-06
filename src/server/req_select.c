@@ -348,7 +348,6 @@ req_selectjobs(struct batch_request *preq)
 	struct select_list *selistp;
 	pbs_sched *psched;
 	long job_limit = 0;
-	int count = 0;
 	long jcount = 0;
 
 	job_limit = server.sv_attr[SVR_ATR_job_stat_limit].at_val.at_long;
@@ -409,6 +408,7 @@ req_selectjobs(struct batch_request *preq)
 		CLEAR_HEAD(preply->brp_un.brp_status);
 	}
 	pselx = &preply->brp_un.brp_select;
+	preply->brp_count = 0;
 
 	/* now start checking for jobs that match the selection criteria */
 	if (pque)
@@ -434,7 +434,7 @@ req_selectjobs(struct batch_request *preq)
 
 					/* Select Jobs Reply */
 
-					preq->rq_reply.brp_auxcode += add_select_array_entries(pjob, dosubjobs, pstate, &pselx, selistp);
+					preply->brp_count += add_select_array_entries(pjob, dosubjobs, pstate, &pselx, selistp);
 
 				} else if ((pjob->ji_qs.ji_svrflags & JOB_SVFLG_SubJob) == 0 || dosubjobs == 2) {
 
@@ -444,13 +444,12 @@ req_selectjobs(struct batch_request *preq)
 					if (dosubjobs == 1 && pjob->ji_ajtrk) {
 						for (i = 0; i < pjob->ji_ajtrk->tkm_ct; i++) {
 							if (pstate == 0 || chk_job_statenum(pjob->ji_ajtrk->tkm_tbl[i].trk_status, pstate)) {
-								if (count >= MAX_JOBS_PER_REPLY) {
+								if (preply->brp_count >= MAX_JOBS_PER_REPLY) {
 									rc = reply_send_status_part(preq);
 									if (rc != PBSE_NONE)
 										return;
-									count = 0;
+									preply->brp_count = 0;
 								}
-								count++;
 								rc = status_subjob(pjob, preq, plist, i, &preply->brp_un.brp_status, &bad);
 								if (rc && rc != PBSE_PERM)
 									goto out;
@@ -471,11 +470,10 @@ req_selectjobs(struct batch_request *preq)
 			pjob = (job *) GET_NEXT(pjob->ji_jobque);
 		else
 			pjob = (job *) GET_NEXT(pjob->ji_alljobs);
-		if (preq->rq_type != PBS_BATCH_SelectJobs && count++ >= MAX_JOBS_PER_REPLY && pjob) {
+		if (preq->rq_type != PBS_BATCH_SelectJobs && preply->brp_count >= MAX_JOBS_PER_REPLY && pjob) {
 			rc = reply_send_status_part(preq);
 			if (rc != PBSE_NONE)
 				return;
-			count = 0;
 		}
 	}
 out:
