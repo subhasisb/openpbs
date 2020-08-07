@@ -370,7 +370,7 @@ req_stat_job(struct batch_request *preq)
 		 */
 		pnxtjid = name;
 		while ((name = parse_comma_string_r(&pnxtjid)) != NULL) {
-			if ((rc = stat_a_jobidname(preq, name, dohistjobs, dosubjobs, &count)) == PBSE_NONE)
+			if ((rc = stat_a_jobidname(preq, name, dohistjobs, dosubjobs)) == PBSE_NONE)
 				at_least_one_success = 1;
 		}
 		if (at_least_one_success == 1)
