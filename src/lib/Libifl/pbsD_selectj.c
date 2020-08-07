@@ -113,7 +113,7 @@ PBSD_select_get(int c, struct reply_list **rlist)
 char **
 reply_to_jobarray(struct reply_list *rlist) {
 	int i;
-	int   njobs;
+	int   njobs = 0;
 	char *sp;
 	int   stringtot;
 	size_t totsize;
@@ -124,33 +124,26 @@ reply_to_jobarray(struct reply_list *rlist) {
 	if (!rlist)
 		return NULL;
 
-	stringtot = 0;
-	njobs = 0;
 	cur = rlist;
-	sr = cur->reply->brp_un.brp_select;
-	while (sr) {
-		stringtot += strlen(sr->brp_jobid) + 1;
-		njobs++;
-		sr = sr->brp_next;
-		if (!sr && cur->next) {
-			cur = cur->next;
-			sr = cur->reply->brp_un.brp_select;
-		}
+	while (cur) {
+		njobs += cur->reply->brp_count;
+		cur = cur->next;
 	}
-
+	stringtot = njobs * (PBS_MAXSVRJOBID + 1);
 	totsize = stringtot + (njobs + 1) * (sizeof(char *));
 	retval = (char **)malloc(totsize);
 	if (retval == NULL) {
 		pbs_errno = PBSE_SYSTEM;
 		return NULL;
 	}
+
 	cur = rlist;
 	sr = cur->reply->brp_un.brp_select;
 	sp = (char *)retval + (njobs + 1) * sizeof(char *);
 	for (i = 0; i < njobs; i++) {
 		retval[i] = sp;
 		strcpy(sp, sr->brp_jobid);
-		sp += strlen(sp) + 1;
+		sp += (PBS_MAXSVRJOBID + 1);
 		sr = sr->brp_next;
 		if (!sr && cur->next) {
 			cur = cur->next;
@@ -345,62 +338,4 @@ PBSD_select_put(int c, int type, struct attropl *attrib,
 	}
 
 	return 0;
-}
-
-/**
- * @brief
- *	-reads selectjob reply from stream
- *
- * @param[in] c - communication handle
- *
- * @return	string list
- * @retval	list of strings		success
- * @retval	NULL			error
- *
- */
-static char **
-PBSD_select_get(int c)
-{
-	int   i;
-	struct batch_reply *reply;
-	int   njobs;
-	char *sp;
-	int   stringtot;
-	size_t totsize;
-	struct brp_select *sr;
-	char **retval = NULL;
-
-	/* read reply from stream */
-
-	reply = PBSD_rdrpy(c);
-	if (reply == NULL) {
-		pbs_errno = PBSE_PROTOCOL;
-	} else if (reply->brp_choice != BATCH_REPLY_CHOICE_NULL &&
-		reply->brp_choice != BATCH_REPLY_CHOICE_Text &&
-		reply->brp_choice != BATCH_REPLY_CHOICE_Select) {
-		pbs_errno = PBSE_PROTOCOL;
-	} else if (get_conn_errno(c) == 0) {
-		njobs = reply->brp_count;
-		stringtot = njobs * (PBS_MAXSVRJOBID + 1);
-		totsize = stringtot + (njobs + 1) * (sizeof(char *));
-		retval = (char **)malloc(totsize);
-		if (retval == NULL) {
-			pbs_errno = PBSE_SYSTEM;
-			PBSD_FreeReply(reply);
-			return NULL;
-		}
-		sr = reply->brp_un.brp_select;
-		sp = (char *)retval + (njobs + 1) * sizeof(char *);
-		for (i = 0; i < njobs; i++) {
-			retval[i] = sp;
-			strcpy(sp, sr->brp_jobid);
-			sp += (PBS_MAXSVRJOBID + 1);
-			sr = sr->brp_next;
-		}
-		retval[i] = NULL;
-	}
-
-	PBSD_FreeReply(reply);
-
-	return retval;
 }
