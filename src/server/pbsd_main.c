@@ -715,28 +715,26 @@ int
 main(int argc, char **argv)
 {
 	char *nodename = NULL;
-	int			are_primary;
-	int			c, rc;
-	int			i;
-	int			tppfd;		/* fd to receive is HELLO's */
-	struct			tpp_config tpp_conf;
-	char			lockfile[MAXPATHLEN+1];
-	char			**origevp;
-	char			*pc;
-	pbs_queue		*pque;
-	char			*servicename;
-	time_t			svrlivetime;
-	int			sock;
-	struct stat 		sb_sa;
-	struct batch_request	*periodic_req;
-	char			hook_msg[HOOK_MSG_SIZE];
-	pbs_sched		*psched;
-	char			*keep_daemon_name = NULL;
-
-	pid_t			sid = -1;
-
-	long			*state;
-	time_t			waittime;
+	int are_primary;
+	int c, rc;
+	int i;
+	int tppfd; /* fd to receive is HELLO's */
+	struct tpp_config tpp_conf;
+	char lockfile[MAXPATHLEN + 1];
+	char **origevp;
+	char *pc;
+	pbs_queue *pque;
+	char *servicename;
+	time_t svrlivetime;
+	int sock;
+	struct stat sb_sa;
+	struct batch_request *periodic_req;
+	char hook_msg[HOOK_MSG_SIZE];
+	pbs_sched *psched;
+	char *keep_daemon_name = NULL;
+	pid_t sid = -1;
+	long *state;
+	time_t waittime;
 #ifdef _POSIX_MEMLOCK
 	int			do_mlockall = 0;
 #endif	/* _POSIX_MEMLOCK */
@@ -1016,8 +1014,6 @@ main(int argc, char **argv)
 		log_err(errno, msg_daemonname, log_buffer);
 		return (2);
 	}
-
-	server.sv_started = time(&time_now);	/* time server started */
 
 	CLEAR_HEAD(svr_requests);
 	CLEAR_HEAD(task_list_immed);
@@ -1627,13 +1623,12 @@ try_db_again:
 	}
 	process_hooks(periodic_req, hook_msg, sizeof(hook_msg), pbs_python_set_interrupt);
 
-	if (server_init_type != RECOV_CREATE) {
-		/*
-		 * Make the scheduler (re)-read the configuration
-		 * and fairshare usage.
-		 */
-		set_scheduler_flag(SCH_CONFIGURE, dflt_scheduler);
-	}
+	/*
+	 * Make the scheduler (re)-read the configuration
+	 * and fairshare usage.
+	 */
+	(void)contact_sched(SCH_CONFIGURE, NULL, pbs_scheduler_addr, pbs_scheduler_port);
+	(void)contact_sched(SCH_SCHEDULE_NULL, NULL, pbs_scheduler_addr, pbs_scheduler_port);
 
 	/*
 	 * main loop of server
