@@ -1623,12 +1623,13 @@ try_db_again:
 	}
 	process_hooks(periodic_req, hook_msg, sizeof(hook_msg), pbs_python_set_interrupt);
 
-	/*
-	 * Make the scheduler (re)-read the configuration
-	 * and fairshare usage.
-	 */
-	(void)contact_sched(SCH_CONFIGURE, NULL, pbs_scheduler_addr, pbs_scheduler_port);
-	(void)contact_sched(SCH_SCHEDULE_NULL, NULL, pbs_scheduler_addr, pbs_scheduler_port);
+	if (server_init_type != RECOV_CREATE) {
+		/*
+		 * Make the scheduler (re)-read the configuration
+		 * and fairshare usage.
+		 */
+		set_scheduler_flag(SCH_CONFIGURE, dflt_scheduler);
+	}
 
 	/*
 	 * main loop of server
