@@ -618,23 +618,13 @@ query_node_info(struct batch_status *node, server_info *sinfo)
 	}
 
 	ninfo->server = sinfo;
+	ninfo->svr_index = sinfo->my_index;
 
 	while (attrp != NULL) {
 		/* Node State... i.e. offline down free etc */
 		if (!strcmp(attrp->name, ATTR_NODE_state))
 			set_node_info_state(ninfo, attrp->value);
 
-		else if (!strcmp(attrp->name, ATTR_server_index)) {
-			count = strtol(attrp->value, &endp, 10);
-			if (*endp == '\0')
-				ninfo->svr_index = count;
-			else
-				ninfo->svr_index = -1;
-			if (ninfo->svr_index == -1) {
-				free_node_info(ninfo);
-				return NULL;
-			}
-		}
 		/* Host name */
 		else if (!strcmp(attrp->name, ATTR_NODE_Mom)) {
 			if (ninfo->mom)
@@ -4871,7 +4861,7 @@ create_execvnode(nspec **ns)
  *
  * @param[in]	execvnode	-	the execvnode to parse
  * @param[in]	sinfo		-	server to get the nodes from
- * @param[in]	sel		- select to map 
+ * @param[in]	sel		- select to map
  *
  * @return	a newly allocated nspec array for the execvnode
  *

@@ -1164,6 +1164,7 @@ query_job(struct batch_status *job, server_info *sinfo, schd_error *err)
 	attrp = job->attribs;
 
 	resresv->server = sinfo;
+	resresv->svr_index = sinfo->my_index;
 
 	resresv->is_job = 1;
 
@@ -1216,17 +1217,6 @@ query_job(struct batch_status *job, server_info *sinfo, schd_error *err)
 #ifdef NAS /* localmod 045 */
 			resresv->job->NAS_pri = resresv->job->priority;
 #endif /* localmod 045 */
-		}
-		else if (!strcmp(attrp->name, ATTR_server_index)) {
-			count = strtol(attrp->value, &endp, 10);
-			if (*endp == '\0')
-				resresv->svr_index = count;
-			else
-				resresv->svr_index = -1;
-			if (resresv->svr_index == -1) {
-				free_resource_resv(resresv);
-				return NULL;
-			}
 		}
 		else if (!strcmp(attrp->name, ATTR_qtime)) { /* queue time */
 			count = strtol(attrp->value, &endp, 10);

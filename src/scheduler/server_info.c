@@ -216,6 +216,13 @@ query_server(status *pol, int pbs_sd)
 		return NULL;
 	}
 
+	if ((sinfo->my_index = get_svr_index_bysd(pbs_sd)) == -1) {
+		pbs_statfree(server);
+		sinfo->fairshare = NULL;
+		free_server(sinfo);
+		return NULL;
+	}
+
 	/* We dup'd the policy structure for the cycle */
 	policy = sinfo->policy;
 

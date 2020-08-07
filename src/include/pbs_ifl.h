@@ -158,7 +158,6 @@ extern "C" {
 #define ATTR_state	"job_state"
 #define ATTR_queue	"queue"
 #define ATTR_server	"server"
-#define ATTR_server_index "server_index"
 #define ATTR_maxrun	"max_running"
 #define ATTR_max_run		"max_run"
 #define ATTR_max_run_res	"max_run_res"

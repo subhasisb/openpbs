@@ -289,7 +289,9 @@ add_str_to_unique_array(char ***str_arr, char *str);
  */
 void free_ptr_array (void *inp);
 
-int get_svr_index(char *svrname);
+int get_svr_index(char *);
+void * get_conn_servers(void);
+int get_svr_index_bysd(int);
 
 #ifdef	__cplusplus
 }

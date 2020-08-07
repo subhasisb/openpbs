@@ -266,7 +266,7 @@ get_hostsockaddr(char *host, struct sockaddr_in *sap)
  * @param[in]   server - The hostname of the pbs server to connect to.
  * @param[in]   port - Port number of the pbs server to connect to.
  * @param[in]   extend_data - a string to send as "extend" data
- * 
+ *
  *
  * @return int
  * @retval >= 0	The physical server socket.
@@ -297,7 +297,7 @@ tcp_connect(char *server, int server_port, char *extend_data)
 	if (sd == -1) {
 		pbs_errno = PBSE_SYSTEM;
 		return -1;
-	}	
+	}
 
 	strncpy(pbs_server, server, sizeof(pbs_server)-1); /* set for error messages from commands */
 	pbs_server[sizeof(pbs_server) - 1] = '\0';
@@ -324,7 +324,7 @@ tcp_connect(char *server, int server_port, char *extend_data)
 		pbs_errno = errno;
 		return -1;
 	}
-	
+
 	/* setup connection level thread context */
 	if (pbs_client_thread_init_connect_context(sd) != 0) {
 		CLOSESOCKET(sd);
@@ -481,7 +481,7 @@ connect_to_server(int idx, svr_conn_t *conn_arr, char *extend_data)
 
 /**
  * @brief
- * 	To connect to all the servers, fill up the connection table 
+ * 	To connect to all the servers, fill up the connection table
  * 	and returns the first connected socket.
  *
  * @param[in]	server_name - name of the server to connect to (NULL if not known)
@@ -492,7 +492,7 @@ connect_to_server(int idx, svr_conn_t *conn_arr, char *extend_data)
  * @retval >0 - success
  * @retval -1 - error
  */
-int 
+int
 connect_to_servers(char *server_name, uint port, char *extend_data)
 {
 	int i = 0;
@@ -592,9 +592,9 @@ __pbs_connect_extend(char *server, char *extend_data)
 		pbs_errno = PBSE_INTERNAL;
 		return -1;
 	}
-	
+
 	/* Returning here  */
-	
+
 	return sock;
 
 	if (pbs_conf.pbs_primary && pbs_conf.pbs_secondary) {

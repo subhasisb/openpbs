@@ -426,6 +426,7 @@ struct server_info
 	unsigned use_hard_duration:1;	/* use hard duration when creating the calendar */
 	unsigned pset_metadata_stale:1;	/* The placement set meta data is stale and needs to be regenerated before the next use */
 	char *name;			/* name of server */
+	int my_index;			/* my index in svr_conns array */
 	struct schd_resource *res;	/* list of resources */
 	void *liminfo;			/* limit storage information */
 	int flt_lic;			/* number of free floating licences */

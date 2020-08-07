@@ -1655,3 +1655,29 @@ get_svr_index(char *svrname)
 
 	return svrindex;
 }
+
+/**
+ * @brief	Set the server index value for the svr sd
+ *
+ * @param[in]	sd - connection sd to server
+ *
+ * @return int
+ * @retval server index
+ * @retval -1 for failure
+ */
+int
+get_svr_index_bysd(int sd)
+{
+	int i;
+	int svrindex = -1;
+	svr_conn_t *conns = get_conn_servers();
+
+	for (i = 0; i < get_num_servers(); i++) {
+		if (conns[i].sd == sd) {
+			svrindex = i;
+			break;
+		}
+	}
+
+	return svrindex;
+}

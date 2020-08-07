@@ -249,7 +249,6 @@ done:
 struct batch_status *
 __pbs_selstat(int c, struct attropl *attrib, struct attrl *rattrib, char *extend)
 {
-	extern struct batch_status *PBSD_status_get(int c, int svr_index);
 	int i;
 	struct batch_status *ret = NULL;
 	struct batch_status *next = NULL;
@@ -282,7 +281,7 @@ __pbs_selstat(int c, struct attropl *attrib, struct attrl *rattrib, char *extend
 
 
 		if (PBSD_select_put(c, PBS_BATCH_SelStat, attrib, rattrib, extend) == 0) {
-			if ((next = PBSD_status_get(c, i))) {
+			if ((next = PBSD_status_get(c))) {
 				if (!ret) {
 					ret = next;
 					cur = next->last;

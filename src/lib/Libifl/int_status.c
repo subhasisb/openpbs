@@ -177,10 +177,9 @@ random_srv_conn(svr_conn_t *svr_connections)
  *
  */
 struct batch_status *
-PBSD_status(int c, int svr_index, int function, char *objid, struct attrl *attrib, char *extend)
+PBSD_status(int c, int function, char *objid, struct attrl *attrib, char *extend)
 {
 	int rc;
-	struct batch_status *PBSD_status_get(int c, int svr_index);
 
 	/* send the status request */
 
@@ -193,7 +192,7 @@ PBSD_status(int c, int svr_index, int function, char *objid, struct attrl *attri
 	}
 
 	/* get the status reply */
-	return (PBSD_status_get(c, svr_index));
+	return (PBSD_status_get(c));
 }
 
 static void
@@ -435,7 +434,7 @@ PBSD_status_aggregate(int c, int cmd, char *id, struct attrl *attrib, char *exte
 		if (pbs_client_thread_lock_connection(c) != 0)
 			return NULL;
 
-		if ((next = PBSD_status(c, i, cmd, id, attrib, extend))) {
+		if ((next = PBSD_status(c, cmd, id, attrib, extend))) {
 			if (!ret) {
 				ret = next;
 				cur = next->last;
@@ -505,7 +504,7 @@ PBSD_status_random(int c, int cmd, char *id, struct attrl *attrib, char *extend,
 	if (pbs_client_thread_lock_connection(c) != 0)
 		return NULL;
 
-	ret = PBSD_status(c, -1, cmd, id, attrib, extend);
+	ret = PBSD_status(c, cmd, id, attrib, extend);
 
 	/* unlock the thread lock and update the thread context data */
 	if (pbs_client_thread_unlock_connection(c) != 0)
@@ -525,7 +524,7 @@ PBSD_status_random(int c, int cmd, char *id, struct attrl *attrib, char *extend,
  * @retval NULL on failure
  */
 struct batch_status *
-PBSD_status_get(int c, int svr_index)
+PBSD_status_get(int c)
 {
 	struct batch_status *rbsp = NULL;
 	struct batch_reply  *reply;
