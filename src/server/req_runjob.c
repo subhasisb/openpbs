@@ -307,10 +307,6 @@ void
 move_and_runjob(struct batch_request *preq, job *pjob)
 {
 	char *dest;
-	//int sock;
-	//int conn = -1;
-	pbs_net_t	 hostaddr;
-	unsigned int	 port = pbs_server_port_dis;
 
 	dest = strdup(preq->rq_ind.rq_run.rq_destin);
 	free(preq->rq_ind.rq_run.rq_destin);
@@ -319,29 +315,6 @@ move_and_runjob(struct batch_request *preq, job *pjob)
 	strcpy(preq->rq_ind.rq_move.rq_jid, pjob->ji_qs.ji_jobid);
 	sprintf(preq->rq_ind.rq_move.rq_destin, "%s@%s", pjob->ji_qs.ji_queue, preq->rq_extend);
 	preq->rq_ind.rq_move.run_exec_vnode = dest;
-
-	get_hostaddr_port_from_svr(preq->rq_ind.rq_move.rq_destin, &hostaddr, &port);
-
-	/*sock = get_peer_server_sock(hostaddr, port);
-	if (sock != -1 && !is_socket_up(sock)) {
-		log_eventf(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_INFO,
-				__func__, "Error from peer server socket fd, "
-				"closing connection: %d", sock);
-		close_conn(sock);
-		sock = -1;
-	}
-
-	if (sock == -1) {
-		if ((conn = connect_2_svr(hostaddr, port)) == -1) {
-			req_reject(SEND_JOB_FATAL, 0, preq);
-			return;
-		}
-
-		log_eventf(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_INFO,
-			   __func__, "New Peer Server fd of server: %s is :%d",
-			   preq->rq_extend, conn);
-		set_peer_server_conn(conn);
-	}*/
 
 	req_movejob(preq);
 }

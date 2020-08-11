@@ -1018,7 +1018,6 @@ setup_nodes()
 	CLEAR_HEAD(atrlist);
 
 	tfree2(&streams);
-	tfree2(&ipaddrs);
 
 	svr_totnodes = 0;
 

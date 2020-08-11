@@ -100,6 +100,7 @@ extern char	*path_hooks_rescdef;
 extern char	*msg_new_inventory_mom;
 
 extern int remove_mom_ipaddresses_list(mominfo_t *pmom);
+extern int make_host_addresses_list(char *phost, u_long **pul);
 
 /*
  * The following function are used by both the Server and Mom
@@ -340,13 +341,16 @@ find_mom_entry(char *hostname, unsigned int port)
  */
 
 mominfo_t *
-create_svrmom_entry(char *hostname, unsigned int port, unsigned long *pul)
+create_svrmom_entry(char *hostname, unsigned int port, unsigned long *pul, int peer_svr)
 {
 	mominfo_t     *pmom;
 	mom_svrinfo_t *psvrmom;
 	extern struct tree  *ipaddrs;
 
-	pmom = create_mom_entry(hostname, port);
+	if (peer_svr)
+		pmom = create_svr_entry(hostname, port);
+	else
+		pmom = create_mom_entry(hostname, port);
 	if (pmom == NULL) {
 		free(pul);
 		return pmom;
@@ -398,6 +402,19 @@ create_svrmom_entry(char *hostname, unsigned int port, unsigned long *pul)
 	}
 
 	return pmom;
+}
+
+mominfo_t*
+create_svrmom_struct(char *phost, int port)
+{
+	u_long		*pul = NULL;
+
+	if (make_host_addresses_list(phost, &pul)) {
+		free(pul);
+		return NULL;
+	}
+
+	return create_svrmom_entry(phost, port, pul, 1);
 }
 
 /**

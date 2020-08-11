@@ -383,13 +383,15 @@ static void
 post_movejob(struct work_task *pwt)
 {
 	struct batch_request *req;
-	int	newstate;
-	int	newsub;
-	int	stat;
-	int	r;
-	job	*jobp;
+	int newstate;
+	int newsub;
+	int stat;
+	int r;
+	job *jobp;
+	int prot = pwt->wt_aux2;
+	int wstat = pwt->wt_aux;
 
-	req  = (struct batch_request *)pwt->wt_parm1;
+	req = (struct batch_request *) pwt->wt_parm1;
 	stat = pwt->wt_aux;
 	pbs_errno = PBSE_NONE;
 	if (req->rq_type != PBS_BATCH_MoveJob) {
@@ -399,53 +401,75 @@ post_movejob(struct work_task *pwt)
 	}
 
 	jobp = find_job(req->rq_ind.rq_move.rq_jid);
-	if ((jobp == NULL) || (jobp != (job *)pwt->wt_parm2)) {
+
+	if (prot == PROT_TCP) {
+		if (WIFEXITED(stat)) {
+			r = WEXITSTATUS(stat);
+			if (r != SEND_JOB_OK) {
+				r = PBSE_ROUTEREJ;
+			}
+		} else
+			r = PBSE_SYSTEM;
+
+	} else {
+		switch (wstat) {
+		case PBSE_NONE:
+			r = SEND_JOB_OK;
+			break;
+		case PBSE_SYSTEM:
+			r = PBSE_SYSTEM;
+			break;
+		default:
+			r = PBSE_ROUTEREJ;
+			break;
+		}
+	}
+
+	if ((jobp == NULL) || (jobp != (job *) pwt->wt_parm2)) {
 		sprintf(log_buffer,
 			"job %s not found",
 			req->rq_ind.rq_move.rq_jid);
 		log_err(-1, __func__, log_buffer);
-
+		req_reject(r, 0, req);
+		return;
 	}
 
-	if (WIFEXITED(stat)) {
-		r = WEXITSTATUS(stat);
-		if (r == SEND_JOB_OK) {	/* purge server's job structure */
-			if (jobp->ji_qs.ji_svrflags & JOB_SVFLG_StagedIn)
-				remove_stagein(jobp);
-			(void)strcpy(log_buffer, msg_movejob);
-			(void)sprintf(log_buffer+strlen(log_buffer),
-				msg_manager,
-				req->rq_ind.rq_move.rq_destin,
-				req->rq_user, req->rq_host);
-			/*
+	switch (r) {
+	case SEND_JOB_OK:
+		if (jobp->ji_qs.ji_svrflags & JOB_SVFLG_StagedIn)
+			remove_stagein(jobp);
+		strcpy(log_buffer, msg_movejob);
+		sprintf(log_buffer + strlen(log_buffer),
+			msg_manager,
+			req->rq_ind.rq_move.rq_destin,
+			req->rq_user, req->rq_host);
+		/*
 			 * If server is configured to keep job history info and
 			 * the job is created here, then keep the job struture
 			 * for history purpose without purging. No need to check
 			 * for sub-jobs as sub jobs can't be moved.
 			 */
-			if (svr_chk_history_conf())
-				svr_setjob_histinfo(jobp, T_MOV_JOB);
-			else
-				job_purge(jobp);
-		} else
-			r = PBSE_ROUTEREJ;
-	} else {
-		r = PBSE_SYSTEM;
-		(void)sprintf(log_buffer, msg_badexit, stat);
-		(void)strcat(log_buffer, __func__);
-		log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_JOB, LOG_NOTICE,
-			jobp->ji_qs.ji_jobid, log_buffer);
-	}
+		if (svr_chk_history_conf())
+			svr_setjob_histinfo(jobp, T_MOV_JOB);
+		else
+			job_purge(jobp);
+		reply_ack(req);
+		break;
 
-	if (r) {
+	case PBSE_SYSTEM:
+		sprintf(log_buffer, msg_badexit, stat);
+		strcat(log_buffer, __func__);
+		log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_JOB, LOG_NOTICE,
+			  jobp->ji_qs.ji_jobid, log_buffer);
+
+	default:
 		if (jobp) {
 			/* force re-eval of job state out of Transit */
 			svr_evaljobstate(jobp, &newstate, &newsub, 1);
 			svr_setjobstate(jobp, newstate, newsub);
 		}
 		req_reject(r, 0, req);
-	} else
-		reply_ack(req);
+	}
 
 	return;
 }
@@ -467,7 +491,7 @@ post_movejob(struct work_task *pwt)
  *
  */
 int
-send_job_exec(job *jobp, pbs_net_t hostaddr, int port, struct batch_request *request)
+send_job_exec(job *jobp, pbs_net_t hostaddr, int port, int move_type, struct batch_request *request)
 {
 	pbs_list_head attrl;
 	attribute *pattr;
@@ -487,6 +511,10 @@ send_job_exec(job *jobp, pbs_net_t hostaddr, int port, struct batch_request *req
 	struct work_task *ptask = NULL;
 	int save_resc_access_perm;
 	char *extend = NULL;
+	void (*post_func)(struct work_task *) = post_sendmom;
+
+	if (move_type == MOVE_TYPE_Move_Run)
+		post_func = post_movejob;
 
 	/* saving resc_access_perm global variable as backup */
 	save_resc_access_perm = resc_access_perm;
@@ -499,10 +527,8 @@ send_job_exec(job *jobp, pbs_net_t hostaddr, int port, struct batch_request *req
 		goto send_err;
 	}
 
-	pmom = tfind2((unsigned long) jobp->ji_qs.ji_un.ji_exect.ji_momaddr,
-		jobp->ji_qs.ji_un.ji_exect.ji_momport,
-		&ipaddrs);
-	if (!pmom || (((mom_svrinfo_t *)(pmom->mi_data))->msr_state & INUSE_DOWN)) {
+	pmom = tfind2(hostaddr, port, &ipaddrs);
+	if (!pmom || (((mom_svrinfo_t *) (pmom->mi_data))->msr_state & INUSE_DOWN)) {
 		log_event(PBSEVENT_ERROR, PBS_EVENTCLASS_REQUEST, LOG_WARNING, "", "Mom is down");
 		pbs_errno = PBSE_NORELYMOM;
 		goto send_err;
@@ -510,27 +536,34 @@ send_job_exec(job *jobp, pbs_net_t hostaddr, int port, struct batch_request *req
 
 	CLEAR_HEAD(attrl);
 
-	resc_access_perm = ATR_DFLAG_MOM;
-	encode_type = ATR_ENCODE_MOM;
+	if (move_type == MOVE_TYPE_Move_Run) {
+		resc_access_perm = ATR_DFLAG_USWR | ATR_DFLAG_OPWR |
+				   ATR_DFLAG_MGWR | ATR_DFLAG_SvRD;
+		encode_type = ATR_ENCODE_SVR;
+	} else {
+		resc_access_perm = ATR_DFLAG_MOM;
+		encode_type = ATR_ENCODE_MOM;
+	}
 
 	pattr = jobp->ji_wattr;
 	for (i = 0; i < (int) JOB_ATR_LAST; i++) {
 		if ((job_attr_def + i)->at_flags & resc_access_perm) {
-			(void)(job_attr_def + i)->at_encode(pattr + i, &attrl,
-				(job_attr_def + i)->at_name, NULL, encode_type,
-				NULL);
+			(void) (job_attr_def + i)->at_encode(pattr + i, &attrl, (job_attr_def + i)->at_name, NULL, encode_type, NULL);
 		}
 	}
 	attrl_fixlink(&attrl);
 	/* save the job id for when after we purge the job */
 
 	/* read any credential file */
-	(void)get_credential(pmom->mi_host, jobp, PBS_GC_BATREQ, &credbuf, &credlen);
+	get_credential(pmom->mi_host, jobp, PBS_GC_BATREQ, &credbuf, &credlen);
 
-	(void) strcpy(job_id, jobp->ji_qs.ji_jobid);
+	strcpy(job_id, jobp->ji_qs.ji_jobid);
 
-	if (((jobp->ji_qs.ji_svrflags & JOB_SVFLG_SCRIPT) == 0) && (credlen <= 0) && ((jobp->ji_qs.ji_svrflags & JOB_SVFLG_HASRUN) == 0))
+	if ((move_type != MOVE_TYPE_Move_Run) && ((jobp->ji_qs.ji_svrflags & JOB_SVFLG_SCRIPT) == 0) &&
+	    (credlen <= 0) && ((jobp->ji_qs.ji_svrflags & JOB_SVFLG_HASRUN) == 0)) {
 		extend = EXTEND_OPT_IMPLICIT_COMMIT;
+		log_err(-1, __func__, "explicit commit");
+	    }
 
 	pqjatr = &((svrattrl *) GET_NEXT(attrl))->al_atopl;
 	jobid = PBSD_queuejob(stream, jobp->ji_qs.ji_jobid, destin, pqjatr, extend, PROT_TPP, &msgid, NULL);
@@ -541,7 +574,7 @@ send_job_exec(job *jobp, pbs_net_t hostaddr, int port, struct batch_request *req
 	tpp_add_close_func(stream, process_DreplyTPP); /* register a close handler */
 
 	/* adding msgid to deferred list, dont free msgid */
-	if ((ptask = add_mom_deferred_list(stream, pmom, post_sendmom, msgid, request, jobp)) == NULL) {
+	if ((ptask = add_mom_deferred_list(stream, pmom, post_func, msgid, request, jobp)) == NULL) {
 		log_event(PBSEVENT_ERROR, PBS_EVENTCLASS_REQUEST, LOG_WARNING, "", "add_mom_deferred_list returned NULL");
 		pbs_errno = PBSE_SYSTEM;
 		goto send_err;
@@ -591,16 +624,21 @@ send_job_exec(job *jobp, pbs_net_t hostaddr, int port, struct batch_request *req
 
 	if ((jobp->ji_qs.ji_svrflags & JOB_SVFLG_HASRUN) && (hostaddr != pbs_server_addr)) {
 		if ((move_job_file(stream, jobp, StdOut, PROT_TPP, &dup_msgid) != 0) ||
-			(move_job_file(stream, jobp, StdErr, PROT_TPP, &dup_msgid) != 0) ||
-			(move_job_file(stream, jobp, Chkpt, PROT_TPP, &dup_msgid) != 0))
+		    (move_job_file(stream, jobp, StdErr, PROT_TPP, &dup_msgid) != 0) ||
+		    (move_job_file(stream, jobp, Chkpt, PROT_TPP, &dup_msgid) != 0))
 			goto send_err;
 	}
 
-	if (PBSD_commit(stream, job_id, PROT_TPP, &dup_msgid) != 0)
-		goto send_err;
+	if (move_type == MOVE_TYPE_Move_Run) {
+		if (PBSD_commit_and_run(stream, job_id, PROT_TPP, &dup_msgid, request->rq_ind.rq_move.run_exec_vnode) != 0)
+			goto send_err;
+	} else {
+		if (PBSD_commit(stream, job_id, PROT_TPP, &dup_msgid) != 0)
+			goto send_err;
+	}
 
 done:
-	free(dup_msgid); /* free this as it is not part of any work task */
+	free(dup_msgid);			  /* free this as it is not part of any work task */
 	resc_access_perm = save_resc_access_perm; /* reset back to it's old value */
 	return 2;
 
@@ -686,9 +724,8 @@ send_job(job *jobp, pbs_net_t hostaddr, int port, int move_type,
 		}
 	}
 
-	if (move_type == MOVE_TYPE_Exec && small_job_files(jobp)) {
-		return (send_job_exec(jobp, hostaddr, port, preq));
-	}
+	if ((move_type == MOVE_TYPE_Exec || move_type == MOVE_TYPE_Move_Run) && small_job_files(jobp))
+		return send_job_exec(jobp, hostaddr, port, move_type, preq);
 
 	(void)snprintf(log_buffer, sizeof(log_buffer), "big job files, sending via subprocess");
 	log_event(PBSEVENT_DEBUG3, PBS_EVENTCLASS_JOB, LOG_INFO, jobp->ji_qs.ji_jobid, log_buffer);
@@ -923,7 +960,7 @@ send_job(job *jobp, pbs_net_t hostaddr, int port, int move_type,
 		}
 
 		if (move_type == MOVE_TYPE_Move_Run)
-			ret = PBSD_commit_and_run(con, job_id, preq->rq_ind.rq_move.run_exec_vnode);
+			ret = PBSD_commit_and_run(con, job_id, PROT_TCP, NULL, preq->rq_ind.rq_move.run_exec_vnode);
 		else
 			ret = PBSD_commit(con, job_id, PROT_TCP, NULL);
 
@@ -981,43 +1018,6 @@ get_hostaddr_port_from_svr(char *destination, pbs_net_t *hostaddr, uint *port)
 	hostname = parse_servername(toserver, port);
 	*hostaddr = get_hostaddr(hostname);
 	return 0;
-}
-
-int
-connect_2_svr(pbs_net_t hostaddr, uint port)
-{
-	int i;
-	conn_t* conn;
-	int sock = -1;
-
-	pbs_errno = 0;
-
-	for (i = 0; i < RETRY; i++) {
-
-		/* connect to receiving server with retries */
-
-		if (i > 0) { /* recycle after an error */
-			if (sock >= 0)
-				svr_disconnect(sock);
-			if (should_retry_route(pbs_errno) == -1)
-				exit(SEND_JOB_FATAL); /* fatal error, don't retry */
-			sleep(1 << i);
-		}
-		if ((sock = svr_connect(hostaddr, port, 0, ToServerDIS, PROT_TCP)) == PBS_NET_RC_FATAL) {
-			log_errf(pbs_errno, __func__, "%s failed to %lx port %d", __func__, hostaddr, port);
-			break;
-		} else if (sock == PBS_NET_RC_RETRY) {
-			pbs_errno = ECONNREFUSED; /* should retry */
-			continue;
-		} else {
-			conn = get_conn(sock);
-			conn->cn_addr = hostaddr;
-			conn->cn_port = port;
-			break;
-		}
-	}
-
-	return sock;
 }
 
 /**

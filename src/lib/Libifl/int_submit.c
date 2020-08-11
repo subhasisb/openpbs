@@ -244,43 +244,7 @@ PBSD_rdytocmt(int c, char *jobid, int prot, char **msgid)
 int
 PBSD_commit(int c, char *jobid, int prot, char **msgid)
 {
-	struct batch_reply *reply;
-	int rc;
-
-	if (prot == PROT_TCP) {
-		DIS_tcp_funcs();
-	} else {
-		if ((rc = is_compose_cmd(c, IS_CMD, msgid)) != DIS_SUCCESS)
-			return rc;
-	}
-
-	if ((rc = encode_DIS_ReqHdr(c, PBS_BATCH_Commit, pbs_current_user)) ||
-		(rc = encode_DIS_JobId(c, jobid)) ||
-		(rc = encode_DIS_ReqExtend(c, NULL))) {
-		if (prot == PROT_TCP) {
-			if (set_conn_errtxt(c, dis_emsg[rc]) != 0) {
-				return (pbs_errno = PBSE_SYSTEM);
-			}
-		}
-		return (pbs_errno = PBSE_PROTOCOL);
-	}
-
-	if (prot == PROT_TPP) {
-		pbs_errno = PBSE_NONE;
-		if (dis_flush(c))
-			pbs_errno = PBSE_PROTOCOL;
-		return pbs_errno;
-	}
-
-	if (dis_flush(c)) {
-		return (pbs_errno = PBSE_PROTOCOL);
-	}
-
-	reply = PBSD_rdrpy(c);
-
-	PBSD_FreeReply(reply);
-
-	return get_conn_errno(c);
+	return PBSD_commit_and_run(c, jobid, prot, msgid, NULL);
 }
 
 /**
@@ -298,20 +262,34 @@ PBSD_commit(int c, char *jobid, int prot, char **msgid)
  *
  */
 int
-PBSD_commit_and_run(int c, char *jobid, char *dest)
+PBSD_commit_and_run(int c, char *jobid, int prot, char **msgid, char *dest)
 {
 	struct batch_reply *reply;
 	int rc;
 
-	DIS_tcp_funcs();
+	if (prot == PROT_TCP) {
+		DIS_tcp_funcs();
+	} else {
+		if ((rc = is_compose_cmd(c, IS_CMD, msgid)) != DIS_SUCCESS)
+			return rc;
+	}
 
 	if ((rc = encode_DIS_ReqHdr(c, PBS_BATCH_Commit, pbs_current_user)) ||
-	    (rc = encode_DIS_JobId(c, jobid)) ||
-	    (rc = encode_DIS_ReqExtend(c, dest))) {
-		if (set_conn_errtxt(c, dis_emsg[rc]) != 0) {
-			return (pbs_errno = PBSE_SYSTEM);
+		(rc = encode_DIS_JobId(c, jobid)) ||
+		(rc = encode_DIS_ReqExtend(c, dest))) {
+		if (prot == PROT_TCP) {
+			if (set_conn_errtxt(c, dis_emsg[rc]) != 0) {
+				return (pbs_errno = PBSE_SYSTEM);
+			}
 		}
 		return (pbs_errno = PBSE_PROTOCOL);
+	}
+
+	if (prot == PROT_TPP) {
+		pbs_errno = PBSE_NONE;
+		if (dis_flush(c))
+			pbs_errno = PBSE_PROTOCOL;
+		return pbs_errno;
 	}
 
 	if (dis_flush(c)) {

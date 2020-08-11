@@ -167,7 +167,16 @@ req_movejob(struct batch_request *req)
 			reply_ack(req);
 			break;
 		case -1:
+		case -2:
 		case 1:			/* fail */
+			if (jobp && req && req->rq_type == PBS_BATCH_MoveJob &&
+			    req->rq_ind.rq_move.run_exec_vnode) {
+				int newstate;
+				int newsub;
+				/* force re-eval of job state out of Transit */
+				svr_evaljobstate(jobp, &newstate, &newsub, 1);
+				svr_setjobstate(jobp, newstate, newsub);
+			}
 			if (jobp->ji_clterrmsg)
 				reply_text(req, pbs_errno, jobp->ji_clterrmsg);
 			else

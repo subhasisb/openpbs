@@ -2516,7 +2516,7 @@ mgr_node_unset(struct batch_request *preq)
  * @retval	PBS error	- error
  */
 
-static int
+int
 make_host_addresses_list(char *phost, u_long **pul)
 {
 	int		i;
@@ -2956,7 +2956,7 @@ create_pbs_node2(char *objname, svrattrl *plist, int perms, int *bad, struct pbs
 
 		nport = pnode->nd_attr[(int)ND_ATR_Port].at_val.at_long;
 
-		if ((pmom = create_svrmom_entry(phost, nport, pul)) == NULL) {
+		if ((pmom = create_svrmom_entry(phost, nport, pul, 0)) == NULL) {
 			effective_node_delete(pnode);
 			return (PBSE_SYSTEM);
 		}

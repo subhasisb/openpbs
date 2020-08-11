@@ -1381,6 +1381,13 @@ try_db_again:
 		exit(0);
 	}
 
+	tfree2(&ipaddrs);
+	if (init_msi() != 0) {
+		fprintf(stderr, "Failed to initialize peer servers\n");
+		stop_db();
+		return (3);
+	}
+
 	if (pbsd_init(server_init_type) != 0) {
 		log_err(-1, msg_daemonname, "pbsd_init failed");
 		pbs_python_ext_quick_shutdown_interpreter();

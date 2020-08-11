@@ -816,55 +816,6 @@ add_conn_priority(int sd, enum conn_type type, pbs_net_t addr, unsigned int port
 	return svr_conn[idx];
 }
 
-void
-set_peer_server_conn(int fd)
-{
-	conn_t *conn = get_conn(fd);
-	if (conn) {
-		append_link(&peer_svr_conns, &conn->cn_link_peer_svr, conn);
-		if (tpp_em_del_fd(poll_context, fd) < 0) {
-			int err = errno;
-			snprintf(logbuf, sizeof(logbuf),
-				 "could not remove socket %d from poll list", fd);
-			log_err(err, __func__, logbuf);
-		}
-#ifdef SO_KEEPALIVE
-		int optval = 1;
-
-		if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof(optval)) < 0) {
-			log_errf(-1, __func__, "setsockopt(SO_KEEPALIVE) errno=%d", errno);
-			return;
-		}
-#endif
-	}
-}
-
-int
-is_socket_up(int fd)
-{
-	int error = 0;
-	socklen_t len = sizeof(error);
-	int ret = getsockopt(fd, SOL_SOCKET, SO_ERROR, &error, &len);
-
-	if (ret || error)
-		return 0;
-
-	return 1;
-}
-
-int
-get_peer_server_sock(pbs_net_t hostaddr, unsigned int port)
-{
-	conn_t *cp;
-
-	for (cp = (conn_t *) GET_NEXT(peer_svr_conns); cp; cp = GET_NEXT(cp->cn_link_peer_svr)) {
-		if (cp->cn_addr == hostaddr && cp->cn_port == port)
-			return cp->cn_sock;
-	}
-
-	return -1;
-}
-
 /**
  * @brief
  *	add_conn_data - add some data to a connection

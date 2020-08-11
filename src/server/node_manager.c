@@ -152,6 +152,7 @@ extern void free_prov_vnode(struct pbsnode *);
 extern void fail_vnode_job(struct prov_vnode_info *, int);
 extern struct prov_tracking * get_prov_record_by_vnode(char *);
 extern int parse_prov_vnode(char *,exec_vnode_listtype *);
+extern void process_IS_CMD(int);
 
 static void check_and_set_multivnode(struct pbsnode *);
 int write_single_node_mom_attr(struct pbsnode *np);
@@ -405,7 +406,7 @@ reply_hellosvr(int stream, int need_inv)
 	if ((ret = send_rpp_values(stream, 1)) != DIS_SUCCESS)
 		return ret;
 
-	if (get_msvr_mode()) {
+	if (msvr_mode()) {
 		/* In multi-server mode, server will not send clusteraddr */
 		return dis_flush(stream);
 	}
@@ -4149,7 +4150,6 @@ err:
 	free(pset);
 }
 
-
 /**
  * @brief
  * 		Input is coming from another server (MOM) over a TPP stream.
@@ -4188,7 +4188,7 @@ is_request(int stream, int version)
 	attribute		*pala;
 	resource_def		*prd;
 	resource		*prc;
-	mominfo_t		*pmom;
+	mominfo_t		*pmom = NULL;
 	mom_svrinfo_t		*psvrmom;
 	int			 s;
 	char			*val;
@@ -4300,6 +4300,8 @@ is_request(int stream, int version)
 	} else {
 		/* check that machine is known */
 		DBPRT(("%s: connect from %s\n", __func__, netaddr(addr)))
+		if ((pmom = is_peersvr(addr)) != NULL)
+			goto found;
 		if ((pmom = tfind2((u_long)stream, 0, &streams)) != NULL)
 			goto found;
 	}
@@ -5167,6 +5169,11 @@ found:
 				is_vnode_prov_done(np->nd_name);
                 }
 
+			break;
+
+		case IS_CMD:
+			DBPRT(("%s: IS_CMD\n", __func__))
+			process_IS_CMD(stream);
 			break;
 
 

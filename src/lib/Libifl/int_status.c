@@ -69,10 +69,12 @@ static char *statename[] = { "Transit", "Queued", "Held", "Waiting",
 
 /**
  * @brief
- *	decoded state attribute to count array
+ *	decode_states - decoded state attribute to count array
  *
  * @param[in] string - string holding state of job
  * @param[out] count    - count array having job per state
+ * 
+ * @return void
  *
  */
 static void
@@ -112,6 +114,17 @@ decode_states(char *string, long *count)
 	}
 }
 
+/**
+ * @brief
+ *	encode_states - Encode state from two state count arrays
+ *
+ * @param[in,out] val - reference to pointer which will get freed and new value gets allocated
+ * @param[in] cur    - count array having job per state
+ * @param[in] next    - count array having job per state
+ * 
+ * @return void
+ *
+ */
 static void
 encode_states(char **val, long *cur, long *nxt)
 {
@@ -130,8 +143,14 @@ encode_states(char **val, long *cur, long *nxt)
 
 /**
  * @brief
+ * 	get_available_conn:
  *	get one of the available connection from multisvr sd
  *
+ * @param[in] svr_connections - pointer to array of server connections
+ * 
+ * @return int
+ * @retval -1: error
+ * @retval != -1 fd corresponding to the connection
  */
 int
 get_available_conn(svr_conn_t *svr_connections)
@@ -147,8 +166,13 @@ get_available_conn(svr_conn_t *svr_connections)
 
 /**
  * @brief
+ * random_srv_conn:
  *	get random server sd - It will choose a random sd from available no of servers.
- *
+ * @param[in] svr_connections - pointer to array of server connections
+ * 
+ * @return int
+ * @retval -1: error
+ * @retval != -1: fd corresponding to the connection
  */
 int
 random_srv_conn(svr_conn_t *svr_connections)
@@ -199,6 +223,16 @@ PBSD_status(int c, int svr_index, int function, char *objid, struct attrl *attri
 	return (PBSD_status_get(c, svr_index));
 }
 
+/**
+ * @brief
+ * aggr_job_ct:
+ *	aggregate the job counts attribute of servers
+ *	total_jobs and state_counts are the attributes aggregated here.
+ * @param[in] cur - batch status to first server
+ * @param[in] next - batch status to second server
+ * 
+ * @return void
+ */
 static void
 aggr_job_ct(struct batch_status *cur, struct batch_status *nxt)
 {
@@ -251,6 +285,18 @@ aggr_job_ct(struct batch_status *cur, struct batch_status *nxt)
 #define STRING 2
 #define SIZE 3
 
+/**
+ * @brief
+ * assess_type:
+ *	Assess the type of the value and return the value along with
+ *	the references passed to it.
+ * @param[in] val - value for which type needs to be assessed
+ * @param[out] type - The type of val: can be long, double, size or string.
+ * @param[out] val_double - double value in case if the type is double or floating number.
+ * @param[out] val_long - long in case if the type is long or size
+ * 
+ * @return void
+ */
 static void
 assess_type(char *val, int *type, double *val_double, long *val_long)
 {
@@ -278,6 +324,17 @@ struct attrl_holder {
 	struct attrl_holder *next;
 };
 
+/**
+ * @brief
+ * accumulate_values:
+ *	Accumulate values in resources assigned attribute in b
+ * @param[in] a - input list of type attrl_holder. 
+ * 		It will contain only resources assigned those needs to be added with the corresponding in b.
+ * @param[in] b - attribute list which needs to be added with a. This function does not iterate through the list.
+ * @param[in,out] orig - original list which is the superset of a. b will be appended to orig if could not find in a.
+ * 
+ * @return void
+ */
 static void
 accumulate_values(struct attrl_holder *a, struct attrl *b, struct attrl *orig)
 {
@@ -333,6 +390,17 @@ accumulate_values(struct attrl_holder *a, struct attrl *b, struct attrl *orig)
 	}
 }
 
+/**
+ * @brief
+ * aggr_resc_ct:
+ *	Aggregate all resources assigned attributes from two batch status.
+ * @param[in] st1 - input list of type attrl_holder. 
+ * 		It will contain only resources assigned those needs to be added with the corresponding in b.
+ * @param[in] b - attribute list which needs to be added with a. This function does not iterate through the list.
+ * @param[in,out] orig - original list which is the superset of a. b will be appended to orig if could not find in a.
+ * 
+ * @return void
+ */
 static void
 aggr_resc_ct(struct batch_status *st1, struct batch_status *st2)
 {
@@ -371,23 +439,44 @@ aggr_resc_ct(struct batch_status *st1, struct batch_status *st2)
 	}
 }
 
+/**
+ * @brief
+ * append_bs:
+ *	append b to end of a. also remove references of b from its batch status
+ * @param[in,out] a - attr list where b needs to be appended
+ * @param[in] b - batch status which needs to be appended to a
+ * @param[in,out] prev_b - previous list element of b for which references needs to be updated
+ * @param[in] head_a - head element of list contains a
+ * @param[in,out] head_b - reference to head element of list contains b. Reference is updated if prev_b is null
+ * 
+ * @return void
+ */
 static void
-append_bs(struct batch_status *a, struct batch_status *b, struct batch_status *prev, struct batch_status *sv1, struct batch_status **sv2)
+append_bs(struct batch_status *a, struct batch_status *b, struct batch_status *prev_b, struct batch_status *head_a, struct batch_status **head_b)
 {
 	if (!a) {
-		for (a = sv1; a->next; a = a->next)
+		for (a = head_a; a->next; a = a->next)
 			;
 		a->next = b;
-		if (prev) {
-			prev->next = b->next;
-			prev->last = b->last;
+		if (prev_b) {
+			prev_b->next = b->next;
+			prev_b->last = b->last;
 		} else {
-			*sv2 = b->next;
+			*head_b = b->next;
 		}
 		b->next = NULL;
 	}
 }
 
+/**
+ * @brief
+ * aggregate_queue:
+ *	aggregate two queues reported by two server instances
+ * @param[in,out] sv1 - server1 list. This will be also the final aggregated list.
+ * @param[in,out] sv2 - Server2 list. Passing reference as the first element can be moved to sv1
+ * 
+ * @return void
+ */
 static void
 aggregate_queue(struct batch_status *sv1, struct batch_status **sv2)
 {
@@ -409,6 +498,15 @@ aggregate_queue(struct batch_status *sv1, struct batch_status **sv2)
 	}
 }
 
+/**
+ * @brief
+ * aggregate_svr:
+ *	aggregate two servers reported by two server instances
+ * @param[in,out] sv1 - server1 list. This will be also the final aggregated list.
+ * @param[in] sv2 - Server2 list.
+ * 
+ * @return void
+ */
 static void
 aggregate_svr(struct batch_status *sv1, struct batch_status *sv2)
 {

@@ -288,7 +288,7 @@ req_quejob(struct batch_request *preq)
 	resource_def *prdefsel;
 	resource_def *prdefplc;
 	resource *presc;
-	conn_t *conn;
+	conn_t *conn = NULL;
 #else
 	mom_hook_input_t  hook_input;
 	mom_hook_output_t hook_output;
@@ -306,17 +306,19 @@ req_quejob(struct batch_request *preq)
 
 #ifndef PBS_MOM		/* server server server server */
 
-	conn = get_conn(sock);
+	if (preq->prot != PROT_TPP) {
+		conn = get_conn(sock);
 
-	if (!conn) {
-		req_reject(PBSE_SYSTEM, 0, preq);
-		return;
-	}
+		if (!conn) {
+			req_reject(PBSE_SYSTEM, 0, preq);
+			return;
+		}
 
-	if (conn->cn_authen & PBS_NET_CONN_FORCE_QSUB_UPDATE) {
-		req_reject(PBSE_FORCE_QSUB_UPDATE, 0, preq);
-		conn->cn_authen &= ~PBS_NET_CONN_FORCE_QSUB_UPDATE;
-		return;
+		if (conn->cn_authen & PBS_NET_CONN_FORCE_QSUB_UPDATE) {
+			req_reject(PBSE_FORCE_QSUB_UPDATE, 0, preq);
+			conn->cn_authen &= ~PBS_NET_CONN_FORCE_QSUB_UPDATE;
+			return;
+		}
 	}
 
 	psatl = (svrattrl *)GET_NEXT(preq->rq_ind.rq_queuejob.rq_attr);
@@ -733,20 +735,22 @@ req_quejob(struct batch_request *preq)
 
 #if defined(PBS_SECURITY) && (PBS_SECURITY == KRB5)
 	/* save gssapi/krb5 creds for this job */
-	if (conn->cn_credid != NULL &&
-		conn->cn_auth_config != NULL &&
-		conn->cn_auth_config->auth_method != NULL
-		&& strcmp(conn->cn_auth_config->auth_method, AUTH_GSS_NAME) == 0) {
-		log_eventf(PBSEVENT_DEBUG, PBS_EVENTCLASS_SERVER, LOG_DEBUG, __func__,
-			"saving creds.  conn is %d, cred id %s", preq->rq_conn, conn->cn_credid);
+	if (conn) {
+		if (conn->cn_credid != NULL &&
+			conn->cn_auth_config != NULL &&
+			conn->cn_auth_config->auth_method != NULL
+			&& strcmp(conn->cn_auth_config->auth_method, AUTH_GSS_NAME) == 0) {
+			log_eventf(PBSEVENT_DEBUG, PBS_EVENTCLASS_SERVER, LOG_DEBUG, __func__,
+				"saving creds.  conn is %d, cred id %s", preq->rq_conn, conn->cn_credid);
 
-		(void)job_attr_def[(int)JOB_ATR_cred_id].at_decode(&pj->ji_wattr[(int)JOB_ATR_cred_id], NULL, NULL, conn->cn_credid);
+			(void)job_attr_def[(int)JOB_ATR_cred_id].at_decode(&pj->ji_wattr[(int)JOB_ATR_cred_id], NULL, NULL, conn->cn_credid);
 
-		if (server.sv_attr[(int)SVR_ATR_acl_krb_submit_realms].at_flags & ATR_VFLAG_SET) {
-			if (!acl_check(&server.sv_attr[(int)SVR_ATR_acl_krb_submit_realms], conn->cn_credid, ACL_Host)) {
-				job_purge(pj);
-				req_reject(PBSE_PERM, 0, preq);
-				return;
+			if (server.sv_attr[(int)SVR_ATR_acl_krb_submit_realms].at_flags & ATR_VFLAG_SET) {
+				if (!acl_check(&server.sv_attr[(int)SVR_ATR_acl_krb_submit_realms], conn->cn_credid, ACL_Host)) {
+					job_purge(pj);
+					req_reject(PBSE_PERM, 0, preq);
+					return;
+				}
 			}
 		}
 	}
@@ -853,12 +857,14 @@ req_quejob(struct batch_request *preq)
 			&pj->ji_wattr[(int)JOB_ATR_job_owner],
 			NULL, NULL, buf);
 
-		job_attr_def[(int)JOB_ATR_submit_host].at_free(
-			&pj->ji_wattr[(int)JOB_ATR_submit_host]);
-		(void)strcpy(buf, conn->cn_physhost);
-		job_attr_def[(int)JOB_ATR_submit_host].at_decode(
-			&pj->ji_wattr[(int)JOB_ATR_submit_host],
-			NULL, NULL, buf);
+		if (conn) {
+			job_attr_def[(int)JOB_ATR_submit_host].at_free(
+				&pj->ji_wattr[(int)JOB_ATR_submit_host]);
+			(void)strcpy(buf, conn->cn_physhost);
+			job_attr_def[(int)JOB_ATR_submit_host].at_decode(
+				&pj->ji_wattr[(int)JOB_ATR_submit_host],
+				NULL, NULL, buf);
+		}
 
 		/* set create time */
 
@@ -875,7 +881,7 @@ req_quejob(struct batch_request *preq)
 		clear_attr(&tempattr, &job_attr_def[(int)JOB_ATR_variables]);
 		(void)strcpy(buf, pbs_o_que);
 		(void)strcat(buf, pque->qu_qs.qu_name);
-		if (get_variable(pj, pbs_o_host) == NULL) {
+		if (conn && (get_variable(pj, pbs_o_host) == NULL)) {
 			(void)strcat(buf, ",");
 			(void)strcat(buf, pbs_o_host);
 			(void)strcat(buf, "=");
@@ -1820,22 +1826,7 @@ req_commit_now(struct batch_request *preq,  job *pj)
 	pj->ji_wattr[(int)JOB_ATR_qrank].at_val.at_long = time_msec;
 	pj->ji_wattr[(int)JOB_ATR_qrank].at_flags |= ATR_SET_MOD_MCACHE;
 
-	/*
-	 * As per Nithin's qmove + qrun changes extend will have dest/select_spec without any marker
-	 * but as per implicit commit job, extend will have implicit commit marker with extra extend from qsub
-	 * (if any)
-	 *
-	 * And as per qmove + qrun changes, extend is passed to svr_enquejob, and if its not NULL
-	 * then svr_enqueue_job will not notify sched for new job
-	 * which conficts in case of implicit commit job from qsub
-	 *
-	 * (for now) so to remove this confict check for implicit commit job marker and if extend
-	 * doesn't have it then only pass extend to svr_enquejob, else pass NULL
-	 *
-	 * But in future we should change Nithin's changes and put marker in extend then here
-	 * check that marker and if that marker exists then only pass it to svr_enquejob
-	 */
-	if (preq->rq_extend && strstr(preq->rq_extend, EXTEND_OPT_IMPLICIT_COMMIT) == NULL)
+	if (preq->rq_type == PBS_BATCH_Commit)
 		runjob_extend = preq->rq_extend;
 
 	if ((rc = svr_enquejob(pj, runjob_extend)) != 0) {
@@ -1917,6 +1908,8 @@ req_commit_now(struct batch_request *preq,  job *pj)
 		}
 
 		preq_runjob->rq_perm = preq->rq_perm;
+		preq_runjob->prot = preq->prot;
+		preq_runjob->tpp_ack = preq->tpp_ack;
 		strcpy(preq_runjob->rq_ind.rq_run.rq_jid, pj->ji_qs.ji_jobid);
 		preq_runjob->rq_ind.rq_run.rq_destin = strdup(runjob_extend);
 		if (preq_runjob->rq_ind.rq_run.rq_destin == NULL) {
@@ -1936,7 +1929,7 @@ req_commit_now(struct batch_request *preq,  job *pj)
 
 	log_event(PBSEVENT_JOB, PBS_EVENTCLASS_JOB, LOG_INFO, pj->ji_qs.ji_jobid, log_buffer);
 
-	if ((pj->ji_qs.ji_svrflags & JOB_SVFLG_HERE) == 0)
+	if (!runjob_extend && !(pj->ji_qs.ji_svrflags & JOB_SVFLG_HERE))
 		issue_track(pj);	/* notify creator where job is */
 
 	if (preq_runjob)

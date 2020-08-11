@@ -204,9 +204,6 @@ int  wait_request(time_t waittime, void *priority_context);
 extern void *priority_context;
 void net_add_close_func(int, void(*)(int));
 extern  pbs_net_t  get_addr_of_nodebyname(char *name, unsigned int *port);
-extern void set_peer_server_conn(int);
-extern int get_peer_server_sock(pbs_net_t, unsigned int);
-int is_socket_up(int fd);
 
 conn_t *get_conn(int sock); /* gets the connection, for a given socket id */
 void connection_idlecheck(void);

@@ -127,6 +127,7 @@ extern  char		*msg_request;
 extern void req_commit(struct batch_request *preq);
 extern void req_quejob(struct batch_request *preq);
 extern void req_jobscript(struct batch_request *preq);
+extern void process_IS_CMD(int);
 
 extern void	mom_vnlp_report(vnl_t *vnl, char *header);
 extern	char	*path_hooks;
@@ -373,86 +374,6 @@ err:
 		log_err(errno, "send_resc_used", log_buffer);
 	tpp_close(stream);
 	return ret;
-}
-
-/**
- * @brief
- *	batch request for log
- *
- * @param[in] request - pointer to batch_request structure
- * @param[in] stream  - connection stream
- *
- * @return Void
- *
- */
-void
-log_request(struct batch_request *request, int stream)
-{
-	sprintf(log_buffer, msg_request, request->rq_type, request->rq_user,
-		request->rq_host, stream);
-	log_event(PBSEVENT_DEBUG2, PBS_EVENTCLASS_REQUEST, LOG_DEBUG, "",
-		log_buffer);
-}
-
-/**
- * @brief
- *  process_IS_CMD: Create batch request on received IS_CMD message
- *                   and dispatch request.
- *
- *  @param[in] - stream -  connection stream.
- *
- *  @return void
- *
- */
-static void
-process_IS_CMD(int stream)
-{
-	int rc;
-	struct batch_request *request;
-	struct	sockaddr_in	*addr;
-	char *msgid = NULL;
-
-	addr = tpp_getaddr(stream);
-	if (addr == NULL) {
-		sprintf(log_buffer, "Sender unknown");
-		log_event(PBSEVENT_DEBUG, PBS_EVENTCLASS_REQUEST, LOG_DEBUG, "?", log_buffer);
-		return;
-	}
-
-	/* in case of IS_CMD there is a unique id passed with each command,
-	 * which we need to send back with the reply so server can
-	 * match the replies to the requests
-	 */
-	msgid = disrst(stream, &rc);
-	if (!msgid || rc) {
-		close(stream);
-		return;
-	}
-
-	request = alloc_br(0); /* freed when reply sent */
-	if (!request) {
-		close(stream);
-		if (msgid)
-			free(msgid);
-		return;
-	}
-
-	request->rq_conn = stream;
-	strcpy(request->rq_host, netaddr(addr));
-	request->rq_fromsvr = 1;
-	request->prot = PROT_TPP;
-	request->tppcmd_msgid = msgid;
-
-	rc = dis_request_read(stream, request);
-	if (rc != 0) {
-		close(stream);
-		free_br(request);
-		return;
-	}
-
-	log_request(request, stream);
-
-	dispatch_request(stream, request);
 }
 
 

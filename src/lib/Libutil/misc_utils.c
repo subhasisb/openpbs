@@ -2190,18 +2190,6 @@ crc_file(char *filepath)
 
 /**
  * @brief
- * 	Return multiserver mode
- *
- * @return int
- */
-int
-get_msvr_mode(void)
-{
-	return 0;
-}
-
-/**
- * @brief
  *	get_num_servers - Getter function to get number of servers configured in PBS complex.
  *
  */
