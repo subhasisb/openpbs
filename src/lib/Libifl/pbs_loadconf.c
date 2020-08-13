@@ -261,8 +261,7 @@ parse_config_line(FILE *fp, char **key, char **val)
 
 /**
  * @brief
- *	parse_psi - parses the PBS_SERVER_INSTANCES configuration key,value 
- * in the pbs.conf file
+ *	parse_psi - parses the PBS_SERVER_INSTANCES
  *
  * @param[in] conf_value	configuration value set in pbs.conf
  *
@@ -271,7 +270,7 @@ parse_config_line(FILE *fp, char **key, char **val)
  * @retval 0, For success
  */
 
-int 
+int
 parse_psi(char *conf_value)
 {
 	char **list;
@@ -279,7 +278,7 @@ parse_psi(char *conf_value)
 
 	free(pbs_conf.psi);
 
-	list = break_comma_list(conf_value);
+	list = break_comma_list(conf_value ? conf_value : pbs_conf.pbs_server_name);
 	if (list == NULL)
 		return -1;
 
@@ -300,19 +299,6 @@ parse_psi(char *conf_value)
 	pbs_conf.pbs_num_servers = i;
 
 	return 0;
-}
-
-/**
- * @brief
- *	set_default_psi - Used to free the memory allocated while parsing PBS_SERVER_INSTANCES and 
- *  set the default values for PBS_SERVER_INSTANCES.
- *
- */
-int
-set_default_psi()
-{
-	free(pbs_conf.psi);
-	return (parse_psi(pbs_conf.pbs_server_name));
 }
 
 /**
@@ -370,6 +356,7 @@ __pbs_loadconf(int reload)
 	char **servalias;		/* service alias list */
 	unsigned int *pui;		/* for use with identify_service_entry */
 #endif
+	char *psi_value = NULL;
 
 	/* initialize the thread context data, if not already initialized */
 	if (pbs_client_thread_init_thread_context() != 0)
@@ -579,7 +566,7 @@ __pbs_loadconf(int reload)
 				pbs_conf.pbs_server_name = strdup(conf_value);
 			}
 			else if (!strcmp(conf_name, PBS_CONF_SERVER_INSTANCES)) {
-				if (parse_psi(conf_value) != 0)
+				if ((psi_value = strdup(conf_value)) == NULL)
 					goto err;
 			}
 			else if (!strcmp(conf_name, PBS_CONF_RCP)) {
@@ -774,7 +761,9 @@ __pbs_loadconf(int reload)
 		}
 	}
 	if ((gvalue = getenv(PBS_CONF_SERVER_INSTANCES)) != NULL) {
-		parse_psi(gvalue);
+		free(psi_value);
+		if ((psi_value = strdup(gvalue)) == NULL)
+			goto err;
 	}
 	if ((gvalue = getenv(PBS_CONF_RCP)) != NULL) {
 		free(pbs_conf.rcp_path);
@@ -934,13 +923,8 @@ __pbs_loadconf(int reload)
 		goto err;
 	}
 
-	/* check sanity of pbs server instances */
-	if (pbs_conf.pbs_num_servers == 0) {
-		if (set_default_psi() != 0)
-			goto err;
-
-		pbs_conf.pbs_num_servers = 1;
-	}
+	parse_psi(psi_value);
+	free(psi_value);
 
 	/*
 	 * Perform sanity checks on PBS_*_HOST_NAME values and PBS_CONF_SMTP_SERVER_NAME.
@@ -1164,7 +1148,7 @@ err:
 	}
 
 	free(pbs_conf.psi);
-	
+
 	pbs_conf.load_failed = 1;
 	(void)pbs_client_thread_unlock_conf();
 	return 0;
