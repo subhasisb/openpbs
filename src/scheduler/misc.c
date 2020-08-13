@@ -1645,9 +1645,23 @@ get_svr_index(char *svrname)
 {
 	int i;
 	int svrindex = -1;
+	int comp_len = 0;
+	int l1 = strlen(svrname);
 
 	for (i = 0; i < get_num_servers(); i++) {
-		if (strcmp(pbs_conf.psi[i].name, svrname) == 0) {
+		int l2 = strlen(pbs_conf.psi[i].name);
+		if (l1 == l2)
+			comp_len = l1;
+		else if (l1 < l2) 
+			comp_len = l1;
+		else
+			comp_len = l2;
+
+		/* Always good to compare shortname if both fqdn and short hostname are used .
+		 * It is because we can have short name in PBS_SERVER and fqdn in
+		 * PBS_SERVER_INSTANCES and vice versa
+		 */
+		if (strncmp(pbs_conf.psi[i].name, svrname, comp_len) == 0) {
 			svrindex = i;
 			break;
 		}
