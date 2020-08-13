@@ -2217,19 +2217,21 @@ get_num_servers()
  * @param[in]	svr_id - id in the format server_name:port
  * @param[out]	svrname - buffer to store server name
  * @param[out]	svrport - buffer to store port number
+ * @param[in]	dflt_svrname - default server name
+ * @param[in]	dflt_svrport - default server port
  *
  * @return	int
  * @retval	0 for success
  * @retval	1 for error
  */
 int
-parse_pbs_name_port(char *svr_id, char *svrname, int *svrport)
+parse_pbs_name_port(char *svr_id, char *svrname, int *svrport, char *dflt_svrname, int dflt_svrport)
 {
 	char *ptr = NULL;
 	char *endptr;
-	long port = pbs_conf.batch_service_port;
+	int port = dflt_svrport;
 
-	if (svr_id == NULL || svrname == NULL || svrport == NULL)
+	if (svr_id == NULL || svrname == NULL || svrport == NULL || dflt_svrname == NULL)
 		return 1;
 
 	ptr = strchr(svr_id, ':');
@@ -2239,11 +2241,11 @@ parse_pbs_name_port(char *svr_id, char *svrname, int *svrport)
 		if (*endptr != '\0')
 			return 1;
 	}
-	*svrport = (int) port;
+	*svrport = port;
 	if (svr_id[0] == '\0')
-		snprintf(svrname, PBS_MAXHOSTNAME, "%s", pbs_conf.pbs_server_name);
+		strcpy(svrname, dflt_svrname);
 	else
-		snprintf(svrname, PBS_MAXHOSTNAME, "%s", svr_id);
+		strcpy(svrname, svr_id);
 
 	if (ptr != NULL)
 		*ptr = ':';

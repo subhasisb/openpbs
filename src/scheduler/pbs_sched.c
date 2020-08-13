@@ -320,8 +320,8 @@ close_server_conn(int svr_index)
 			if (svr_conns[svr_index].secondary_sd >= 0) {
 				/* We no need to call close_tcp_connection() once again on secondary connection
 				   It is because PBS_BATCH_Disconnect is sent as part of close_tcp_connection on primary.
-				   The other reason is Server is just expecting only end of cycle on secondary connection 
-				*/ 
+				   The other reason is Server is just expecting only end of cycle on secondary connection
+				*/
 				CS_close_socket(svr_conns[svr_index].secondary_sd);
 				CLOSESOCKET(svr_conns[svr_index].secondary_sd);
 				dis_destroy_chan(svr_conns[svr_index].secondary_sd);
@@ -471,7 +471,7 @@ restart(int sig)
 		num_conf_svrs = get_num_servers();
 
 		if (num_conf_svrs > MAX_ALLOWED_SVRS) {
-			log_record(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_INFO, __func__,  "Maximum allowed servers exceeded");	
+			log_record(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_INFO, __func__,  "Maximum allowed servers exceeded");
 			die(0);
 		}
 
@@ -498,7 +498,7 @@ restart(int sig)
 			}
 			pthread_setspecific(psi_key, conn_arr);
 		}
-		
+
 		sprintf(log_buffer, "restart on signal %d", sig);
 	} else {
 		sprintf(log_buffer, "restart command");
@@ -592,7 +592,7 @@ badconn(char *msg)
  *
  * @brief
  *		Gets a scheduling command  from the server from the primary
- *		socket connection to the server. 
+ *		socket connection to the server.
  *
  * @param[in/out]	max_sd	-	pointer to maximum socket descriptor. If new socket after
  * 					accept call is bigger then its value is returned to the caller.
@@ -1458,7 +1458,7 @@ socket_to_conn(int sock, struct sockaddr_in saddr_in)
 		return -1;
 	}
 
-	if (parse_pbs_name_port(svr_id, svrname, &port) != 0) {
+	if (parse_pbs_name_port(svr_id, svrname, &port, pbs_conf.pbs_server_name, pbs_conf.batch_service_port) != 0) {
 		log_event(PBSEVENT_ERROR, PBS_EVENTCLASS_SCHED, LOG_ERR, __func__, "malformed svr_id");
 		return -1;
 	}
@@ -1628,4 +1628,3 @@ schedule_wrapper(fd_set *read_fdset, int opt_no_restart)
 
 	return 0;
 }
-

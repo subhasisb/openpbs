@@ -200,7 +200,7 @@ char *pbs_strcat(char **strbuf, int *ssize, char *str);
  * like strcpy, but returns pointer to end of copied data
  * useful for chain copies instead of sprintf which is very
  * slow
- * 
+ *
  */
 char *pbs_strcpy(char *dest, const char *src);
 
@@ -344,17 +344,16 @@ DECLDIR void encode_SHA(char*, size_t, char **);
 void encode_SHA(char*, size_t, char **);
 #endif
 
-
-#ifdef  __cplusplus
-}
-#endif
-#endif
-
 /**
  * Getter function to get the number of currently configured servers.
  */
 extern int get_num_servers();
 
-extern int parse_pbs_name_port(char *svr_id, char *svrname, int *svrport);
+extern int parse_pbs_name_port(char *, char *, int *, char *, int);
 
 extern int rand_num();
+
+#ifdef  __cplusplus
+}
+#endif
+#endif
