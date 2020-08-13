@@ -1448,8 +1448,8 @@ socket_to_conn(int sock, struct sockaddr_in saddr_in)
 	char *svr_id;
 	int cmd;
 	int svr_conn_index;
-	char svrname[PBS_MAXHOSTNAME];
-	int port;
+	char svrname[PBS_MAXHOSTNAME] = {'\0'};
+	int port = 0;
 	svr_conn_t *conn_arr = NULL;
 
 	if (get_sched_cmd(sock, &cmd, &svr_id) != 1) {
@@ -1458,7 +1458,7 @@ socket_to_conn(int sock, struct sockaddr_in saddr_in)
 		return -1;
 	}
 
-	if (parse_pbs_name_port(svr_id, svrname, &port, pbs_conf.pbs_server_name, pbs_conf.batch_service_port) != 0) {
+	if (parse_pbs_name_port(svr_id, svrname, &port) != 0 || svrname[0] == '\0' || port == 0) {
 		log_event(PBSEVENT_ERROR, PBS_EVENTCLASS_SCHED, LOG_ERR, __func__, "malformed svr_id");
 		return -1;
 	}

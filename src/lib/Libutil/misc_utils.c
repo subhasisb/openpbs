@@ -2217,35 +2217,31 @@ get_num_servers()
  * @param[in]	svr_id - id in the format server_name:port
  * @param[out]	svrname - buffer to store server name
  * @param[out]	svrport - buffer to store port number
- * @param[in]	dflt_svrname - default server name
- * @param[in]	dflt_svrport - default server port
  *
  * @return	int
  * @retval	0 for success
  * @retval	1 for error
  */
 int
-parse_pbs_name_port(char *svr_id, char *svrname, int *svrport, char *dflt_svrname, int dflt_svrport)
+parse_pbs_name_port(char *svr_id, char *svrname, int *svrport)
 {
 	char *ptr = NULL;
-	char *endptr;
-	int port = dflt_svrport;
 
-	if (svr_id == NULL || svrname == NULL || svrport == NULL || dflt_svrname == NULL)
+	if (svr_id == NULL || svrname == NULL)
 		return 1;
 
 	ptr = strchr(svr_id, ':');
 	if (ptr != NULL) {
+		int port;
+		char *endptr;
+
 		*ptr = '\0';
 		port = strtol(ptr + 1, &endptr, 10);
 		if (*endptr != '\0')
 			return 1;
+		*svrport = port;
 	}
-	*svrport = port;
-	if (svr_id[0] == '\0')
-		strcpy(svrname, dflt_svrname);
-	else
-		strcpy(svrname, svr_id);
+	strcpy(svrname, svr_id);
 
 	if (ptr != NULL)
 		*ptr = ':';

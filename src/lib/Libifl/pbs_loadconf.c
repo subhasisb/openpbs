@@ -291,10 +291,14 @@ parse_psi(char *conf_value)
 	}
 
 	for (i = 0; list[i] != NULL; i++) {
-		if (parse_pbs_name_port(list[i], pbs_conf.psi[i].name, &pbs_conf.psi[i].port, pbs_conf.pbs_server_name, pbs_conf.batch_service_port) != 0) {
+		if (parse_pbs_name_port(list[i], pbs_conf.psi[i].name, &pbs_conf.psi[i].port) != 0) {
 			fprintf(stderr, "Error parsing PBS_SERVER_INSTANCES\n");
 			return -1;
 		}
+		if (pbs_conf.psi[i].name[0] == '\0')
+			strcpy(pbs_conf.psi[i].name, pbs_conf.pbs_server_name);
+		if (pbs_conf.psi[i].port == 0)
+			pbs_conf.psi[i].port = pbs_conf.batch_service_port;
 	}
 	free_string_array(list);
 	pbs_conf.pbs_num_servers = i;
