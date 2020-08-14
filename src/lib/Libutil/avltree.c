@@ -631,8 +631,10 @@ void
 avl_destroy_index(AVL_IX_DESC *pix)
 {
 	ix_keylength = pix->keylength;
-	avltree_clear((node **) &(pix->root));
-	pix->root = NULL;
+	if (pix->root) {
+		avltree_clear((node **) &(pix->root));
+		pix->root = NULL;
+	}
 }
 
 /**

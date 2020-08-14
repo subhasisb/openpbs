@@ -255,6 +255,7 @@ __pbs_selstat(int c, struct attropl *attrib, struct attrl *rattrib, char *extend
 	struct batch_status *next = NULL;
 	struct batch_status *cur = NULL;
 	svr_conn_t *svr_connections = get_conn_servers();
+	int *failed_conn;
 
 	if (!svr_connections)
 		return NULL;
@@ -268,6 +269,8 @@ __pbs_selstat(int c, struct attropl *attrib, struct attrl *rattrib, char *extend
 	    PBS_BATCH_SelectJobs, MGR_OBJ_JOB, MGR_CMD_NONE, attrib))
 		return NULL;
 
+	failed_conn = calloc(get_num_servers(), sizeof(int));
+
 	for (i = 0; i < get_num_servers(); i++) {
 
 		if (svr_connections[i].state != SVR_CONN_STATE_CONNECTED)
@@ -280,16 +283,31 @@ __pbs_selstat(int c, struct attropl *attrib, struct attrl *rattrib, char *extend
 		if (pbs_client_thread_lock_connection(c) != 0)
 			return NULL;
 
+		if (PBSD_select_put(c, PBS_BATCH_SelStat, attrib, rattrib, extend) != 0) {
+			failed_conn[i] = 1;
+			if (pbs_client_thread_unlock_connection(c) != 0)
+				return NULL;
+			continue;
+		}
+	}
 
-		if (PBSD_select_put(c, PBS_BATCH_SelStat, attrib, rattrib, extend) == 0) {
-			if ((next = PBSD_status_get(c, i))) {
-				if (!ret) {
-					ret = next;
-					cur = next->last;
-				} else {
-					cur->next = next;
-					cur = next->last;
-				}
+	for (i = 0; i < get_num_servers(); i++) {
+
+		if (svr_connections[i].state != SVR_CONN_STATE_CONNECTED)
+			continue;
+
+		if (failed_conn[i])
+			continue;
+
+		c = svr_connections[i].sd;
+
+		if ((next = PBSD_status_get(c, i))) {
+			if (!ret) {
+				ret = next;
+				cur = next->last;
+			} else {
+				cur->next = next;
+				cur = next->last;
 			}
 		}
 

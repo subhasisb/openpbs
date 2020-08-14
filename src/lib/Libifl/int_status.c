@@ -51,6 +51,7 @@
 #include "pbs_ecl.h"
 #include "libutil.h"
 #include "attribute.h"
+#include "pbs_idx.h"
 
 
 static struct batch_status *alloc_bs();
@@ -66,6 +67,7 @@ enum state { TRANSIT_STATE,
 
 static char *statename[] = { "Transit", "Queued", "Held", "Waiting",
 		"Running", "Exiting", "Begun"};
+static void *nodes_idx;
 
 /**
  * @brief
@@ -474,20 +476,16 @@ aggr_resc_ct(struct batch_status *st1, struct batch_status *st2)
  * @return void
  */
 static void
-append_bs(struct batch_status *a, struct batch_status *b, struct batch_status *prev_b, struct batch_status *head_a, struct batch_status **head_b)
+append_bs(struct batch_status *b, struct batch_status *prev, struct batch_status *sv1, struct batch_status **sv2)
 {
-	if (!a) {
-		for (a = head_a; a->next; a = a->next)
-			;
-		a->next = b;
-		if (prev_b) {
-			prev_b->next = b->next;
-			prev_b->last = b->last;
-		} else {
-			*head_b = b->next;
-		}
-		b->next = NULL;
+	sv1->last->next = b;
+	if (prev) {
+		prev->next = b->next;
+		prev->last = b;
+	} else {
+		*sv2 = b->next;
 	}
+	b->next = NULL;
 }
 
 /**
@@ -515,7 +513,7 @@ aggregate_queue(struct batch_status *sv1, struct batch_status **sv2)
 			}
 		}
 		if (!a)
-			append_bs(a, b, prev_b, sv1, sv2);
+			append_bs(b, prev_b, sv1, sv2);
 	}
 }
 
@@ -667,6 +665,7 @@ aggr_node_attrs(struct batch_status *cur, struct batch_status *nxt)
 		if (found == 5)
 			break;
 	}
+
 	for (b = nxt->attribs, found = 0; b; b = b->next) {
 		if (b->name && !strcmp(b->name, ATTR_NODE_jobs)) {
 			if (!job_list)
@@ -696,7 +695,7 @@ swap_needed(struct batch_status *cur, struct batch_status *nxt)
 {
 	struct attrl *a = NULL;
 
-	if (!cur || !nxt)
+	if (!cur)
 		return 0;
 
 	if (cur->text && !strcmp(cur->text, SERVER_FOUND))
@@ -722,30 +721,57 @@ set_prev_link(struct batch_status **sv, struct batch_status *prev, struct batch_
 }
 
 static void
+set_prev_link_spl(struct batch_status **sv, struct batch_status *new, struct batch_status *old)
+{
+	struct batch_status *prev;
+
+	for (prev = *sv; prev; prev = prev->next) {
+		if (prev->next == old) {
+			prev->next = new;
+			break;
+		}
+	}
+
+	if (!prev)
+		*sv = new;
+}
+
+static void
+fix_indx(struct batch_status *a)
+{
+	pbs_idx_delete(nodes_idx, a->name);
+	pbs_idx_insert(nodes_idx, a->name, a);
+}
+
+static void
 aggregate_node(struct batch_status **sv1, struct batch_status **sv2)
 {
 	struct batch_status *a = NULL;
 	struct batch_status *b = NULL;
 	struct batch_status *prev_b = NULL;
-	struct batch_status *prev_a = NULL;
+	int rc = 0;
 
 	for (b = *sv2; b; prev_b = b, b = b->next) {
-		for (a = *sv1; a; prev_a = a, a = a->next) {
-			if (a->name && b->name && !strcmp(a->name, b->name)) {
-				if (swap_needed(a, b)) {
-					swap(&a->next, &b->next);
-					swap(&a, &b);
-					set_prev_link(sv1, prev_a, a);
-					set_prev_link(sv2, prev_b, b);
-				}
-				aggr_node_attrs(a, b);
-				aggr_resc_ct(a, b);
-				break;
-			}
+
+		rc = pbs_idx_find(nodes_idx, (void **)&b->name, (void **)&a, NULL);
+		if (rc != PBS_IDX_RET_OK) {
+			append_bs(b, prev_b, *sv1, sv2);
+			pbs_idx_insert(nodes_idx, b->name, b);
+			continue;
 		}
 
-		if (!a)
-			append_bs(a, b, prev_b, *sv1, sv2);
+		if (a->name && b->name && !strcmp(a->name, b->name)) {
+			if (swap_needed(a, b)) {
+				swap(&a->next, &b->next);
+				swap(&a->last, &b->last);
+				swap(&a, &b);
+				set_prev_link_spl(sv1, a, b);
+				set_prev_link(sv2, prev_b, b);
+				fix_indx(a);
+			}
+			aggr_node_attrs(a, b);
+			aggr_resc_ct(a, b);
+		}
 	}
 }
 
@@ -766,17 +792,40 @@ aggregate_svr(struct batch_status *sv1, struct batch_status *sv2)
 }
 
 static void
-clean_final_list(struct batch_status *ret, int parent_object)
+clean_final_list(struct batch_status *head, int parent_object)
 {
 	struct batch_status *cur = NULL;
 
 	switch (parent_object) {
 	case MGR_OBJ_NODE:
-		for (cur = ret; cur; cur = cur->next) {
+		for (cur = head; cur; cur = cur->next) {
 			if (cur->text)
 				cur->text = NULL;
 		}
+		pbs_idx_destroy(nodes_idx);
 	}
+}
+
+static int
+index_objects(struct batch_status *head, int parent_object)
+{
+	struct batch_status *cur = NULL;
+
+	if (!head || !get_msvr_mode())
+		return 0;
+
+	switch (parent_object) {
+	case MGR_OBJ_NODE:
+		if ((nodes_idx = pbs_idx_create(0, 0)) == NULL)
+			return (-1);
+		for (cur = head; cur; cur = cur->next) {
+			if (cur->name) {
+				if (pbs_idx_insert(nodes_idx, cur->name, cur) != PBS_IDX_RET_OK)
+					return -1;
+			}
+		}
+	}
+	return 0;
 }
 
 /**
@@ -803,6 +852,7 @@ PBSD_status_aggregate(int c, int cmd, char *id, struct attrl *attrib, char *exte
 	struct batch_status *next = NULL;
 	struct batch_status *cur = NULL;
 	svr_conn_t *svr_connections = get_conn_servers();
+	int *failed_conn;
 
 	if (!svr_connections)
 		return NULL;
@@ -816,6 +866,8 @@ PBSD_status_aggregate(int c, int cmd, char *id, struct attrl *attrib, char *exte
 		parent_object, MGR_CMD_NONE, (struct attropl *) attrib)))
 		return NULL;
 
+	failed_conn = calloc(get_num_servers(), sizeof(int));
+
 	for (i = 0; i < get_num_servers(); i++) {
 		if (svr_connections[i].state != SVR_CONN_STATE_CONNECTED)
 			continue;
@@ -825,10 +877,33 @@ PBSD_status_aggregate(int c, int cmd, char *id, struct attrl *attrib, char *exte
 		if (pbs_client_thread_lock_connection(c) != 0)
 			return NULL;
 
-		if ((next = PBSD_status(c, i, cmd, id, attrib, extend))) {
+		if (id == NULL)
+			id = "";
+
+		if (PBSD_status_put(c, cmd, id, attrib, extend, PROT_TCP, NULL) != 0) {
+			failed_conn[i] = 1;
+			if (pbs_client_thread_unlock_connection(c) != 0)
+				return NULL;
+			continue;
+		}
+	}
+
+	for (i = 0; i < get_num_servers(); i++) {
+
+		if (svr_connections[i].state != SVR_CONN_STATE_CONNECTED)
+			continue;
+
+		if (failed_conn[i])
+			continue;
+
+		c = svr_connections[i].sd;
+
+		if ((next = PBSD_status_get(c, i))) {
 			if (!ret) {
 				ret = next;
 				cur = next->last;
+				if (index_objects(ret, parent_object) != 0)
+					return NULL;
 			} else {
 				switch(parent_object) {
 					case MGR_OBJ_SERVER:
