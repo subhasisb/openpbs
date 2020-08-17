@@ -4300,7 +4300,7 @@ is_request(int stream, int version)
 	} else {
 		/* check that machine is known */
 		DBPRT(("%s: connect from %s\n", __func__, netaddr(addr)))
-		if ((pmom = is_peersvr(addr)) != NULL)
+		if ((pmom = get_peersvr(addr)) != NULL)
 			goto found;
 		if ((pmom = tfind2((u_long)stream, 0, &streams)) != NULL)
 			goto found;

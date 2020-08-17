@@ -45,6 +45,7 @@
  */
 
 #include	"pbs_nodes.h"
+#include	"pbs_error.h"
 
 
 extern char server_host[];
@@ -54,7 +55,7 @@ extern mominfo_t* create_svrmom_struct(char *phost, int port);
 
 
 mominfo_t *
-is_peersvr(struct sockaddr_in *addr)
+get_peersvr(struct sockaddr_in *addr)
 {
 	mominfo_t *pmom;
 
@@ -83,38 +84,48 @@ struct peersvr_list {
 	struct peersvr_list *next;
 	mominfo_t  *pmom;
 };
+typedef struct peersvr_list peersvr_list_t;
 
 static struct peersvr_list *peersvrl;
 
 mominfo_t *
 create_svr_entry(char *hostname, unsigned int port)
 {
-	mominfo_t *pmom;
+	mominfo_t *pmom = NULL;
 
 	pmom = (mominfo_t *) malloc(sizeof(mominfo_t));
-	if (pmom) {
-		strncpy(pmom->mi_host, hostname, PBS_MAXHOSTNAME);
-		pmom->mi_host[PBS_MAXHOSTNAME] = '\0';
-		pmom->mi_port = port;
-		pmom->mi_rmport = port;
-		pmom->mi_modtime = (time_t) 0;
-		pmom->mi_data = NULL;
-		pmom->mi_action = NULL;
-		pmom->mi_num_action = 0;
-	}
+	if (!pmom)
+		goto err;
+
+	strncpy(pmom->mi_host, hostname, PBS_MAXHOSTNAME);
+	pmom->mi_host[PBS_MAXHOSTNAME] = '\0';
+	pmom->mi_port = port;
+	pmom->mi_rmport = port;
+	pmom->mi_modtime = (time_t) 0;
+	pmom->mi_data = NULL;
+	pmom->mi_action = NULL;
+	pmom->mi_num_action = 0;
 
 	if (peersvrl) {
-		struct peersvr_list *tmp = calloc(1, sizeof(struct peersvr_list));
+		peersvr_list_t *tmp = calloc(1, sizeof(peersvr_list_t));
+		if (!tmp)
+			goto err;
 		tmp->pmom = pmom;
-		struct peersvr_list *itr;
+		peersvr_list_t *itr;
 		for (itr = peersvrl; itr->next; itr = itr->next)
 			;
 		itr->next = tmp;
 	} else {
-		peersvrl = calloc(1, sizeof(struct peersvr_list));
+		peersvrl = calloc(1, sizeof(peersvr_list_t));
+		if (!peersvrl)
+			goto err;
 		peersvrl->pmom = pmom;
 	}
 
+	return pmom;
+
+err:
+	log_errf(PBSE_SYSTEM, __func__, "malloc/calloc failed");
 	return pmom;
 }
 

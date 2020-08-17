@@ -187,7 +187,7 @@ extern int			license_sanity_check(void);
 extern void			memory_debug_log(struct work_task *ptask);
 
 /* multi-server functions */
-extern void *	is_peersvr(struct sockaddr_in*);
+extern void *	get_peersvr(struct sockaddr_in*);
 extern int	msvr_mode(void);
 extern void *	create_svr_entry(char *, unsigned int);
 extern int	init_msi();

@@ -1061,10 +1061,9 @@ dispatch_request(int sfds, struct batch_request *request)
 static void
 log_request(struct batch_request *request, int stream)
 {
-	sprintf(log_buffer, msg_request, request->rq_type, request->rq_user,
-		request->rq_host, stream);
-	log_event(PBSEVENT_DEBUG2, PBS_EVENTCLASS_REQUEST, LOG_DEBUG, "",
-		log_buffer);
+	log_eventf(PBSEVENT_DEBUG2, PBS_EVENTCLASS_REQUEST, LOG_DEBUG, "",
+		   msg_request, request->rq_type, request->rq_user,
+		   request->rq_host, stream);
 }
 
 /**
@@ -1126,7 +1125,7 @@ process_IS_CMD(int stream)
 	log_request(request, stream);
 
 #ifndef PBS_MOM
-	if (is_peersvr(addr)) {
+	if (get_peersvr(addr)) {
 		/* request came from another server */
 		request->rq_perm = ATR_DFLAG_USRD | ATR_DFLAG_USWR |
 				   ATR_DFLAG_OPRD | ATR_DFLAG_OPWR |

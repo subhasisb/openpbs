@@ -169,8 +169,7 @@ req_movejob(struct batch_request *req)
 		case -1:
 		case -2:
 		case 1:			/* fail */
-			if (jobp && req && req->rq_type == PBS_BATCH_MoveJob &&
-			    req->rq_ind.rq_move.run_exec_vnode) {
+			if (jobp) {
 				int newstate;
 				int newsub;
 				/* force re-eval of job state out of Transit */
