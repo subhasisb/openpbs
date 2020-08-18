@@ -106,5 +106,4 @@ int init_non_prime_time(struct status *, char *);
  */
 time_t end_prime_status(time_t date);
 
-
 #endif	/* _PRIME_H */

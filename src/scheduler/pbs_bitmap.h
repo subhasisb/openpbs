@@ -41,7 +41,6 @@
 #ifndef _PBS_BITMASK_H
 #define _PBS_BITMASK_H
 
-
 struct pbs_bitmap {
 	unsigned long *bits;	/* bit storage */
 	unsigned long num_longs;		/* number of longs in the bits array */

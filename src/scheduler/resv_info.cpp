@@ -144,6 +144,8 @@ stat_resvs(int pbs_sd)
 resource_resv **
 query_reservations(int pbs_sd, server_info *sinfo, struct batch_status *resvs)
 {
+	static struct batch_status *prev_resvs;
+	struct batch_status *diff_resvs;
 	/* the current reservation in the list */
 	struct batch_status *cur_resv;
 
@@ -151,50 +153,54 @@ query_reservations(int pbs_sd, server_info *sinfo, struct batch_status *resvs)
 	resource_resv **resresv_arr;
 
 	/* the current resv */
-	resource_resv *resresv;
+	resource_resv *resresv;;
 
-	/* a convient ptr to make things more simple */
-	resource_resv *rjob;
-
-	/* used to calculate the resources assigned per node */
-	schd_resource *res;
-	resource_req *req;
-	nspec *ns;
-	node_info *resvnode;
-	int j;
-	int k;
-	int idx = 0; /* index of the server info's resource reservation array */
-	int num_resv = 0;
+	int new_resvs = 0;
 
 	schd_error *err;
 
-	if (resvs == NULL)
+	if (resvs == NULL) {
+		sinfo->num_resvs = 0;
+		free_resource_resv_array(sinfo->resvs);
 		return NULL;
+	}
 
 	err = new_schd_error();
-	if (err == NULL)
-		return NULL;
-
-	cur_resv = resvs;
-
-	while (cur_resv != NULL) {
-		num_resv++;
-		cur_resv = cur_resv->next;
-	}
-
-	if ((resresv_arr = static_cast<resource_resv **>(malloc(sizeof(resource_resv *) * (num_resv + 1)))) == NULL) {
-		log_err(errno, __func__, MEM_ERR_MSG);
-		free_schd_error(err);
+	if (err == NULL) {
+		free_resource_resv_array(sinfo->resvs);
 		return NULL;
 	}
-	resresv_arr[0] = NULL;
-	sinfo->num_resvs = num_resv;
+	
+	if (sinfo->resvs == NULL && prev_resvs != NULL) {
+		pbs_statfree(prev_resvs);
+		prev_resvs = NULL;
+	}
 
-	for (cur_resv = resvs; cur_resv != NULL; cur_resv = cur_resv->next) {
+	if (prev_resvs != NULL)
+		diff_resvs = diff_batch_status_list(prev_resvs, resvs);
+	else
+		diff_resvs = resvs;
+
+	cur_resv = diff_resvs;
+
+	if (sinfo->resvs == NULL) {
+		if ((resresv_arr = static_cast<resource_resv **> (malloc(sizeof(resource_resv *)))) == NULL) {
+			log_err(errno, __func__, MEM_ERR_MSG);
+			free_schd_error(err);
+			return NULL;
+		}
+		resresv_arr[0] = NULL;
+	} else
+		resresv_arr = sinfo->resvs;
+
+	for (cur_resv = diff_resvs; cur_resv != NULL; cur_resv = cur_resv->next) {
 		int ignore_resv = 0;
+		struct attrl *attrp = NULL;
+		resource_resv *presresv = NULL;
+		int old_is_running = 0;
+
 		clear_schd_error(err);
-		struct attrl	*attrp = NULL;
-		resource_resv **jobs_in_reservations;
+
 		/* Check if this reservation belongs to this scheduler */
 		for (attrp = cur_resv->attribs; attrp != NULL; attrp = attrp->next) {
 			if (strcmp(attrp->name, ATTR_partition) == 0) {
@@ -203,15 +209,49 @@ query_reservations(int pbs_sd, server_info *sinfo, struct batch_status *resvs)
 				break;
 			}
 		}
-		if (ignore_resv == 1) {
-			sinfo->num_resvs--;
+		
+		presresv = find_resource_resv(resresv_arr, cur_resv->name);
+		if (presresv != NULL) {
+			if (ignore_resv) { /* resv confirmed on another partition */
+				remove_ptr_from_array(resresv_arr, presresv);
+				sinfo->num_resvs--;
+				delete presresv;
+				presresv = NULL;
+			} else if (presresv->resv->is_standing) {
+				while (presresv != NULL && presresv->end != UNSPECIFIED && presresv->end < sinfo->server_time) {
+					resource_resv *tmp_resresv;
+					presresv->resv->resv_queue->resv = NULL;
+					remove_ptr_from_array(resresv_arr, presresv);
+					tmp_resresv = find_resource_resv(resresv_arr, cur_resv->name);
+					if (presresv->resv->resv_queue->jobs != NULL)
+						for (int i = 0; presresv->resv->resv_queue->jobs[i] != NULL; i++)
+							presresv->resv->resv_queue->jobs[i]->job->resv = tmp_resresv;
+					delete presresv;
+					sinfo->num_resvs--;
+					presresv = tmp_resresv;
+				}
+				if (presresv == NULL)
+					ignore_resv = 1;
+			}
+		}
+
+		if (cur_resv->attribs == NULL && presresv != NULL) { /* Reservation removed */
+			sinfo->num_resvs -= remove_resv_from_server(resresv_arr, presresv);
 			continue;
 		}
 
-		/* convert resv info from server batch_status into resv_info */
-		if ((resresv = query_resv(cur_resv, sinfo)) == NULL) {
+		if (ignore_resv) {
+			requery_universe = true;
+			continue;
+		}
+
+		if (presresv != NULL)
+			old_is_running = is_resresv_running(presresv);
+
+		if ((resresv = query_resv(cur_resv, sinfo, presresv)) == NULL) {
 			free_resource_resv_array(resresv_arr);
 			free_schd_error(err);
+			requery_universe = true;
 			return NULL;
 		}
 #ifdef NAS /* localmod 047 */
@@ -230,34 +270,34 @@ query_reservations(int pbs_sd, server_info *sinfo, struct batch_status *resvs)
 		}
 		/* Make sure it is not a future reservation that is being deleted, if so ignore it */
 		else if ((resresv->resv->resv_state == RESV_BEING_DELETED) && (resresv->start > sinfo->server_time)) {
-			log_event(PBSEVENT_SCHED, PBS_EVENTCLASS_RESV, LOG_DEBUG,
-				resresv->name, "Future reservation is being deleted, ignoring this reservation");
+			log_event(PBSEVENT_SCHED, PBS_EVENTCLASS_RESV, LOG_DEBUG, resresv->name, 
+				"Future reservation is being deleted, ignoring this reservation");
 			ignore_resv = 1;
 		}
 		else if ((resresv->resv->resv_state == RESV_BEING_DELETED) && (resresv->resv->resv_nodes != NULL) &&
 			(!is_string_in_arr(resresv->resv->resv_nodes[0]->resvs, resresv->name.c_str()))) {
-			log_event(PBSEVENT_SCHED, PBS_EVENTCLASS_RESV, LOG_DEBUG,
-				resresv->name, "Reservation is being deleted and not present on node, ignoring this reservation");
+			log_event(PBSEVENT_SCHED, PBS_EVENTCLASS_RESV, LOG_DEBUG, resresv->name, 
+				"Reservation is being deleted and not present on node, ignoring this reservation");
 			ignore_resv = 1;
 		}
 
-		if (ignore_resv == 1) {
-			sinfo->num_resvs--;
+		if (ignore_resv) {
 			/* mark all the jobs of the associated queue as can never run */
-			if (resresv->resv->queuename != NULL) {
-				queue_info *qinfo = find_queue_info(sinfo->queues, resresv->resv->queuename);
-				if (qinfo != NULL) {
-					clear_schd_error(err);
-					set_schd_error_arg(err, SPECMSG, "Reservation is in an invalid state");
-					set_schd_error_codes(err, NEVER_RUN, ERR_SPECIAL);
-					update_jobs_cant_run(pbs_sd, qinfo->jobs, NULL, err, START_WITH_JOB);
-				}
+			if (resresv->resv->resv_queue != NULL) {
+				clear_schd_error(err);
+				set_schd_error_arg(err, SPECMSG, "Reservation is in an invalid state");
+				set_schd_error_codes(err, NEVER_RUN, ERR_SPECIAL);
+				update_jobs_cant_run(pbs_sd, resresv->resv->resv_queue->jobs, NULL, err, START_WITH_JOB);
+				resresv->resv->resv_queue->resv = NULL;
 			}
-			delete resresv;
+			if (presresv == resresv)
+				sinfo->num_resvs -= remove_resv_from_server(resresv_arr, presresv);
+			else
+				delete resresv;
+
+			requery_universe = true;
 			continue;
 		}
-
-		resresv->rank = get_sched_rank();
 
 		resresv->aoename = getaoename(resresv->select);
 		resresv->eoename = geteoename(resresv->select);
@@ -289,96 +329,18 @@ query_reservations(int pbs_sd, server_info *sinfo, struct batch_status *resvs)
 		}
 
 		if (resresv->node_set_str != NULL) {
+			if (resresv->node_set != NULL)
+				free(resresv->node_set);
 			resresv->node_set = create_node_array_from_str(
 				resresv->server->unassoc_nodes, resresv->node_set_str);
 		}
-		resresv->resv->resv_queue =
-			find_queue_info(sinfo->queues, resresv->resv->queuename);
-		if (is_resresv_running(resresv)) {
-			for (j = 0; resresv->ninfo_arr[j] != NULL; j++)
-				resresv->ninfo_arr[j]->num_run_resv++;
+		if (is_resresv_running(resresv) && !old_is_running) {
+			for (int i = 0; resresv->ninfo_arr[i] != NULL; i++)
+				resresv->ninfo_arr[i]->num_run_resv++;
 		}
 
-		if (resresv->resv->resv_queue != NULL) {
+		if (resresv->resv->resv_queue != NULL)
 			resresv->resv->resv_queue->resv = resresv;
-			if (resresv->resv->resv_queue->jobs != NULL) {
-				for (j = 0; resresv->resv->resv_queue->jobs[j] != NULL; j++) {
-					rjob = resresv->resv->resv_queue->jobs[j];
-					rjob->job->resv = resresv;
-					rjob->job->can_not_preempt = 1;
-					if (rjob->node_set_str != NULL)
-						rjob->node_set =
-							create_node_array_from_str(resresv->resv->resv_nodes,
-							rjob->node_set_str);
-
-					/* if a job will exceed the end time of a duration, it will be
-					 * killed by the server. We set the job's end time to the resv's
-					 * end time for better estimation.
-					 */
-					if (sinfo->server_time + rjob->duration > resresv->end) {
-						rjob->duration = resresv->end - sinfo->server_time;
-						rjob->hard_duration = rjob->duration;
-						if (rjob->end != UNSPECIFIED)
-							rjob->end = resresv->end;
-					}
-
-					if (rjob->job->is_running) {
-						/* the reservations resv_nodes is pointing to
-						 * a node_info array with just the reservations part of the node
-						 * i.e. the universe of the reservation
-						 */
-						for (k = 0; rjob->nspec_arr[k] != NULL; k++) {
-							ns = rjob->nspec_arr[k];
-							resvnode = find_node_info(resresv->resv->resv_nodes,
-								ns->ninfo->name);
-
-							if (resvnode != NULL) {
-								/* update the ninfo to point to the ninfo in our universe */
-								ns->ninfo = resvnode;
-								rjob->ninfo_arr[k] = resvnode;
-
-								/* update resource assigned amounts on the nodes in the
-								 * reservation's universe
-								 */
-								req = ns->resreq;
-								while (req != NULL) {
-									if (req->type.is_consumable) {
-										res = find_resource(ns->ninfo->res, req->def);
-										if (res != NULL)
-											res->assigned += req->amount;
-									}
-									req = req->next;
-								}
-							}
-							else {
-#ifdef NAS /* localmod 031 */
-								log_eventf(PBSEVENT_RESV, PBS_EVENTCLASS_RESV, LOG_INFO, rjob->name,
-									"Job has been assigned a node that doesn't exist in its reservation: %s", ns->ninfo->name);
-#else
-								log_event(PBSEVENT_RESV, PBS_EVENTCLASS_RESV, LOG_INFO, rjob->name,
-									"Job has been assigned a node which doesn't exist in its reservation");
-#endif /* localmod 031 */
-							}
-						}
-						if (rjob->ninfo_arr[k] != NULL) {
-							log_event(PBSEVENT_RESV, PBS_EVENTCLASS_RESV, LOG_INFO, rjob->name,
-								"Job's node array has different length than nspec_arr in query_reservations()");
-						}
-					}
-				}
-				jobs_in_reservations = resource_resv_filter(resresv->resv->resv_queue->jobs,
-									    count_array(resresv->resv->resv_queue->jobs),
-									    check_running_job_in_reservation, NULL, 0);
-				collect_jobs_on_nodes(resresv->resv->resv_nodes, jobs_in_reservations,
-					              count_array(jobs_in_reservations), NO_FLAGS);
-				free(jobs_in_reservations);
-
-				/* Sort the nodes to ensure correct job placement. */
-				qsort(resresv->resv->resv_nodes,
-					count_array(resresv->resv->resv_nodes),
-					sizeof(node_info *), multi_node_sort);
-			}
-		}
 		/* The server's info only gives information about a single reservation
 		 * object. In the case of a standing reservation, it is up to the
 		 * scheduler to account for each occurrence and attempt to confirm the
@@ -405,7 +367,6 @@ query_reservations(int pbs_sd, server_info *sinfo, struct batch_status *resvs)
 			char *execvnodes_seq = NULL; /* confirmed execvnodes sequence string */
 			char **execvnode_ptr = NULL;
 			char **tofree = NULL;
-			resource_resv **tmp = NULL;
 			time_t dtstart;
 			time_t next;
 			char *rrule = NULL;
@@ -434,10 +395,10 @@ query_reservations(int pbs_sd, server_info *sinfo, struct batch_status *resvs)
 				log_event(PBSEVENT_SCHED, PBS_EVENTCLASS_RESV, LOG_DEBUG,
 					resresv->name, "Error processing standing reservation");
 				free(execvnodes_seq);
-				sinfo->num_resvs--;
-				delete resresv;
+				if (presresv == NULL)
+					delete resresv;
 				continue;
-			}
+			} 
 			/* unroll_execvnode_seq will destroy the first argument that is passed
 			 * to it by calling tokenizing functions, hence, it has to be duplicated
 			 */
@@ -452,32 +413,6 @@ query_reservations(int pbs_sd, server_info *sinfo, struct batch_status *resvs)
 			 */
 			degraded_idx = occr_idx - (count - occr_count);
 
-			/* The number of remaining occurrences to add to the svr_info is given
-			 * by the total number of occurrences (count) to which we subtract the
-			 * number of elapsed occurrences that started at 1.
-			 * For example, if a standing reservation for a count of 10 is submitted
-			 * and the reservation has already run 2 and is now scheduling the 3rd
-			 * one to start, then occr_idx is 3. The number of remaining occurrences
-			 * to add to the server info is then 10-3=7
-			 * Note that 'count - occr_idx' is identical to
-			 * 'occr_count - degraded_idx'
-			 */
-			sinfo->num_resvs += count - occr_idx;
-
-			/* Resize the reservations array to append each occurrence */
-			if ((tmp = static_cast<resource_resv **>(realloc(resresv_arr,
-				sizeof(resource_resv *) * (sinfo->num_resvs + 1)))) == NULL) {
-				log_err(errno, __func__, MEM_ERR_MSG);
-				free_resource_resv_array(resresv_arr);
-				delete resresv;
-				free_execvnode_seq(tofree);
-				free(execvnodes_seq);
-				free(execvnode_ptr);
-				free_schd_error(err);
-				return NULL;
-			}
-			resresv_arr = tmp;
-
 			rrule = resresv->resv->rrule;
 			dtstart = resresv->resv->req_start;
 			tz = resresv->resv->timezone;
@@ -486,32 +421,32 @@ query_reservations(int pbs_sd, server_info *sinfo, struct batch_status *resvs)
 			 * parent reservation and resetting start and end times and the
 			 * execvnode on which the occurrence is confirmed to run.
 			 */
-			for (j = 0; occr_idx <= count; occr_idx++, j++, degraded_idx++) {
+			for (int i = 0; occr_idx <= count; occr_idx++, i++, degraded_idx++) {
 				/* If it is not the first occurrence then update the start time as
 				 * req_start_standing (if set). This is to ensure that if the first
 				 * occurrence has been changed, other future occurrences are not
 				 * affected.
 				 */
-				if (j == 1 && resresv_ocr->resv->req_start_standing != UNSPECIFIED)
+				if (i == 1 && resresv_ocr->resv->req_start_standing != UNSPECIFIED)
 					dtstart = resresv_ocr->resv->req_start_standing;
 				/* Get the start time of the next occurrence computed from dtstart.
 				 * The server maintains state of a single reservation object for
 				 * which in the case of a standing reservation, it updates start
 				 * and end times and execvnodes.
-				 * The last argument (j+1) indicates the occurrence index from dtstart
+				 * The last argument (i+1) indicates the occurrence index from dtstart
 				 * starting at 1. Returns dtstart if it's an advance reservation.
 				 */
-				next = get_occurrence(rrule, dtstart, tz, j + 1);
+				next = get_occurrence(rrule, dtstart, tz, i + 1);
 
 				/* Duplicate the "master" resv only for subsequent occurrences */
-				if (j == 0)
+				if (i == 0)
 					resresv_ocr = resresv;
 				else {
 					resresv_ocr = dup_resource_resv(resresv, sinfo, NULL);
 					if (resresv_ocr == NULL) {
-						log_err(errno, __func__, "Error duplicating resource reservation");
 						free_resource_resv_array(resresv_arr);
-						delete resresv;
+						if (presresv == NULL)
+							delete resresv;
 						free_execvnode_seq(tofree);
 						free(execvnodes_seq);
 						free(execvnode_ptr);
@@ -560,16 +495,54 @@ query_reservations(int pbs_sd, server_info *sinfo, struct batch_status *resvs)
 				 * occurrence has been changed, other future occurrences are not
 				 * affected.
 				 */
-				if (j != 0 && resresv->resv->req_duration_standing != UNSPECIFIED)
+				if (i != 0 && resresv->resv->req_duration_standing != UNSPECIFIED)
 					resresv_ocr->hard_duration = resresv_ocr->duration = resresv->resv->req_duration_standing;
 				resresv_ocr->resv->req_end = next + resresv->duration;
 				resresv_ocr->start = resresv_ocr->resv->req_start;
 				resresv_ocr->end = resresv_ocr->resv->req_end;
 				resresv_ocr->resv->resv_idx = occr_idx;
 
-				/* Add the occurrence to the global array of reservations */
-				resresv_arr[idx++] = resresv_ocr;
-				resresv_arr[idx] = NULL;
+				resresv_ocr->rank = get_sched_rank();
+
+				if (presresv == NULL) {
+					resource_resv **tmp;
+					tmp = add_resresv_to_array(resresv_arr, resresv_ocr, NO_FLAGS);
+					if (tmp == NULL) {
+						free_resource_resv_array(resresv_arr);
+						if (presresv == NULL)
+							delete resresv;
+						free_execvnode_seq(tofree);
+						free(execvnodes_seq);
+						free(execvnode_ptr);
+						free_schd_error(err);
+						return NULL;
+					}
+					resresv_arr = tmp;
+					new_resvs++;
+				} else if (i > 0) {
+					int j;
+					for (j = 0; resresv_arr[j] != NULL && !(resresv_arr[j]->name == resresv_ocr->name &&
+										resresv_arr[j]->start == resresv_ocr->start); j++)
+						;
+					/* The cycle after the reservation gets confirmed, we'll have only one occurrence of the reservation
+					 * So presresv != NULL, but we still need to add the other occurrences
+					 */
+					if (resresv_arr[j] == NULL) {
+						resource_resv **tmp;
+						tmp = add_resresv_to_array(resresv_arr, resresv_ocr, NO_FLAGS);
+						if (tmp == NULL) {
+							free_resource_resv_array(resresv_arr);
+							delete resresv_ocr;
+							free_schd_error(err);
+							return NULL;
+						}
+						resresv_arr = tmp;
+						new_resvs++;
+					} else {
+						delete resresv_arr[j];
+						resresv_arr[j] = resresv_ocr;
+					}
+				}
 
 				loc_time = localtime(&resresv_ocr->start);
 				strftime(start_time, sizeof(start_time), "%Y%m%d-%H:%M:%S", loc_time);
@@ -584,19 +557,127 @@ query_reservations(int pbs_sd, server_info *sinfo, struct batch_status *resvs)
 			free_execvnode_seq(tofree);
 			free(execvnodes_seq);
 			free(execvnode_ptr);
+		} else if (presresv == NULL) {
+			resource_resv **tmp;
+			tmp = add_resresv_to_array(resresv_arr, resresv, NO_FLAGS);
+			if (tmp == NULL) {
+				free_resource_resv_array(resresv_arr);
+				delete resresv;
+				free_schd_error(err);
+				return NULL;
+			}
+			resresv_arr = tmp;
+			new_resvs++;
+		}
+	}
+	for (int i = 0; resresv_arr[i] != NULL; i++) {
+		if (resresv_arr[i]->resv->rjob_state_change) {
+			/* pick up any new running jobs on the resv_nodes */
+			for (int j = 0; resresv_arr[i]->resv->resv_nodes[j] != NULL; j++) {
+				node_info *resv_node = resresv_arr[i]->resv->resv_nodes[j];
 
-			continue;
-		} else {
-			resresv_arr[idx++] = resresv;
-			resresv_arr[idx] = NULL;
+				if (resv_node->jobs != NULL)
+					free_string_array(resv_node->jobs);
+				resv_node->jobs = dup_string_arr(resv_node->svr_node->jobs);
+			}
+
+			if (resresv_arr[i]->resv->resv_queue->jobs != NULL) {
+				resource_resv **jobs_in_reservations;
+				jobs_in_reservations = resource_resv_filter(resresv_arr[i]->resv->resv_queue->jobs,
+									    count_array(resresv_arr[i]->resv->resv_queue->jobs),
+									    check_running_job_in_reservation, NULL, 0);
+				collect_jobs_on_nodes(resresv_arr[i]->resv->resv_nodes, jobs_in_reservations,
+						      count_array(jobs_in_reservations), NO_FLAGS);
+				free(jobs_in_reservations);
+
+				for (int j = 0; resresv_arr[i]->resv->resv_nodes[j] != NULL; j++)
+					create_resource_assn_for_node(resresv_arr[i]->resv->resv_nodes[j], 1);
+
+				/* Sort the nodes to ensure correct job placement. */
+				qsort(resresv_arr[i]->resv->resv_nodes,
+				      count_array(resresv_arr[i]->resv->resv_nodes),
+				      sizeof(node_info *), multi_node_sort);
+			}
+			resresv_arr[i]->resv->rjob_state_change = 0;
 		}
 	}
 
 	free_schd_error(err);
+	sinfo->num_resvs += new_resvs;
+
+	if (prev_resvs != NULL)
+		pbs_statfree(prev_resvs);
+	
+	if (diff_resvs != resvs)
+		pbs_statfree(diff_resvs);
+
+	prev_resvs = resvs;
 
 	return resresv_arr;
 }
 
+void modify_job_for_resv(resource_resv *rjob, resource_resv *resv, time_t server_time)
+{
+	int i;
+
+	if (rjob == NULL || resv == NULL)
+		return;
+	
+	rjob->job->resv = resv;
+	rjob->job->can_not_preempt = 1;
+	if (rjob->node_set_str != NULL) {
+		if (rjob->node_set != NULL)
+			free(rjob->node_set);
+		rjob->node_set = create_node_array_from_str(resv->resv->resv_nodes, rjob->node_set_str);
+	}
+
+	/* if a job will exceed the end time of a duration, it will be
+	 * killed by the server. We set the job's end time to the resv's
+	 * end time for better estimation.
+	 */
+	if (server_time + rjob->duration > resv->end) {
+		rjob->duration = resv->end - server_time;
+		rjob->hard_duration = rjob->duration;
+		if (rjob->end != UNSPECIFIED)
+			rjob->end = resv->end;
+	}
+
+	if (rjob->job->is_running) {
+		/* the reservations resv_nodes is pointing to
+		 * a node_info array with just the reservations part of the node
+		 * i.e. the universe of the reservation
+		 */
+		for (i = 0; rjob->nspec_arr[i] != NULL; i++) {
+			nspec *ns;
+			node_info *resvnode;
+			ns = rjob->nspec_arr[i];
+			resvnode = find_node_by_indrank(resv->resv->resv_nodes, -1, ns->rank);
+
+			if (resvnode != NULL) {
+				/* update the ninfo to point to the ninfo in our universe */
+				ns->ninfo = resvnode;
+				rjob->ninfo_arr[i] = resvnode;
+			} else {
+#ifdef NAS /* localmod 031 */
+				log_eventf(PBSEVENT_RESV, PBS_EVENTCLASS_RESV, LOG_INFO, rjob->name,
+					   "Job has been assigned a node that doesn't exist in its reservation: %s", ns->ninfo->name);
+#else
+				log_event(PBSEVENT_RESV, PBS_EVENTCLASS_RESV, LOG_INFO, rjob->name,
+					  "Job has been assigned a node which doesn't exist in its reservation");
+#endif /* localmod 031 */
+			}
+		}
+		if (rjob->ninfo_arr[i] != NULL) {
+			log_event(PBSEVENT_RESV, PBS_EVENTCLASS_RESV, LOG_INFO, rjob->name,
+				  "Job's node array has different length than nspec_arr in query_reservations()");
+		}
+	} else if (rjob->nspec_arr != NULL) {
+		free_nspecs(rjob->nspec_arr);
+		rjob->nspec_arr = NULL;
+		free(rjob->ninfo_arr);
+		rjob->ninfo_arr = NULL;
+	}
+}
 
 /**
  * @brief
@@ -610,7 +691,7 @@ query_reservations(int pbs_sd, server_info *sinfo, struct batch_status *resvs)
  *
  */
 resource_resv *
-query_resv(struct batch_status *resv, server_info *sinfo)
+query_resv(struct batch_status *resv, server_info *sinfo, resource_resv *presresv)
 {
 	struct attrl *attrp = NULL;	/* linked list of attributes from server */
 	resource_resv *advresv = NULL;	/* resv_info to be created */
@@ -618,97 +699,106 @@ query_resv(struct batch_status *resv, server_info *sinfo)
 	char *endp = NULL;		/* used with strtol() */
 	long count = 0; 		/* used to convert string -> num */
 	char *resv_nodes = NULL;	/* used to hold the resv_nodes for later processing */
+	int occr_changed = 0;
 
 	if (resv == NULL)
 		return NULL;
 
-	if ((advresv = new resource_resv(resv->name)) == NULL)
-		return NULL;
+	if (presresv == NULL) {
+		advresv = new resource_resv(resv->name);
+		if ((advresv->resv = new_resv_info()) == NULL) {
+			delete advresv;
+			return NULL;
+		}
+		advresv->server = sinfo;
+		advresv->is_resv = 1;
 
-	if ((advresv->resv = new_resv_info()) == NULL) {
-		delete  advresv;
-		return NULL;
-	}
+	} else
+		advresv = presresv;
 
 	attrp = resv->attribs;
-	advresv->server = sinfo;
-	advresv->is_resv = 1;
 
 	while (attrp != NULL) {
-		if (!strcmp(attrp->name, ATTR_resv_owner))
+		bool unset = false;
+		if (attrp->value[0] == '\0') {
+			unset = true;
+			endp = NULL;
+		} else {
+			count = strtol(attrp->value, &endp, 10);
+			if (*endp != '\0')
+				count = UNSPECIFIED;
+		}
+
+		if (!strcmp(attrp->name, ATTR_resv_owner)) {
+			if (advresv->user != NULL)
+				free(advresv->user);
 			advresv->user = string_dup(attrp->value);
-		else if (!strcmp(attrp->name, ATTR_egroup))
+		} else if (!strcmp(attrp->name, ATTR_egroup)) {
+			if (advresv->group != NULL)
+				free(advresv->group);
 			advresv->group = string_dup(attrp->value);
-		else if (!strcmp(attrp->name, ATTR_queue))
+		} else if (!strcmp(attrp->name, ATTR_queue)) {
+			if (advresv->resv->queuename != NULL)
+				free(advresv->resv->queuename);
 			advresv->resv->queuename = string_dup(attrp->value);
-		else if (!strcmp(attrp->name, ATTR_SchedSelect)) {
+		} else if (!strcmp(attrp->name, ATTR_SchedSelect)) {
+			if (advresv->select != NULL)
+				delete advresv->select;
 			advresv->select = parse_selspec(attrp->value);
 			if (advresv->select != NULL && advresv->select->chunks != NULL) {
 				/* Ignore resv if any of the chunks has no resource req. */
 				int i;
 				for (i = 0; advresv->select->chunks[i] != NULL; i++)
 					if (advresv->select->chunks[i]->req == NULL)
-						advresv->is_invalid = 1;
-			}
-		}
-		else if (!strcmp(attrp->name, ATTR_resv_start)) {
-			count = strtol(attrp->value, &endp, 10);
-			if (*endp != '\0')
-				count = -1;
+						advresv->is_invalid = true;
+			} else
+				advresv->is_invalid = true;
+		} else if (!strcmp(attrp->name, ATTR_resv_start))
 			advresv->resv->req_start = count;
-		}
-		else if (!strcmp(attrp->name, ATTR_resv_end)) {
-			count = strtol(attrp->value, &endp, 10);
-			if (*endp != '\0')
-				count = -1;
+		else if (!strcmp(attrp->name, ATTR_resv_end))
 			advresv->resv->req_end = count;
-		}
-		else if (!strcmp(attrp->name, ATTR_resv_duration)) {
-			count = strtol(attrp->value, &endp, 10);
-			if (*endp != '\0')
-				count = -1;
+		else if (!strcmp(attrp->name, ATTR_resv_duration))
 			advresv->resv->req_duration = count;
-		}
 		else if (!strcmp(attrp->name, ATTR_resv_alter_revert)) {
 			if (!strcmp(attrp->resource, "start_time")) {
-				count = strtol(attrp->value, &endp, 10);
-				if (*endp != '\0')
-					count = -1;
-				advresv->resv->req_start_orig = count;
+				if (unset)
+					advresv->resv->req_start_orig = UNSPECIFIED;
+				else 
+					advresv->resv->req_start_orig = count;
 			} else if (!strcmp(attrp->resource, "walltime")) {
-				advresv->resv->req_duration_orig = (time_t) res_to_num(attrp->value, NULL);
+				if (unset)
+					advresv->resv->req_duration_orig = UNSPECIFIED;
+				else
+					advresv->resv->req_duration_orig = (time_t) res_to_num(attrp->value, NULL);
 			}
-		}
-		else if (!strcmp(attrp->name, ATTR_resv_standing_revert)) {
+		} else if (!strcmp(attrp->name, ATTR_resv_standing_revert)) {
 			if (!strcmp(attrp->resource, "start_time")) {
-				count = strtol(attrp->value, &endp, 10);
-				if (*endp != '\0')
-					count = -1;
-				advresv->resv->req_start_standing = count;
+				if (unset)
+					advresv->resv->req_start_standing = UNSPECIFIED;
+				else
+					advresv->resv->req_start_standing = count;
 			} else if (!strcmp(attrp->resource, "walltime")) {
-				advresv->resv->req_duration_standing = (time_t) res_to_num(attrp->value, NULL);
-			} else if (!strcmp(attrp->resource, "select")) {
-				advresv->resv->select_standing = parse_selspec(attrp->value);
+				if (unset)
+					advresv->resv->req_duration_standing = UNSPECIFIED;
+				else
+					advresv->resv->req_duration_standing = (time_t) res_to_num(attrp->value, NULL);
+			} else if (!strcmp(attrp->resource, "select")) { 
+				if (unset) {
+					delete advresv->resv->select_standing;
+					advresv->resv->select_standing = NULL;
+				} else
+					advresv->resv->select_standing = parse_selspec(attrp->value);
 			}
-		}
-		else if (!strcmp(attrp->name, ATTR_resv_retry)) {
-			count = strtol(attrp->value, &endp, 10);
-			if (*endp != '\0')
-				count = -1;
-			advresv->resv->retry_time = count;
-		}
-		else if (!strcmp(attrp->name, ATTR_resv_state)) {
-			count = strtol(attrp->value, &endp, 10);
-			if (*endp != '\0')
-				count = -1;
+		} else if (!strcmp(attrp->name, ATTR_resv_retry)) {
+			if (unset)
+				advresv->resv->retry_time = UNSPECIFIED;
+			else
+				advresv->resv->retry_time = count;
+		} else if (!strcmp(attrp->name, ATTR_resv_state))
 			advresv->resv->resv_state = (enum resv_states) count;
-		}
-		else if (!strcmp(attrp->name, ATTR_resv_substate)) {
-			count = strtol(attrp->value, &endp, 10);
-			if (*endp != '\0')
-				count = -1;
+		else if (!strcmp(attrp->name, ATTR_resv_substate))
 			advresv->resv->resv_substate = (enum resv_states) count;
-		} else if (!strcmp(attrp->name, ATTR_l)) { /* resources requested*/
+		else if (!strcmp(attrp->name, ATTR_l)) { /* resources requested */
 			resreq = find_alloc_resource_req_by_str(advresv->resreq, attrp->resource);
 			if (resreq == NULL) {
 				delete advresv;
@@ -721,34 +811,57 @@ query_resv(struct batch_status *resv, server_info *sinfo)
 				if (advresv->resreq == NULL)
 					advresv->resreq = resreq;
 				if (!strcmp(attrp->resource, "place")) {
+					if (advresv->place_spec != NULL)
+						free_place(advresv->place_spec);
 					advresv->place_spec = parse_placespec(attrp->value);
 					if (advresv->place_spec == NULL)
 						advresv->is_invalid = 1;
 				}
 			}
-		}
-		else if (!strcmp(attrp->name, ATTR_resv_nodes))
+		} else if (!strcmp(attrp->name, ATTR_resv_nodes)) {
 			resv_nodes = attrp->value;
-		else if (!strcmp(attrp->name, ATTR_node_set))
-			advresv->node_set_str = break_comma_list(attrp->value);
-		else if (!strcmp(attrp->name, ATTR_resv_timezone))
+			if (advresv->resv->resv_nodes_str != NULL)
+				free(advresv->resv->resv_nodes_str);
+			advresv->resv->resv_nodes_str = string_dup(resv_nodes);
+		} else if (!strcmp(attrp->name, ATTR_node_set)) {
+			if (advresv->node_set_str != NULL)
+				free_string_array(advresv->node_set_str);
+			if (unset)
+				advresv->node_set_str = NULL;
+			else
+				advresv->node_set_str = break_comma_list(attrp->value);
+		} else if (!strcmp(attrp->name, ATTR_resv_timezone)) {
+			if (advresv->resv->timezone != NULL)
+				free(advresv->resv->timezone);
 			advresv->resv->timezone = string_dup(attrp->value);
-		else if (!strcmp(attrp->name, ATTR_resv_rrule))
+		} else if (!strcmp(attrp->name, ATTR_resv_rrule)) {
+			if (advresv->resv->rrule != NULL )
+				free(advresv->resv->rrule);
 			advresv->resv->rrule = string_dup(attrp->value);
-		else if (!strcmp(attrp->name, ATTR_resv_execvnodes))
+		} else if (!strcmp(attrp->name, ATTR_resv_execvnodes)) {
+			if (advresv->resv->execvnodes_seq != NULL)
+				free(advresv->resv->execvnodes_seq);
 			advresv->resv->execvnodes_seq = string_dup(attrp->value);
-		else if (!strcmp(attrp->name, ATTR_resv_idx))
-			advresv->resv->resv_idx = atoi(attrp->value);
-		else if (!strcmp(attrp->name, ATTR_resv_standing)) {
-			count = atoi(attrp->value);
+		} else if (!strcmp(attrp->name, ATTR_resv_idx)) {
+			advresv->resv->resv_idx = count;
+			occr_changed = 1;
+		} else if (!strcmp(attrp->name, ATTR_resv_standing))
 			advresv->resv->is_standing = count;
-		}
 		else if (!strcmp(attrp->name, ATTR_resv_count))
-			advresv->resv->count = atoi(attrp->value);
+			advresv->resv->count = count;
 		else if (!strcmp(attrp->name, ATTR_partition)) {
-			advresv->resv->partition = strdup(attrp->value);
+			if (advresv->resv->partition != NULL)
+				free(advresv->resv->partition);
+			advresv->resv->partition = string_dup(attrp->value);
 		} else if (!strcmp(attrp->name, ATTR_SchedSelect_orig)) {
-			advresv->resv->select_orig = parse_selspec(attrp->value);
+			if (advresv->resv->select_orig != NULL)
+				delete advresv->resv->select_orig;
+			if (unset)
+				advresv->resv->select_orig = NULL;
+			else
+				advresv->resv->select_orig = parse_selspec(attrp->value);
+			if (resv_nodes == NULL)
+				resv_nodes = advresv->resv->resv_nodes_str;
 		} else if (!strcmp(attrp->name, ATTR_server_inst_id)) {
 			advresv->svr_inst_id = string_dup(attrp->value);
 			if (advresv->svr_inst_id == NULL) {
@@ -787,6 +900,7 @@ query_resv(struct batch_status *resv, server_info *sinfo)
 	if (resv_nodes != NULL) {
 		selspec *sel;
 		std::string selectspec;
+		node_info **new_resv_nodes;
 		/* parse the execvnode and create an nspec array with ninfo ptrs pointing
 		 * to nodes in the real server
 		 */
@@ -794,27 +908,51 @@ query_resv(struct batch_status *resv, server_info *sinfo)
 			sel = advresv->resv->select_orig;
 		else
 			sel = advresv->select;
+		if (advresv->resv->orig_nspec_arr != NULL) {
+			free_nspecs(advresv->resv->orig_nspec_arr);
+			delete advresv->execselect;
+		}
 		advresv->resv->orig_nspec_arr = parse_execvnode(resv_nodes, sinfo, sel);
+		selectspec = create_select_from_nspec(advresv->resv->orig_nspec_arr);
+		advresv->execselect = parse_selspec(selectspec);
+
+		if (advresv->nspec_arr != NULL)
+			free_nspecs(advresv->nspec_arr);
 		advresv->nspec_arr = combine_nspec_array(advresv->resv->orig_nspec_arr);
+		if (advresv->ninfo_arr != NULL)
+			free(advresv->ninfo_arr);
 		advresv->ninfo_arr = create_node_array_from_nspec(advresv->nspec_arr);
 
 		/* create a node info array by copying the nodes and setting
 		 * available resources to only the ones assigned to the reservation
 		 */
-		advresv->resv->resv_nodes = create_resv_nodes(advresv->nspec_arr, sinfo);
-		selectspec = create_select_from_nspec(advresv->resv->orig_nspec_arr);
-		advresv->execselect = parse_selspec(selectspec);
+		new_resv_nodes = create_resv_nodes(advresv->nspec_arr, sinfo);
+		if (advresv->resv->resv_nodes != NULL)
+			free_nodes(advresv->resv->resv_nodes);
+		advresv->resv->resv_nodes = new_resv_nodes;
+
+	}
+
+	/* The first time we see the reservation, the partition won't be set on its queue, so it won't be queried.
+	 * We won't associate the queue with the reservation until the second cycle
+	 */
+	if (advresv->resv->queuename != NULL && advresv->resv->resv_queue == NULL)
+		advresv->resv->resv_queue = find_queue_info(sinfo->queues, advresv->resv->queuename);
+
+	if ((resv_nodes != NULL || occr_changed) && advresv->resv->resv_queue != NULL && advresv->resv->resv_queue->jobs != NULL) {
+			int i;
+			for (i = 0; advresv->resv->resv_queue->jobs[i] != NULL; i++)
+				modify_job_for_resv(advresv->resv->resv_queue->jobs[i], advresv, sinfo->server_time);
 	}
 
 	/* If reservation is unconfirmed and the number of occurrences is 0 then flag
 	 * the reservation as invalid. This is an extra check but isn't supposed to
 	 * happen because the server will purge such reservations.
 	 */
-	if (advresv->resv->resv_state == RESV_UNCONFIRMED &&
-		get_num_occurrences(advresv->resv->rrule,
-		advresv->resv->req_start,
-		advresv->resv->timezone) == 0)
+	if (advresv->resv->resv_state == RESV_UNCONFIRMED && get_num_occurrences(advresv->resv->rrule,
+		advresv->resv->req_start, advresv->resv->timezone) == 0) {
 		advresv->is_invalid = 1;
+	}
 
 	/* When a reservation is recognized as DEGRADED, it is converted into
 	 * state = CONFIRMED; substate = DEGRADED
@@ -829,11 +967,12 @@ query_resv(struct batch_status *resv, server_info *sinfo)
 			advresv->resv->resv_substate = RESV_DEGRADED;
 	}
 
+	advresv->resv->is_running = 0;
 	if (advresv->resv->resv_state == RESV_BEING_ALTERED) {
 		time_t alter_end = advresv->resv->req_start_orig + advresv->resv->req_duration_orig;
 		if (advresv->resv->req_start_orig <= sinfo->server_time && alter_end >= sinfo->server_time)
 			advresv->resv->is_running = 1;
-	} else if (advresv->resv->req_start <= sinfo->server_time && advresv->resv->req_end >= sinfo->server_time)
+	} else if (advresv->resv->req_start <= sinfo->server_time && advresv->resv->req_end >= sinfo->server_time && advresv->resv->resv_state != RESV_UNCONFIRMED)
 		advresv->resv->is_running = 1;
 
 	return advresv;
@@ -876,11 +1015,13 @@ new_resv_info()
 	rinfo->count = 0;
 	rinfo->is_standing = 0;
 	rinfo->is_running = 0;
+	rinfo->rjob_state_change = 0;
 	rinfo->occr_start_arr = NULL;
 	rinfo->partition = NULL;
 	rinfo->select_orig = NULL;
 	rinfo->select_standing = NULL;
 	rinfo->orig_nspec_arr = NULL;
+	rinfo->resv_nodes_str = NULL;
 
 	return rinfo;
 }
@@ -929,6 +1070,9 @@ free_resv_info(resv_info *rinfo)
 
 	if (rinfo->orig_nspec_arr != NULL)
 		free_nspecs(rinfo->orig_nspec_arr);
+	
+	if (rinfo->resv_nodes_str != NULL);
+	free(rinfo->resv_nodes_str);
 
 	free(rinfo);
 
@@ -986,9 +1130,10 @@ dup_resv_info(resv_info *rinfo, server_info *sinfo)
 	 * catch this when we duplicate the queues
 	 */
 	if (rinfo->resv_queue != NULL)
-		nrinfo->resv_queue = find_queue_info(sinfo->queues, rinfo->queuename);
+		nrinfo->resv_queue = find_queue_info(sinfo->queues, rinfo->resv_queue->name);
 
 	nrinfo->resv_nodes = dup_nodes(rinfo->resv_nodes, sinfo, NO_FLAGS);
+	nrinfo->resv_nodes_str = string_dup(rinfo->resv_nodes_str);
 
 	return nrinfo;
 }
@@ -1042,7 +1187,7 @@ check_new_reservations(status *policy, int pbs_sd, resource_resv **resvs, server
 		return -1;
 
 	/* If no reservations to check then return, this is not an error */
-	if (resvs == NULL)
+	if (resvs == NULL || resvs[0] == NULL)
 		return 0;
 
 	err = new_schd_error();
@@ -1053,8 +1198,7 @@ check_new_reservations(status *policy, int pbs_sd, resource_resv **resvs, server
 
 	for (i = 0; sinfo->resvs[i] != NULL; i++) {
 		if (sinfo->resvs[i]->resv == NULL) {
-			log_event(PBSEVENT_RESV, PBS_EVENTCLASS_RESV, LOG_INFO,
-				sinfo->resvs[i]->name,
+			log_event(PBSEVENT_RESV, PBS_EVENTCLASS_RESV, LOG_INFO, sinfo->resvs[i]->name,
 				"Error determining if reservation can be confirmed: "
 				"Could not find the reservation.");
 			continue;
@@ -1078,10 +1222,8 @@ check_new_reservations(status *policy, int pbs_sd, resource_resv **resvs, server
 			 */
 			nresv = find_resource_resv_by_indrank(nsinfo->resvs, sinfo->resvs[i]->resresv_ind, sinfo->resvs[i]->rank);
 			if (nresv == NULL) {
-				log_event(PBSEVENT_RESV, PBS_EVENTCLASS_RESV, LOG_INFO,
-					sinfo->resvs[i]->name,
-					"Error determining if reservation can be confirmed: "
-					"Resource not found.");
+				log_event(PBSEVENT_RESV, PBS_EVENTCLASS_RESV, LOG_INFO, sinfo->resvs[i]->name,
+					"Error determining if reservation can be confirmed: Resource not found.");
 				free_server(nsinfo);
 				return -1;
 			}
@@ -1120,8 +1262,7 @@ check_new_reservations(status *policy, int pbs_sd, resource_resv **resvs, server
 					occr_execvnodes_arr = unroll_execvnode_seq(
 						nresv->resv->execvnodes_seq, &tofree);
 					if (occr_execvnodes_arr == NULL) {
-						log_event(PBSEVENT_RESV, PBS_EVENTCLASS_RESV, LOG_INFO,
-							sinfo->resvs[i]->name,
+						log_event(PBSEVENT_RESV, PBS_EVENTCLASS_RESV, LOG_INFO, sinfo->resvs[i]->name,
 							"Error unrolling standing reservation.");
 						free_server(nsinfo);
 						return -1;
@@ -1163,8 +1304,7 @@ check_new_reservations(status *policy, int pbs_sd, resource_resv **resvs, server
 							nresv_copy = find_resource_resv_by_time(sinfo->all_resresv,
 								nresv_copy->name, nresv->resv->occr_start_arr[j]);
 							if (nresv_copy == NULL) {
-								log_event(PBSEVENT_RESV, PBS_EVENTCLASS_RESV,
-									LOG_INFO, nresv->name,
+								log_event(PBSEVENT_RESV, PBS_EVENTCLASS_RESV, LOG_INFO, nresv->name,
 									"Error determining if reservation can be confirmed: "
 									"Could not find reservation by time.");
 								break;
@@ -1202,7 +1342,7 @@ check_new_reservations(status *policy, int pbs_sd, resource_resv **resvs, server
 					nresv_copy->start = nresv->resv->occr_start_arr[j];
 
 					/* update start time, duration, and execvnodes of the occurrence */
-					nresv_copy->end = nresv_copy->start + nresv_copy->duration ;
+					nresv_copy->end = nresv_copy->start + nresv_copy->duration;
 
 					/* Only add the occurrence to the real universe if we are not
 					 * processing a degraded reservation as otherwise, the resources
@@ -1257,8 +1397,7 @@ check_new_reservations(status *policy, int pbs_sd, resource_resv **resvs, server
 						nresv_copy = find_resource_resv_by_time(sinfo->all_resresv,
 							nresv->name, nresv->resv->occr_start_arr[j]);
 						if (nresv_copy == NULL) {
-							log_event(PBSEVENT_RESV, PBS_EVENTCLASS_RESV,
-								LOG_INFO, nresv->name,
+							log_event(PBSEVENT_RESV, PBS_EVENTCLASS_RESV, LOG_INFO, nresv->name,
 								"Error determining if reservation can be confirmed: "
 								"Could not find reservation by time.");
 							break;
@@ -1601,8 +1740,7 @@ confirm_reservation(status *policy, int pbs_sd, resource_resv *unconf_resv, serv
 				free_nspecs(ns);
 				if (tmp == NULL) {
 					log_event(PBSEVENT_RESV, PBS_EVENTCLASS_RESV, LOG_INFO, nresv->name,
-						"Error determining if reservation can be confirmed: "
-						"Creation of execvnode failed.");
+						"Error determining if reservation can be confirmed: Creation of execvnode failed.");
 					rconf = RESV_CONFIRM_FAIL;
 					break;
 				}
@@ -1629,7 +1767,8 @@ confirm_reservation(status *policy, int pbs_sd, resource_resv *unconf_resv, serv
 
 				/* If the reservation is degraded, we log a message and continue */
 				if (nresv->resv->resv_substate == RESV_DEGRADED || nresv->resv->resv_substate == RESV_IN_CONFLICT) {
-					log_eventf(PBSEVENT_RESV, PBS_EVENTCLASS_RESV, LOG_INFO, nresv->name, "Reservation Failed to Reconfirm: %s", logmsg);
+					log_eventf(PBSEVENT_RESV, PBS_EVENTCLASS_RESV, LOG_INFO, nresv->name, 
+						"Reservation Failed to Reconfirm: %s", logmsg);
 				}
 				/* failed to confirm so move on. This will throw flow out of the
 				 * loop
@@ -1638,10 +1777,8 @@ confirm_reservation(status *policy, int pbs_sd, resource_resv *unconf_resv, serv
 			}
 		} /* end of simulation */
 		else {
-			log_event(PBSEVENT_RESV, PBS_EVENTCLASS_RESV, LOG_INFO,
-				nresv->name,
-				"Error determining if reservation can be confirmed: "
-				"Simulation failed.");
+			log_event(PBSEVENT_RESV, PBS_EVENTCLASS_RESV, LOG_INFO, nresv->name,
+				"Error determining if reservation can be confirmed: Simulation failed.");
 			rconf = RESV_CONFIRM_FAIL;
 		}
 	}
@@ -1685,10 +1822,8 @@ confirm_reservation(status *policy, int pbs_sd, resource_resv *unconf_resv, serv
 		 */
 		pbsrc = send_confirmresv(pbs_sd, nresv_parent, "null", resv_start_time, PBS_RESV_CONFIRM_FAIL);
 	}
-
 	/* Error handling first checks for the return code from the server and the
 	 * confirmation flag. If either failed, we print the error message, otherwise
-	 * we print success
 	 */
 	if (pbsrc > 0 || rconf == RESV_CONFIRM_FAIL) {
 		/* If the scheduler could not find a place for the reservation, use the
@@ -1729,8 +1864,7 @@ confirm_reservation(status *policy, int pbs_sd, resource_resv *unconf_resv, serv
 	 * execvnodes
 	 */
 	else if (rconf == RESV_CONFIRM_SUCCESS) {
-		log_event(PBSEVENT_RESV, PBS_EVENTCLASS_RESV, LOG_INFO, nresv_parent->name,
-			"Reservation Confirmed");
+		log_event(PBSEVENT_RESV, PBS_EVENTCLASS_RESV, LOG_INFO, nresv_parent->name, "Reservation Confirmed");
 
 		/* If handling a degraded reservation or while altering a standing reservation
 		 * we recreate a new execvnode sequence string, so the old should be cleared.
@@ -2088,12 +2222,15 @@ release_nodes(resource_resv *resresv)
  *
  * @param[in]	nspec_arr -	the nspec array created from the resv_nodes
  * @param[in]	sinfo     -	server reservation belongs too
+ * 
+ * @par 	the new duplicated nodes will NOT be part of sinfo->nodes.  
+ *		We include the server because it is expected that every node 
+ *		have a server pointer and parts of the code gets 
+ *		cranky if it isn't there.
  *
- * @return	new node universe
- * @retval	NULL	: on error
  */
 node_info **
-create_resv_nodes(nspec **nspec_arr, server_info *sinfo)
+create_resv_nodes(nspec * *nspec_arr, server_info *sinfo)
 {
 	node_info **nodes = NULL;
 	schd_resource *res;
@@ -2103,23 +2240,19 @@ create_resv_nodes(nspec **nspec_arr, server_info *sinfo)
 	if (nspec_arr != NULL) {
 		for (i = 0; nspec_arr[i] != NULL; i++)
 			;
-		nodes = static_cast<node_info **>(malloc((i+1) * sizeof(node_info *)));
+		nodes = static_cast<node_info **>(malloc((i + 1) * sizeof(node_info *)));
 		if (nodes != NULL) {
 			for (i = 0; nspec_arr[i] != NULL; i++) {
-				/* please note - the new duplicated nodes will NOT be part
-				 * of sinfo.  This means that you can't find a node in
-				 * node -> server -> nodes.  We include the server because
-				 * it is expected that every node have a server pointer and
-				 * parts of the code gets cranky if it isn't there.
-				 */
-				nodes[i] = dup_node_info(nspec_arr[i]->ninfo, sinfo, DUP_INDIRECT);
-				nodes[i]->svr_node = nspec_arr[i]->ninfo;
+				node_info *svr_node;
+				/* Find the node in sinfo->nodes because nspec->ninfo might be pointed to an old resv node */
+				svr_node = find_node_by_indrank(sinfo->nodes, nspec_arr[i]->ninfo->node_ind, nspec_arr[i]->ninfo->rank);
+				nodes[i] = dup_node_info(svr_node, sinfo, DUP_INDIRECT);
+				nodes[i]->svr_node = svr_node;
 
-				/* reservation nodes in state resv_exclusive can be assigned to jobs
-				 * within the reservation
-				 */
-				if (nodes[i]->is_resv_exclusive)
-					remove_node_state(nodes[i], ND_resv_exclusive);
+				set_node_info_state(nodes[i], ND_free);
+
+				free(nodes[i]->run_resvs_arr);
+				nodes[i]->run_resvs_arr = NULL;
 
 				req = nspec_arr[i]->resreq;
 				while (req != NULL) {
@@ -2215,4 +2348,32 @@ int will_confirm(resource_resv *resv, time_t server_time) {
 		return 1;
 
 	return 0;
+}
+
+int remove_resv_from_server(resource_resv **resvs, resource_resv *resresv) {
+	resource_resv *sresv;
+	int num_resvs_removed = 0;
+
+	if (is_resresv_running(resresv))
+		for (int i = 0; resresv->ninfo_arr[i] != NULL; i++)
+			resresv->ninfo_arr[i]->num_run_resv--;
+
+	if (resresv->resv->is_standing && resresv->resv->resv_state != RESV_UNCONFIRMED) {
+		/* Remove all occurrences of the reservation */
+		sresv = resresv;
+		do {
+			resource_resv *tmpresv;
+			sresv->resv->resv_queue->resv = NULL;
+			remove_ptr_from_array(resvs, sresv);
+			tmpresv = find_resource_resv(resvs, sresv->name);
+			delete sresv;
+			num_resvs_removed++;
+			sresv = tmpresv;
+		} while (sresv != NULL);
+	} else {
+		remove_ptr_from_array(resvs, resresv);
+		delete resresv;
+		num_resvs_removed = 1;
+	}
+	return num_resvs_removed;
 }

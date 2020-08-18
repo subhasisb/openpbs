@@ -523,7 +523,10 @@ find_timed_event(timed_event *te_list, const std::string &name, int ignore_disab
 		if (event_time == te->event_time || event_time == 0)
 			found_time = 1;
 
-		if (found_name + found_type + found_time == 3)
+		if (name.empty() || te->name == name)
+			found_name = 1;
+
+		if (found_type + found_time + found_name == 3)
 			break;
 	}
 
@@ -1398,7 +1401,6 @@ free_timed_event(timed_event *te)
 		if (te->event_type & TIMED_END_EVENT)
 			((resource_resv *)te->event_ptr)->end_event = NULL;
 	}
-
 	delete te;
 }
 
@@ -1463,10 +1465,8 @@ add_event(event_list *calendar, timed_event *te)
 		if (te->event_time > current_time) {
 			if (te->event_time < calendar->next_event->event_time)
 				calendar->next_event = te;
-			else if (te->event_time == calendar->next_event->event_time) {
-				calendar->next_event =
-					find_timed_event(calendar->events, te->event_time);
-			}
+			else if (te->event_time == calendar->next_event->event_time)
+				calendar->next_event = find_timed_event(calendar->events, te->event_time);
 		}
 	}
 	/* if next_event == NULL, then we've simulated to the end. */

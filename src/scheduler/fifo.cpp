@@ -122,6 +122,7 @@ schedinit(int nthreads)
 	PyObject *module;
 	PyObject *obj;
 	PyObject *dict;
+	static int python_initialized = 0;
 #endif
 
 	conf = parse_config(CONFIG_FILE);
@@ -165,34 +166,37 @@ schedinit(int nthreads)
 	set_ical_zoneinfo(zone_dir);
 
 #ifdef PYTHON
-	Py_NoSiteFlag = 1;
-	Py_FrozenFlag = 1;
-	Py_IgnoreEnvironmentFlag = 1;
+	if (!python_initialized) {
+		Py_NoSiteFlag = 1;
+		Py_FrozenFlag = 1;
+		Py_IgnoreEnvironmentFlag = 1;
 
-	set_py_progname();
-	Py_InitializeEx(0);
+		set_py_progname();
+		Py_InitializeEx(0);
 
-	PyRun_SimpleString(
-		"_err =\"\"\n"
-		"ex = None\n"
-		"try:\n"
+		PyRun_SimpleString(
+			"_err =\"\"\n"
+			"ex = None\n"
+			"try:\n"
 			"\tfrom math import *\n"
-		"except ImportError as ex:\n"
+			"except ImportError as ex:\n"
 			"\t_err = str(ex)");
 
-	module = PyImport_AddModule("__main__");
-	dict = PyModule_GetDict(module);
+		module = PyImport_AddModule("__main__");
+		dict = PyModule_GetDict(module);
 
-	errstr = NULL;
-	obj = PyMapping_GetItemString(dict, "_err");
-	if (obj != NULL) {
-		errstr = PyUnicode_AsUTF8(obj);
-		if (errstr != NULL) {
-			if (strlen(errstr) > 0)
-				log_eventf(PBSEVENT_SCHED, PBS_EVENTCLASS_SCHED, LOG_WARNING,
-					   "PythonError", " %s. Python is unlikely to work properly.", errstr);
+		errstr = NULL;
+		obj = PyMapping_GetItemString(dict, "_err");
+		if (obj != NULL) {
+			errstr = PyUnicode_AsUTF8(obj);
+			if (errstr != NULL) {
+				if (strlen(errstr) > 0)
+					log_eventf(PBSEVENT_SCHED, PBS_EVENTCLASS_SCHED, LOG_WARNING,
+						   "PythonError", " %s. Python is unlikely to work properly.", errstr);
+			}
+			Py_XDECREF(obj);
 		}
-		Py_XDECREF(obj);
+		python_initialized = 1;
 	}
 
 #endif
@@ -350,13 +354,15 @@ init_scheduling_cycle(status *policy, int pbs_sd, server_info *sinfo)
 					auto rj = find_resource_resv(sinfo->running_jobs, lj.name);
 
 					if (rj != NULL && rj->job != NULL) {
+						sch_resource_t now, then;
 						/* just in case the delta is negative just add 0 */
-						delta = formula_evaluate(conf.fairshare_res.c_str(), rj, rj->job->resused) -
-							formula_evaluate(conf.fairshare_res.c_str(), rj, lj.resused);
+						now = formula_evaluate(conf.fairshare_res.c_str(), rj, rj->job->resused);
+						then = formula_evaluate(conf.fairshare_res.c_str(), rj, lj.resused);
 
-						delta = IF_NEG_THEN_ZERO(delta);
+						delta = IF_NEG_THEN_ZERO(now - then);
+						if (delta)
+							log_eventf(PBSEVENT_DEBUG2, PBS_EVENTCLASS_JOB, LOG_DEBUG, rj->name, "entity: %s now: %lf then: %lf delta: %lf", user->name, now, then, delta);
 
-						;
 						for (auto gpath = user->gpath; gpath != NULL; gpath = gpath->next)
 							gpath->ginfo->usage += delta;
 
@@ -504,6 +510,7 @@ schedule(int sd, const sched_cmd *cmd)
 		case SCH_SCHEDULE_AJOB:
 			return intermediate_schedule(sd, cmd);
 		case SCH_CONFIGURE:
+			requery_universe = true;
 			log_event(PBSEVENT_SCHED, PBS_EVENTCLASS_SCHED, LOG_INFO,
 				  "reconfigure", "Scheduler is reconfiguring");
 			/* Get config from sched_priv/ files */
@@ -588,15 +595,27 @@ intermediate_schedule(int sd, const sched_cmd *cmd)
 int
 scheduling_cycle(int sd, const sched_cmd *cmd)
 {
-	server_info *sinfo;		/* ptr to the server/queue/job/node info */
+	static server_info *keep_sinfo;	/* ptr to the server/queue/job/node info */
+	server_info *sinfo;
 	int rc = SUCCESS;		/* return code from main_sched_loop() */
 	char log_msg[MAX_LOG_SIZE];	/* used to log the message why a job can't run*/
 	int error = 0;			/* error happened, don't run main loop */
 	status *policy;			/* policy structure used for cycle */
+	struct timeval pre_last_cycle_time;
 	schd_error *err = NULL;
 
 	log_event(PBSEVENT_DEBUG, PBS_EVENTCLASS_REQUEST, LOG_DEBUG,
 		  "", "Starting Scheduling Cycle");
+		
+	if (requery_universe) {
+		if (keep_sinfo != NULL) {
+			keep_sinfo->fstree = NULL; /* This has been freed already */
+			free_server(keep_sinfo);
+			keep_sinfo = NULL;
+		}
+		requery_universe = false;
+		memset(&last_cycle_time, 0, sizeof(last_cycle_time));
+	}
 
 	/* Decide whether we need to send "can't run" type updates this cycle */
 	if (time(NULL) - last_attr_updates >= sc_attrs.attr_update_period)
@@ -610,15 +629,66 @@ scheduling_cycle(int sd, const sched_cmd *cmd)
 	do_soft_cycle_interrupt = 0;
 	do_hard_cycle_interrupt = 0;
 #endif /* localmod 030 */
-	/* create the server / queue / job / node structures */
-	if ((sinfo = query_server(&cstat, sd)) == NULL) {
+
+	/* Keep time before we call query_server() so if something happens while we are in query_server() we don't miss it next cycle */
+	gettimeofday(&pre_last_cycle_time, NULL);
+	if ((keep_sinfo = query_server(&cstat, sd, keep_sinfo)) == NULL) {
 		log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_NOTICE,
 			  "", "Problem with creating server data structure");
-		end_cycle_tasks(sinfo);
+		memset(&last_cycle_time, 0, sizeof(last_cycle_time));
+		requery_universe = true;
+		end_cycle_tasks(keep_sinfo);
 		return 0;
 	}
+	last_cycle_time = pre_last_cycle_time;
+
+	/* jobid will not be NULL if we received a qrun request */
+	if (cmd->jid != NULL) {
+		log_event(PBSEVENT_JOB, PBS_EVENTCLASS_JOB, LOG_INFO, cmd->jid, "Received qrun request");
+		keep_sinfo->qrun_job = find_resource_resv(keep_sinfo->jobs, cmd->jid);
+		if (keep_sinfo->qrun_job == NULL && is_job_array(cmd->jid)) {
+			char jid[PBS_MAXSVRJOBID + 1];
+			char *bracket;
+			pbs_strncpy(jid, cmd->jid, sizeof(jid));
+			bracket = strchr(jid, (int)'[');
+			if (bracket != NULL) {
+				char *other_bracket;
+				other_bracket = strchr(cmd->jid, (int) ']');
+				strcpy(bracket + 1, other_bracket);
+				keep_sinfo->qrun_job = find_resource_resv(keep_sinfo->jobs, jid);
+			}
+		}
+
+		if (keep_sinfo->qrun_job == NULL) { /* something went wrong */
+			log_event(PBSEVENT_JOB, PBS_EVENTCLASS_JOB, LOG_INFO, cmd->jid, "Could not find job to qrun.");
+			error = 1;
+			rc = SCHD_ERROR;
+			sprintf(log_msg, "PBS Error: Scheduler can not find job");
+		}
+	}
+
+	if (init_scheduling_cycle(keep_sinfo->policy, sd, keep_sinfo) == 0) {
+		log_event(PBSEVENT_DEBUG, PBS_EVENTCLASS_SERVER, LOG_DEBUG,
+			  "", "init_scheduling_cycle failed.");
+		end_cycle_tasks(keep_sinfo);
+		return 0;
+	}
+
+	sinfo = dup_server_info(keep_sinfo);
 	policy = sinfo->policy;
 
+	if (sinfo->qrun_job != NULL) {
+		if (is_job_array(cmd->jid) > 1) /* is a single subjob or a range */
+			modify_job_array_for_qrun(sinfo->qrun_job, cmd->jid);
+
+		sinfo->qrun_job->can_not_run = 0;
+		if (sinfo->qrun_job->job != NULL) {
+			if (sinfo->qrun_job->job->is_waiting ||
+			    sinfo->qrun_job->job->is_held) {
+				set_job_state("Q", sinfo->qrun_job->job);
+			}
+		}
+	}
 
 	/* don't confirm reservations if we're handling a qrun request */
 	if (cmd->jid == NULL) {
@@ -630,45 +700,12 @@ scheduling_cycle(int sd, const sched_cmd *cmd)
 			 * information about the newly confirmed reservations
 			 */
 			end_cycle_tasks(sinfo);
+			free_server(sinfo);
 			/* Problem occurred confirming reservation, retry cycle */
 			if (rc < 0)
 				return -1;
 
 			return 0;
-		}
-	}
-
-	/* jobid will not be NULL if we received a qrun request */
-	if (cmd->jid != NULL) {
-		log_event(PBSEVENT_JOB, PBS_EVENTCLASS_JOB, LOG_INFO, cmd->jid, "Received qrun request");
-		if (is_job_array(cmd->jid) > 1) /* is a single subjob or a range */
-			modify_job_array_for_qrun(sinfo, cmd->jid);
-		else
-			sinfo->qrun_job = find_resource_resv(sinfo->jobs, cmd->jid);
-
-		if (sinfo->qrun_job == NULL) { /* something went wrong */
-			log_event(PBSEVENT_JOB, PBS_EVENTCLASS_JOB, LOG_INFO, cmd->jid, "Could not find job to qrun.");
-			error = 1;
-			rc = SCHD_ERROR;
-			sprintf(log_msg, "PBS Error: Scheduler can not find job");
-		}
-	}
-
-
-	if (init_scheduling_cycle(policy, sd, sinfo) == 0) {
-		log_event(PBSEVENT_DEBUG, PBS_EVENTCLASS_SERVER, LOG_DEBUG, sinfo->name, "init_scheduling_cycle failed.");
-		end_cycle_tasks(sinfo);
-		return 0;
-	}
-
-
-	if (sinfo->qrun_job != NULL) {
-		sinfo->qrun_job->can_not_run = 0;
-		if (sinfo->qrun_job->job != NULL) {
-			if (sinfo->qrun_job->job->is_waiting ||
-				sinfo->qrun_job->job->is_held) {
-				set_job_state("Q", sinfo->qrun_job->job);
-			}
 		}
 	}
 
@@ -721,6 +758,7 @@ scheduling_cycle(int sd, const sched_cmd *cmd)
 	site_list_shares(stdout, sinfo, "eoc_", 1);
 #endif
 	end_cycle_tasks(sinfo);
+	free_server(sinfo);
 
 	free_schd_error(err);
 	if (rc < 0)
@@ -1130,14 +1168,6 @@ end_cycle_tasks(server_info *sinfo)
 	if (sinfo != NULL && sinfo->policy->fair_share)
 		create_prev_job_info(sinfo->running_jobs);
 
-	/* we copied in the global fairshare into sinfo at the start of the cycle,
-	 * we don't want to free it now, or we'd lose all fairshare data
-	 */
-	if (sinfo != NULL) {
-		sinfo->fstree = NULL;
-		free_server(sinfo);	/* free server and queues and jobs */
-	}
-
 	/* close any open connections to peers */
 	for (auto& pq : conf.peer_queues) {
 		if (pq.peer_sd >= 0) {
@@ -1153,7 +1183,6 @@ end_cycle_tasks(server_info *sinfo)
 		free(cmp_aoename);
 		cmp_aoename = NULL;
 	}
-
 	got_sigpipe = 0;
 
 	log_event(PBSEVENT_DEBUG, PBS_EVENTCLASS_REQUEST, LOG_DEBUG,
@@ -1202,8 +1231,7 @@ update_job_can_not_run(int pbs_sd, resource_resv *job, schd_error *err)
 		}
 
 		if (log_buf[0] != '\0')
-			log_event(PBSEVENT_SCHED, PBS_EVENTCLASS_JOB, LOG_INFO,
-				job->name, log_buf);
+			log_event(PBSEVENT_SCHED, PBS_EVENTCLASS_JOB, LOG_INFO, job->name, log_buf);
 
 		/* We won't be looking at this job in main_sched_loop()
 		 * and we just updated some attributes just above.  Send Now.
@@ -1303,7 +1331,7 @@ run_job(int pbs_sd, resource_resv *rjob, char *execvnode, int has_runjob_hook, s
 		snprintf(buf, sizeof(buf), "%d", pbs_errno);
 		set_schd_error_arg(err, ARG2, buf);
 #ifdef NAS /* localmod 031 */
-		set_schd_error_arg(err, ARG3, rjob->name);
+		set_schd_error_arg(err, ARG3, rjob->name.c_str());
 #endif /* localmod 031 */
 	}
 
@@ -1400,7 +1428,7 @@ run_update_resresv(status *policy, int pbs_sd, server_info *sinfo,
 		ret = -1;
 
 	if (!is_resource_resv_valid(resresv, err)) {
-		schdlogerr(PBSEVENT_DEBUG2, PBS_EVENTCLASS_SCHED, LOG_DEBUG, (char *) __func__, "Request not valid:", err);
+		schdlogerr(PBSEVENT_DEBUG2, PBS_EVENTCLASS_SCHED, LOG_DEBUG, std::string(__func__), "Request not valid:", err);
 		ret = -1;
 	}
 
@@ -1523,7 +1551,7 @@ run_update_resresv(status *policy, int pbs_sd, server_info *sinfo,
 					printf("%04d-%02d-%02d %02d:%02d:%02d %s %s %s\n",
 						ptm->tm_year+1900, ptm->tm_mon+1, ptm->tm_mday,
 						ptm->tm_hour, ptm->tm_min, ptm->tm_sec,
-						"Running", resresv->name,
+						"Running", resresv->name.c_str(),
 						execvnode != NULL ? execvnode : "(NULL)");
 					fflush(stdout);
 #endif /* localmod 031 */
@@ -1586,8 +1614,7 @@ run_update_resresv(status *policy, int pbs_sd, server_info *sinfo,
 		rr->nspec_arr = ns;
 
 		if (rr->is_job && !(flags & RURR_NOPRINT)) {
-				log_event(PBSEVENT_SCHED, PBS_EVENTCLASS_JOB,
-					LOG_INFO, rr->name, "Job run");
+				log_event(PBSEVENT_SCHED, PBS_EVENTCLASS_JOB, LOG_INFO, rr->name, "Job run");
 		}
 		if ((resresv->is_job) && (resresv->job->is_suspended ==1))
 			old_state = 'S';

@@ -55,7 +55,7 @@ queue_info **query_queues(status *policy, int pbs_sd, server_info *sinfo);
  *      query_queue_info - collects information from a batch_status and
  *                         puts it in a queue_info struct for easier access
  */
-queue_info *query_queue_info(status *policy, struct batch_status *queue, struct server_info *sinfo);
+queue_info *query_queue_info(status *policy, struct batch_status *queue, struct server_info *sinfo, struct queue_info *qinfo);
 
 /*
  *      new_queue_info - allocate and initalize a new queue_info struct
@@ -99,5 +99,6 @@ update_queue_on_end(queue_info *qinfo, resource_resv *resresv,
 
 int queue_in_partition(queue_info *qinfo, char *partition);
 
+void clear_queue_info_for_query(queue_info *qinfo);
 
 #endif /* _QUEUE_INFO_H */

@@ -262,6 +262,4 @@ void reset_usage(group_info *node);
 /* Calculate the arbitrary usage of the tree */
 void calc_usage_factor(fairshare_head *tree);
 
-
-
 #endif	/* _FAIRSHARE_H */

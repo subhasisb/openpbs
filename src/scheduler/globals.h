@@ -115,6 +115,8 @@ extern int send_job_attr_updates;
 extern int clust_primary_sock;
 
 extern int clust_secondary_sock;
+extern struct timeval last_cycle_time;
+extern bool requery_universe;
 
 /* a list of running jobs from the last scheduling cycle */
 extern std::vector<prev_job_info> last_running;

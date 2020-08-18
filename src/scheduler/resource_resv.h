@@ -69,8 +69,7 @@ void dup_resource_resv_array_chunk(th_data_dup_resresv *data);
  *      dup_resource_resv_array - dup a array of pointers of resource resvs
  */
 resource_resv **
-dup_resource_resv_array(resource_resv **oresresv_arr,
-	server_info *nsinfo, queue_info *nqinfo);
+dup_resource_resv_array(resource_resv **oresresv_arr, server_info *nsinfo, queue_info *nqinfo);
 
 /*
  *      is_resource_resv_valid - do simple validity checks for a resource resv
@@ -82,7 +81,6 @@ int is_resource_resv_valid(resource_resv *resresv, schd_error *err);
  *      find_resource_resv - find a resource_resv by name
  */
 resource_resv *find_resource_resv(resource_resv **resresv_arr, const std::string& name);
-
 
 /*
  * find a resource_resv by unique numeric rank
@@ -105,6 +103,7 @@ resource_req *find_resource_req_by_str(resource_req *reqlist, const char *name);
  */
 resource_req *find_resource_req(resource_req *reqlist, resdef *def);
 
+void remove_resource_req(resource_req **req_list, char *name);
 /*
  *	find resource_count by resource definition
  */

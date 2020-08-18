@@ -119,14 +119,14 @@
 #include <signal.h>
 #include <sys/wait.h>
 
+#include "constant.h"
+#include "config.h"
 #include "pbs_entlim.h"
 #include "pbs_ifl.h"
 #include "pbs_error.h"
 #include "log.h"
 #include "pbs_share.h"
 #include "libpbs.h"
-#include "constant.h"
-#include "config.h"
 #include "server_info.h"
 #include "queue_info.h"
 #include "job_info.h"
@@ -179,12 +179,10 @@ extern char **environ;
  *
  */
 server_info *
-query_server(status *pol, int pbs_sd)
+query_server(status *pol, int pbs_sd, server_info *sinfo)
 {
 	struct batch_status *server;	/* info about the server */
 	struct batch_status *bs_resvs;	/* batch status of the reservations */
-	server_info *sinfo;		/* scheduler internal form of server info */
-	queue_info **qinfo;		/* array of queues on the server */
 	counts *cts;			/* used to count running per user/grp */
 	int num_express_queues = 0;	/* number of express queues */
 	int i;
@@ -192,6 +190,8 @@ query_server(status *pol, int pbs_sd)
 	resource_resv **jobs_alive;
 	status *policy;
 	int job_arrays_associated = FALSE;
+	queue_info **qinfo_arr;
+	int recreate_resdef = 0;
 
 	if (pol == NULL)
 		return NULL;
@@ -212,8 +212,11 @@ query_server(status *pol, int pbs_sd)
 		return NULL;
 	}
 
+	if (sinfo != NULL)
+		clear_server_info_for_query(sinfo);
+
 	/* convert batch_status structure into server_info structure */
-	if ((sinfo = query_server_info(pol, server)) == NULL) {
+	if ((sinfo = query_server_info(pol, server, sinfo)) == NULL) {
 		pbs_statfree(server);
 		return NULL;
 	}
@@ -247,8 +250,8 @@ query_server(status *pol, int pbs_sd)
 	 */
 	bs_resvs = stat_resvs(pbs_sd);
 
-	/* get the nodes, if any - NOTE: will set sinfo -> num_nodes */
-	if ((sinfo->nodes = query_nodes(pbs_sd, sinfo)) == NULL) {
+	/* get the nodes, if any - NOTE: will set sinfo->nodes */
+	if (query_nodes(pbs_sd, sinfo) == NULL) {
 		pbs_statfree(server);
 		sinfo->fstree = NULL;
 		free_server(sinfo);
@@ -262,37 +265,37 @@ query_server(status *pol, int pbs_sd)
 			multi_node_sort);
 
 	/* get the queues */
-	if ((sinfo->queues = query_queues(policy, pbs_sd, sinfo)) == NULL) {
+	if ((qinfo_arr = query_queues(policy, pbs_sd, sinfo)) == NULL) {
 		pbs_statfree(server);
 		sinfo->fstree = NULL;
 		free_server(sinfo);
 		pbs_statfree(bs_resvs);
 		return NULL;
 	}
+	free(sinfo->queues);
+	sinfo->queues = qinfo_arr;
 
-	if (sinfo->has_nodes_assoc_queue)
-		sinfo->unassoc_nodes =
-			node_filter(sinfo->nodes, sinfo->num_nodes, is_unassoc_node, NULL, 0);
-	else
+	if (sinfo->has_nodes_assoc_queue) {
+		if (sinfo->unassoc_nodes != sinfo->nodes)
+			free(sinfo->unassoc_nodes);
+		sinfo->unassoc_nodes = node_filter(sinfo->nodes, sinfo->num_nodes, is_unassoc_node, NULL, 0);
+	} else
 		sinfo->unassoc_nodes = sinfo->nodes;
 
 	/* count the queues and total up the individual queue states
 	 * for server totals. (total up all the state_count structs)
 	 */
-	qinfo = sinfo->queues;
-	while (*qinfo != NULL) {
-		sinfo->num_queues++;
-		total_states(&(sinfo->sc), &((*qinfo)->sc));
+	init_state_count(&sinfo->sc);
+	for (i = 0; sinfo->queues[i] != NULL; i++) {
+		total_states(&sinfo->sc, &sinfo->queues[i]->sc);
 
-		if ((*qinfo)->priority >= sc_attrs.preempt_queue_prio)
+		if (sinfo->queues[i]->priority >= sc_attrs.preempt_queue_prio)
 			num_express_queues++;
-
-		qinfo++;
 	}
+	sinfo->num_queues = i;
 
 	if (num_express_queues > 1)
 		sinfo->has_mult_express = 1;
-
 
 	/* sort the queues before we collect the jobs list (i.e. set_jobs())
 	 * in the case we don't sort the jobs and don't have by_queue turned on
@@ -300,6 +303,7 @@ query_server(status *pol, int pbs_sd)
 	if ((policy->round_robin == 1) || (policy->by_queue == 1))
 		qsort(sinfo->queues, sinfo->num_queues, sizeof(queue_info *),
 			cmp_queue_prio_dsc);
+
 	if (policy->round_robin == 1) {
 		int ret_val;
 		/* queues are already sorted in descending order of their priority */
@@ -314,9 +318,15 @@ query_server(status *pol, int pbs_sd)
 		}
 	}
 
-	/* get reservations, if any - NOTE: will set sinfo -> num_resvs */
+	sinfo->use_hard_duration = 0;
+	/* get reservations, if any - NOTE: will set sinfo->num_resvs */
 	sinfo->resvs = query_reservations(pbs_sd, sinfo, bs_resvs);
-	pbs_statfree(bs_resvs);
+	if (sinfo->resvs == NULL && bs_resvs != NULL) {
+		pbs_statfree(bs_resvs);
+		sinfo->fstree = NULL;
+		free_server(sinfo);
+		return NULL;
+	}
 
 	if (create_server_arrays(sinfo) == 0) { /* bad stuff happened */
 		sinfo->fstree = NULL;
@@ -333,16 +343,25 @@ query_server(status *pol, int pbs_sd)
 	associate_dependent_jobs(sinfo);
 
 	/* create res_to_check arrays based on current jobs/resvs */
-	policy->resdef_to_check = collect_resources_from_requests(sinfo->all_resresv);
-	for (const auto& rd : policy->resdef_to_check) {
-		if (!(rd == allres["host"] || rd == allres["vnode"]))
-			policy->resdef_to_check_no_hostvnode.insert(rd);
-		
-		if (rd->flags & ATR_DFLAG_RASSN)
-			policy->resdef_to_check_rassn.insert(rd);
+	auto new_resdef_to_check = collect_resources_from_requests(sinfo->all_resresv);
+	if (policy->resdef_to_check.empty() || new_resdef_to_check != policy->resdef_to_check) {
+		recreate_resdef = 1;
+		policy->resdef_to_check = new_resdef_to_check;
+	}
 
-		if ((rd->flags & ATR_DFLAG_RASSN) && (rd->flags & ATR_DFLAG_CVTSLT))
-			policy->resdef_to_check_rassn_select.insert(rd);
+	if (recreate_resdef) {
+		free(sinfo->nodesigs);
+		sinfo->nodesigs = NULL;
+		for (const auto &rd : policy->resdef_to_check) {
+			if (!(rd == allres["host"] || rd == allres["vnode"]))
+				policy->resdef_to_check_no_hostvnode.insert(rd);
+
+			if (rd->flags & ATR_DFLAG_RASSN)
+				policy->resdef_to_check_rassn.insert(rd);
+
+			if ((rd->flags & ATR_DFLAG_RASSN) && (rd->flags & ATR_DFLAG_CVTSLT))
+				policy->resdef_to_check_rassn_select.insert(rd);
+		}
 	}
 
 	sinfo->calendar = create_event_list(sinfo);
@@ -439,22 +458,30 @@ query_server(status *pol, int pbs_sd)
 
 	for (i = 0; sinfo->nodes[i] != NULL; i++) {
 		node_info *ninfo = sinfo->nodes[i];
-		ninfo->nodesig = create_resource_signature(ninfo->res,
-							   policy->resdef_to_check_no_hostvnode, ADD_ALL_BOOL);
-		ninfo->nodesig_ind = add_str_to_unique_array(&(sinfo->nodesigs),
-							     ninfo->nodesig);
+		if (recreate_resdef) {
+			free(ninfo->nodesig);
+			ninfo->nodesig = create_resource_signature(ninfo->res, policy->resdef_to_check_no_hostvnode, ADD_ALL_BOOL);
+			ninfo->nodesig_ind = add_str_to_unique_array(&(sinfo->nodesigs), ninfo->nodesig);
+		}
 
 		if (ninfo->has_ghost_job)
 			create_resource_assn_for_node(ninfo);
 
-		sinfo->nodes[i]->node_ind = i;
+		ninfo->node_ind = i;
 		sinfo->unordered_nodes[i] = ninfo;
+		
+		if (ninfo->node_events != NULL) {
+			free_te_list(ninfo->node_events);
+			ninfo->node_events = NULL;
+		}
+		free(ninfo->np_arr);
+		ninfo->np_arr = NULL;
 	}
 	sinfo->unordered_nodes[i] = NULL;
 
 	generic_sim(sinfo->calendar, TIMED_RUN_EVENT, 0, 0, add_node_events, NULL, NULL);
 
-	/* Create placement sets  after collecting jobs on nodes because
+	/* Create placement sets after collecting jobs on nodes because
 	 * we don't want to account for resources consumed by ghost jobs
 	 */
 	create_placement_sets(policy, sinfo);
@@ -478,6 +505,8 @@ query_server(status *pol, int pbs_sd)
 		free(np);
 	}
 
+	if (sinfo->buckets != NULL)
+		free_node_bucket_array(sinfo->buckets);
 	sinfo->buckets = create_node_buckets(policy, sinfo->nodes, sinfo->queues, UPDATE_BUCKET_IND);
 
 	if (sinfo->buckets != NULL) {
@@ -489,7 +518,7 @@ query_server(status *pol, int pbs_sd)
 	pbs_statfree(server);
 
 	return sinfo;
-}
+	}
 
 /**
  * @brief
@@ -504,27 +533,29 @@ query_server(status *pol, int pbs_sd)
  *
  */
 server_info *
-query_server_info(status *pol, struct batch_status *server)
+query_server_info(status *pol, struct batch_status *server, server_info *sinfo)
 {
 	struct attrl *attrp;	/* linked list of attributes */
-	server_info *sinfo;	/* internal scheduler structure for server info */
 	schd_resource *resp;	/* a resource to help create the resource list */
 	sch_resource_t count;	/* used to convert string -> integer */
 	char *endp;		/* used with strtol() */
 	status *policy;
 
 	if (pol == NULL || server == NULL)
-		return NULL;
+		return sinfo;
+	
 
-	if ((sinfo = new_server_info(1)) == NULL)
-		return NULL;		/* error */
+	if (sinfo == NULL) {
+		if ((sinfo = new_server_info(1)) == NULL)
+			return NULL;
 
-	if (sinfo->liminfo == NULL)
-		return NULL;
+		if (sinfo->liminfo == NULL)
+			return NULL;
 
-	if ((sinfo->name = string_dup(server->name)) == NULL) {
-		free_server_info(sinfo);
-		return NULL;
+		if ((sinfo->name = string_dup(server->name)) == NULL) {
+			free_server_info(sinfo);
+			return NULL;
+		}
 	}
 
 	if ((sinfo->policy = dup_status(pol)) == NULL) {
@@ -534,9 +565,7 @@ query_server_info(status *pol, struct batch_status *server)
 
 	policy = sinfo->policy;
 
-	attrp = server->attribs;
-
-	while (attrp != NULL) {
+	for (attrp = server->attribs; attrp != NULL; attrp = attrp->next) {
 		if (is_reslimattr(attrp)) {
 			(void) lim_setlimits(attrp, LIM_RES, sinfo->liminfo);
 			if(strstr(attrp->value, "u:") != NULL)
@@ -573,7 +602,7 @@ query_server_info(status *pol, struct batch_status *server)
 				sinfo->node_group_enable = 0;
 		} else if (!strcmp(attrp->name, ATTR_NodeGroupKey))
 			sinfo->node_group_key = break_comma_list(attrp->value);
-		else if (!strcmp(attrp->name, ATTR_job_sort_formula)) {	/* Deprecated */
+		else if (!strcmp(attrp->name, ATTR_job_sort_formula)) { /* Deprecated */
 			sinfo->job_sort_formula = read_formula();
 			if (policy->sort_by->size() > 1) /* 0 is the formula itself */
 				log_event(PBSEVENT_DEBUG, PBS_EVENTCLASS_SERVER, LOG_DEBUG, __func__,
@@ -623,20 +652,19 @@ query_server_info(status *pol, struct batch_status *server)
 				sinfo->policy->backfill_depth = count;
 			if (count == 0)
 				sinfo->policy->backfill = 0;
-		} else if(!strcmp(attrp->name, ATTR_restrict_res_to_release_on_suspend)) {
+		} else if (!strcmp(attrp->name, ATTR_restrict_res_to_release_on_suspend)) {
 			char **resl;
 			resl = break_comma_list(attrp->value);
 			if(resl != NULL) {
 				policy->rel_on_susp = resstr_to_resdef(resl);
 				free_string_array(resl);
 			}
-		} else if(!strcmp(attrp->name, ATTR_has_runjob_hook)) {
+		} else if (!strcmp(attrp->name, ATTR_has_runjob_hook)) {
 			if (!strcmp(attrp->value, ATR_TRUE))
 				sinfo->has_runjob_hook = 1;
 			else
 				sinfo->has_runjob_hook = 0;
 		}
-		attrp = attrp->next;
 	}
 
 	if (sinfo->job_sort_formula == NULL && sc_attrs.job_sort_formula != NULL) {
@@ -981,6 +1009,28 @@ find_resource(schd_resource *reslist, resdef *def)
 	return resp;
 }
 
+void
+remove_resource(schd_resource **res_list, char *name, enum resource_fields fld)
+{
+	schd_resource *prev_res = NULL;
+	for (auto res = *res_list; res != NULL; prev_res = res, res = res->next) {
+		if (!strcmp(res->name, name)) {
+			if (fld == RF_AVAIL)
+				res->avail = RES_DEFAULT_AVAIL;
+			else if (fld == RF_ASSN)
+				res->assigned = RES_DEFAULT_ASSN;
+			
+			if (res->avail == RES_DEFAULT_AVAIL && res->assigned == RES_DEFAULT_ASSN) {
+				if (prev_res != NULL)
+					prev_res->next = res->next;
+				else
+					*res_list = res->next;
+				free_resource(res);
+			}
+		}
+	}
+}
+
 /**
  * @brief	free the sinfo->svr_to_psets map
  * 			Note: this won't be needed once we convert node_partition to a class
@@ -1264,6 +1314,128 @@ new_server_info(int limallocflag)
 #endif
 
 	return sinfo;
+}
+
+void
+clear_server_info_for_query(server_info *sinfo)
+{
+	if (sinfo == NULL)
+		return;
+	
+	sinfo->has_soft_limit = 0;
+	sinfo->has_hard_limit = 0;
+	sinfo->has_user_limit = 0;
+	sinfo->has_grp_limit = 0;
+	sinfo->has_proj_limit = 0;
+	sinfo->has_all_limit = 0;
+	sinfo->has_mult_express = 0;
+	sinfo->has_prime_queue = 0;
+	sinfo->has_nonprime_queue = 0;
+	sinfo->has_nodes_assoc_queue = 0;
+	sinfo->has_ded_queue = 0;
+	sinfo->has_runjob_hook = 0;
+	sinfo->node_group_enable = 0;
+	if (sinfo->node_group_key != NULL) {
+		free_string_array(sinfo->node_group_key);
+		sinfo->node_group_key = NULL;
+	}
+	sinfo->eligible_time_enable = 0;
+	sinfo->provision_enable = 0;
+	sinfo->power_provisioning = 0;
+	sinfo->use_hard_duration = 0;
+	sinfo->num_parts = 0;
+	if (sinfo->res != NULL) 
+		free_resource_list(sinfo->res);
+	sinfo->res = NULL;
+	if (sinfo->npc_arr != NULL)
+		free_np_cache_array(sinfo->npc_arr);
+	sinfo->npc_arr = NULL;
+	if (sinfo->unordered_nodes != NULL)
+		free(sinfo->unordered_nodes);
+	sinfo->unordered_nodes = NULL;
+	if (sinfo->unassoc_nodes != sinfo->nodes)
+		free(sinfo->unassoc_nodes);
+	sinfo->unassoc_nodes = NULL;
+	if (sinfo->nodesigs != NULL)
+		free_string_array(sinfo->nodesigs);
+	sinfo->nodesigs = NULL;
+	sinfo->qrun_job = NULL;
+	sinfo->num_queues = 0;
+	sinfo->num_hostsets = 0;
+	sinfo->server_time = 0;
+	if (sinfo->job_sort_formula != NULL) {
+	
+		free(sinfo->job_sort_formula);
+		sinfo->job_sort_formula = NULL;
+	}
+
+	if (sinfo->liminfo != NULL)
+		lim_free_liminfo(sinfo->liminfo);
+	sinfo->liminfo = lim_alloc_liminfo();
+
+	init_state_count(&(sinfo->sc));
+	memset(sinfo->preempt_count, 0, (NUM_PPRIO + 1) * sizeof(int));
+
+	if (sinfo->policy != NULL) 
+		delete sinfo->policy;
+	sinfo->policy = NULL;
+
+	if (sinfo->queue_list != NULL)
+		free_queue_list(sinfo->queue_list);
+	sinfo->queue_list = NULL;
+
+	if (sinfo->calendar != NULL)
+		free_event_list(sinfo->calendar);
+	sinfo->calendar = NULL;
+
+	if (sinfo->running_jobs != NULL)
+		free(sinfo->running_jobs);
+	sinfo->running_jobs = NULL;
+
+	if (sinfo->exiting_jobs != NULL)
+		free(sinfo->exiting_jobs);
+	sinfo->exiting_jobs = NULL;
+
+	if (sinfo->user_counts != NULL)
+		free_counts_list(sinfo->user_counts);
+	sinfo->user_counts = NULL;
+
+	if (sinfo->group_counts != NULL)
+		free_counts_list(sinfo->group_counts);
+	sinfo->group_counts = NULL;
+
+	if (sinfo->user_counts != NULL)
+		free_counts_list(sinfo->project_counts);
+	sinfo->project_counts = NULL;
+
+	if (sinfo->alljobcounts != NULL)
+		free_counts_list(sinfo->alljobcounts);
+	sinfo->alljobcounts = NULL;
+
+	if (sinfo->total_user_counts != NULL)
+		free_counts_list(sinfo->total_user_counts);
+	sinfo->total_user_counts = NULL;
+
+	if (sinfo->total_group_counts != NULL)
+		free_counts_list(sinfo->total_group_counts);
+	sinfo->total_group_counts = NULL;
+
+	if (sinfo->total_project_counts != NULL)
+		free_counts_list(sinfo->total_project_counts);
+	sinfo->total_project_counts = NULL;
+
+	if (sinfo->total_alljobcounts != NULL)
+		free_counts_list(sinfo->total_alljobcounts);
+	sinfo->total_alljobcounts = NULL;
+
+	if (sinfo->equiv_classes != NULL)
+		free_resresv_set_array(sinfo->equiv_classes);
+	sinfo->equiv_classes = NULL;
+
+#ifdef NAS
+			/* localmod 034 */
+			sinfo->share_head = NULL;
+#endif
 }
 
 /**
@@ -1977,13 +2149,21 @@ create_server_arrays(server_info *sinfo)
 	resource_resv **resresv_arr;	/* used as source array to copy */
 	int i = 0, j;
 
-	if ((job_arr = static_cast<resource_resv **>(malloc(sizeof(resource_resv *) * (sinfo->sc.total + 1)))) == NULL) {
+	if (sinfo->jobs != NULL) {
+		free(sinfo->jobs);
+		sinfo->jobs = NULL;
+	}
+	if (sinfo->all_resresv != NULL) {
+		free(sinfo->all_resresv);
+		sinfo->all_resresv = NULL;
+	}
+
+	if ((job_arr = static_cast<resource_resv **>(calloc(sinfo->sc.total + 1, sizeof(resource_resv *)))) == NULL) {
 		log_err(errno, __func__, MEM_ERR_MSG);
 		return 0;
 	}
 
-	if ((all_arr = static_cast<resource_resv **>(malloc(sizeof(resource_resv *) *
-		(sinfo->sc.total + sinfo->num_resvs + 1)))) == NULL) {
+	if ((all_arr = static_cast<resource_resv **>(calloc(sinfo->sc.total + sinfo->num_resvs + 1, sizeof(resource_resv *)))) == NULL) {
 		free(job_arr);
 		log_err(errno, __func__, MEM_ERR_MSG);
 		return 0;
@@ -2092,7 +2272,7 @@ check_exit_job(resource_resv *job, const void *arg)
  * @retval	0	: if reservation is not running.
  */
 int
-check_run_resv(resource_resv *resv, void *arg)
+check_run_resv(resource_resv *resv, const void *arg)
 {
 	if (resv->is_resv && resv->resv != NULL)
 		return resv->resv->is_running;
@@ -2226,7 +2406,7 @@ dup_server_info(server_info *osinfo)
 
 	/* duplicate the server information */
 	if ((nsinfo = new_server_info(0)) == NULL)
-		return NULL;                /* error */
+		return NULL;			/* error */
 
 	if (osinfo->fstree != NULL) {
 		nsinfo->fstree = dup_fairshare_head(osinfo->fstree);
@@ -2253,6 +2433,7 @@ dup_server_info(server_info *osinfo)
 	nsinfo->power_provisioning = osinfo->power_provisioning;
 	nsinfo->use_hard_duration = osinfo->use_hard_duration;
 	nsinfo->pset_metadata_stale = osinfo->pset_metadata_stale;
+	nsinfo->has_runjob_hook = osinfo->has_runjob_hook;
 	nsinfo->name = string_dup(osinfo->name);
 	nsinfo->liminfo = lim_dup_liminfo(osinfo->liminfo);
 	nsinfo->server_time = osinfo->server_time;
@@ -2427,6 +2608,14 @@ dup_server_info(server_info *osinfo)
 
 	/* Copy the map of server psets */
 	nsinfo->svr_to_psets = dup_server_psets(osinfo->svr_to_psets, nsinfo);
+
+	for (i = 0; nsinfo->jobs[i] != NULL; i++)
+		nsinfo->jobs_umap[nsinfo->jobs[i]->name] = nsinfo->jobs[i];
+	
+	for (i = 0; nsinfo->nodes[i] != NULL; i++)
+		nsinfo->nodes_umap[nsinfo->nodes[i]->name] = nsinfo->nodes[i];
+
+	sort_jobs(nsinfo->policy, nsinfo);
 
 	return nsinfo;
 }
@@ -2903,8 +3092,7 @@ update_counts_on_run(counts *cts, resource_req *resreq)
  *		of a job
  *
  * @param[in]	cts 	- counts structure to update
- * @param[in]	resreq 	- the resource requirements of the job which
- *							ended
+ * @param[in]	resreq 	- the resource requirements of the job which ended
  *
  * @return	void
  *
@@ -3678,8 +3866,8 @@ refresh_total_counts(server_info *sinfo)
 int
 get_sched_rank()
 {
-	cstat.order++;
-	return cstat.order;
+	static long order = 0;
+	return ++order;
 }
 
 
@@ -3814,13 +4002,14 @@ add_req_list_to_assn(schd_resource *reslist, resource_req *reqlist)
 
 /**
  * @brief create the ninfo->res->assigned values for the node
- * @param ninfo - the node
+ * @param[in] ninfo - the node
+ * @param[in] resv_node - is this a reservation node or a real node
  * @return int
  * @retval 1 success
  * @retval 0 failure
  */
 int
-create_resource_assn_for_node(node_info *ninfo)
+create_resource_assn_for_node(node_info *ninfo, int resv_node)
 {
 	schd_resource *r;
 	schd_resource *ncpus_res = NULL;
@@ -3840,58 +4029,15 @@ create_resource_assn_for_node(node_info *ninfo)
 	if (ninfo->job_arr != NULL) {
 		for (i = 0; ninfo->job_arr[i] != NULL; i++) {
 			/* ignore jobs in reservations.  The resources will be accounted for with the reservation itself.  */
-			if (ninfo->job_arr[i]->job != NULL && ninfo->job_arr[i]->job->resv == NULL) {
-				if (ninfo->job_arr[i]->nspec_arr != NULL) {
-					int j;
-					for (j = 0; ninfo->job_arr[i]->nspec_arr[j] != NULL; j++) {
-						nspec *n = ninfo->job_arr[i]->nspec_arr[j];
-						if (n->ninfo->rank == ninfo->rank)
-							add_req_list_to_assn(ninfo->res, n->resreq);
-					}
-				}
-			}
-		}
-	}
-
-	/* Next up, account for running reservations.  Running reservations consume all resources on the node when they start.  */
-	if (ninfo->run_resvs_arr != NULL) {
-		for (i = 0; ninfo->run_resvs_arr[i] != NULL; i++) {
-			if (ninfo->run_resvs_arr[i]->nspec_arr != NULL) {
-				int j;
-				for (j = 0; ninfo->run_resvs_arr[i]->nspec_arr[j] != NULL; j++) {
-					nspec *n = ninfo->run_resvs_arr[i]->nspec_arr[j];
-					if (n->ninfo->rank == ninfo->rank)
-						add_req_list_to_assn(ninfo->res, n->resreq);
-				}
-			}
-		}
-	}
-
-	/* Lastly if restrict_res_to_release_on_suspend is set, suspended jobs may not have released all their resources
-	 * This is tricky since a suspended job knows what resources they released.
-	 * We need to know what they didn't release to account for in the nodes resources_assigned
-	 * Also, we only need to deal with suspended jobs outside of reservations since resources for reservations were handled above.
-	 */
-	if (ninfo->num_susp_jobs > 0) {
-		int i;
-		server_info *sinfo = ninfo->server;
-		for (i = 0; sinfo->jobs[i] != NULL; i++) {
-			if (sinfo->jobs[i]->job->is_suspended && sinfo->jobs[i]->job->resv == NULL) {
-				nspec *ens;
-				ens = find_nspec(sinfo->jobs[i]->nspec_arr, ninfo);
-				if (ens != NULL) {
-					nspec *rns;
-					rns = find_nspec(sinfo->jobs[i]->job->resreleased, ninfo);
-					if (rns != NULL) {
-						resource_req *cur_req;
-						for (cur_req = ens->resreq; cur_req != NULL; cur_req = cur_req->next) {
-							if (cur_req->type.is_consumable)
-								if (find_resource_req(rns->resreq, cur_req->def) == NULL) {
-									schd_resource *nres;
-									nres = find_resource(ninfo->res, cur_req->def);
-									if (nres != NULL)
-										nres->assigned += cur_req->amount;
-								}
+			if (ninfo->job_arr[i]->job != NULL) {
+				if ((resv_node && ninfo->job_arr[i]->job->resv != NULL) || 
+					(!resv_node && ninfo->job_arr[i]->job->resv == NULL)) {
+					if (ninfo->job_arr[i]->nspec_arr != NULL) {
+						int j;
+						for (j = 0; ninfo->job_arr[i]->nspec_arr[j] != NULL; j++) {
+							nspec *n = ninfo->job_arr[i]->nspec_arr[j];
+							if (n->ninfo->rank == ninfo->rank)
+								add_req_list_to_assn(ninfo->res, n->resreq);
 						}
 					}
 				}
@@ -3899,6 +4045,54 @@ create_resource_assn_for_node(node_info *ninfo)
 		}
 	}
 
+	if (!resv_node) {
+		/* Next up, account for running reservations.  Running reservations consume all resources on the node when they start. */
+		if (ninfo->run_resvs_arr != NULL) {
+			for (i = 0; ninfo->run_resvs_arr[i] != NULL; i++) {
+				if (ninfo->run_resvs_arr[i]->nspec_arr != NULL) {
+					int j;
+					for (j = 0; ninfo->run_resvs_arr[i]->nspec_arr[j] != NULL; j++) {
+						nspec *n = ninfo->run_resvs_arr[i]->nspec_arr[j];
+						if (n->ninfo->rank == ninfo->rank)
+							add_req_list_to_assn(ninfo->res, n->resreq);
+					}
+				}
+			}
+		}
+
+		/* Lastly if restrict_res_to_release_on_suspend is set, suspended jobs may not have released all their resources
+	 	 * This is tricky since a suspended job knows what resources they released.
+	 	 * We need to know what they didn't release to account for in the nodes resources_assigned
+	 	 * Also, we only need to deal with suspended jobs outside of reservations since resources for reservations were handled above.
+	 	 */
+		if (ninfo->num_susp_jobs > 0) {
+			int i;
+			server_info *sinfo = ninfo->server;
+			for (i = 0; sinfo->jobs[i] != NULL; i++) {
+				if (sinfo->jobs[i]->job->is_suspended && sinfo->jobs[i]->job->resv == NULL) {
+					nspec *ens;
+					ens = find_nspec(sinfo->jobs[i]->nspec_arr, ninfo);
+					if (ens != NULL) {
+						nspec *rns;
+						rns = find_nspec(sinfo->jobs[i]->job->resreleased, ninfo);
+						if (rns != NULL) {
+							resource_req *cur_req;
+							for (cur_req = ens->resreq; cur_req != NULL; cur_req = cur_req->next) {
+								if (cur_req->type.is_consumable)
+									if (find_resource_req(rns->resreq, cur_req->def) == NULL) {
+										schd_resource *nres;
+										nres = find_resource(ninfo->res, cur_req->def);
+										if (nres != NULL)
+											nres->assigned += cur_req->amount;
+									}
+							}
+						}
+					}
+				}
+			}
+		}
+
+	}
 	if (ncpus_res != NULL && ncpus_res->assigned < ncpus_res->avail)
 		remove_node_state(ninfo, ND_jobbusy);
 

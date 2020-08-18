@@ -1284,7 +1284,7 @@ check_server_max_user_run(server_info *si, queue_info *qi, resource_resv *rr,
 
 	/* at this point, we know a generic or individual limit is set */
 	used = find_counts_elm(cts, user, NULL, NULL, NULL);
-	log_eventf(PBSEVENT_DEBUG4, PBS_EVENTCLASS_JOB, LOG_DEBUG, __func__,
+	log_eventf(PBSEVENT_DEBUG4, PBS_EVENTCLASS_JOB, LOG_DEBUG, rr->name,
 		"user %s max_*user_run (%d, %d), used %d",
 		user, max_user_run, max_genuser_run, used);
 
@@ -1515,7 +1515,7 @@ check_queue_max_user_run(server_info *si, queue_info *qi, resource_resv *rr,
 		return (SCHD_ERROR);
 
 	if (!qi->has_user_limit)
-	    return (0);
+		return (0);
 
 	cts = qc->user;
 
@@ -2554,8 +2554,7 @@ check_server_max_res_soft(server_info *si, queue_info *qi, resource_resv *rr)
 			used = used_res->amount;
 
 		log_eventf(PBSEVENT_DEBUG4, PBS_EVENTCLASS_JOB, LOG_DEBUG, rr->name,
-			"max_res_soft.%s %.1lf, used %.1lf",
-			res->name, max_res_soft, used);
+			"max_res_soft.%s %.1lf, used %.1lf", res->name, max_res_soft, used);
 
 		if (max_res_soft < used) {
 			if (used_res != NULL)

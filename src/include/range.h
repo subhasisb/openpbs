@@ -147,6 +147,8 @@ int range_add_value(range **r, int val, int range_step);
  */
 range *range_intersection(range *r1, range *r2);
 
+range *range_difference(range *r1, range *r2);
+
 extern int parse_subjob_index(char *, char **, int *, int *, int *, int *);
 
 /*

@@ -102,11 +102,6 @@ filter_array(void **ptrarr, int (*filter_func)(void*, void*),
 int calc_time_left_STF(resource_resv *resresv, sch_resource_t* min_time_left);
 
 /*
- *      string_array_verify - verify two string arrays are equal
- */
-unsigned string_array_verify(char **sa1, char **sa2);
-
-/*
  *
  *	match_string_array - match two NULL terminated string arrays
  *
@@ -138,14 +133,8 @@ char *string_array_to_str(char **strarr);
 int calc_time_left(resource_resv *jinfo, int use_hard_duration);
 
 /*
- *      cstrcmp - check string compare - compares two strings but doesn't bomb
- *                if either one is null
- */
-int cstrcmp(char *s1, char *s2);
-
-/*
- *      is_num - checks to see if the string is a number, size, float
- *               or time in string form
+ *	is_num - checks to see if the string is a number, size, float
+ *		or time in string form
  */
 int is_num(const char *str);
 
@@ -194,18 +183,17 @@ void *add_ptr_to_array(void *ptr_arr, void *ptr);
 int remove_str_from_array(char **arr, char *str);
 
 /*
- *      is_valid_pbs_name - is str a valid pbs username (POSIX.1 + ' ')
- *                          a valid name is: alpha numeric '-' '_' '.' or ' '
+ *	is_valid_pbs_name - is str a valid pbs username (POSIX.1 + ' ')
+ *			a valid name is: alpha numeric '-' '_' '.' or ' '
  */
 int is_valid_pbs_name(char *str, int len);
 
 /*
  *
- *      res_to_str - turn a resource (resource/resource_req) into
- *                   a string for printing.
- *      returns the resource in string format.  It is returned in a static
- *              buffer
- *              a null string ("") is returned on error
+ *	res_to_str - turn a resource (resource/resource_req) into
+ *		a string for printing.
+ *	returns the resource in string format.  It is returned in a static buffer
+ *		a null string ("") is returned on error
  */
 char *res_to_str(void *p, enum resource_fields fld);
 
@@ -262,10 +250,8 @@ void set_schd_error_arg(schd_error *err, enum schd_error_args arg_field, const c
 void set_schd_error_codes(schd_error *err, enum schd_err_status status_code, enum sched_error_code error_code);
 
 /* schd_error destuctor */
-void
-free_schd_error(schd_error *err);
-void
-free_schd_error_list(schd_error *err_list);
+void free_schd_error(schd_error *err);
+void free_schd_error_list(schd_error *err_list);
 
 /* helper functions to create schd_errors*/
 schd_error *
@@ -297,5 +283,7 @@ void free_ptr_array (void *inp);
 
 void log_eventf(int eventtype, int objclass, int sev, const std::string& objname, const char *fmt, ...);
 void log_event(int eventtype, int objclass, int sev, const std::string& objname, const char *text);
+struct batch_status *diff_batch_status(struct batch_status *prev_bs, struct batch_status *bs);
+struct batch_status *diff_batch_status_list(struct batch_status *old_bs, struct batch_status *bs);
 
 #endif	/* _MISC_H */

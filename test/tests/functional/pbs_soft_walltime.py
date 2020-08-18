@@ -300,7 +300,7 @@ e.accept()
         self.server.alterjob(jid, {'Resource_List.soft_walltime': 6})
         self.server.expect(JOB, {'job_state': 'R'}, id=jid)
 
-        time.sleep(7)
+        time.sleep(10)
         self.server.manager(MGR_CMD_SET, SERVER, {'scheduling': 'True'})
 
         self.server.expect(JOB, {'estimated.soft_walltime': 6}, op=GT, id=jid)
@@ -310,7 +310,7 @@ e.accept()
                                    attrib=['estimated.soft_walltime'])
         est_soft_walltime = jstat[0]['estimated.soft_walltime']
 
-        time.sleep(7)
+        time.sleep(10)
         self.server.manager(MGR_CMD_SET, SERVER, {'scheduling': 'True'})
 
         # Check if soft_walltime extended
@@ -325,7 +325,7 @@ e.accept()
         hook_body = \
             """import pbs
 e = pbs.event()
-e.job.Resource_List["soft_walltime"] = pbs.duration(5)
+e.job.Resource_List["soft_walltime"] = pbs.duration(6)
 e.accept()
 """
         a = {'event': 'queuejob', 'enabled': 'True'}
@@ -334,13 +334,13 @@ e.accept()
         J = Job(TEST_USER)
         jid = self.server.submit(J)
 
-        self.server.expect(JOB, {'Resource_List.soft_walltime': 5}, id=jid)
+        self.server.expect(JOB, {'Resource_List.soft_walltime': 6}, id=jid)
         self.server.expect(JOB, {'job_state': 'R'}, id=jid)
 
-        time.sleep(6)
+        time.sleep(10)
         self.server.manager(MGR_CMD_SET, SERVER, {'scheduling': 'True'})
 
-        self.server.expect(JOB, {'estimated.soft_walltime': 5}, op=GT, id=jid)
+        self.server.expect(JOB, {'estimated.soft_walltime': 6}, op=GT, id=jid)
 
         # Get the current soft_walltime
         jstat = self.server.status(JOB, id=jid,
@@ -363,21 +363,21 @@ e.accept()
                             {'job_history_enable': 'True'})
 
         J = Job(TEST_USER,
-                attrs={'Resource_List.ncpus': 1, 'Resource_List.walltime': 16})
+                attrs={'Resource_List.ncpus': 1, 'Resource_List.walltime': 30})
         jid = self.server.submit(J)
 
-        self.server.alterjob(jid, {'Resource_List.soft_walltime': 6})
+        self.server.alterjob(jid, {'Resource_List.soft_walltime': 10})
         self.server.expect(JOB, {'job_state': 'R'}, id=jid)
 
-        time.sleep(7)
+        time.sleep(12)
         self.server.manager(MGR_CMD_SET, SERVER, {'scheduling': 'True'})
 
-        self.server.expect(JOB, {'estimated.soft_walltime': 6}, op=GT, id=jid)
+        self.server.expect(JOB, {'estimated.soft_walltime': 10}, op=GT, id=jid)
 
-        time.sleep(7)
+        time.sleep(10)
         self.server.manager(MGR_CMD_SET, SERVER, {'scheduling': 'True'})
 
-        self.server.expect(JOB, {'estimated.soft_walltime': 16},
+        self.server.expect(JOB, {'estimated.soft_walltime': 30},
                            offset=4, extend='x', id=jid)
 
         self.server.expect(JOB, 'queue', op=UNSET, id=jid)
@@ -997,7 +997,7 @@ e.accept()
         self.server.expect(JOB, {'job_state': 'R'}, id=jid)
 
         self.logger.info("Wait till the soft_walltime is extended once")
-        time.sleep(9)
+        time.sleep(11)
         self.server.manager(MGR_CMD_SET, SERVER, {'scheduling': 'True'})
 
         self.server.expect(JOB, {'estimated.soft_walltime': 8}, op=GT,

@@ -1208,13 +1208,16 @@ set_job_history_enable(attribute *pattr, void *pobject, int actmode)
 		(actmode == ATR_ACTION_RECOV)) {
 
 		svr_history_enable = pattr->at_val.at_long;
+
 		if (svr_history_enable) {
 			(void)set_task(WORK_Timed,
 				(long)(time_now + SVR_CLEAN_JOBHIST_TM),
 				svr_clean_job_history, 0);
 
 			force_cli_daemons_update(PBS_NET_CONN_FROM_QSTAT_DAEMON);
-		} else {
+		}
+		else
+		{
 			unset_job_history_enable();
 		}
 	}

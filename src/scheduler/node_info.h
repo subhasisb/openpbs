@@ -43,8 +43,6 @@
 #include "data_types.h"
 #include <pbs_ifl.h>
 
-void query_node_info_chunk(th_data_query_ninfo *data);
-
 /*
  *      query_nodes - query all the nodes associated with a server
  */
@@ -54,7 +52,7 @@ node_info **query_nodes(int pbs_sd, server_info *sinfo);
  *      query_node_info - collect information from a batch_status and
  *                        put it in a node_info struct for easier access
  */
-node_info *query_node_info(struct batch_status *node, server_info *sinfo);
+node_info *query_node_info(struct batch_status *node, server_info *sinfo, node_info *prev_ninfo);
 
 /*
  * pthread routine for freeing up a node_info array
