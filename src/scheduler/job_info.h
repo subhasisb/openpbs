@@ -46,12 +46,7 @@
 /*
  *	query_job - takes info from a batch_status about a job and puts
  */
-resource_resv *query_job(struct batch_status *job, server_info *sinfo, schd_error *err);
-
-/*
- * pthread routine for querying a chunk of jobs
- */
-void query_jobs_chunk(th_data_query_jinfo *data);
+resource_resv *query_job(struct batch_status *job, server_info *sinfo, resource_resv *presv_job, schd_error *err);
 
 /* create an array of jobs for a particular queue */
 resource_resv **query_jobs(status *policy, int pbs_sd, queue_info *qinfo, resource_resv **pjobs, const std::string& queue_name);
@@ -227,7 +222,7 @@ int is_job_array(char *jobid);
  *				    range which is being run
  *				    set qrun_job on server
  */
-int modify_job_array_for_qrun(server_info *sinfo, char *jobid);
+int modify_job_array_for_qrun(resource_resv *qrun_job, char *jobid);
 
 /*
  *	queue_subjob - create a subjob from a job array and queue it
@@ -391,5 +386,8 @@ void associate_dependent_jobs(server_info *sinfo);
 
 /* This function associated the job passed in to its parent job */
 int associate_array_parent(resource_resv *pjob, server_info *sinfo);
+void set_job_times(int pbs_sd, resource_resv *resresv, time_t server_time);
+
+void remove_finished_jobs(server_info *sinfo);
 
 #endif	/* _JOB_INFO_H */

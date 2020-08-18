@@ -37,10 +37,10 @@
  * subject to Altair's trademark licensing policies.
  */
 
-#include "data_types.h"
 #ifndef _RESOURCE_H
 #define _RESOURCE_H
 
+#include "data_types.h"
 
 /*
  *	query_resources - query a pbs server for the resources it knows about

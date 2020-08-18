@@ -1514,7 +1514,8 @@ mgr_server_unset(struct batch_request *preq, conn_t *conn)
 
 	rc = mgr_unset_attr(server.sv_attr, svr_attr_idx, svr_attr_def, SVR_ATR_LAST, plist,
 		preq->rq_perm, &bad_attr, (void *)&server, PARENT_TYPE_SERVER, INDIRECT_RES_CHECK);
-	if (rc != 0)
+
+	if (rc != 0) 
 		reply_badattr(rc, bad_attr, plist, preq);
 	else {
 		attribute *pattr = get_sattr(SVR_ATR_DefaultChunk);
@@ -1525,6 +1526,7 @@ mgr_server_unset(struct batch_request *preq, conn_t *conn)
 		plist = (svrattrl *)GET_NEXT(preq->rq_ind.rq_manager.rq_attr);
 		for (plist = (svrattrl *)GET_NEXT(preq->rq_ind.rq_manager.rq_attr);
 			plist != NULL; plist = (struct svrattrl *)GET_NEXT(plist->al_link)) {
+
 			if (strcasecmp(plist->al_name, ATTR_logevents) == 0) {
 				set_sattr_l_slim(SVR_ATR_log_events, SVR_LOG_DFLT, SET);
 				*log_event_mask = get_sattr_long(SVR_ATR_log_events);
@@ -1578,8 +1580,8 @@ mgr_server_unset(struct batch_request *preq, conn_t *conn)
 		}
 		svr_save_db(&server);
 		log_eventf(PBSEVENT_ADMIN, PBS_EVENTCLASS_SERVER, LOG_INFO,
-			msg_daemonname, msg_manager, msg_man_uns,
-			preq->rq_user, preq->rq_host);
+			   msg_daemonname, msg_manager, msg_man_uns,
+			   preq->rq_user, preq->rq_host);
 		mgr_log_attr(msg_man_uns, plist, PBS_EVENTCLASS_SERVER, msg_daemonname, NULL);
 		reply_ack(preq);
 	}

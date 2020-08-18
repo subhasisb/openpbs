@@ -319,6 +319,59 @@ class TestSchedPerf(TestPerformance):
         # Delete all jobs
         self.server.cleanup_jobs()
 
+    @timeout(3600)
+    def test_many_job_scheduling_on(self):
+        """
+        Submit many short jobs with scheduling on and allow them to finish
+        """
+        num_jobs = 2000
+        job_sleep_time = 10
+
+        a = {'resources_available.ncpus': 1}
+        self.mom.create_vnodes(a, 100)
+
+        t1 = time.time()
+        jids = []
+        for _ in range(10):
+            for _ in range(10):
+                j = Job()
+                j.set_sleep_time(job_sleep_time)
+                jids.append(self.server.submit(j))
+            time.sleep(1)
+
+        for _ in range(num_jobs - 100):
+            j = Job()
+            j.set_sleep_time(job_sleep_time)
+            jids.append(self.server.submit(j))
+
+        self.server.expect(JOB, 'queue', op=UNSET, id=jids[-1],
+                           interval=1, max_attempts=num_jobs * 10)
+        t2 = time.time()
+
+        self.logger.info("*" * 80)
+        self.logger.info("Time taken to complete %d jobs: %f" %
+                         (num_jobs, (t2 - t1)))
+        self.logger.info("*" * 80)
+    
+    @timeout(3600)
+    def test_many_cycles_no_run(self):
+        """
+        Run many cycles with little difference between them
+        """
+        num_jobs = 5000
+        num_cycles = 5000
+
+        jids = self.submit_jobs({'Resource_List.select': '2:ncpus=1', 'Resource_List.place': 'scatter'}, num_jobs)
+
+        t1 = time.time()
+        for _ in range(num_cycles):
+            self.scheduler.run_scheduling_cycle()
+        t2 = time.time()
+
+        print("*" * 80)
+        print("Time taken to run %d cycles with %d jobs %f" % (num_cycles, num_jobs, (t2 - t1)))
+        print("*" * 80)
+
     @timeout(5000)
     def test_attr_update_period_perf(self):
         """

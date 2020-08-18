@@ -66,6 +66,8 @@
 #include "resource_resv.h"
 #include "resource.h"
 
+struct attrl *dup_attrl(struct attrl *);
+struct attrl *dup_attrl_list(struct attrl *oattr_list);
 
 /**
  * @brief
@@ -329,9 +331,9 @@ schdlogerr(int event, int event_class, int sev, const std::string& name, const c
 	if (will_log_event(event)) {
 		translate_fail_code(err, NULL, logbuf);
 		if (text == NULL)
-			log_event(event, event_class, sev, name, logbuf);
+			log_event(event, event_class, sev, name.c_str(), logbuf);
 		else
-			log_eventf(event, event_class, sev, name, "%s %s", text, logbuf);
+			log_eventf(event, event_class, sev, name.c_str(), "%s %s", text, logbuf);
 	}
 }
 
@@ -399,11 +401,11 @@ log_event(int eventtype, int objclass, int sev, const std::string& objname, cons
  *
  * @par
  * 	   filter_func prototype: @fn int func( void *, void * )
- *                                           object   arg
- *		  object - specific member of ptrarr[]
- *		  arg    - arg parameter
- *               - returns 1: ptr will be added to filtered array
- *               - returns 0: ptr will NOT be added to filtered array
+ * 		object	arg
+ *		object	specific member of ptrarr[]
+ *		arg	arg parameter
+ *			- returns 1: ptr will be added to filtered array
+ *			- returns 0: ptr will NOT be added to filtered array
  *
  * @return	void ** filtered array.
  */
@@ -411,7 +413,7 @@ void **
 filter_array(void **ptrarr, int (*filter_func)(void*, void*),
 	void *arg, int flags)
 {
-	void **new_arr = NULL;                      /* the filtered array */
+	void **new_arr = NULL;			/* the filtered array */
 	void **tmp;
 	int i, j;
 	int size;
@@ -556,37 +558,6 @@ string_array_to_str(char **strarr)
 
 /**
  * @brief
- *		string_array_verify - verify two string arrays are equal
- *
- * @param[in]	sa1	-	string array 1
- * @param[in]	sa2	-	string array 2
- *
- * @return	int
- * @retval	0	: array equal
- *					number of the first unequal string
- * @retval	(unsigned) -1	: on error
- *
- */
-unsigned string_array_verify(char **sa1, char **sa2)
-{
-	int i;
-
-	if (sa1 == NULL && sa2 == NULL)
-		return 0;
-
-	if (sa1 == NULL || sa2 == NULL)
-		return (unsigned) -1;
-
-	for (i = 0; sa1[i] != NULL && sa2[i] != NULL && !cstrcmp(sa1[i], sa2[i]); i++)
-		;
-
-	if (sa1[i] != NULL || sa2[i] != NULL)
-		return i + 1;
-
-	return 0;
-}
-/**
- * @brief
  * 		calc_used_walltime - calculate the  used amount of a resource resv
  *
  * @param[in]	resresv	-	the resource resv to calculate
@@ -677,35 +648,6 @@ calc_time_left(resource_resv *resresv, int use_hard_duration)
 	used_amount = calc_used_walltime(resresv);
 
 	return IF_NEG_THEN_ZERO(duration - used_amount);
-}
-
-/**
- * @brief
- *		cstrcmp	- check string compare - compares two strings but doesn't bomb
- *		  if either one is null
- *
- * @param[in]	s1	-	string one
- * @param[in]	s2	-	string two
- *
- * @return	int
- * @retval	-1	: if s1 < s2
- * @retval	0	: if s1 == s2
- * @retval	1	: if s1 > s2
- *
- */
-int
-cstrcmp(char *s1, char *s2)
-{
-	if (s1 == NULL && s2 == NULL)
-		return 0;
-
-	if (s1 == NULL && s2 != NULL)
-		return -1;
-
-	if (s1 != NULL && s2 == NULL)
-		return 1;
-
-	return strcmp(s1, s2);
 }
 
 /**
@@ -893,13 +835,14 @@ add_ptr_to_array(void *ptr_arr, void *ptr)
 		arr[0] = ptr;
 		arr[1] = NULL;
 	} else {
-		arr = static_cast<void **>(realloc(ptr_arr, (cnt + 1) * sizeof(void *)));
+		// +2 because count_array() returns the actual number of elements.  We need 1 for the new element and 1 for the NULL
+		arr = static_cast<void **>(realloc(ptr_arr, (cnt + 2) * sizeof(void *)));
 		if (arr == NULL) {
 			log_err(errno, __func__, MEM_ERR_MSG);
 			return NULL;
 		}
-		arr[cnt - 1] = ptr;
-		arr[cnt] = NULL;
+		arr[cnt] = ptr;
+		arr[cnt + 1] = NULL;
 	}
 	return arr;
 }
@@ -1646,4 +1589,321 @@ free_ptr_array(void *inp)
 	for (i = 0; arr[i] != NULL; i++)
 		free(arr[i]);
 	free(arr);
+}
+
+struct batch_status *
+find_batch_status(struct batch_status *bs_list, char *name)
+{
+	struct batch_status *bs;
+	for (bs = bs_list; bs != NULL; bs = bs->next)
+		if (strcmp(bs->name, name) == 0)
+			return bs;
+	return NULL;
+}
+
+/**
+ *
+ * @brief locate a attribute (attrl) by name/res and return the pointer previous to it
+ *
+ * @param[in] pattrl - attrl list to search
+ * @param[in] name   - name of attribute to search for
+ * @param[in] resc   - name of resources to search for (may be NULL of none)
+ * @param[out] prev - previous pointer to found attrl.  NULL if the front of the list, end of list if not found
+ * 
+ * @return struct attrl *
+ * @retval found attrl
+ * @retval NULL if not found
+ */
+
+struct attrl *
+find_attrl(struct attrl *pattrl, char *name, char *resc, struct attrl **prev)
+{
+	struct attrl *prevp = NULL;
+	if (name == NULL)
+		return NULL;
+
+	for (; pattrl != NULL; pattrl = pattrl->next) {
+		if (strcmp(name, pattrl->name) == 0) {
+			if ((resc != NULL) && (pattrl->resource != NULL)) {
+				if (strcmp(resc, pattrl->resource) == 0) {
+					*prev = prevp;
+					return pattrl;
+				}
+			} else {
+				*prev = prevp;
+				return pattrl;
+			}
+		}
+		prevp = pattrl;
+	}
+
+	return NULL;
+}
+
+struct attrl *
+dup_attrl2(const struct attrl *attr)
+{
+	struct attrl *nattr;
+
+	nattr = static_cast<struct attrl *>(malloc(sizeof(struct attrl)));
+	if (nattr == NULL)
+		return NULL;
+
+	nattr->name = string_dup(attr->name);
+	nattr->resource = string_dup(attr->resource);
+	nattr->value = string_dup(attr->value);
+	nattr->op = attr->op;
+	nattr->next = NULL;
+
+	return nattr;
+}
+
+struct attrl *
+dup_attrl_list2(const struct attrl *attr_list)
+{
+	const struct attrl *cur_attr;
+	struct attrl *head = NULL;
+	struct attrl *last = NULL;
+	struct attrl *new_attr;
+
+	for (cur_attr = attr_list; cur_attr != NULL; cur_attr = cur_attr->next) {
+		new_attr = dup_attrl2(cur_attr);
+		if (head == NULL)
+			head = new_attr;
+		else
+			last->next = new_attr;
+		last = new_attr;
+	}
+	return head;
+}
+
+struct batch_status *dup_batch_status(struct batch_status *bs)
+{
+	struct batch_status *new_bs;
+
+	new_bs = static_cast<struct batch_status *>(calloc(1, sizeof(struct batch_status)));
+	if (new_bs == NULL) {
+		log_err(errno, __func__, MEM_ERR_MSG);
+		return NULL;
+	}
+
+	new_bs->name = string_dup(bs->name);
+	new_bs->attribs = dup_attrl_list2(bs->attribs);
+
+	return new_bs;
+}
+
+/**
+ * @brief diff the attributes in two batch_status structures
+ * 	This function works by looping over the old_bs's attrls and finding it in the bs's attrls.
+ * 	Once we diff the attrls, we remove bs's attrl and add it to a new list.  This is required 
+ * 	because attributes might be in different orders.  Once we finish the loop obs old_bs, any
+ * 	attribute left in bs's list is a new attribute.
+ * 
+ * @param[in] prev_bs - the old batch_status
+ * @param[in,out] bs - the new bs.  This can be reordered if both prev_bs and bs are in different orders
+ * 
+ * @return struct batch_status
+ * @retval diff'd batch_status
+ * @retval NULL on error or two lists are the same
+ */
+struct batch_status *
+diff_batch_status(struct batch_status *old_bs, struct batch_status *bs)
+{
+	struct attrl *pattr;		/* Attr list 1 (last cycle) */
+	struct attrl *attr;		/* Attr list 2 (this cycle) */
+	struct attrl *last_new_attr = NULL; /* end of the attrl list of the diff */
+	struct attrl *head_diff = NULL;	/* head of attrl for diff */
+	struct attrl *head_attr = NULL; /* head of attrl for finished attrls */
+	struct attrl *last_attr = NULL; /* end of the attrl list for finished attrls */
+
+	if (old_bs == NULL || bs == NULL || strcmp(old_bs->name, bs->name) != 0)
+		return NULL;
+
+	for(pattr = old_bs->attribs, attr = bs->attribs; pattr != NULL && attr != NULL; pattr = pattr->next) {
+		int cmp;
+		struct attrl *fattr = NULL;	/* found attrl */
+		struct attrl *new_attr = NULL; /* newly created attl for diff */
+		struct attrl *prev;
+
+		fattr = find_attrl(attr, pattr->name, pattr->resource, &prev);
+		if (fattr != NULL) {
+			if (strcmp(pattr->value, fattr->value))
+				cmp = 2; /* Value has changed */
+			else
+				cmp = 0; /* The attrl is unchanged */
+		} else
+			cmp = 1; /* Attribute Unset */
+
+		if (cmp == 2) { 
+			new_attr = dup_attrl2(fattr);
+
+		} else if (cmp == 1) { 
+			new_attr = dup_attrl2(pattr);
+			free(new_attr->value);
+			new_attr->value = string_dup("");
+		}
+
+		if (new_attr != NULL) {
+			if (last_new_attr == NULL)
+				head_diff = new_attr;
+			else
+				last_new_attr->next = new_attr;
+
+			last_new_attr = new_attr;
+			new_attr = NULL;
+		}
+
+		if (fattr != NULL) {
+			if (head_attr == NULL)
+				head_attr = fattr;
+			else
+				last_attr->next = fattr;
+			last_attr = fattr;
+			if (prev == NULL)
+				attr = fattr->next;
+			else
+				prev->next = fattr->next;
+		}
+	}
+
+	/* Handle new attributes being set */
+	for (; attr != NULL; attr = attr->next) {
+		struct attrl *new_attr;
+
+		new_attr = dup_attrl2(attr);
+		if (last_new_attr == NULL)
+			head_diff = new_attr;
+		else
+			last_new_attr->next = new_attr;
+
+		last_new_attr = new_attr;
+
+		if (head_attr == NULL)
+			head_attr = attr;
+		else
+			last_attr->next = attr;
+		last_attr = attr;
+	}
+
+	bs->attribs = head_attr;
+
+	if (head_diff != NULL) {
+		struct batch_status *new_bs = NULL;
+		new_bs = static_cast<struct batch_status *>(calloc(1, sizeof(struct batch_status)));
+		if (new_bs == NULL) {
+			log_err(errno, __func__, MEM_ERR_MSG);
+			return NULL;
+		}
+
+		new_bs->name = string_dup(bs->name);
+		new_bs->attribs = head_diff;
+		return new_bs;
+	}
+
+	return NULL;
+}
+
+struct batch_status *
+diff_batch_status_list(struct batch_status *old_bs, struct batch_status *bs)
+{
+	struct batch_status *new_bs = NULL;
+	struct batch_status *prev_bs = NULL;
+	struct batch_status *obs;
+	struct batch_status *cbs;
+	struct batch_status *tmp_bs;
+	struct batch_status *fbs;
+
+	obs = old_bs;
+	cbs = bs;
+	while (obs != NULL && cbs != NULL) {
+		if (strcmp(obs->name, cbs->name) == 0) {
+			tmp_bs = diff_batch_status(obs, cbs);
+			if (tmp_bs != NULL) {
+				if (prev_bs == NULL)
+					new_bs = tmp_bs;
+				else
+					prev_bs->next = tmp_bs;
+				prev_bs = tmp_bs;
+			}
+			obs = obs->next;
+			cbs = cbs->next;
+		} else {
+			fbs = find_batch_status(old_bs, cbs->name);
+			if (fbs == NULL) { /* New batch_status (e.g. new job submitted) */
+				tmp_bs = dup_batch_status(cbs);
+				if (prev_bs == NULL)
+					new_bs = tmp_bs;
+				else
+					prev_bs->next = tmp_bs;
+				prev_bs = tmp_bs;
+				cbs = cbs->next;
+			} else {
+				fbs = find_batch_status(bs, obs->name);
+				if (fbs == NULL) { /* batch_status removed (e.g. job ended) */
+					tmp_bs = static_cast<struct batch_status *>(calloc(1, sizeof(struct batch_status)));
+					if (tmp_bs == NULL) {
+						pbs_statfree(new_bs);
+						return NULL;
+					}
+					/* A deleted batch_status is represented with a NULL attribs list */
+					tmp_bs->name = string_dup(obs->name);
+					if (prev_bs == NULL)
+						new_bs = tmp_bs;
+					else
+						prev_bs->next = tmp_bs;
+
+					/* NULL attribs list signifies batch_status removed */
+					prev_bs = tmp_bs;
+					obs = obs->next;
+				} else { /* batch_status out of order (e.g. qorder J1 J2)*/
+					tmp_bs = diff_batch_status(obs, cbs);
+					if (tmp_bs != NULL) {
+						if (prev_bs == NULL)
+							new_bs = tmp_bs;
+						else
+							prev_bs->next = tmp_bs;
+					}
+					prev_bs = tmp_bs;
+					obs = obs->next;
+				}
+			}
+		}
+		
+	}
+	/* Only one of the following loops can happen */
+
+	/* Deleted batch_status structures at the end of the prev list */
+	while (obs != NULL) {
+		fbs = find_batch_status(bs, obs->name);
+		if (fbs == NULL) { /* batch_status removed (e.g. job ended) */
+			tmp_bs = static_cast<struct batch_status *>(calloc(1, sizeof(struct batch_status)));
+			if (tmp_bs == NULL) {
+				pbs_statfree(new_bs);
+				return NULL;
+			}
+			/* A deleted batch_status is represented with a NULL attribs list */
+			tmp_bs->name = string_dup(obs->name);
+			if (prev_bs == NULL)
+				new_bs = tmp_bs;
+			else
+				prev_bs->next = tmp_bs;
+
+			/* NULL attribs list signifies batch_status removed */
+			prev_bs = tmp_bs;
+			obs = obs->next;
+		}
+	}
+
+	/* New batch_status structures at the end of the new list */
+	while(cbs != NULL) {
+		tmp_bs = dup_batch_status(cbs);
+		if (prev_bs == NULL)
+			new_bs = tmp_bs;
+		else
+			prev_bs->next = tmp_bs;
+		prev_bs = tmp_bs;
+		cbs = cbs->next;
+	}
+	return new_bs;
 }

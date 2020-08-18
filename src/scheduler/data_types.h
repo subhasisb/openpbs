@@ -40,7 +40,7 @@
 
 /**
  * A quick explanation of the scheduler's data model:
- * To free an object, use the object’s destructor (e.g., free_node_info())
+ * To free an object, use the object’s destructor
  * To free an array of objects, you need to know if you own the objects yourself
  * or are an array of references
  * If you own the objects(e.g., sinfo->nodes), you call the multi-object object
@@ -272,7 +272,7 @@ struct state_count
 	int begin;			/* number of job arrays in begin state */
 	int expired;			/* expired jobs which are no longer running */
 	int invalid;			/* number of invalid jobs */
-	int total;			/* total number of jobs in all states */
+	int total; /* total number of jobs in all states */
 };
 
 struct place
@@ -422,8 +422,10 @@ struct server_info
 	resource_resv **exiting_jobs;	/* array of jobs which are in state E */
 	resource_resv **jobs;		/* all the jobs in the server */
 	resource_resv **all_resresv;	/* a list of all jobs and adv resvs */
+	std::unordered_map<std::string, resource_resv *> jobs_umap; /* all jobs in an unordered map */
+	std::unordered_map<std::string, node_info *> nodes_umap; /* all nodes in an unoredered map */
 	event_list *calendar;		/* the calendar of events */
-	char *job_sort_formula;	/* set via the JSF attribute of either the sched, or the server */
+	char *job_sort_formula;		/* set via the JSF attribute of either the sched, or the server */
 
 	time_t server_time;		/* The time the server is at.  Could be in the
 					 * future if we're simulating
@@ -557,7 +559,7 @@ struct job_info
 	bool is_userbusy:1;
 	bool is_begin:1;		/* job array 'B' state */
 	bool is_expired:1;		/* 'X' pseudo state for simulated job end */
-	bool is_checkpointed:1;	/* job has been checkpointed */
+	bool is_checkpointed:1; /* job has been checkpointed */
 
 	bool can_not_preempt:1;	/* this job can not be preempted */
 
@@ -571,11 +573,10 @@ struct job_info
 	bool is_provisioning:1;	/* job is provisioning */
 	bool is_preempted:1;	/* job is preempted */
 	bool topjob_ineligible:1;	/* Job is ineligible to be a top job */
-
+	bool no_fairshare:1;		/* Entity is not in the resource_group file */
 	char *job_name;			/* job name attribute (qsub -N) */
 	char *comment;			/* comment field of job */
 	char *resv_id;			/* identifier of reservation job is in */
-	char *alt_id;			/* vendor assigned job identifier */
 	queue_info *queue;		/* queue where job resides */
 	resource_resv *resv;		/* the reservation the job is part of */
 	int priority;			/* PBS priority of job */
@@ -732,6 +733,8 @@ struct resv_info
 {
 	bool is_standing:1;		/* set to 1 for a standing reservation */
 	bool is_running:1;		/* the reservation is running (not necessarily in the running state) */
+	bool rjob_state_change:1;	/* a job in the reservation changed to or from the running state */
+
 	char *queuename;		/* the name of the queue */
 	char *rrule;			/* recurrence rule for standing reservations */
 	char *execvnodes_seq;		/* sequence of execvnodes for standing resvs */
@@ -755,6 +758,7 @@ struct resv_info
 	selspec *select_orig;		/* original schedselect pre-alter */
 	selspec *select_standing;	/* original schedselect for standing reservations */
 	nspec **orig_nspec_arr;		/* original non-shrunk exec_vnode with exec_vnode chunk mapped to select chunk */
+	char *resv_nodes_str;		/* original resv_nodes, might be needed for remapping select */
 };
 
 /* resource reservation - used for both jobs and advanced reservations */
@@ -818,6 +822,7 @@ class resource_resv
 
 	resource_resv(const std::string& rname);
 	~resource_resv();
+
 };
 
 class resource_type
@@ -1094,6 +1099,7 @@ struct nspec
 	bool go_provision:1; /* used to mark a node to be provisioned */
 	int seq_num;			/* sequence number of chunk */
 	int sub_seq_num;		/* sub sequence number for sort stabilization */
+	int rank;			/* rank of ninfo */
 	node_info *ninfo;
 	resource_req *resreq;
 	chunk *chk;
@@ -1207,7 +1213,7 @@ struct event_list
 struct timed_event
 {
 	bool disabled:1;	/* event is disabled - skip it in simulation */
-	std::string name;	
+	std::string name;
 	enum timed_event_types event_type;
 	time_t event_time;
 	event_ptr_t *event_ptr;

@@ -151,18 +151,15 @@ query_queues(status *policy, int pbs_sd, server_info *sinfo)
 		errmsg = pbs_geterrmsg(pbs_sd);
 		if (errmsg == NULL)
 			errmsg = "";
-	log_eventf(PBSEVENT_SCHED, PBS_EVENTCLASS_QUEUE, LOG_NOTICE, "queue_info",
+		log_eventf(PBSEVENT_SCHED, PBS_EVENTCLASS_QUEUE, LOG_NOTICE, "queue_info",
 			"Statque failed: %s (%d)", errmsg, pbs_errno);
 		free_schd_error(sch_err);
 		return NULL;
 	}
 
-	cur_queue = queues;
-
-	while (cur_queue != NULL) {
+	for (cur_queue = queues; cur_queue != NULL; cur_queue = cur_queue->next)
 		num_queues++;
-		cur_queue = cur_queue->next;
-	}
+
 
 	if ((qinfo_arr = static_cast<queue_info **>(malloc(sizeof(queue_info *) * (num_queues + 1)))) == NULL) {
 		log_err(errno, __func__, MEM_ERR_MSG);
@@ -174,9 +171,18 @@ query_queues(status *policy, int pbs_sd, server_info *sinfo)
 
 	cur_queue = queues;
 
-	for (i = 0, qidx=0; cur_queue != NULL && !err; i++) {
+	for (i = 0, qidx = 0; cur_queue != NULL && !err; i++) {
+		qinfo = find_queue_info(sinfo->queues, cur_queue->name);
+		if (qinfo != NULL)
+			clear_queue_info_for_query(qinfo);
+		
+		if (cur_queue->attribs == NULL) { // queue deleted
+			delete qinfo;
+			continue;
+		}
+
 		/* convert queue information from batch_status to queue_info */
-		if ((qinfo = query_queue_info(policy, cur_queue, sinfo)) == NULL) {
+		if ((qinfo = query_queue_info(policy, cur_queue, sinfo, qinfo)) == NULL) {
 			free_schd_error(sch_err);
 			pbs_statfree(queues);
 			free_queues(qinfo_arr);
@@ -217,12 +223,26 @@ query_queues(status *policy, int pbs_sd, server_info *sinfo)
 					node_queue_cmp, (void *) qinfo->name.c_str(), 0);
 
 				qinfo->num_nodes = count_array(qinfo->nodes);
-
 			}
 
 			if (ret != QUEUE_NOT_EXEC) {
 				/* get all the jobs which reside in the queue */
-				qinfo->jobs = query_jobs(policy, pbs_sd, qinfo, NULL, qinfo->name);
+				qinfo->jobs = query_jobs(policy, pbs_sd, qinfo, qinfo->jobs, qinfo->name);
+
+				if (qinfo->is_ok_to_run == 0) {
+					clear_schd_error(sch_err);
+					set_schd_error_codes(sch_err, NOT_RUN, ret);
+					translate_fail_code(sch_err, comment, log_msg);
+					update_jobs_cant_run(pbs_sd, qinfo->jobs, NULL, sch_err, START_WITH_JOB);
+				} else {
+					if (qinfo->jobs != NULL) {
+						for (j = 0; qinfo->jobs[j] != NULL; j++)
+							if (in_runnable_state(qinfo->jobs[j]) && !qinfo->jobs[j]->job->no_fairshare)
+								qinfo->jobs[j]->can_not_run = 0;
+							else
+								qinfo->jobs[j]->can_not_run = 1;
+					}
+				}
 
 				for (auto& pq : conf.peer_queues) {
 					int peer_on = 1;
@@ -250,25 +270,18 @@ query_queues(status *policy, int pbs_sd, server_info *sinfo)
 					}
 				}
 
-				clear_schd_error(sch_err);
-				set_schd_error_codes(sch_err, NOT_RUN, ret);
-				if (qinfo->is_ok_to_run == 0) {
-					translate_fail_code(sch_err, comment, log_msg);
-					update_jobs_cant_run(pbs_sd, qinfo->jobs, NULL, sch_err, START_WITH_JOB);
-				}
-
 				count_states(qinfo->jobs, &(qinfo->sc));
 
 				qinfo->running_jobs = resource_resv_filter(qinfo->jobs,
-					qinfo->sc.total, check_run_job, NULL, 0);
+									   qinfo->sc.total, check_run_job, NULL, 0);
 
-				if (qinfo->running_jobs  == NULL)
+				if (qinfo->running_jobs == NULL)
 					err = 1;
 
 				if (qinfo->has_soft_limit || qinfo->has_hard_limit) {
 					counts *allcts;
 					allcts = find_alloc_counts(qinfo->alljobcounts,
-						PBS_ALL_ENTITY);
+								   PBS_ALL_ENTITY);
 					if (qinfo->alljobcounts == NULL)
 						qinfo->alljobcounts = allcts;
 
@@ -276,14 +289,14 @@ query_queues(status *policy, int pbs_sd, server_info *sinfo)
 						/* set the user and group counts */
 						for (j = 0; qinfo->running_jobs[j] != NULL; j++) {
 							cts = find_alloc_counts(qinfo->user_counts,
-								qinfo->running_jobs[j]->user);
+										qinfo->running_jobs[j]->user);
 							if (qinfo->user_counts == NULL)
 								qinfo->user_counts = cts;
 
 							update_counts_on_run(cts, qinfo->running_jobs[j]->resreq);
 
 							cts = find_alloc_counts(qinfo->group_counts,
-								qinfo->running_jobs[j]->group);
+										qinfo->running_jobs[j]->group);
 
 							if (qinfo->group_counts == NULL)
 								qinfo->group_counts = cts;
@@ -291,7 +304,7 @@ query_queues(status *policy, int pbs_sd, server_info *sinfo)
 							update_counts_on_run(cts, qinfo->running_jobs[j]->resreq);
 
 							cts = find_alloc_counts(qinfo->project_counts,
-								qinfo->running_jobs[j]->project);
+										qinfo->running_jobs[j]->project);
 
 							if (qinfo->project_counts == NULL)
 								qinfo->project_counts = cts;
@@ -343,7 +356,7 @@ query_queues(status *policy, int pbs_sd, server_info *sinfo)
  */
 
 queue_info *
-query_queue_info(status *policy, struct batch_status *queue, server_info *sinfo)
+query_queue_info(status *policy, struct batch_status *queue, server_info *sinfo, queue_info *pqinfo)
 {
 	struct attrl *attrp;		/* linked list of attributes from server */
 	struct queue_info *qinfo;	/* queue_info being created */
@@ -351,11 +364,16 @@ query_queue_info(status *policy, struct batch_status *queue, server_info *sinfo)
 	char *endp;			/* used with strtol() */
 	sch_resource_t count;		/* used to convert string -> num */
 
-	if ((qinfo = new queue_info(queue->name)) == NULL)
-		return NULL;
+	if (pqinfo == NULL) {
+		if ((qinfo = new queue_info(queue->name)) == NULL)
+			return NULL;
 
-	if (qinfo->liminfo == NULL)
-		return NULL;
+		if (qinfo->liminfo == NULL) {
+			delete qinfo;
+			return NULL;
+		}
+	} else
+		qinfo = pqinfo;
 
 	attrp = queue->attribs;
 	qinfo->server = sinfo;
@@ -370,16 +388,15 @@ query_queue_info(status *policy, struct batch_status *queue, server_info *sinfo)
 			if (!strcmp(attrp->value, ATR_TRUE)) {
 				sinfo->has_nodes_assoc_queue = 1;
 				qinfo->has_nodes = 1;
-			}
-			else
+			} else {
+				sinfo->has_nodes_assoc_queue = 0;
 				qinfo->has_nodes = 0;
-		}
-		else if(!strcmp(attrp->name, ATTR_backfill_depth)) {
+			}
+		} else if (!strcmp(attrp->name, ATTR_backfill_depth)) {
 			qinfo->backfill_depth = strtol(attrp->value, NULL, 10);
 			if(qinfo->backfill_depth > 0)
 				policy->backfill = 1;
-		}
-		else if(!strcmp(attrp->name, ATTR_partition)) {
+		} else if (!strcmp(attrp->name, ATTR_partition)) {
 			if (attrp->value != NULL) {
 				qinfo->partition = string_dup(attrp->value);
 				if (qinfo->partition == NULL) {
@@ -388,8 +405,7 @@ query_queue_info(status *policy, struct batch_status *queue, server_info *sinfo)
 					return NULL;
 				}
 			}
-		}
-		else if (is_reslimattr(attrp)) {
+		} else if (is_reslimattr(attrp)) {
 			(void) lim_setlimits(attrp, LIM_RES, qinfo->liminfo);
 			if(strstr(attrp->value, "u:") != NULL)
 				qinfo->has_user_limit = 1;
@@ -399,8 +415,7 @@ query_queue_info(status *policy, struct batch_status *queue, server_info *sinfo)
 				qinfo->has_proj_limit = 1;
 			if(strstr(attrp->value, "o:") != NULL)
 				qinfo->has_all_limit = 1;
-		}
-		else if (is_runlimattr(attrp)) {
+		} else if (is_runlimattr(attrp)) {
 			(void) lim_setlimits(attrp, LIM_RUN, qinfo->liminfo);
 			if(strstr(attrp->value, "u:") != NULL)
 				qinfo->has_user_limit = 1;
@@ -420,14 +435,12 @@ query_queue_info(status *policy, struct batch_status *queue, server_info *sinfo)
 			if(strstr(limname, "g:") != NULL)
 				qinfo->has_grp_limit = 1;
 			/* no need to check for project limits because there were no old style project limits */
-		}
-		else if (!strcmp(attrp->name, ATTR_p)) { /* priority */
+		} else if (!strcmp(attrp->name, ATTR_p)) { /* priority */
 			count = strtol(attrp->value, &endp, 10);
 			if (*endp != '\0')
 				count = -1;
 			qinfo->priority = count;
-		}
-		else if (!strcmp(attrp->name, ATTR_qtype)) { /* queue_type */
+		} else if (!strcmp(attrp->name, ATTR_qtype)) { /* queue_type */
 			if (!strcmp(attrp->value, "Execution")) {
 				qinfo->is_exec = 1;
 				qinfo->is_route = 0;
@@ -436,10 +449,10 @@ query_queue_info(status *policy, struct batch_status *queue, server_info *sinfo)
 				qinfo->is_route = 1;
 				qinfo->is_exec = 0;
 			}
-		}
-		else if (!strcmp(attrp->name, ATTR_NodeGroupKey))
+		} else if (!strcmp(attrp->name, ATTR_NodeGroupKey)) {
+			free_string_array(qinfo->node_group_key);
 			qinfo->node_group_key = break_comma_list(attrp->value);
-		else if (!strcmp(attrp->name, ATTR_rescavail)) { /* resources_available*/
+		} else if (!strcmp(attrp->name, ATTR_rescavail)) { /* resources_available*/
 #ifdef NAS
 			/* localmod 040 */
 			if (!strcmp(attrp->resource, ATTR_ignore_nodect_sort)) {
@@ -561,6 +574,76 @@ queue_info::queue_info(char *qname): name(qname)
 	ignore_nodect_sort	 = 0;
 #endif
 	partition = NULL;
+}
+
+void 
+clear_queue_info_for_query(queue_info *qinfo)
+{
+	qinfo->is_started = 0;
+	qinfo->is_exec = 0;
+	qinfo->is_route = 0;
+	qinfo->is_ded_queue = 0;
+	qinfo->is_prime_queue = 0;
+	qinfo->is_nonprime_queue = 0;
+	qinfo->is_ok_to_run = 0;
+	qinfo->has_nodes = 0;
+	qinfo->priority = 0;
+	qinfo->has_soft_limit = 0;
+	qinfo->has_hard_limit = 0;
+	qinfo->has_resav_limit = 0;
+	qinfo->has_user_limit = 0;
+	qinfo->has_grp_limit = 0;
+	qinfo->has_proj_limit = 0;
+	qinfo->has_all_limit = 0;
+	init_state_count(&(qinfo->sc));
+	lim_free_liminfo(qinfo->liminfo);
+	qinfo->liminfo = lim_alloc_liminfo();
+	qinfo->num_nodes = 0;
+	if (qinfo->qres != NULL) {
+		free_resource_list(qinfo->qres);
+		qinfo->qres = NULL;
+	}
+	qinfo->backfill_depth = UNSPECIFIED;
+	if (qinfo->partition != NULL) {
+		free(qinfo->partition);
+		qinfo->partition = NULL;
+	}
+	if (qinfo->running_jobs != NULL) {
+		free(qinfo->running_jobs);
+		qinfo->running_jobs = NULL;
+	}
+	if (qinfo->alljobcounts != NULL) {
+		free_counts_list(qinfo->alljobcounts);
+		qinfo->alljobcounts = NULL;
+	}
+	if (qinfo->group_counts != NULL) {
+		free_counts_list(qinfo->group_counts);
+		qinfo->group_counts = NULL;
+	}
+	if (qinfo->project_counts != NULL) {
+		free_counts_list(qinfo->project_counts);
+		qinfo->project_counts = NULL;
+	}
+	if (qinfo->user_counts != NULL) {
+		free_counts_list(qinfo->user_counts);
+		qinfo->user_counts = NULL;
+	}
+	if (qinfo->total_alljobcounts != NULL) {
+		free_counts_list(qinfo->total_alljobcounts);
+		qinfo->total_alljobcounts = NULL;
+	}
+	if (qinfo->total_group_counts != NULL) {
+		free_counts_list(qinfo->total_group_counts);
+		qinfo->total_group_counts = NULL;
+	}
+	if (qinfo->total_project_counts != NULL) {
+		free_counts_list(qinfo->total_project_counts);
+		qinfo->total_project_counts = NULL;
+	}
+	if (qinfo->total_user_counts != NULL) {
+		free_counts_list(qinfo->total_user_counts);
+		qinfo->total_user_counts = NULL;
+	}
 }
 
 /**

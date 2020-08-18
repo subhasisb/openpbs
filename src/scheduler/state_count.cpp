@@ -104,42 +104,43 @@ count_states(resource_resv **jobs, state_count *sc)
 {
 	int i;
 
-	if (jobs != NULL) {
-		for (i = 0; jobs[i] != NULL; i++) {
-			if (jobs[i]->job != NULL) {
-				if (jobs[i]->job->is_queued)
-					sc->queued++;
-				else if (jobs[i]->job->is_running)
-					sc->running++;
-				else if (jobs[i]->job->is_transit)
-					sc->transit++;
-				else if (jobs[i]->job->is_exiting)
-					sc->exiting++;
-				else if (jobs[i]->job->is_held)
-					sc->held++;
-				else if (jobs[i]->job->is_waiting)
-					sc->waiting++;
-				else if (jobs[i]->job->is_suspended)
-					sc->suspended++;
-				else if (jobs[i]->job->is_userbusy)
-					sc->userbusy++;
-				else if (jobs[i]->job->is_begin)
-					sc->begin++;
-				else if (jobs[i]->job->is_expired)
-					sc->expired++;
-				else {
-					sc->invalid++;
-					log_event(PBSEVENT_JOB, PBS_EVENTCLASS_JOB, LOG_INFO, jobs[i]->name, "Job in unknown state");
-				}
-			}
-		}
+	if (jobs == NULL || sc == NULL)
+		return;
+
+	for (i = 0; jobs[i] != NULL; i++)
+		job_state_count_add(sc, jobs[i], 1);
+}
+
+void job_state_count_add(state_count *sc, resource_resv *job, int count) 
+{
+	if (sc == NULL || job == NULL || job->job == NULL)
+		return;
+
+	if (job->job->is_queued)
+		sc->queued += count;
+	else if (job->job->is_running)
+		sc->running += count;
+	else if (job->job->is_transit)
+		sc->transit += count;
+	else if (job->job->is_exiting)
+		sc->exiting += count;
+	else if (job->job->is_held)
+		sc->held += count;
+	else if (job->job->is_waiting)
+		sc->waiting += count;
+	else if (job->job->is_suspended)
+		sc->suspended += count;
+	else if (job->job->is_userbusy)
+		sc->userbusy += count;
+	else if (job->job->is_begin)
+		sc->begin += count;
+	else if (job->job->is_expired)
+		sc->expired += count;
+	else {
+		sc->invalid += count;
+		log_event(PBSEVENT_JOB, PBS_EVENTCLASS_JOB, LOG_INFO, job->name, "Job in unknown state");
 	}
-
-	sc->total = sc->queued + sc->running + sc->transit +
-		sc->exiting + sc->held + sc->waiting +
-		sc->suspended + sc->userbusy + sc->begin +
-		sc->expired + sc->invalid;
-
+	sc->total += count;
 }
 
 /**

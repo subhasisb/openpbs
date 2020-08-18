@@ -653,13 +653,21 @@ select_job(job *pjob, struct select_list *psel, int dohistjobs, int dosubjobs, s
 			return 0;
 	}
 
-	if ((dosubjobs == 2) && (pjob->ji_qs.ji_svrflags & JOB_SVFLG_SubJob) &&
-		(!check_job_state(pjob, JOB_STATE_LTR_EXITING)) &&
-		(!check_job_state(pjob, JOB_STATE_LTR_RUNNING))) /* select only exiting or running subjobs */
-		return 0;
+	if ((dosubjobs == 2) && (pjob->ji_qs.ji_svrflags & JOB_SVFLG_SubJob)) {
+		int state_ok = 0;
+		/* extend = "S" (dosubjobs == 2) includes running (+suspended) and exiting subjobs */
+		if (check_job_state(pjob, JOB_STATE_LTR_EXITING) || check_job_state(pjob, JOB_STATE_LTR_RUNNING))
+			state_ok = 1;
+		else if (dohistjobs) { /* If we're doing history, return finished and expired as well */
+			if (check_job_state(pjob, JOB_STATE_LTR_FINISHED) || check_job_state(pjob, JOB_STATE_LTR_EXPIRED))
+				state_ok = 1;
+		}
+		if (!state_ok)
+			return 0;
+	}
 
 	if ((pjob->ji_qs.ji_svrflags & JOB_SVFLG_ArrayJob) == 0)
-		dosubjobs = 0;  /* not an Array Job,  ok to check state */
+		dosubjobs = 0;  /* not an Array Job, ok to check state */
 	else if ((dosubjobs != 2) &&
 		(pjob->ji_qs.ji_svrflags & JOB_SVFLG_SubJob))
 		return 0;	/* don't bother to look at sub job */

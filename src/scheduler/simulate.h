@@ -42,6 +42,7 @@
 
 #include "data_types.h"
 #include "constant.h"
+#include "globals.h"
 
 /*
  *	simulate_events - simulate the future of a PBS universe

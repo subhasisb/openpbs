@@ -81,10 +81,8 @@ void set_truth_bucket_to_chkpt(node_bucket *nb);
 
 /* chunk_map constructor, copy constructor, destructor */
 chunk_map *new_chunk_map();
-chunk_map *dup_chunk_map(chunk_map *ocmap);
 void free_chunk_map(chunk_map *cmap);
 void free_chunk_map_array(chunk_map **cmap_arr);
-chunk_map **dup_chunk_map_array(chunk_map **ocmap_arr);
 
 /* decide of a job should use the node_bucket path */
 int job_should_use_buckets(resource_resv *resresv);

@@ -486,8 +486,7 @@ create_node_partitions(status *policy, node_info **nodes, const char * const *re
 							if (free_str) {
 								np_arr[np_i]->name = str;
 								free_str = 0;
-							}
-							else
+							} else
 								np_arr[np_i]->name = string_dup(str);
 
 							np_arr[np_i]->def = def;
@@ -1235,8 +1234,12 @@ create_placement_sets(status *policy, server_info *sinfo)
 	const char *resstr[] = {"host", NULL};
 	int num;
 
+	if (sinfo->allpart != NULL)
+		free_node_partition(sinfo->allpart);
 	sinfo->allpart = create_specific_nodepart(policy, "all", sinfo->unassoc_nodes, NO_FLAGS);
 	if (sinfo->has_multi_vnode) {
+		if (sinfo->hostsets != NULL)
+			free_node_partition_array(sinfo->hostsets);
 		sinfo->hostsets = create_node_partitions(policy, sinfo->nodes,
 			resstr, sc_attrs.only_explicit_psets ? NP_NONE : NP_CREATE_REST, &num);
 		if (sinfo->hostsets != NULL) {
@@ -1250,8 +1253,7 @@ create_placement_sets(status *policy, server_info *sinfo)
 					snprintf(hostbuf, sizeof(hostbuf), "host=%s", hostres->str_avail[0]);
 					sinfo->nodes[i]->hostset =
 						find_node_partition(sinfo->hostsets, hostbuf);
-				}
-				else {
+				} else {
 					snprintf(hostbuf, sizeof(hostbuf), "host=\"\"");
 					sinfo->nodes[i]->hostset =
 						find_node_partition(sinfo->hostsets, hostbuf);
@@ -1266,10 +1268,12 @@ create_placement_sets(status *policy, server_info *sinfo)
 	}
 
 	if (sinfo->node_group_enable && sinfo->node_group_key != NULL) {
+		if (sinfo->nodepart != NULL)
+			free_node_partition_array(sinfo->nodepart);
 		sinfo->nodepart = create_node_partitions(policy, sinfo->unassoc_nodes,
-			sinfo->node_group_key,
-			sc_attrs.only_explicit_psets ? NP_NONE : NP_CREATE_REST,
-			&sinfo->num_parts);
+							 sinfo->node_group_key,
+							 sc_attrs.only_explicit_psets ? NP_NONE : NP_CREATE_REST,
+							 &sinfo->num_parts);
 
 		if (sinfo->nodepart != NULL) {
 			qsort(sinfo->nodepart, sinfo->num_parts,
@@ -1287,8 +1291,11 @@ create_placement_sets(status *policy, server_info *sinfo)
 		char **ngkey;
 		queue_info *qinfo = sinfo->queues[i];
 
-		if (qinfo->has_nodes)
+		if (qinfo->has_nodes) {
+			if (qinfo->allpart != NULL)
+				free_node_partition(qinfo->allpart);
 			qinfo->allpart = create_specific_nodepart(policy, "all", qinfo->nodes, NO_FLAGS);
+		}
 
 		if (sinfo->node_group_enable && (qinfo->has_nodes || qinfo->node_group_key)) {
 			if (qinfo->has_nodes)
@@ -1301,6 +1308,8 @@ create_placement_sets(status *policy, server_info *sinfo)
 			else
 				ngkey = sinfo->node_group_key;
 
+			if (qinfo->nodepart != NULL)
+				free_node_partition_array(qinfo->nodepart);
 			qinfo->nodepart = create_node_partitions(policy, ngroup_nodes,
 				ngkey, sc_attrs.only_explicit_psets ? NP_NONE : NP_CREATE_REST,
 				&(qinfo->num_parts));

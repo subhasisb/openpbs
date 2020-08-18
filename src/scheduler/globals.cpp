@@ -194,9 +194,10 @@ int clust_primary_sock = -1;
 /* secondary socket descriptor to the server pool */
 int clust_secondary_sock = -1;
 
-/* a list of running jobs from the last scheduling cycle */
+/* a vector of running jobs from the last scheduling cycle */
 std::vector<prev_job_info> last_running;
 
 /* fairshare tree */
 fairshare_head *fstree;
+struct timeval last_cycle_time = {0, 0};
 bool requery_universe = false;

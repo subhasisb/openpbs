@@ -560,6 +560,16 @@ multi_node_sort(const void *n1, const void *n2)
 			break;
 	}
 
+	/* All sort keys are equal, stabilize on rank (pbsnodes order)*/
+	if (ret == 0) {
+		int rank1 = (*(node_info **) n1)->rank;
+		int rank2 = (*(node_info **) n2)->rank;
+		if (rank1 < rank2)
+			return -1;
+		else /* ranks are unique, they can't be equal */
+			return 1;
+	}
+
 	return ret;
 }
 
@@ -680,7 +690,6 @@ node_sort_cmp(const void *vp1, const void *vp2, const struct sort_info& si, cons
 	node_partition **np2 = NULL;
 	node_bucket **b1 = NULL;
 	node_bucket **b2 = NULL;
-	int rank1, rank2;
 
 	if (vp1 != NULL && vp2 == NULL)
 		return -1;
@@ -698,24 +707,18 @@ node_sort_cmp(const void *vp1, const void *vp2, const struct sort_info& si, cons
 			n2 = (node_info **) vp2;
 			v1 = find_node_amount(*n1, si.res_name, si.def, si.res_type);
 			v2 = find_node_amount(*n2, si.res_name, si.def, si.res_type);
-			rank1 = (*n1)->rank;
-			rank2 = (*n2)->rank;
 			break;
 		case SOBJ_PARTITION:
 			np1 = (node_partition **) vp1;
 			np2 = (node_partition **) vp2;
 			v1 = find_nodepart_amount(*np1, si.res_name, si.def, si.res_type);
 			v2 = find_nodepart_amount(*np2, si.res_name, si.def, si.res_type);
-			rank1 = (*np1)->rank;
-			rank2 = (*np2)->rank;
 			break;
 		case SOBJ_BUCKET:
 			b1 = (node_bucket **) vp1;
 			b2 = (node_bucket **) vp2;
 			v1 = find_bucket_amount(*b1, si.res_name, si.def, si.res_type);
 			v2 = find_bucket_amount(*b2, si.res_name, si.def, si.res_type);
-			rank1 = 0;
-			rank2 = 0;
 			break;
 
 		default:
@@ -723,31 +726,20 @@ node_sort_cmp(const void *vp1, const void *vp2, const struct sort_info& si, cons
 			break;
 	}
 
-	if (v1 == v2)
-		return 0;
-
 	if (si.order == ASC) {
 		if (v1 < v2)
 			return -1;
 		else if (v1 > v2)
 			return 1;
-		else {
-			if (rank1 < rank2)
-				return -1;
-			else
-				return 1;
-		}
+		else
+			return 0;
 	} else {
 		if (v1 < v2)
 			return 1;
 		else if (v1 > v2)
 			return -1;
-		else {
-			if (rank1 < rank2)
-				return 1;
-			else
-				return -1;
-		}
+		else
+			return 0;
 	}
 }
 
@@ -1135,13 +1127,13 @@ cmp_job_preemption_time_asc(const void *j1, const void *j2)
 	 * If both jobs are preempted, one which is preempted first gets priority
 	 */
 	if (r1->job->time_preempted == UNSPECIFIED &&
-		r2->job->time_preempted ==UNSPECIFIED)
+		r2->job->time_preempted == UNSPECIFIED)
 		return 0;
 	else if (r1->job->time_preempted != UNSPECIFIED &&
-		r2->job->time_preempted ==UNSPECIFIED)
+		r2->job->time_preempted == UNSPECIFIED)
 		return -1;
 	else if (r1->job->time_preempted == UNSPECIFIED &&
-		r2->job->time_preempted !=UNSPECIFIED)
+		r2->job->time_preempted != UNSPECIFIED)
 		return 1;
 
 	if (r1->job->time_preempted < r2->job->time_preempted)

@@ -608,6 +608,42 @@ range_intersection(range *r1, range *r2)
 	return intersection;
 }
 
+/**
+ * @brief take the difference between two ranges
+ * @param[in] r1 - first range
+ * @param[in] r2 - second range
+ * 
+ * @par we take A - B so:
+ * 	1-4 - 1-3 = 4
+ * 	1,2,3 - 1,3 = 2
+ * 	1,2 - 1,2,3 = empty range
+ * 
+ * @return range *
+ * @retval difference of ranges
+ * @retval NULL on error
+ */
+range *
+range_difference(range *r1, range *r2)
+{
+	range *difference = NULL;
+	int cur = 0;
+
+	if (r1 == NULL)
+		return NULL;
+	
+	if (r2 == NULL)
+		return dup_range_list(r1);
+
+	cur = range_next_value(r1, -1);
+
+	while (cur >= 0) {
+		if (!range_contains(r2, cur)) {
+			range_add_value(&difference, cur, r2->step);
+		}
+		cur = range_next_value(r1, cur);
+	}
+	return difference;
+}
 
 /**
  * @brief
