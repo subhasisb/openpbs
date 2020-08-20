@@ -407,10 +407,11 @@ reply_hellosvr(int stream, int need_inv)
 	if ((ret = send_rpp_values(stream, 1)) != DIS_SUCCESS)
 		return ret;
 
-	if (msvr_mode()) {
-		/* In multi-server mode, server will not send clusteraddr */
+	/* In multi-server mode, server will not send clusteraddr */
+	/*
+	if (get_msvr_mode()) {
 		return dis_flush(stream);
-	}
+	}*/
 
 	if ((ret = send_ip_addrs_to_mom(stream, 1)) != DIS_SUCCESS)
 		return ret;

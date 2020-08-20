@@ -209,7 +209,8 @@ RUN set -ex \\
     && make -j12 install \\
     && chmod 4755 /opt/pbs/sbin/pbs_iff /opt/pbs/sbin/pbs_rcp \\
     && cd / \\
-    && rm -rf /pbssrc
+    && rm -rf /pbssrc \\
+    && ulimit -c unlimited
 __PP_DF__
 
     docker build --force-rm --rm \
@@ -300,6 +301,8 @@ function _setup_svrs() {
             -h ${_svrn} \
             --name ${_svrn} \
             ${_varg} \
+            -v ${cur_dir}:pbs_src \
+            --privileged \
             pbs${WHICH_IMG}:base ${HOME_DIR_BASE} server ${SVRS_INSTANCES} >/dev/null
         if [ $? -ne 0 ]; then
             echo "Failed to start ${_svrn}"
@@ -319,6 +322,9 @@ function _setup_svrs() {
             if [ $? -eq 0 ]; then
                 echo "${_svrn} up"
                 docker exec -it -e PBS_SERVER_INSTANCES=${_svrn} ${_svrn} /opt/pbs/bin/qmgr -c "s s flatuid=1" &>/dev/null
+                docker exec -it -e PBS_SERVER_INSTANCES=${_svrn} ${_svrn} /opt/pbs/bin/qmgr -c "s s acl_roots=root" &>/dev/null
+                docker exec -it -e PBS_SERVER_INSTANCES=${_svrn} ${_svrn} /opt/pbs/bin/qmgr -c "s s acl_roots=root@*" &>/dev/null
+                docker exec -it -e PBS_SERVER_INSTANCES=${_svrn} ${_svrn} /opt/pbs/bin/qmgr -c "s s managers=root@*" &>/dev/null
                 docker exec -it -e PBS_SERVER_INSTANCES=${_svrn} ${_svrn} /opt/pbs/bin/qmgr -c "s sched sched_host = pbs-server-1" &>/dev/null
                 break
             else
@@ -421,7 +427,7 @@ function __setup_mom_helper() {
         else
             echo "Started ${_momn} instance"
         fi
-        docker exec -it -e PBS_SERVER_INSTANCES=${_svrn} ${_svrn} /opt/pbs/bin/qmgr -c "c n ${_momn}"
+        docker exec -it ${_svrn} /opt/pbs/bin/qmgr -c "c n ${_momn}"
         if [ $? -ne 0 ]; then
             echo "Failed to create mom (${_momn}) on ${_svrn}"
             exit 1
@@ -432,7 +438,7 @@ function __setup_mom_helper() {
             __vnodes_on_mom ${_svrn} ${_momn} ${NO_VNODE_PER_MOM}
         else
             if [ ${NO_CPUS_PER_VNODE} -ne 0 ]; then
-                docker exec -it -e PBS_SERVER_INSTANCES=${_svrn} ${_svrn} \
+                docker exec -it ${_svrn} \
                     /opt/pbs/bin/qmgr -c "s n ${_momn} resources_available.ncpus = ${NO_CPUS_PER_VNODE}"
             fi
         fi

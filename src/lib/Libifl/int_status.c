@@ -632,7 +632,7 @@ aggr_node_attrs(struct batch_status *cur, struct batch_status *nxt)
 	struct attrl *b = NULL;
 	int found = 0;
 	int cpus = 0;
-	char *state_a = NULL;
+	char **state_a = NULL;
 	char *state_b = NULL;
 	int tot_cpus = 0;
 	char *pc;
@@ -654,7 +654,7 @@ aggr_node_attrs(struct batch_status *cur, struct batch_status *nxt)
 			cur->text = SERVER_FOUND;
 			found++;
 		} else if (a->name && !strcmp(a->name, ATTR_NODE_state)) {
-			state_a = a->value;
+			state_a = &a->value;
 			found++;
 		} else if (a->name && a->resource &&
 			   !strcmp(a->name, ATTR_rescavail) &&
@@ -687,7 +687,7 @@ aggr_node_attrs(struct batch_status *cur, struct batch_status *nxt)
 	}
 
 	if (cur->text && !strcmp(cur->text, SERVER_FOUND))
-		encode_node_state(&state_a, state_b, cpus, tot_cpus);
+		encode_node_state(state_a, state_b, cpus, tot_cpus);
 }
 
 static int
@@ -754,7 +754,7 @@ aggregate_node(struct batch_status **sv1, struct batch_status **sv2)
 	for (b = *sv2; b; prev_b = b, b = b->next) {
 
 		rc = pbs_idx_find(nodes_idx, (void **)&b->name, (void **)&a, NULL);
-		if (rc != PBS_IDX_RET_OK) {
+		if (rc) {
 			append_bs(b, prev_b, *sv1, sv2);
 			pbs_idx_insert(nodes_idx, b->name, b);
 			continue;
