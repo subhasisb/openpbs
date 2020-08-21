@@ -2195,7 +2195,7 @@ crc_file(char *filepath)
  * @return int
  */
 int
-get_msvr_mode(void)
+msvr_mode(void)
 {
 	return (get_num_servers() > 1);
 }

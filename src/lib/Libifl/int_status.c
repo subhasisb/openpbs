@@ -811,7 +811,7 @@ index_objects(struct batch_status *head, int parent_object)
 {
 	struct batch_status *cur = NULL;
 
-	if (!head || !get_msvr_mode())
+	if (!head || !msvr_mode())
 		return 0;
 
 	switch (parent_object) {

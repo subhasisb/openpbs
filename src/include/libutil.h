@@ -346,6 +346,7 @@ void encode_SHA(char*, size_t, char **);
  * Getter function to get the number of currently configured servers.
  */
 extern int get_num_servers();
+extern int msvr_mode(void);
 
 extern int parse_pbs_name_port(char *, char *, int *);
 

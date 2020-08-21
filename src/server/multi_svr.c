@@ -68,18 +68,6 @@ get_peersvr(struct sockaddr_in *addr)
 	return NULL;
 }
 
-/**
- * @brief
- * 	Return multiserver mode
- *
- * @return int
- */
-int
-msvr_mode(void)
-{
-	return (get_num_servers() > 1);
-}
-
 struct peersvr_list {
 	struct peersvr_list *next;
 	mominfo_t  *pmom;
