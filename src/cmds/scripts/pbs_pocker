@@ -301,7 +301,7 @@ function _setup_svrs() {
             -h ${_svrn} \
             --name ${_svrn} \
             ${_varg} \
-            -v ${cur_dir}:pbs_src \
+            -v ${cur_dir}:/pbs \
             --privileged \
             pbs${WHICH_IMG}:base ${HOME_DIR_BASE} server ${SVRS_INSTANCES} >/dev/null
         if [ $? -ne 0 ]; then
