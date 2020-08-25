@@ -496,7 +496,7 @@ function modify_cpus() {
                 _vnodes=$(${_cmd} pbs-server-${i} /opt/pbs/bin/pbsnodes -av | grep -E "^${_momn}\\[" | wc -l)
                 __vnodes_on_mom pbs-server-${i} ${_momn} ${_vnodes//[[:space:]]/} 1 &>/dev/null
             else
-                docker exec -it -e PBS_SERVER_INSTANCES=pbs-server-${i} pbs-server-${i} \
+                docker exec -it pbs-server-${i} \
                     /opt/pbs/bin/qmgr -c "s n ${_momn} resources_available.ncpus = ${NO_CPUS_PER_VNODE}"
             fi
         done

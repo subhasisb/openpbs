@@ -467,7 +467,6 @@ aggr_resc_ct(struct batch_status *st1, struct batch_status *st2)
  * @brief
  * append_bs:
  *	append b to end of a. also remove references of b from its batch status
- * @param[in,out] a - attr list where b needs to be appended
  * @param[in] b - batch status which needs to be appended to a
  * @param[in,out] prev_b - previous list element of b for which references needs to be updated
  * @param[in] head_a - head element of list contains a
@@ -476,16 +475,29 @@ aggr_resc_ct(struct batch_status *st1, struct batch_status *st2)
  * @return void
  */
 static void
-append_bs(struct batch_status *b, struct batch_status *prev, struct batch_status *sv1, struct batch_status **sv2)
+append_bs(struct batch_status **b, struct batch_status *prev, struct batch_status *sv1, struct batch_status **sv2)
 {
-	sv1->last->next = b;
+	struct batch_status *last;
+
 	if (prev) {
-		prev->next = b->next;
-		prev->last = b;
+		prev->next = (*b)->next;
+		if (prev->last && prev->last == *b)
+			prev->last = (*b)->next;
 	} else {
-		*sv2 = b->next;
+		last = (*sv2)->last;
+		*sv2 = (*b)->next;
+		if (*sv2) {
+			if (last)
+				(*sv2)->last = last;
+			else
+				(*sv2)->last = (*b);
+		}
 	}
-	b->next = NULL;
+
+	sv1->last->next = *b;
+	sv1->last = *b;
+	(*b)->next = NULL;
+	*b = prev;
 }
 
 /**
@@ -503,8 +515,10 @@ aggregate_queue(struct batch_status *sv1, struct batch_status **sv2)
 	struct batch_status *a = NULL;
 	struct batch_status *b = NULL;
 	struct batch_status *prev_b = NULL;
+	struct batch_status *next = NULL;
 
-	for (b = *sv2; b; prev_b = b, b = b->next) {
+	for (b = *sv2; b; prev_b = b, b = next) {
+		next = b->next;
 		for (a = sv1; a; a = a->next) {
 			if (a->name && b->name && !strcmp(a->name, b->name)) {
 				aggr_job_ct(a, b);
@@ -513,7 +527,7 @@ aggregate_queue(struct batch_status *sv1, struct batch_status **sv2)
 			}
 		}
 		if (!a)
-			append_bs(b, prev_b, sv1, sv2);
+			append_bs(&b, prev_b, sv1, sv2);
 	}
 }
 
@@ -562,12 +576,13 @@ encode_job_list(char **val, char *nxt, int *cpus)
 		}
 		if ((pc = strrchr(job, '/')) != NULL) {
 			*(pc + 1) = '\0';
-			len += sprintf(buf + len, ", %s%d", job, ++cpu);
+			len += sprintf(buf + len - 1, ", %s%d", job, ++cpu);
 		}
 	}
 
 	free(*val);
-	*val = buf;
+	*val = strdup(buf);
+	free(buf);
 	free_string_array(arr);
 	*cpus = cpu + 1;
 }
@@ -728,6 +743,8 @@ set_prev_link_spl(struct batch_status **sv, struct batch_status *new, struct bat
 	for (prev = *sv; prev; prev = prev->next) {
 		if (prev->next == old) {
 			prev->next = new;
+			if ((*sv)->last == old)
+				(*sv)->last = new;
 			break;
 		}
 	}
@@ -744,19 +761,21 @@ fix_indx(struct batch_status *a)
 }
 
 static void
-aggregate_node(struct batch_status **sv1, struct batch_status **sv2)
+aggregate_nodes(struct batch_status **sv1, struct batch_status **sv2)
 {
 	struct batch_status *a = NULL;
 	struct batch_status *b = NULL;
 	struct batch_status *prev_b = NULL;
+	struct batch_status *next_b = NULL;
 	int rc = 0;
 
-	for (b = *sv2; b; prev_b = b, b = b->next) {
+	for (b = *sv2; b; prev_b = b, b = next_b) {
+		next_b = b->next;
 
 		rc = pbs_idx_find(nodes_idx, (void **)&b->name, (void **)&a, NULL);
 		if (rc) {
-			append_bs(b, prev_b, *sv1, sv2);
 			pbs_idx_insert(nodes_idx, b->name, b);
+			append_bs(&b, prev_b, *sv1, sv2);
 			continue;
 		}
 
@@ -917,7 +936,7 @@ PBSD_status_aggregate(int c, int cmd, char *id, struct attrl *attrib, char *exte
 						next = NULL;
 						break;
 					case MGR_OBJ_NODE:
-						aggregate_node(&ret, &next);
+						aggregate_nodes(&ret, &next);
 						pbs_statfree(next);
 						next = NULL;
 						break;
@@ -933,6 +952,7 @@ PBSD_status_aggregate(int c, int cmd, char *id, struct attrl *attrib, char *exte
 			return NULL;
 	}
 
+	free(failed_conn);
 	clean_final_list(ret, parent_object);
 
 	return ret;

@@ -4738,6 +4738,7 @@ found:
 				}
 			}
 
+			set_srv_attr_on_nodes(pmom);
 			if (made_new_vnodes || cr_node) {
 				save_nodes_db(1, pmom); /* update the node database */
 			}
@@ -4751,7 +4752,6 @@ found:
 
 			set_all_state(pmom, 0, INUSE_DOWN| INUSE_INIT,
 				NULL, Set_All_State_Regardless);
-			set_srv_attr_on_nodes(pmom);
 
 			/* log a node up message only if it was not marked
 			 * as "markeddown" by TPP layer due to broken connection
