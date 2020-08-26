@@ -85,6 +85,7 @@
 #include	"tpp.h"
 #include	"dis.h"
 #include	"mom_func.h"
+#include	"mom_server.h"
 #include	"credential.h"
 #include	"ticket.h"
 #include	"pbs_nodes.h"
@@ -5406,7 +5407,7 @@ join_err:
 
 			free(nodehost);
 			nodehost = NULL;
-			update_ajob_status(pjob);
+			enqueue_update_for_send(pjob, IS_RESCUSED);
 			break;
 
 		case	IM_UPDATE_JOB:
