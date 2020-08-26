@@ -651,11 +651,14 @@ set_all_state(mominfo_t *pmom, int do_set, unsigned long bits, char *txt,
 }
 
 static void
-set_srv_attr_on_nodes(mominfo_t *pmom)
+propogate_srv_attr_on_nodes(mominfo_t *pmom)
 {
 	int		nchild;
 	struct pbsnode *pnode;
 	mom_svrinfo_t  *psvrmom = (mom_svrinfo_t *)(pmom->mi_data);
+
+	if (!(psvrmom->msr_children[0]->nd_attr[ND_ATR_at_server].at_flags & ATR_VFLAG_SET))
+		return;
 
 	for (nchild = 0; nchild < psvrmom->msr_numvnds; ++nchild) {
 		pnode = psvrmom->msr_children[nchild];
@@ -4301,7 +4304,7 @@ is_request(int stream, int version)
 			add_mom_mcast(pmom, &mtfd_replyhello);
 		else
 			add_mom_mcast(pmom, &mtfd_replyhello_noinv);
-		
+
 		if (reply_send_tm <= time_now) {
 			struct work_task *ptask;
 
@@ -4310,14 +4313,21 @@ is_request(int stream, int version)
 			ptask = set_task(WORK_Timed, reply_send_tm, mcast_moms, NULL);
 			ptask->wt_aux = IS_REPLYHELLO;
 		}
+		node_attr_def[ND_ATR_at_server].at_decode(
+			&psvrmom->msr_children[0]->nd_attr[ND_ATR_at_server],
+			NULL, NULL, pbs_server_name);
+
 		return;
-		
+
 	} else {
 		/* check that machine is known */
 		DBPRT(("%s: connect from %s\n", __func__, netaddr(addr)))
 		if ((pmom = get_peersvr(addr)) != NULL)
 			goto found;
-		if ((pmom = tfind2((u_long)stream, 0, &streams)) != NULL)
+		if ((pmom = tfind2((u_long) stream, 0, &streams)) != NULL)
+			goto found;
+		if ((command == IS_UPDATE2) &&
+		    ((pmom = tfind2(ipaddr, ntohs(addr->sin_port) - 1, &ipaddrs)) != NULL))
 			goto found;
 	}
 
@@ -4738,7 +4748,7 @@ found:
 				}
 			}
 
-			set_srv_attr_on_nodes(pmom);
+			propogate_srv_attr_on_nodes(pmom);
 			if (made_new_vnodes || cr_node) {
 				save_nodes_db(1, pmom); /* update the node database */
 			}

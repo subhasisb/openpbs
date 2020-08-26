@@ -308,6 +308,8 @@ long		joinjob_alarm_time = -1;
 long		job_launch_delay  = -1;	/* # of seconds to delay job launch due to pipe reads (pipe read timeout)  */
 int		update_joinjob_alarm_time = 0;
 int		update_job_launch_delay = 0;
+char		*servername = NULL;
+uint		serverport = 0;
 
 #ifdef NAS /* localmod 015 */
 unsigned long	spoolsize = 0; /* default spoolsize = unlimited */
@@ -8098,8 +8100,6 @@ main(int argc, char *argv[])
 	int			stalone = 0;
 	int			i;
 	char			*ptr;
-	char			*servername;
-	unsigned int		serverport;
 	int			recover = 0;
 	time_t			time_state_update = 0;
 	int			tppfd; /* fd for rm and im comm */

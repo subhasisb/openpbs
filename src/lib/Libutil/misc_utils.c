@@ -2223,7 +2223,7 @@ get_num_servers()
  * @retval	1 for error
  */
 int
-parse_pbs_name_port(char *svr_id, char *svrname, int *svrport)
+parse_pbs_name_port(char *svr_id, char *svrname, uint *svrport)
 {
 	char *ptr = NULL;
 

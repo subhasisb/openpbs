@@ -198,7 +198,7 @@ extern "C" {
 typedef struct pbs_server_instance
 {
 	char name[PBS_MAXHOSTNAME];
-	int port;
+	uint port;
 } pbs_server_instance;
 
 struct pbs_config

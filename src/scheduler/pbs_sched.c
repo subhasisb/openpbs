@@ -1444,7 +1444,7 @@ socket_to_conn(int sock, struct sockaddr_in saddr_in)
 	int cmd;
 	int svr_conn_index;
 	char svrname[PBS_MAXHOSTNAME] = {'\0'};
-	int port = 0;
+	uint port = 0;
 	svr_conn_t *conn_arr = NULL;
 
 	if (get_sched_cmd(sock, &cmd, &svr_id) != 1) {

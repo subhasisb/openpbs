@@ -123,6 +123,8 @@ extern  int		enable_exechost2;
 extern  vnl_t		*vnlp;        	   /* vnode list */
 extern  vnl_t		*vnlp_from_hook;   /* vnode list updates from hook */
 extern  char		*msg_request;
+extern char		*servername;
+extern unsigned int	serverport;
 
 extern void req_commit(struct batch_request *preq);
 extern void req_quejob(struct batch_request *preq);
@@ -1137,61 +1139,16 @@ hook_requests_to_server_err:
 	return (ret);
 }
 
-/**
- * @brief
- * 	state_to_server() - if UPDATE_MOM_STATE is set, send state update message to
- *	the server.
- *
- * @param[in]	what_to_update - defines what to update
- * 		UPDATE_VNODES - update all the vnodes
- *		UPDATE_MOM_ONLY - update only the info about the mom
- * @param[in]	combine_msg	- combine message in the caller.
- *
- *	If we have placement set information to send, we use IS_UPDATE2;
- *	otherwise, we fall back to IS_UPDATE.
- *
- * @return int
- * @retval	0: success
- * @retval	1: failure
- *
- */
 int
-state_to_server(int what_to_update, int combine_msg)
+encode_mom_update(int server_stream, int combine_msg, int cmd, int internal_state)
 {
-	int			i, ret;
-	extern const char *dis_emsg[];
-	extern vnl_t		*vnlp;				/* vnode list */
-	char			*pv;
-	int			use_UPDATE2 = 0;
-	int			cmd = IS_UPDATE;
-
-	if (internal_state_update == 0)
-		return 0;
-
-	if (server_stream < 0)
-		return -1;
-
-	if (av_phy_mem == 0)
-		av_phy_mem = strTouL(physmem(0), &pv, 10);
-
-	i = internal_state & MOM_STATE_MASK;
-	if (internal_state & (MOM_STATE_BUSYKB | MOM_STATE_INBYKB))
-		i |= MOM_STATE_BUSY;
-	if (cycle_harvester == 1)
-		i |= MOM_STATE_CONF_HARVEST;
-
-	DBPRT(("updating state 0x%x to server\n", i))
-
-	if ((vnlp != NULL) && (what_to_update == UPDATE_VNODES)) {
-		use_UPDATE2 = 1;
-		cmd = IS_UPDATE2;
-	}
+	int ret;
 
 	if (!combine_msg)
 		if ((ret = is_compose(server_stream, cmd)) != DIS_SUCCESS)
 			goto err;
 
-	if ((ret = diswui(server_stream, i)) != DIS_SUCCESS)		/* node state */
+	if ((ret = diswui(server_stream, internal_state)) != DIS_SUCCESS)		/* node state */
 		goto err;
 	if ((ret = diswui(server_stream, num_pcpus)) != DIS_SUCCESS) /* phy cpus */
 		goto err;
@@ -1202,7 +1159,7 @@ state_to_server(int what_to_update, int combine_msg)
 	if ((ret = diswst(server_stream, arch(0))) != DIS_SUCCESS)	/* arch type */
 		goto err;
 
-	if (use_UPDATE2) {
+	if (cmd == IS_UPDATE2) {
 #if	MOM_ALPS
 		/*
 		 * This is a workaround for a problem with the reporting of
@@ -1242,6 +1199,113 @@ err:
 	tpp_close(server_stream);
 	server_stream = -1;
 	return ret;
+}
+
+/**
+ * @brief
+ * 	state_to_server() - if UPDATE_MOM_STATE is set, send state update message to
+ *	the server.
+ *
+ * @param[in]	what_to_update - defines what to update
+ * 		UPDATE_VNODES - update all the vnodes
+ *		UPDATE_MOM_ONLY - update only the info about the mom
+ * @param[in]	combine_msg	- combine message in the caller.
+ *
+ *	If we have placement set information to send, we use IS_UPDATE2;
+ *	otherwise, we fall back to IS_UPDATE.
+ *
+ * @return int
+ * @retval	0: success
+ * @retval	1: failure
+ *
+ */
+int
+state_to_server(int what_to_update, int combine_msg)
+{
+	int			i, rc;
+	extern const char *dis_emsg[];
+	extern vnl_t		*vnlp;				/* vnode list */
+	char			*pv;
+	int			cmd = IS_UPDATE;
+	int mtfd = -1;
+	int *stream;
+	char		*svr = NULL;
+	unsigned int	port = default_server_port;
+	struct	sockaddr_in	*addr;
+
+	if (internal_state_update == 0)
+		return 0;
+
+	if (server_stream < 0)
+		return -1;
+
+	if (av_phy_mem == 0)
+		av_phy_mem = strTouL(physmem(0), &pv, 10);
+
+	i = internal_state & MOM_STATE_MASK;
+	if (internal_state & (MOM_STATE_BUSYKB | MOM_STATE_INBYKB))
+		i |= MOM_STATE_BUSY;
+	if (cycle_harvester == 1)
+		i |= MOM_STATE_CONF_HARVEST;
+
+	DBPRT(("updating state 0x%x to server\n", i))
+
+	if ((vnlp != NULL) && (what_to_update == UPDATE_VNODES)) {
+		cmd = IS_UPDATE2;
+	}
+
+	if (!serverport) {
+		addr = tpp_getaddr(server_stream);
+		serverport = ntohs(addr->sin_port);
+	}
+
+	if ((rc = encode_mom_update(server_stream, combine_msg, cmd, i)) != 0)
+		return rc;
+
+	if (cmd == IS_UPDATE2) {
+		if ((mtfd = tpp_mcast_open()) == -1) {
+			log_err(-1, __func__, "Failed to open TPP mcast channel for mom pings");
+			return -1;
+		}
+
+		stream = calloc(get_num_servers(), sizeof(int));
+
+		for (i = 0; i < get_num_servers(); i++) {
+
+			if (!strcmp(pbs_conf.psi[i].name, servername) &&
+					(pbs_conf.psi[i].port == serverport)) {
+				stream[i] = -1;
+				continue;
+			}
+
+			stream[i] = tpp_open(pbs_conf.psi[i].name, pbs_conf.psi[i].port);
+			if (stream[i] < 0) {
+				log_errf(errno, msg_daemonname, "tpp_open(%s, %d) failed", svr, port);
+				continue;
+			}
+
+			rc = tpp_mcast_add_strm(mtfd, stream[i]);
+			if (rc == -1) {
+				snprintf(log_buffer, sizeof(log_buffer),
+						"Failed to add server at %s:%d to mcast IS_UPDATE", pbs_conf.psi[i].name, pbs_conf.psi[i].port);
+				log_err(-1, __func__, log_buffer);
+				tpp_close(stream[i]);
+				stream[i] = -1;
+			}
+		}
+
+		rc = encode_mom_update(mtfd, 0, cmd, i);
+		
+		for (i = 0; i < get_num_servers(); i++) {
+			if (stream[i] >= 0)
+				tpp_close(stream[i]);
+		}
+		tpp_mcast_close(mtfd);
+
+		return rc;
+	}
+
+	return 0;
 }
 
 /**
