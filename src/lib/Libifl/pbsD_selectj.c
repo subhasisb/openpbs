@@ -258,6 +258,7 @@ __pbs_selstat(int c, struct attropl *attrib, struct attrl *rattrib, char *extend
 	struct batch_status *cur = NULL;
 	svr_conn_t *svr_connections = get_conn_servers();
 	int num_cfg_svrs = get_num_servers();
+	int *failed_conn;
 
 	if (!svr_connections)
 		return NULL;
@@ -270,38 +271,48 @@ __pbs_selstat(int c, struct attropl *attrib, struct attrl *rattrib, char *extend
 	if (pbs_verify_attributes_wrapper(PBS_BATCH_SelectJobs, MGR_OBJ_JOB, MGR_CMD_NONE, (struct attropl *) attrib) != 0)
 		return NULL;
 
+	if (pbs_client_thread_unlock_connection(c) != 0)
+		return NULL;
+
 	for (i = 0; i < num_cfg_svrs; i++) {
+	failed_conn = calloc(get_num_servers(), sizeof(int));
+
+	for (i = 0; i < get_num_servers(); i++) {
 
 		if (svr_connections[i].state != SVR_CONN_STATE_CONNECTED) {
 			pbs_errno = PBSE_NOSERVER;
 			continue;
 		}
 
-		c = svr_connections[i].sd;
-
-		/* lock pthread mutex here for this connection */
-		/* blocking call, waits for mutex release */
-		if (pbs_client_thread_lock_connection(c) != 0)
-			return NULL;
-
-
-		if (PBSD_select_put(c, PBS_BATCH_SelStat, attrib, rattrib, extend) == 0) {
-			if ((next = PBSD_status_get(c, i))) {
-				if (!ret) {
-					ret = next;
-					cur = next->last;
-				} else {
-					cur->next = next;
-					cur = next->last;
-				}
-			}
+		if (PBSD_select_put(svr_connections[i].sd, PBS_BATCH_SelStat, attrib, rattrib, extend) != 0) {
+			failed_conn[i] = 1;
+			continue;
 		}
-
-		/* unlock the thread lock and update the thread context data */
-		if (pbs_client_thread_unlock_connection(c) != 0)
-			return NULL;
 	}
 
+	for (i = 0; i < num_cfg_svrs; i++) {
+
+		if (svr_connections[i].state != SVR_CONN_STATE_CONNECTED)
+			continue;
+
+		if (failed_conn[i])
+			continue;
+
+		if ((next = PBSD_status_get(svr_connections[i].sd, i))) {
+			if (!ret) {
+				ret = next;
+				cur = next->last;
+			} else {
+				cur->next = next;
+				cur = next->last;
+			}
+		}
+	}
+
+	/* unlock the thread lock and update the thread context data */
+	if (pbs_client_thread_unlock_connection(c) != 0)
+		return NULL;
+	free(failed_conn);
 	return ret;
 }
 

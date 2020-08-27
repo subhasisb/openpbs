@@ -540,9 +540,12 @@ PBSD_status_aggregate(int c, int cmd, char *id, struct attrl *attrib, char *exte
 	struct batch_status *cur = NULL;
 	svr_conn_t *svr_connections = get_conn_servers();
 	int num_cfg_svrs = get_num_servers();
+	int *failed_conn;
 
 	if (!svr_connections)
 		return NULL;
+
+	failed_conn = calloc(get_num_servers(), sizeof(int));
 
 	/* initialize the thread context data, if not already initialized */
 	if (pbs_client_thread_init_thread_context() != 0)
@@ -552,18 +555,35 @@ PBSD_status_aggregate(int c, int cmd, char *id, struct attrl *attrib, char *exte
 	if (pbs_verify_attributes_wrapper(cmd, parent_object, MGR_CMD_NONE, (struct attropl *) attrib) != 0)
 		return NULL;
 
+	if (pbs_client_thread_lock_connection(c) != 0)
+		return NULL;
+
 	for (i = 0; i <num_cfg_svrs; i++) {
 		if (svr_connections[i].state != SVR_CONN_STATE_CONNECTED) {
 			rc = PBSE_NOSERVER;
 			continue;
 		}
 
-		c = svr_connections[i].sd;
+		if (id == NULL)
+			id = "";
 
-		if (pbs_client_thread_lock_connection(c) != 0)
-			return NULL;
+		if (PBSD_status_put(svr_connections[i].sd, cmd, id, attrib, extend, PROT_TCP, NULL) != 0) {
+			failed_conn[i] = 1;
+			if (pbs_client_thread_unlock_connection(c) != 0)
+				return NULL;
+			continue;
+		}
+	}
 
-		if ((next = PBSD_status(c, i, cmd, id, attrib, extend))) {
+	for (i = 0; i < num_cfg_svrs; i++) {
+
+		if (svr_connections[i].state != SVR_CONN_STATE_CONNECTED)
+			continue;
+
+		if (failed_conn[i])
+			continue;
+
+		if ((next = PBSD_status_get(svr_connections[i].sd, i))) {
 			if (!ret) {
 				ret = next;
 				cur = next->last;
@@ -585,15 +605,16 @@ PBSD_status_aggregate(int c, int cmd, char *id, struct attrl *attrib, char *exte
 				}
 			}
 		}
-
-		/* unlock the thread lock and update the thread context data */
-		if (pbs_client_thread_unlock_connection(c) != 0)
-			return NULL;
 	}
+
+	/* unlock the thread lock and update the thread context data */
+	if (pbs_client_thread_unlock_connection(c) != 0)
+		return NULL;
 
 	if (rc)
 		pbs_errno = rc;
 
+	free(failed_conn);
 	return ret;
 }
 
