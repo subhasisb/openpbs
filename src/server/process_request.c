@@ -222,12 +222,6 @@ req_authenticate(conn_t *conn, struct batch_request *request)
 		}
 		cp = conn;
 	} else {
-		/* ensure resvport auth request is coming from priv port */
-		if ((conn->cn_authen & PBS_NET_CONN_FROM_PRIVIL) == 0) {
-			req_reject(PBSE_BADCRED, 0, request);
-			close_client(conn->cn_sock);
-			return;
-		}
 		cp = (conn_t *)GET_NEXT(svr_allconns);
 		for (; cp != NULL; cp = GET_NEXT(cp->cn_link)) {
 			if (request->rq_ind.rq_auth.rq_port == cp->cn_port && conn->cn_addr == cp->cn_addr) {

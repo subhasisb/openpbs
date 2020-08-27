@@ -1296,40 +1296,6 @@ add_transport_conn(phy_conn_t *conn)
 
 		int fd = conn->sock_fd;
 
-		/* authentication */
-		if (conn->conn_params->need_resvport) {
-			int tryport;
-			int start;
-			int rc = -1;
-
-			srand(time(NULL));
-			start = (rand() % (IPPORT_RESERVED - 1)) + 1;
-			tryport = start;
-
-			while (1) {
-				struct sockaddr_in serveraddr;
-				/* bind this socket to a reserved port */
-				serveraddr.sin_family = AF_INET;
-				serveraddr.sin_addr.s_addr = INADDR_ANY;
-				serveraddr.sin_port = htons(tryport);
-				memset(&(serveraddr.sin_zero), '\0', sizeof(serveraddr.sin_zero));
-				if ((rc = tpp_sock_bind(fd, (struct sockaddr *) &serveraddr, sizeof(serveraddr))) != -1)
-					break;
-				if ((errno != EADDRINUSE) && (errno != EADDRNOTAVAIL))
-					break;
-
-				--tryport;
-				if (tryport <= 0)
-					tryport = IPPORT_RESERVED;
-				if (tryport == start)
-					break;
-			}
-			if (rc == -1) {
-				tpp_log_func(LOG_WARNING, NULL, "No reserved ports available");
-				return (-1);
-			}
-		}
-
 		conn->net_state = TPP_CONN_CONNECTING;
 		if (tpp_em_add_fd(conn->td->em_context, conn->sock_fd,
 			EM_OUT | EM_ERR | EM_HUP) == -1) {

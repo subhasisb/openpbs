@@ -633,12 +633,6 @@ accept_svr_conn(int *max_sd)
 	setsockopt(new_socket, IPPROTO_TCP, TCP_USER_TIMEOUT, (char*) &tcp_timeout, sizeof (tcp_timeout));
 #endif
 
-	if (ntohs(saddr.sin_port) >= IPPORT_RESERVED) {
-		badconn("non-reserved port");
-		close(new_socket);
-		return SCH_ERROR;
-	}
-
 	addr = (pbs_net_t)saddr.sin_addr.s_addr;
 	for (i = 0; i < numclients; i++) {
 		if (addr == okclients[i])

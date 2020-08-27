@@ -226,9 +226,9 @@ check_status() {
 #
 oom_protect() {
 	if [ -f /proc/self/oom_score_adj ] ; then
-		echo "-1000" > /proc/self/oom_score_adj
+		echo "-1000" > /proc/self/oom_score_adj 2>/dev/null
 	elif [ -f /proc/self/oom_adj ] ; then
-		echo "-17" > /proc/self/oom_adj
+		echo "-17" > /proc/self/oom_adj 2>/dev/null
 	fi
 }
 
@@ -245,8 +245,8 @@ oom_protect() {
 #
 start_dataservice() {
 	is_systemd=0
-	systemctl --version >/dev/null 2>&1
-	if [ $? -eq 0 ] ; then
+	sc_status="$(systemctl is-system-running 2>/dev/null)"
+	if [ "x${sc_status}" == "xrunning" -o "x${sc_status}" == "xdegraded" ] ; then
 		is_systemd=1
 	fi
 

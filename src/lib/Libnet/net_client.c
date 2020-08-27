@@ -233,7 +233,6 @@ client_to_svr_extend(pbs_net_t hostaddr, unsigned int port, int authport_flags, 
 {
 	struct sockaddr_in	remote;
 	int	sock;
-	int	local_port;
 	int	errn;
 	int	rc;
 #ifdef WIN32
@@ -249,95 +248,9 @@ client_to_svr_extend(pbs_net_t hostaddr, unsigned int port, int authport_flags, 
 	int		oflag;
 #endif
 
-
-	/*	If local privilege port requested, bind to one	*/
-	/*	Must be root privileged to do this		*/
-	local_port = authport_flags & B_RESERVED;
-
-	if (local_port) {
-#ifdef	IP_PORTRANGE_LOW
-		int			lport = IPPORT_RESERVED - 1;
-
-		sock = rresvport(&lport);
-		if (sock < 0) {
-			if (errno == EAGAIN)
-				return PBS_NET_RC_RETRY;
-			else
-				return PBS_NET_RC_FATAL;
-		}
-#else	/* IP_PORTRANGE_LOW */
-		struct sockaddr_in	local;
-		unsigned short		tryport;
-		static unsigned short	start_port = 0;
-
-		sock = socket(AF_INET, SOCK_STREAM, 0);
-		if (sock < 0) {
-			return PBS_NET_RC_FATAL;
-		}
-
-		if (start_port == 0) {	/* arbitrary start point */
-			start_port = (getpid() %(IPPORT_RESERVED/2)) +
-				IPPORT_RESERVED/2;
-		}
-		else if (--start_port < IPPORT_RESERVED/2)
-			start_port = IPPORT_RESERVED - 1;
-		tryport = start_port;
-
-		memset(&local, 0, sizeof(local));
-		local.sin_family = AF_INET;
-		if (localaddr != NULL) {
-			local.sin_addr.s_addr = inet_addr(localaddr);
-			if (local.sin_addr.s_addr == INADDR_NONE) {
-				perror("inet_addr failed");
-				return (PBS_NET_RC_FATAL);
-			}
-		} else if (pbs_conf.pbs_public_host_name) {
-			pbs_net_t public_addr;
-			public_addr = get_hostaddr(pbs_conf.pbs_public_host_name);
-			if (public_addr == (pbs_net_t)0) {
-				return (PBS_NET_RC_FATAL);
-			}
-			local.sin_addr.s_addr = htonl(public_addr);
-		}
-		for (;;) {
-
-			local.sin_port = htons(tryport);
-			if (bind(sock, (struct sockaddr *)&local,
-				sizeof(local)) == 0)
-				break;
-#ifdef WIN32
-			errno = WSAGetLastError();
-			if (errno != EADDRINUSE && errno != EADDRNOTAVAIL && errno != WSAEACCES) {
-				closesocket(sock);
-#else
-			if (errno != EADDRINUSE && errno != EADDRNOTAVAIL) {
-				close(sock);
-#endif
-				return PBS_NET_RC_FATAL;
-			}
-			else if (--tryport < (IPPORT_RESERVED/2)) {
-				tryport = IPPORT_RESERVED - 1;
-			}
-			if (tryport == start_port) {
-#ifdef WIN32
-				closesocket(sock);
-#else
-				close(sock);
-#endif
-				return PBS_NET_RC_RETRY;
-			}
-		}
-		/*
-		 ** Ensure last tryport becomes start port on next call.
-		 */
-		start_port = tryport;
-#endif	/* IP_PORTRANGE_LOW */
-	}
-	else {
-		sock = socket(AF_INET, SOCK_STREAM, 0);
-		if (sock < 0) {
-			return PBS_NET_RC_FATAL;
-		}
+	sock = socket(AF_INET, SOCK_STREAM, 0);
+	if (sock < 0) {
+		return PBS_NET_RC_FATAL;
 	}
 
 	remote.sin_addr.s_addr = htonl(hostaddr);

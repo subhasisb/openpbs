@@ -1291,16 +1291,6 @@ router_pkt_handler(int tfd, void *data, int len, void *c, void *extra)
 					if (data_out)
 						free(data_out);
 					return 0; /* let connection be alive, so we can send error */
-				} else {
-					/* reserved port based authentication, and is not yet authenticated, so check resv port */
-					if (tpp_transport_isresvport(tfd) != 0) {
-						snprintf(tpp_get_logbuf(), TPP_LOGBUF_SZ, "Connection from non-reserved port, rejected");
-						tpp_log_func(LOG_CRIT, NULL, tpp_get_logbuf());
-						tpp_send_ctl_msg(tfd, TPP_MSG_AUTHERR, &connected_host, &this_router->router_addr, -1, 0, tpp_get_logbuf());
-						if (data_out)
-							free(data_out);
-						return 0; /* let connection be alive, so we can send error */
-					}
 				}
 			}
 
