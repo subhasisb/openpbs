@@ -1609,6 +1609,13 @@ make_connection(char *name)
 		Mstring(svr->s_name, strlen(name) + 1);
 		strcpy(svr->s_name, name);
 		svr->s_connect = connection;
+	} else if (getenv(MULTI_SERVER)) {
+		int i;
+		svr_conn_t *svr_connections = get_conn_servers();
+		for (i = 0; i < get_num_servers(); i++) {
+			if (svr_connections[i].state != SVR_CONN_STATE_CONNECTED)
+				PSTDERR1("qmgr: cannot connect to server %s\n", pbs_conf.psi[i].name)
+		}
 	}
 	else
 		PSTDERR1("qmgr: cannot connect to server %s\n", name)
@@ -1649,7 +1656,7 @@ connect_servers(struct objname *server_names, int numservers)
 		/* if numservers == -1 (all servers) the var i will never equal zero */
 		for (i = numservers; i != 0 && cur_obj != NULL; i--, cur_obj=cur_obj->next) {
 			nservers++;
-			if ((cur_svr = make_connection(cur_obj->svr_name)) ==NULL) {
+			if ((cur_svr = make_connection(cur_obj->svr_name)) == NULL) {
 				nservers--;
 				error = TRUE;
 			}

@@ -472,8 +472,10 @@ connect_to_server(int idx, svr_conn_t *conn_arr, char *extend_data)
 			add_connection(conn_arr[idx].sd);
 			pbs_client_thread_unlock_conntable();
 		}
-		else
+		else {
 			conn_arr[idx].state = SVR_CONN_STATE_FAILED;
+			pbs_errno = PBSE_SVR_CON_FAIL;
+		}
 	}
 
 	return conn_arr[idx].sd;

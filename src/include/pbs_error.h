@@ -285,6 +285,7 @@ extern "C" {
 #define PBSE_NODE_BUSY	15227		 /* Node is busy */
 #define PBSE_DEFAULT_PARTITION 15228	/* Default partition name is not allowed */
 #define PBSE_HISTDEPEND  15229		/* Finished job did not satisfy dependency */
+#define PBSE_SVR_CON_FAIL	15230		/* Server connection failure */
 
 /* the following structure is used to tie error number      */
 /* with text to be returned to a client, see svr_messages.c */
