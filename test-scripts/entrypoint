@@ -1,0 +1,128 @@
+#!/bin/bash
+
+if [ "x$1" == "xchangesched" ]; then
+    servers="$(grep PBS_SERVER_INSTANCES /etc/pbs.conf 2>/dev/null | cut -d= -f2)"
+    if [ "x${servers}" == "x" ]; then
+        /opt/pbs/bin/qmgr -c "s s scheduling=$2"
+        exit 0
+    fi
+    for svr in ${servers//,/ }
+    do
+        PBS_SERVER_INSTANCES=${svr} /opt/pbs/bin/qmgr -c "s s scheduling=$2" &>/dev/null
+    done
+    exit 0
+fi
+
+if [ "x$1" == "xwaitsvr" ]; then
+    . /etc/pbs.conf
+    export PBS_SERVER_INSTANCES=${PBS_SERVER}:${PBS_BATCH_SERVICE_PORT}
+    while true
+    do
+        /opt/pbs/bin/qstat -Bf &>/dev/null
+        if [ $? -eq 0 ]; then
+            break
+        fi
+        sleep 5
+    done
+    _moms=$2
+    for _mom in ${_moms//,/ }
+    do
+        _name=${_mom//:*}
+        while true
+        do
+            /opt/pbs/bin/pbsnodes -v ${_name} 2>/dev/null | grep -q 'state = free' &>/dev/null
+            if [ $? -eq 0 ]; then
+                break
+            fi
+            sleep 2
+        done
+    done
+    exit 0
+fi
+
+/usr/sbin/sshd
+
+# for server: <home path> server svrno (1 - start/0 - no start sched/comm) port dbport moms cpus svrinsts?
+_phome=/var/spool/pbs
+if [ "x$1" != "xdefault" ]; then
+    _phome=$1
+fi
+
+chown root: ${_phome}
+chmod 0755 ${_phome}
+
+if [ "x$2" == "xserver" -a $# -ge 6 ]; then
+    {
+        echo PBS_SERVER=pbs-server-$3
+        echo PBS_EXEC=/opt/pbs
+        echo PBS_HOME=${_phome}/pbs-server-$3
+        echo PBS_START_SERVER=1
+        echo PBS_START_MOM=0
+        echo PBS_START_SCHED=$4
+        echo PBS_START_COMM=$4
+        echo PBS_SCP=$(which scp)
+        echo PBS_LOG_HIGHRES_TIMESTAMP=1
+        echo PBS_CORE_LIMIT=unlimited
+        echo PBS_BATCH_SERVICE_PORT=$5
+        echo PBS_BATCH_SERVICE_PORT_DIS=$5
+        echo PBS_DATA_SERVICE_PORT=$6
+        echo PBS_LEAF_ROUTERS=pbs-server-1:17001
+        if [ "x$9" != "x" ]; then
+            echo PBS_SERVER_INSTANCES=$9
+        fi
+    } > /etc/pbs.conf
+    unset _phome
+# for mom: <home path> mom momport ownserver ownserverport name svrinsts?
+elif [ "x$2" == "xmom" -a $# -ge 5 ]; then
+    _port=$3
+    {
+        echo PBS_SERVER=$4
+        echo PBS_EXEC=/opt/pbs
+        echo PBS_HOME=${_phome}/$6
+        echo PBS_START_SERVER=0
+        echo PBS_START_MOM=1
+        echo PBS_START_SCHED=0
+        echo PBS_START_COMM=0
+        echo PBS_SCP=$(which scp)
+        echo PBS_LOG_HIGHRES_TIMESTAMP=1
+        echo PBS_CORE_LIMIT=unlimited
+        echo PBS_BATCH_SERVICE_PORT=$5
+        echo PBS_BATCH_SERVICE_PORT_DIS=$5
+        echo PBS_MOM_SERVICE_PORT=${_port}
+        echo PBS_MANAGER_SERVICE_PORT=$(( _port + 1 ))
+        echo PBS_LEAF_ROUTERS=pbs-server-1:17001
+        if [ "x$7" != "x" ]; then
+            echo PBS_SERVER_INSTANCES=$7
+        fi
+    } > /etc/pbs.conf
+    unset _port _phome
+else
+    unset _phome
+    exec /bin/bash
+fi
+/opt/pbs/libexec/pbs_init.d start
+if [ "x$2" == "xserver" ]; then
+    sleep 2
+    export PBS_SERVER_INSTANCES=pbs-server-$3:$5
+    /opt/pbs/bin/qmgr -c "s sched sched_host = pbs-server-1"
+    /opt/pbs/bin/qmgr -c "s sched sched_port = 15004"
+    /opt/pbs/bin/qmgr -c 's s acl_roots = root@*'
+    /opt/pbs/bin/qmgr -c "s s flatuid = 1"
+    _moms=$7
+    _cpus=$8
+    if [ "x${_moms}" != "xnone" ]; then
+        for _mom in ${_moms//,/ }
+        do
+            _name=${_mom//:*}
+            _mom=${_mom#*:}
+            _host=${_mom//:*}
+            _mport=${_mom//*:}
+            /opt/pbs/bin/qmgr -c "c n ${_name} MoM=${_host},Port=${_mport}"
+            if [ "x${_cpus}" != "x0" ]; then
+                /opt/pbs/bin/qmgr -c "s n ${_name} resources_available.ncpus = ${_cpus}"
+            fi
+        done
+    fi
+    unset _mom _moms _cpus _name _host _mport PBS_SERVER_INSTANCES
+fi
+exec /bin/bash

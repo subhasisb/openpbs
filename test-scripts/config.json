@@ -1,0 +1,24 @@
+{
+	"setups": {
+		"setup-1" : {
+			"total_num_svrs": 1,
+			"num_moms_per_host": 20,
+			"num_cpus_per_mom": 0
+		},
+		"setup-2": {
+			"total_num_svrs": 2,
+			"num_moms_per_host": 20,
+			"num_cpus_per_mom": 0
+		},
+		"setup-3": {
+			"total_num_svrs": 5,
+			"num_moms_per_host": 20,
+			"num_cpus_per_mom": 0
+		},
+		"setup-4": {
+			"total_num_svrs": 10,
+			"num_moms_per_host": 20,
+			"num_cpus_per_mom": 0
+		}
+	}
+}
