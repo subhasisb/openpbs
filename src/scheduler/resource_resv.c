@@ -159,6 +159,7 @@ new_resource_resv()
 	resresv->is_job = 0;
 	resresv->is_shrink_to_fit = 0;
 	resresv->is_resv = 0;
+	resresv->msvr_local = 1;
 
 	resresv->will_use_multinode = 0;
 

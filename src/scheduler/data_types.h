@@ -800,6 +800,7 @@ struct resource_resv
 	unsigned is_resv : 1;		/* res resv is an advanced reservation */
 
 	unsigned will_use_multinode:1;	/* res resv will use multiple nodes */
+	unsigned msvr_local:1;	/* res resv ran on the local/owner server's resources? */
 
 	char *name;			/* name of res resv */
 	char *user;			/* username of the owner of the res resv */

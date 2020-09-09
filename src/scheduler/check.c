@@ -1622,6 +1622,7 @@ check_normal_node_path(status *policy, server_info *sinfo, queue_info *qinfo, re
 	if (using_svr_nodes && nodepart == NULL && sinfo->svr_node_array[resresv->svr_index] != NULL && sinfo->svr_node_array[resresv->svr_index]->unassoc_nodes != NULL) {
 		ninfo_arr = sinfo->svr_node_array[resresv->svr_index]->unassoc_nodes;
 		svr_index_used = resresv->svr_index;
+		resresv->msvr_local = 1;
 	}
 
 	err->status_code = NOT_RUN;
@@ -1633,8 +1634,10 @@ check_normal_node_path(status *policy, server_info *sinfo, queue_info *qinfo, re
 	else if (svr_index_used != -1) { /* Try "all" nodes, the owner doesn't have enough resources to run the job */
 		ninfo_arr = sinfo->unassoc_nodes;
 		rc = eval_selspec(policy, spec, pl, ninfo_arr, nodepart, resresv, flags, &nspec_arr, err);
-		if (rc > 0)
+		if (rc > 0) {
+			resresv->msvr_local = 0;
 			return nspec_arr;
+		}
 	}
 
 	/* We were not told why the resresv can't run: Use generic reason */

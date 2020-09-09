@@ -1304,7 +1304,8 @@ update_job_can_not_run(int pbs_sd, resource_resv *job, schd_error *err)
  * @retval	return value of the runjob call
  */
 static int
-send_run_job(int pbs_sd, int has_runjob_hook, char *jobid, char *execvnode, int svr_of_node, int svr_of_job)
+send_run_job(int pbs_sd, int has_runjob_hook, char *jobid, char *execvnode,
+		int svr_of_node, int svr_of_job, int msvr_local)
 {
 	svr_conn_t *svr_conns = NULL;
 	char *extend = NULL;
@@ -1321,7 +1322,7 @@ send_run_job(int pbs_sd, int has_runjob_hook, char *jobid, char *execvnode, int 
 
 	if (sc_attrs.runjob_mode == RJ_EXECJOB_HOOK)
 		return pbs_runjob(pbs_sd, jobid, execvnode, extend);
-	else if ((sc_attrs.runjob_mode == RJ_RUNJOB_HOOK) && has_runjob_hook)
+	else if (((sc_attrs.runjob_mode == RJ_RUNJOB_HOOK) && has_runjob_hook) || !msvr_local)
 		return pbs_asyrunjob_ack(pbs_sd, jobid, execvnode, extend);
 	else
 		return pbs_asyrunjob(pbs_sd, jobid, execvnode, extend);
@@ -1400,10 +1401,12 @@ run_job(int pbs_sd, resource_resv *rjob, char *execvnode, int has_runjob_hook, s
 				if (strlen(timebuf) > 0)
 					log_eventf(PBSEVENT_SCHED, PBS_EVENTCLASS_JOB, LOG_NOTICE, rjob->name,
 						"Job will run for duration=%s", timebuf);
-				rc = send_run_job(pbs_sd, has_runjob_hook, rjob->name, execvnode, svr_of_node, svr_of_job);
+				rc = send_run_job(pbs_sd, has_runjob_hook, rjob->name, execvnode, svr_of_node,
+						svr_of_job, rjob->msvr_local);
 			}
 		} else
-			rc = send_run_job(pbs_sd, has_runjob_hook, rjob->name, execvnode,  svr_of_node, svr_of_job);
+			rc = send_run_job(pbs_sd, has_runjob_hook, rjob->name, execvnode,  svr_of_node,
+					svr_of_job, rjob->msvr_local);
 	}
 
 	if (rc) {
