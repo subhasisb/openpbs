@@ -268,16 +268,15 @@ __pbs_selstat(int c, struct attropl *attrib, struct attrl *rattrib, char *extend
 		return NULL;
 
 	/* now verify the attributes, if verification is enabled */
-	if (pbs_verify_attributes_wrapper(PBS_BATCH_SelectJobs, MGR_OBJ_JOB, MGR_CMD_NONE, (struct attropl *) attrib) != 0)
+	if (pbs_verify_attributes_wrapper(PBS_BATCH_SelStat, MGR_OBJ_JOB, MGR_CMD_NONE, (struct attropl *) attrib) != 0)
 		return NULL;
 
-	if (pbs_client_thread_unlock_connection(c) != 0)
+	if (pbs_client_thread_lock_connection(c) != 0)
 		return NULL;
+
+	failed_conn = calloc(num_cfg_svrs, sizeof(int));
 
 	for (i = 0; i < num_cfg_svrs; i++) {
-	failed_conn = calloc(get_num_servers(), sizeof(int));
-
-	for (i = 0; i < get_num_servers(); i++) {
 
 		if (svr_connections[i].state != SVR_CONN_STATE_CONNECTED) {
 			pbs_errno = PBSE_NOSERVER;

@@ -545,7 +545,7 @@ PBSD_status_aggregate(int c, int cmd, char *id, struct attrl *attrib, char *exte
 	if (!svr_connections)
 		return NULL;
 
-	failed_conn = calloc(get_num_servers(), sizeof(int));
+	failed_conn = calloc(num_cfg_svrs, sizeof(int));
 
 	/* initialize the thread context data, if not already initialized */
 	if (pbs_client_thread_init_thread_context() != 0)
