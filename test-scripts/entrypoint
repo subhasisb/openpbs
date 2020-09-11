@@ -1,18 +1,5 @@
 #!/bin/bash
 
-if [ "x$1" == "xchangesched" ]; then
-    servers="$(grep PBS_SERVER_INSTANCES /etc/pbs.conf 2>/dev/null | cut -d= -f2)"
-    if [ "x${servers}" == "x" ]; then
-        /opt/pbs/bin/qmgr -c "s s scheduling=$2"
-        exit 0
-    fi
-    for svr in ${servers//,/ }
-    do
-        PBS_SERVER_INSTANCES=${svr} /opt/pbs/bin/qmgr -c "s s scheduling=$2" &>/dev/null
-    done
-    exit 0
-fi
-
 if [ "x$1" == "xwaitsvr" ]; then
     . /etc/pbs.conf
     export PBS_SERVER_INSTANCES=${PBS_SERVER}:${PBS_BATCH_SERVICE_PORT}

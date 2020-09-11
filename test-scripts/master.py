@@ -211,6 +211,7 @@ def main():
   hosts = []
   with open('nodes') as f:
     hosts = f.read().splitlines()
+    hosts = [_h for _h in hosts if len(_h.strip()) > 0]
 
   if len(hosts) == 0:
     print('No hosts defined in nodes file')

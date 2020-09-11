@@ -9,10 +9,6 @@ concmd="podman exec pbs-server-1 "
 ###############################
 # utility funcs
 ###############################
-function change_scheduling() {
-	${concmd} ${curdir}/entrypoint changesched $1
-}
-
 function wait_jobs() {
 	local _ct
 
@@ -80,10 +76,10 @@ function get_total_ncpus() {
 function test_with_sched_off() {
 	local _ct
 
-	change_scheduling 0
+	${concmd} /opt/pbs/bin/qmgr -c "s s scheduling=0"
 	_ct=$(get_total_ncpus)
 	${curdir}/submit-jobs.sh $(( _ct * 3 ))
-	change_scheduling 1
+	${concmd} /opt/pbs/bin/qmgr -c "s s scheduling=1"
 	wait_jobs
 	collect_logs sched_off
 }
@@ -91,7 +87,7 @@ function test_with_sched_off() {
 function test_with_sched_on() {
 	local _ct
 
-	change_scheduling 1
+	${concmd} /opt/pbs/bin/qmgr -c "s s scheduling=1"
 	_ct=$(get_total_ncpus)
 	${curdir}/submit-jobs.sh $(( _ct * 3 ))
 	wait_jobs

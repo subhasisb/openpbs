@@ -247,6 +247,15 @@ svr_get_privilege(char *user, char *host)
 			}
 		}
 		if (is_root == 0) {
+			int i;
+			for (i = 0; i < get_num_servers(); i++) {
+				if (is_same_host(host, pbs_conf.psi[i].name)) {
+					is_root = 1;
+					break;
+				}
+			}
+		}
+		if (is_root == 0) {
 			/* Now try with DNS lookup. */
 			if (is_same_host(host, server_host)) {
 				is_root = 1;
