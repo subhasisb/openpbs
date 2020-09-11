@@ -289,6 +289,7 @@ struct batch_reply
 #define PBS_BATCH_Authenticate		95
 #define PBS_BATCH_ModifyJob_Async	96
 #define PBS_BATCH_AsyrunJob_ack	97
+#define PBS_BATCH_Resc_Update	98
 
 #define PBS_BATCH_FileOpt_Default	0
 #define PBS_BATCH_FileOpt_OFlg		1

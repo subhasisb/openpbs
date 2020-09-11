@@ -5645,7 +5645,6 @@ job_nodes_inner(struct job *pjob, hnodent **mynp)
 			 * Mom in case of multiple-Moms for the allocated vnodes
 			 */
 			n = 0;
-
 			if (enable_exechost2 == 0) {
 				while ((*peh != '/') && (*peh != '\0') &&
 					(n < PBS_MAXNODENAME)) {

@@ -153,6 +153,7 @@ extern void fail_vnode_job(struct prov_vnode_info *, int);
 extern struct prov_tracking * get_prov_record_by_vnode(char *);
 extern int parse_prov_vnode(char *,exec_vnode_listtype *);
 extern void process_IS_CMD(int);
+extern void mcast_resc_usage(char *, char *, int);
 
 static void check_and_set_multivnode(struct pbsnode *);
 int write_single_node_mom_attr(struct pbsnode *np);
@@ -724,9 +725,9 @@ node_down_requeue(struct work_task *pwt)
 
 			for (psn = np->nd_psn; psn; psn = psn->next) {
 				for (pjinfo = psn->jobs; pjinfo; pjinfo = pjinfo_nxt) {
-					pj = pjinfo->job;
+					pj = find_job(pjinfo->job);
 					pjinfo_nxt = pjinfo->next;
-					while (pjinfo_nxt && (pjinfo_nxt->job == pj)) {
+					while (pjinfo_nxt && (find_job(pjinfo_nxt->job) == pj)) {
 						/* skip over next occurrence of same job in list*/
 						/* if it is deleted in discard_job(), we would	*/
 						/* have a pointer to nothingness		*/
@@ -1001,6 +1002,7 @@ momptr_down(mominfo_t *pmom, char *why)
 	long		 sec;
 	int		 setwktask = 0;
 	int		 is_provisioning = 0;
+	job 		*pj;
 
 	psvrmom->msr_state |= INUSE_DOWN;
 
@@ -1054,7 +1056,8 @@ momptr_down(mominfo_t *pmom, char *why)
 				/* find list of jobs on this sub-node */
 				/* first, how many are they */
 				for (pji = psn->jobs; pji; pji = pji->next) {
-					if (pji->job->ji_discard)
+					pj = find_job(pji->job);
+					if (pj && pj->ji_discard)
 						++nj;
 				}
 				/* if any, save pointer to the jobs in an array as the    */
@@ -1064,14 +1067,15 @@ momptr_down(mominfo_t *pmom, char *why)
 					if (parray) {
 						i = 0;
 						for (pji = psn->jobs; pji; pji = pji->next) {
-							if (pji->job->ji_discard) {
+							pj = find_job(pji->job);
+							if (pj && pj->ji_discard) {
 								/* we only want one entry per job */
 								for (j=0; j<i; ++j) {
-									if (*(parray+j) == pji->job)
+									if (*(parray+j) == pj)
 										break;
 								}
 								if (j == i) {
-									*(parray+i) = pji->job; /* new, add it */
+									*(parray+i) = pj; /* new, add it */
 									++i;
 								}
 							}
@@ -2519,10 +2523,9 @@ recv_wk_job_idle(int stream)
  *
  */
 static int
-deallocate_job_from_node(job *pjob, struct pbsnode *pnode)
+deallocate_job_from_node(char *pjob, struct pbsnode *pnode, int *still_has_jobs)
 {
 	int              numcpus = 0;	/* for floating licensing */
-	int		 still_has_jobs; /* still jobs on this vnode */
 	struct	pbssubn	*np;
 	struct	jobinfo	*jp, *prev, *next;
 
@@ -2530,17 +2533,19 @@ deallocate_job_from_node(job *pjob, struct pbsnode *pnode)
 		return (0);
 	}
 
-	still_has_jobs = 0;
+	*still_has_jobs = 0;
 	for (np = pnode->nd_psn; np; np = np->next) {
 
 		for (prev = NULL, jp = np->jobs; jp; jp = next) {
 			next = jp->next;
-			if (jp->job != pjob) {
+			if (strcmp(jp->job, pjob)) {
 				prev = jp;
-				still_has_jobs = 1; /* another job still here */
+				*still_has_jobs = 1; /* another job still here */
 				continue;
 			}
 
+			free(jp->job);
+			jp->job = NULL;
 			if (prev == NULL)
 				np->jobs = next;
 			else
@@ -2562,7 +2567,7 @@ deallocate_job_from_node(job *pjob, struct pbsnode *pnode)
 			np->inuse &= ~(INUSE_JOB|INUSE_JOBEXCL);
 		}
 	}
-	if (still_has_jobs) {
+	if (*still_has_jobs) {
 		/* if the vnode still has jobs, then don't clear */
 		/* JOBEXCL */
 		if (pnode->nd_nsnfree > 0) {
@@ -2574,11 +2579,6 @@ deallocate_job_from_node(job *pjob, struct pbsnode *pnode)
 		set_vnode_state(pnode,
 			~(INUSE_JOB|INUSE_JOBEXCL),
 			Nd_State_And);
-
-		/* call function to check and free the node from the */
-		/* prov list and reset wait_prov flag, if set */
-		if (pjob->ji_qs.ji_substate == JOB_SUBSTATE_PROVISION)
-			free_prov_vnode(pnode);
 	}
 
 	return (numcpus);
@@ -2773,6 +2773,7 @@ deallocate_job(mominfo_t *pmom, job *pjob)
 	attribute deallocated_attr;
 	char	*jobid;
 	pbs_sched *psched;
+	int still_has_jobs = 0;
 
 	if ((pmom == NULL) || (pjob == NULL)) {
 		return;
@@ -2790,7 +2791,9 @@ deallocate_job(mominfo_t *pmom, job *pjob)
 		if ((pnode != NULL) && !(pnode->nd_state & INUSE_DELETED)
 			&& is_parent_mom_of_node(pmom, pnode)) {
 			totcpus0 = totcpus;
-			totcpus += deallocate_job_from_node(pjob, pnode);
+			totcpus += deallocate_job_from_node(pjob->ji_qs.ji_jobid, pnode, &still_has_jobs);
+			if (!still_has_jobs && pjob->ji_qs.ji_substate == JOB_SUBSTATE_PROVISION)
+				free_prov_vnode(pnode);
 			if (totcpus > totcpus0) {
 				snprintf(log_buffer, sizeof(log_buffer),
 					"clearing job %s from node %s", jobid, pnode->nd_name);
@@ -2938,7 +2941,7 @@ mark_nodes_unknown(int all)
  * @param[in] mtfd  - The TPP channel to add moms for multicasting.
  *
  */
-static void
+void
 add_mom_mcast(mominfo_t *pmom, int *mtfd)
 {
 	mom_svrinfo_t *psvrmom = (mom_svrinfo_t *)(pmom->mi_data);
@@ -6238,6 +6241,109 @@ which_parent_mom(pbsnode *pnode, mominfo_t *pcur_mom)
 	return (rtnmom);
 }
 
+int
+assign_jobs_on_subnode(struct pbsnode *pnode, int hw_ncpus, char *jobid, int svr_init, int alloc_how)
+{
+	struct pbssubn *snp;
+	struct jobinfo *jp;
+
+	snp = pnode->nd_psn;
+	if (hw_ncpus == 0) {
+		/* setup jobinfo struture */
+		jp = (struct jobinfo *) malloc(sizeof(struct jobinfo));
+		if (jp) {
+			jp->next = snp->jobs;
+			jp->has_cpu = 0; /* has no cpus allocatted */
+			snp->jobs = jp;
+			jp->job = strdup(jobid);
+		}
+	} else {
+		struct pbssubn *lst_sn;
+		int ncpus;
+
+		lst_sn = NULL;
+		for (ncpus = 0; ncpus < hw_ncpus; ncpus++) {
+
+			while (snp->inuse != INUSE_FREE) {
+				if (snp->next)
+					snp = snp->next;
+				else if (svr_init == TRUE) {
+					/*
+						* Server is in the process of recovering jobs at
+						* start up. Haven't contacted the Moms yet, so
+						* unsure about the number of cpus.  So add as many
+						* subnodes as needed to hold all of the job chunks
+						* which were allocated to the node.
+						*/
+					if ((snp = create_subnode(pnode, lst_sn)) == NULL) {
+						return PBSE_SYSTEM;
+					}
+					break;
+				} else
+					break; /* if last subnode, use it even if in use */
+			}
+
+			snp->inuse |= alloc_how;
+			pnode->nd_nsnfree--;
+			/*
+				* Store the last subnode of parent node list.
+				* This removes the need to find the last node of
+				* parent node's list, in create_subnode().
+				*/
+			lst_sn = snp;
+			if (pnode->nd_nsnfree < 0) {
+				log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_NODE,
+					  LOG_ALERT, pnode->nd_name,
+					  "free CPU count went negative on node");
+			}
+
+			/* setup jobinfo struture */
+			jp = (struct jobinfo *) malloc(sizeof(struct jobinfo));
+			if (jp) {
+				jp->next = snp->jobs;
+				jp->has_cpu = 1; /* has a cpu allocatted */
+				snp->jobs = jp;
+				jp->job = strdup(jobid);
+			}
+			DBPRT(("set_node: node: %s/%ld to job %s, still free: %ld\n",
+			       pnode->nd_name, snp->index, jobid,
+			       pnode->nd_nsnfree))
+		}
+	}
+
+	return 0;
+}
+
+void
+update_node_state(struct pbsnode *pnode, int share_job)
+{
+	int share_node = pnode->nd_attr[(int) ND_ATR_Sharing].at_val.at_long;
+
+	if (share_node == (int) VNS_FORCE_EXCL || share_node == (int) VNS_FORCE_EXCLHOST) {
+		set_vnode_state(pnode, INUSE_JOBEXCL, Nd_State_Or);
+	} else if (share_node == (int) VNS_IGNORE_EXCL) {
+		if (pnode->nd_nsnfree <= 0)
+			set_vnode_state(pnode, INUSE_JOB, Nd_State_Or);
+		else
+			set_vnode_state(pnode, ~(INUSE_JOB | INUSE_JOBEXCL), Nd_State_And);
+	} else if (share_node == (int) VNS_DFLT_EXCL || share_node == (int) VNS_DFLT_EXCLHOST) {
+		if (share_job == (int) VNS_IGNORE_EXCL) {
+			if (pnode->nd_nsnfree <= 0)
+				set_vnode_state(pnode, INUSE_JOB, Nd_State_Or);
+			else
+				set_vnode_state(pnode, ~(INUSE_JOB | INUSE_JOBEXCL), Nd_State_And);
+		} else {
+			set_vnode_state(pnode, INUSE_JOBEXCL, Nd_State_Or);
+		}
+	} else if (share_job == VNS_FORCE_EXCL) {
+		set_vnode_state(pnode, INUSE_JOBEXCL, Nd_State_Or);
+	} else if (pnode->nd_nsnfree <= 0) {
+		set_vnode_state(pnode, INUSE_JOB, Nd_State_Or);
+	} else {
+		set_vnode_state(pnode, ~(INUSE_JOB | INUSE_JOBEXCL), Nd_State_And);
+	}
+}
+
 #define EHBUF_SZ 500
 /**
  * @brief
@@ -6335,6 +6441,8 @@ set_nodes(void *pobj, int objtype, char *execvnod_in, char **execvnod_out, char 
 	struct jobinfo *jp;
 	resc_resv *presv = NULL;
 	int 	   tc;		/* num of nodes being allocated  */
+	int dummy_node;
+	int rc = 0;
 	struct pbssubn *snp;
 	struct pbsnode *pnode;
 	struct key_value_pair *pkvp;
@@ -6346,6 +6454,7 @@ set_nodes(void *pobj, int objtype, char *execvnod_in, char **execvnod_out, char 
 		int	     hw_chunk;	/* non-zero if start of a chunk      */
 		int          hw_index;	/* index of job on Mom if hw_chunk   */
 		int	     hw_htcpu;	/* sum of cpus on this Mom, hw_chuhk */
+		bool	dummy;
 	}   *phowl;
 	static size_t  ehbufsz = 0;
 	static size_t  ehbufsz2 = 0;
@@ -6466,12 +6575,16 @@ set_nodes(void *pobj, int objtype, char *execvnod_in, char **execvnod_out, char 
 
 	while (chunk) {
 
+		dummy_node = 0;
 		if (parse_node_resc(chunk, &vname, &nelem, &pkvp) == 0) {
 			pnode = find_nodebyname(vname);
 			if (pnode == NULL) {
-				free(phowl);
-				free(execvncopy);
-				return (PBSE_UNKNODE);
+				if (create_pbs_node(vname, NULL, 0, NULL, &pnode, 0) != 0) {
+					free(execvncopy);
+					rc = PBSE_UNKNODE;
+					goto end;
+				}
+				dummy_node = 1;
 			}
 
 			if ((pnode->nd_state & VNODE_UNAVAILABLE) && (svr_init == FALSE))
@@ -6499,6 +6612,7 @@ set_nodes(void *pobj, int objtype, char *execvnod_in, char **execvnod_out, char 
 			(phowl + ndindex)->hw_chunk = setck;
 			(phowl + ndindex)->hw_index = -1;	/* will fill in later */
 			(phowl + ndindex)->hw_htcpu = 0;
+			(phowl + ndindex)->dummy = dummy_node;
 			if (setck == 1) {	/* start of new chunk on host */
 				if (mk_new_host) {
 
@@ -6509,9 +6623,9 @@ set_nodes(void *pobj, int objtype, char *execvnod_in, char **execvnod_out, char 
 						parentmom = which_parent_mom(pnode, parentmom);
 						if (parentmom == NULL) {
 							/* cannot find a Mom that works */
-							free(phowl);
 							free(execvncopy);
-							return (PBSE_SYSTEM);
+							rc = PBSE_SYSTEM;
+							goto end;
 						}
 						/*
 						 * save the "first" allocated Mom for incr
@@ -6553,9 +6667,9 @@ set_nodes(void *pobj, int objtype, char *execvnod_in, char **execvnod_out, char 
 					*pehnxt = '\0';
 					(phowl+ndindex)->hw_natvn = find_nodebyname(peh);
 					if ((phowl+ndindex)->hw_natvn == NULL) {
-						free(phowl);
 						free(execvncopy);
-						return (PBSE_UNKNODE);
+						rc = PBSE_UNKNODE;
+						goto end;
 					}
 					(phowl+ndindex)->hw_mom =  pnode->nd_moms[0];
 					*pehnxt = '/';
@@ -6584,10 +6698,10 @@ set_nodes(void *pobj, int objtype, char *execvnod_in, char **execvnod_out, char 
 					(phowl+ndindex)->hw_ncpus = atoi((pkvp+i)->kv_val);
 				else {
 					if ((find_resc_def(svr_resc_def, (pkvp+i)->kv_keyw) == NULL) && (svr_init == FALSE)) {
-						free(phowl);
 						free(execvncopy);
 						resc_in_err = strdup((pkvp+i)->kv_keyw);
-						return (PBSE_UNKRESC);
+						rc = PBSE_UNKRESC;
+						goto end;
 					}
 				}
 			}
@@ -6601,9 +6715,9 @@ set_nodes(void *pobj, int objtype, char *execvnod_in, char **execvnod_out, char 
 
 		} else {
 			/* Error */
-			free(phowl);
 			free(execvncopy);
-			return (PBSE_BADATVAL);
+			rc = PBSE_BADATVAL;
+			goto end;
 		}
 
 		chunk = parse_plus_spec_r(last, &last, &hasprn);
@@ -6640,8 +6754,8 @@ set_nodes(void *pobj, int objtype, char *execvnod_in, char **execvnod_out, char 
 				ehbuf = pc;
 				ehbufsz = ehlen + EHBUF_SZ;
 			} else {
-				free(phowl);
-				return (PBSE_SYSTEM);
+				rc = PBSE_SYSTEM;
+				goto end;
 			}
 		}
 
@@ -6652,8 +6766,8 @@ set_nodes(void *pobj, int objtype, char *execvnod_in, char **execvnod_out, char 
 				ehbuf2 = pc2;
 				ehbufsz2 = ehlen2 + EHBUF_SZ;
 			} else {
-				free(phowl);
-				return (PBSE_SYSTEM);
+				rc = PBSE_SYSTEM;
+				goto end;
 			}
 		}
 
@@ -6663,7 +6777,6 @@ set_nodes(void *pobj, int objtype, char *execvnod_in, char **execvnod_out, char 
 		 */
 
 		for (i = 0; i < ndindex; ++i) {
-			int share_node;
 
 			pnode = (phowl+i)->hw_pnd;
 
@@ -6671,9 +6784,9 @@ set_nodes(void *pobj, int objtype, char *execvnod_in, char **execvnod_out, char 
 				/* allocate node only if other users are this same job */
 				for (snp=pnode->nd_psn; snp; snp=snp->next) {
 					for (jp=snp->jobs; jp; jp=jp->next) {
-						if (jp->job != pjob) {
-							free(phowl);
-							return (PBSE_RESCUNAV);
+						if (find_job(jp->job) != pjob) {
+							rc = PBSE_RESCUNAV;
+							goto end;
 						}
 					}
 				}
@@ -6685,95 +6798,11 @@ set_nodes(void *pobj, int objtype, char *execvnod_in, char **execvnod_out, char 
 				/* No need to add suspended job to jobinfo structure and assign CPU slots to it*/
 				break;
 
-			snp = pnode->nd_psn;
-			if ((phowl+i)->hw_ncpus == 0) {
-				/* setup jobinfo struture */
-				jp = (struct jobinfo *)malloc(sizeof(struct jobinfo));
-				if (jp) {
-					jp->next  = snp->jobs;
-					jp->has_cpu = 0;	/* has no cpus allocatted */
-					snp->jobs = jp;
-					jp->job   = pjob;
-				}
-			} else {
-				struct pbssubn *lst_sn;
-				int ncpus;
+			rc = assign_jobs_on_subnode(pnode, (phowl+i)->hw_ncpus, pjob->ji_qs.ji_jobid, svr_init, alloc_how);
+			if (rc != PBSE_NONE)
+				goto end;
 
-				lst_sn = NULL;
-				for (ncpus = 0; ncpus < (phowl+i)->hw_ncpus; ncpus++) {
-
-					while (snp->inuse != INUSE_FREE) {
-						if (snp->next)
-							snp = snp->next;
-						else if (svr_init == TRUE) {
-							/*
-							 * Server is in the process of recovering jobs at
-							 * start up. Haven't contacted the Moms yet, so
-							 * unsure about the number of cpus.  So add as many
-							 * subnodes as needed to hold all of the job chunks
-							 * which were allocated to the node.
-							 */
-							if ((snp = create_subnode(pnode, lst_sn)) == NULL) {
-								free(phowl);
-								return PBSE_SYSTEM;
-							}
-							break;
-						} else
-							break; /* if last subnode, use it even if in use */
-					}
-
-					snp->inuse |= alloc_how;
-					pnode->nd_nsnfree--;
-					/*
-					 * Store the last subnode of parent node list.
-					 * This removes the need to find the last node of
-					 * parent node's list, in create_subnode().
-					 */
-					lst_sn = snp;
-					if (pnode->nd_nsnfree < 0) {
-						log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_NODE,
-							LOG_ALERT, pnode->nd_name,
-							"free CPU count went negative on node");
-					}
-
-					/* setup jobinfo struture */
-					jp = (struct jobinfo *)malloc(sizeof(struct jobinfo));
-					if (jp) {
-						jp->next  = snp->jobs;
-						jp->has_cpu = 1;    /* has a cpu allocatted */
-						snp->jobs = jp;
-						jp->job   = pjob;
-					}
-					DBPRT(("set_node: node: %s/%ld to job %s, still free: %ld\n",
-						pnode->nd_name, snp->index, pjob->ji_qs.ji_jobid,
-						pnode->nd_nsnfree))
-				}
-			}
-			share_node = pnode->nd_attr[(int)ND_ATR_Sharing].at_val.at_long;
-			if (share_node == (int)VNS_FORCE_EXCL || share_node == (int)VNS_FORCE_EXCLHOST) {
-				set_vnode_state(pnode, INUSE_JOBEXCL, Nd_State_Or);
-			} else if (share_node == (int)VNS_IGNORE_EXCL) {
-				if (pnode->nd_nsnfree <= 0)
-					set_vnode_state(pnode, INUSE_JOB, Nd_State_Or);
-				else
-					set_vnode_state(pnode, ~(INUSE_JOB | INUSE_JOBEXCL), Nd_State_And);
-			} else if (share_node == (int)VNS_DFLT_EXCL || share_node == (int)VNS_DFLT_EXCLHOST) {
-				if (share_job == (int)VNS_IGNORE_EXCL) {
-					if (pnode->nd_nsnfree <= 0)
-						set_vnode_state(pnode, INUSE_JOB, Nd_State_Or);
-					else
-						set_vnode_state(pnode, ~(INUSE_JOB | INUSE_JOBEXCL), Nd_State_And);
-				} else {
-					set_vnode_state(pnode, INUSE_JOBEXCL, Nd_State_Or);
-				}
-			} else if (share_job == VNS_FORCE_EXCL) {
-				set_vnode_state(pnode, INUSE_JOBEXCL, Nd_State_Or);
-			} else if (pnode->nd_nsnfree <= 0) {
-				set_vnode_state(pnode, INUSE_JOB, Nd_State_Or);
-			} else {
-				set_vnode_state(pnode, ~(INUSE_JOB | INUSE_JOBEXCL), Nd_State_And);
-			}
-
+			update_node_state(pnode, share_job);
 
 			/*
 			 * now for each new chunk, add the job to the Mom job index
@@ -6867,8 +6896,8 @@ set_nodes(void *pobj, int objtype, char *execvnod_in, char **execvnod_out, char 
 				/* create a backlink from the reservation to the vnode */
 				tmp_pl = malloc(sizeof(pbsnode_list_t));
 				if (tmp_pl == NULL) {
-					free(phowl);
-					return PBSE_SYSTEM;
+					rc = PBSE_SYSTEM;
+					goto end;
 				}
 				tmp_pl->next = presv->ri_pbsnode_list;
 				tmp_pl->vnode = (phowl + i)->hw_pnd;
@@ -6886,8 +6915,14 @@ set_nodes(void *pobj, int objtype, char *execvnod_in, char **execvnod_out, char 
 		*hoststr  = ehbuf;
 		*hoststr2 = ehbuf2;
 	}
+
+end:
+	for (i = 0; i < ndindex; ++i) {
+		if ((phowl + i)->dummy)
+			effective_node_delete((phowl + i)->hw_pnd);
+	}
 	free(phowl);
-	return 0;
+	return rc;
 }
 
 void
@@ -6937,6 +6972,7 @@ free_nodes(job *pjob)
 	int nelem;
 	struct key_value_pair *pkvp;
 	char *execvnod = NULL;
+	int still_has_jobs = 0;
 
 
 	/* decrement number of jobs on the Mom who is the first Mom */
@@ -6982,7 +7018,9 @@ free_nodes(job *pjob)
 		if (parse_node_resc(chunk, &vname, &nelem, &pkvp) == 0) {
 			pnode = find_nodebyname(vname);
 			disassociate_job_from_moms(pjob, pnode);
-			deallocate_job_from_node(pjob, pnode);
+			deallocate_job_from_node(pjob->ji_qs.ji_jobid, pnode, &still_has_jobs);
+			if (!still_has_jobs && pjob->ji_qs.ji_substate == JOB_SUBSTATE_PROVISION)
+				free_prov_vnode(pnode);
 			chunk = parse_plus_spec_r(last, &last, &hasprn);
 		}
 	}
@@ -7245,6 +7283,7 @@ update_job_node_rassn(job *pjob, attribute *pexech, enum batch_op op)
 	resource	*pr = NULL;
 	attribute	tmpattr;
 	int		nchunk = 0;
+	int		broadcast_resc_usage = 0;
 
 	/* Parse the exec_vnode string */
 
@@ -7286,8 +7325,12 @@ update_job_node_rassn(job *pjob, attribute *pexech, enum batch_op op)
 					continue;
 				}
 
-				if ((rc = adj_resc_on_node(noden, asgn, op, prdef, pkvp[j].kv_val, 0)) != 0)
-					return;
+				if ((rc = adj_resc_on_node(noden, asgn, op, prdef, pkvp[j].kv_val, 0)) != 0) {
+					if (rc != PBSE_UNKNODE)
+						return;
+					broadcast_resc_usage = 1;
+					continue;
+				}
 				/* update system attribute of resources assigned */
 
 				if (sysru || queru) {
@@ -7335,6 +7378,9 @@ update_job_node_rassn(job *pjob, attribute *pexech, enum batch_op op)
 		if (rc != 0)
 			return;
 	}
+
+	if (broadcast_resc_usage && pjob)
+		mcast_resc_usage(pjob->ji_qs.ji_jobid, pexech->at_val.at_str, op);
 
 	if (sysru || queru) {
 		/* set pseudo-resource "nodect" to the number of chunks */
@@ -7844,12 +7890,12 @@ set_last_used_time_node(void *pobj, int type)
 		if (last_pn == NULL || (cmp_ret = strcmp(pn, last_pn)) != 0 ) {
 			pnode = find_nodebyname(pn);
 			/* had better be the "natural" vnode with only the one parent */
-			if (pnode != NULL) {
+			if (pnode) {
 				snprintf(str_val, sizeof(str_val), "%d", time_int_val);
 				set_attr_svr(&(pnode->nd_attr[(int)ND_ATR_last_used_time]),
 						&node_attr_def[(int) ND_ATR_last_used_time], str_val);
+				node_save_db(pnode);
 			}
-			node_save_db(pnode);
 		}
 		last_pn = pn;
 		pn = parse_plus_spec(NULL, &rc);
@@ -8009,6 +8055,51 @@ void
 update_node_rassn(attribute *pexech, enum batch_op op)
 {
 	update_job_node_rassn(NULL, pexech, op);
+}
+
+void
+update_jobs_on_node(char *jid, char *exec_vnode, int op)
+{
+	char *chunk;
+	int j;
+	int nelem;
+	char *noden;
+	int rc;
+	resource_def *prdef = NULL;
+	struct key_value_pair *pkvp;
+	int asgn = ATR_DFLAG_ANASSN | ATR_DFLAG_FNASSN;
+	long ncpus;
+	struct pbsnode *pnode;
+
+	for (chunk = parse_plus_spec(exec_vnode, &rc); chunk && !rc; chunk = parse_plus_spec(NULL, &rc)) {
+		if (parse_node_resc(chunk, &noden, &nelem, &pkvp) == 0) {
+			if ((pnode = find_nodebyname(noden)) == NULL)
+				continue;
+			for (j = 0; j < nelem; ++j) {
+				prdef = find_resc_def(svr_resc_def, pkvp[j].kv_keyw);
+				if (prdef == NULL)
+					return;
+				/* skip all non-consumable resources (e.g. aoe) */
+				if ((prdef->rs_flags & asgn) == 0) {
+					continue;
+				}
+				if (!strcmp(prdef->rs_name, "ncpus")) {
+					ncpus = strtol(pkvp[j].kv_val, NULL, 10);
+					if (op == INCR) {
+						assign_jobs_on_subnode(pnode, ncpus, jid, 0, INUSE_JOB);
+						update_node_state(pnode, 0);
+					}
+					else if (op == DECR) {
+						int still_has_jobs;
+						deallocate_job_from_node(jid, pnode, &still_has_jobs);
+					}
+				}
+			}
+		}
+		chunk = parse_plus_spec(NULL, &rc);
+		if (rc != 0)
+			return;
+	}
 }
 
 /**

@@ -46,6 +46,11 @@
 
 #include	"pbs_nodes.h"
 #include	"pbs_error.h"
+#include	"server.h"
+#include	"batch_request.h"
+#include	"svrfunc.h"
+#include	"pbs_nodes.h"
+#include	"tpp.h"
 
 
 extern char server_host[];
@@ -54,7 +59,7 @@ extern mominfo_t* create_svrmom_struct(char *phost, int port);
 
 
 
-mominfo_t *
+void *
 get_peersvr(struct sockaddr_in *addr)
 {
 	mominfo_t *pmom;
@@ -68,18 +73,6 @@ get_peersvr(struct sockaddr_in *addr)
 	return NULL;
 }
 
-/**
- * @brief
- * 	Return multiserver mode
- *
- * @return int
- */
-int
-msvr_mode(void)
-{
-	return (get_num_servers() > 1);
-}
-
 struct peersvr_list {
 	struct peersvr_list *next;
 	mominfo_t  *pmom;
@@ -88,7 +81,7 @@ typedef struct peersvr_list peersvr_list_t;
 
 static struct peersvr_list *peersvrl;
 
-mominfo_t *
+void *
 create_svr_entry(char *hostname, unsigned int port)
 {
 	mominfo_t *pmom = NULL;
@@ -149,4 +142,87 @@ init_msi()
 	}
 
 	return 0;
+}
+
+void
+req_resc_update(struct batch_request *preq)
+{
+	attribute pexech;
+
+	update_jobs_on_node(preq->rq_ind.rq_rescupdate.rq_jid, preq->rq_ind.rq_rescupdate.selectspec, preq->rq_ind.rq_rescupdate.op);
+	set_attr_svr(&pexech, &job_attr_def[JOB_ATR_exec_vnode], preq->rq_ind.rq_rescupdate.selectspec);
+	update_node_rassn(&pexech, preq->rq_ind.rq_rescupdate.op);
+}
+
+int
+decode_DIS_RescUpdate(int sock, struct batch_request *preq)
+{
+	int rc;
+	size_t ct;
+
+	rc = disrfst(sock, PBS_MAXSVRJOBID+1, preq->rq_ind.rq_rescupdate.rq_jid);
+	if (rc) return rc;
+
+	preq->rq_ind.rq_rescupdate.op = disrsi(sock, &rc);
+	if (rc) return rc;
+
+	preq->rq_ind.rq_rescupdate.selectspec = disrcs(sock, &ct, &rc);
+	if (rc) {
+		if (preq->rq_ind.rq_rescupdate.selectspec)
+			free(preq->rq_ind.rq_rescupdate.selectspec);
+		preq->rq_ind.rq_rescupdate.selectspec = 0;
+	}
+
+	return rc;
+}
+
+int
+encode_DIS_RescUpdate(int sock, char *jobid, char *selectspec, int op)
+{
+	int rc;
+
+	if ((rc = diswst(sock, jobid) != 0) ||
+	    (rc = diswsi(sock, op) != 0) ||
+	    (rc = diswcs(sock, selectspec, strlen(selectspec)) != 0))
+		return rc;
+
+	return 0;
+}
+
+int
+send_resc_usage(int c, char *jobid, char **msgid, char *selectspec, int op)
+{
+	int rc;
+
+	if ((rc = is_compose_cmd(c, IS_CMD, msgid)) != DIS_SUCCESS)
+		return rc;
+
+	if ((rc = encode_DIS_ReqHdr(c, PBS_BATCH_Resc_Update, pbs_current_user)) ||
+	    (rc = encode_DIS_RescUpdate(c, jobid, selectspec, op)) ||
+	    (rc = encode_DIS_ReqExtend(c, NULL))) {
+		return (pbs_errno = PBSE_PROTOCOL);
+	}
+
+	pbs_errno = PBSE_NONE;
+	if (dis_flush(c))
+		pbs_errno = PBSE_PROTOCOL;
+	return pbs_errno;
+}
+
+void
+mcast_resc_usage(char *jobid, char *selectspec, int op)
+{
+	int mtfd = -1;
+	peersvr_list_t *itr;
+	char *msgid = NULL;
+
+	for (itr = peersvrl; itr; itr = itr->next) {
+		open_momstream(itr->pmom);
+		add_mom_mcast(itr->pmom, &mtfd);
+	}
+
+	if (mtfd != -1) {
+		send_resc_usage(mtfd, jobid, &msgid, selectspec, op);
+		tpp_mcast_close(mtfd);
+	}
 }

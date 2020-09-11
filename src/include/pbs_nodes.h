@@ -194,7 +194,7 @@ struct	prop {
 };
 
 struct	jobinfo {
-	struct	job	*job;
+	char	*job;
 	int		has_cpu;
 	size_t		mem;
 	struct	jobinfo	*next;
@@ -427,7 +427,7 @@ extern	int	chk_vnode_pool(attribute *, void *, int);
 extern	void	free_pnode(struct pbsnode *);
 extern	int	save_nodes_db(int, void *);
 extern void	propagate_socket_licensing(mominfo_t *);
-
+extern void	update_jobs_on_node(char *, char *, int);
 extern char *msg_daemonname;
 
 #define	NODE_TOPOLOGY_TYPE_HWLOC	"hwloc:"
@@ -465,6 +465,7 @@ extern void		destroy_vmap(void *);
 extern mominfo_t	*find_vmapent_byID(void *, const char *);
 extern int		add_vmapent_byID(void *, const char *, void *);
 extern  int		open_momstream(mominfo_t *);
+extern void		add_mom_mcast(mominfo_t *, int *);
 
 #ifdef	__cplusplus
 }

@@ -643,7 +643,11 @@ dis_request_read(int sfds, struct batch_request *request)
 			break;
 
 		case PBS_BATCH_PreemptJobs:
-			decode_DIS_PreemptJobs(sfds, request);
+			decode_DIS_PreemptJobs(sfds, request); 
+			break;
+
+		case PBS_BATCH_Resc_Update:
+			decode_DIS_RescUpdate(sfds, request);
 			break;
 
 #else	/* yes PBS_MOM */

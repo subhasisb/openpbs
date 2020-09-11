@@ -408,13 +408,16 @@ mominfo_t*
 create_svrmom_struct(char *phost, int port)
 {
 	u_long		*pul = NULL;
+	mominfo_t *pmom;
 
 	if (make_host_addresses_list(phost, &pul)) {
 		free(pul);
 		return NULL;
 	}
 
-	return create_svrmom_entry(phost, port, pul, 1);
+	pmom = create_svrmom_entry(phost, port, pul, 1);
+
+	return pmom;
 }
 
 /**

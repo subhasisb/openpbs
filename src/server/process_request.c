@@ -975,6 +975,9 @@ dispatch_request(int sfds, struct batch_request *request)
 		case PBS_BATCH_StatusRsc:
 			req_stat_resc(request);
 			break;
+		case PBS_BATCH_Resc_Update:
+			req_resc_update(request);
+			break;
 #else	/* MOM only functions */
 
 		case PBS_BATCH_CopyFiles:
@@ -1555,6 +1558,9 @@ free_br(struct batch_request *preq)
 			break;
 		case PBS_BATCH_MoveJob:
 			free(preq->rq_ind.rq_move.run_exec_vnode);
+			break;
+		case PBS_BATCH_Resc_Update:
+			free(preq->rq_ind.rq_rescupdate.selectspec);
 			break;
 #endif /* PBS_MOM */
 	}

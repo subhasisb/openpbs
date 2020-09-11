@@ -211,6 +211,13 @@ struct rq_defschrpy {
 	char *rq_txt;
 };
 
+/* Resource update from peer server */
+struct rq_rescupdate {
+	char rq_jid[PBS_MAXSVRJOBID + 1];
+	int op;
+	char *selectspec;
+};
+
 /* Copy/Delete Files (Server -> MOM Only) */
 
 #define STDJOBFILE 1
@@ -314,6 +321,7 @@ struct batch_request {
 		struct rq_hookfile rq_hookfile;
 		struct rq_preempt rq_preempt;
 		struct rq_cred rq_cred;
+		struct rq_rescupdate rq_rescupdate;
 	} rq_ind;
 };
 
@@ -335,6 +343,7 @@ extern int isode_request_read(int, struct batch_request *);
 extern void req_stat_job(struct batch_request *);
 extern void req_stat_resv(struct batch_request *);
 extern void req_stat_resc(struct batch_request *);
+extern void req_resc_update(struct batch_request *);
 extern void req_rerunjob(struct batch_request *);
 extern void arrayfree(char **);
 
@@ -413,6 +422,7 @@ extern int encode_DIS_Cred(int, char *, char *, int, char *, size_t, long);
 extern int dis_request_read(int, struct batch_request *);
 extern int dis_reply_read(int, struct batch_reply *, int);
 extern int decode_DIS_PreemptJobs(int, struct batch_request *);
+extern int decode_DIS_RescUpdate(int, struct batch_request *);
 
 #ifdef __cplusplus
 }

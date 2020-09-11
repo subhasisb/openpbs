@@ -3016,14 +3016,21 @@ im_request(int stream, int version)
 		tpp_close(stream);
 		return;
 	}
-	ipaddr = ntohl(addr->sin_addr.s_addr);
-	DBPRT(("connect from %s\n", netaddr(addr)))
-	if (!addrfind(ipaddr)) {
-		sprintf(log_buffer, "bad connect from %s",
-			netaddr(addr));
-		log_err(-1, __func__, log_buffer);
-		im_eof(stream, 0);
-		return;
+
+	/* This change is temporary in multi-svr branch.
+	This will disable authentication between sister moms 
+	This is to make testing easy
+	*/
+	if (!msvr_mode()) {
+		ipaddr = ntohl(addr->sin_addr.s_addr);
+		DBPRT(("connect from %s\n", netaddr(addr)))
+		if (!addrfind(ipaddr)) {
+			sprintf(log_buffer, "bad connect from %s",
+				netaddr(addr));
+			log_err(-1, __func__, log_buffer);
+			im_eof(stream, 0);
+			return;
+		}
 	}
 
 	jobid = disrst(stream, &ret);
