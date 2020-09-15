@@ -1114,6 +1114,7 @@ process_IS_CMD(int stream)
 	request->rq_fromsvr = 1;
 	request->prot = PROT_TPP;
 	request->tppcmd_msgid = msgid;
+	request->tpp_stream = stream;
 
 	rc = dis_request_read(stream, request);
 	if (rc != 0) {

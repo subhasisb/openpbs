@@ -2366,6 +2366,7 @@ im_eof(int stream, int ret)
 	job			*pjob;
 	hnodent			*np;
 	struct	sockaddr_in	*addr;
+	int i;
 
 	addr = tpp_getaddr(stream);
 	sprintf(log_buffer, "%s from addr %s on stream %d",
@@ -2378,6 +2379,10 @@ im_eof(int stream, int ret)
 		log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_NOTICE,
 			__func__, log_buffer);
 		server_stream = -1;
+	}
+	for (i = 0; i < get_num_servers(); i++) {
+		if (msvr_stream[i] == stream)
+			msvr_stream[i] = -1;
 	}
 
 	/*

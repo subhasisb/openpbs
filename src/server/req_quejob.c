@@ -595,6 +595,8 @@ req_quejob(struct batch_request *preq)
 		created_here = JOB_SVFLG_HERE;
 		free(namebuf);
 	}
+	if (pj)
+		pj->ji_svr_stream = preq->tpp_stream;
 #endif          /* PBS_MOM */
 
 	(void)strcpy(pj->ji_qs.ji_jobid, jid);
@@ -1747,6 +1749,8 @@ req_commit_now(struct batch_request *preq,  job *pj)
 
 #ifdef PBS_MOM	/* MOM only */
 
+	if (pj)
+		pj->ji_svr_stream = preq->tpp_stream;
 	/* move job from new job list to "all" job list, set to running state */
 	delete_link(&pj->ji_alljobs);
 	if (pbs_idx_insert(jobs_idx, pj->ji_qs.ji_jobid, pj) != PBS_IDX_RET_OK) {

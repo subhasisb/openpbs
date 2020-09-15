@@ -8079,6 +8079,20 @@ time_delta_hellosvr(int mode)
 	return delta;
 }
 
+int *msvr_stream;
+
+void
+init_msi()
+{
+	int i;
+
+	msvr_stream = malloc(sizeof(int) * get_num_servers());
+
+	for (i = 0; i < get_num_servers(); i++) {
+		msvr_stream[i] = -1;
+	}
+}
+
 #ifdef	WIN32
 /**
  * @brief
@@ -8276,6 +8290,7 @@ main(int argc, char *argv[])
 	pbs_mom_port = pbs_conf.mom_service_port;
 	default_server_port = pbs_conf.batch_service_port;
 	pbs_rm_port = pbs_conf.manager_service_port;
+	init_msi();
 
 	/* Is an alternate Mom Home path specified in pbs.conf ? */
 

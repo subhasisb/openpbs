@@ -1021,7 +1021,7 @@ update_ajob_status_using_cmd(job *pjob, int cmd, int use_rtn_list_ext)
 	}
 
 	/* now send info to server via tpp */
-	send_resc_used(cmd, 1, &rused);
+	send_resc_used(cmd, 1, &rused, pjob->ji_svr_stream);
 
 	/* free svrattrl list */
 
@@ -1062,92 +1062,101 @@ update_ajob_status(job *pjob)
 void
 update_jobs_status(void)
 {
-	int			count = 0;
+	int			count;
 	job			*pjob;
 	struct resc_used_update	*prused;
-	struct resc_used_update	*prusedtop = NULL;
+	struct resc_used_update	*prusedtop;
 	struct resc_used_update	**prusednext;	/* keep jobs in order */
+	int i;
 
 	/* pass user-client privilege to encode_resc() */
 
-	resc_access_perm = ATR_DFLAG_MGRD;
-	prusednext = &prusedtop;
+	for (i = 0; i < get_num_servers(); i++) {
+		count = 0;
+		prusedtop = NULL;
+		resc_access_perm = ATR_DFLAG_MGRD;
+		prusednext = &prusedtop;
 
-	for (pjob = (job *)GET_NEXT(svr_alljobs);
-		pjob; pjob = (job *)GET_NEXT(pjob->ji_alljobs)) {
+		for (pjob = (job *) GET_NEXT(svr_alljobs);
+		     pjob;
+		     pjob = (job *) GET_NEXT(pjob->ji_alljobs)) {
 
-		if ((pjob->ji_qs.ji_svrflags & JOB_SVFLG_HERE) == 0)
-			continue;	/* not Mother Superior */
-		if (pjob->ji_qs.ji_substate != JOB_SUBSTATE_RUNNING)
-			continue;
+			if (pjob->ji_svr_stream != msvr_stream[i])
+				continue;
+			if ((pjob->ji_qs.ji_svrflags & JOB_SVFLG_HERE) == 0)
+				continue;	/* not Mother Superior */
+			if (pjob->ji_qs.ji_substate != JOB_SUBSTATE_RUNNING)
+				continue;
 
-		++count;
-		/* allocate reply structure and fill in header portion */
-		prused = (struct resc_used_update *)
-			malloc(sizeof(struct resc_used_update));
-		assert(prused != NULL);
-		prused->ru_pjobid = pjob->ji_qs.ji_jobid;
-		prused->ru_comment= NULL;
-		prused->ru_status = 0;
-		if (pjob->ji_wattr[(int)JOB_ATR_run_version].at_flags & ATR_VFLAG_SET) {
-			prused->ru_hop    = pjob->ji_wattr[(int)JOB_ATR_run_version].at_val.at_long;
-		} else {
-			prused->ru_hop    = pjob->ji_wattr[(int)JOB_ATR_runcount].at_val.at_long;
-		}
-		CLEAR_HEAD(prused->ru_attr);
-		*prusednext	  = prused;	/* make last on list */
-		prused->ru_next   = NULL;	/* terminate list */
-		prusednext	  = &prused->ru_next;	/* track last link */
-
-		/* now append the session id and resources used */
-		(void)job_attr_def[(int)JOB_ATR_session_id].at_encode(
-			&pjob->ji_wattr[(int)JOB_ATR_session_id],
-			&prused->ru_attr,
-			job_attr_def[(int)JOB_ATR_session_id].at_name,
-			NULL, ATR_ENCODE_CLIENT, NULL);
-		encode_used(pjob, &prused->ru_attr);
-
-		if (svr_hook_resend_job_attrs != 0) {
-			int		 index;
-			int		 nth;
-			attribute	*at;
-			attribute_def	*ad;
-
-			/* resend any of the attributes modified by a hook */
-			/* just incase the update didn't reach the server  */
-
-			for (index=0; (int)mom_rtn_list[index] != JOB_ATR_LAST; ++index) {
-				nth = (int)mom_rtn_list[index];
-				at = &pjob->ji_wattr[nth];
-				ad = &job_attr_def[nth];
-
-				if (at->at_flags & ATR_VFLAG_HOOK) {
-					(void)ad->at_encode(at,
-						&prused->ru_attr,
-						ad->at_name, NULL,
-						ATR_ENCODE_CLIENT, NULL);
-
-				}
+			++count;
+			/* allocate reply structure and fill in header portion */
+			prused = (struct resc_used_update *)
+				malloc(sizeof(struct resc_used_update));
+			assert(prused != NULL);
+			prused->ru_pjobid = pjob->ji_qs.ji_jobid;
+			prused->ru_comment= NULL;
+			prused->ru_status = 0;
+			if (pjob->ji_wattr[(int)JOB_ATR_run_version].at_flags & ATR_VFLAG_SET) {
+				prused->ru_hop    = pjob->ji_wattr[(int)JOB_ATR_run_version].at_val.at_long;
+			} else {
+				prused->ru_hop    = pjob->ji_wattr[(int)JOB_ATR_runcount].at_val.at_long;
 			}
+			CLEAR_HEAD(prused->ru_attr);
+			*prusednext	  = prused;	/* make last on list */
+			prused->ru_next   = NULL;	/* terminate list */
+			prusednext	  = &prused->ru_next;	/* track last link */
 
+			/* now append the session id and resources used */
+			(void)job_attr_def[(int)JOB_ATR_session_id].at_encode(
+				&pjob->ji_wattr[(int)JOB_ATR_session_id],
+				&prused->ru_attr,
+				job_attr_def[(int)JOB_ATR_session_id].at_name,
+				NULL, ATR_ENCODE_CLIENT, NULL);
+			encode_used(pjob, &prused->ru_attr);
+
+			if (svr_hook_resend_job_attrs != 0) {
+				int		 index;
+				int		 nth;
+				attribute	*at;
+				attribute_def	*ad;
+
+				/* resend any of the attributes modified by a hook */
+				/* just incase the update didn't reach the server  */
+
+				for (index=0; (int)mom_rtn_list[index] != JOB_ATR_LAST; ++index) {
+					nth = (int)mom_rtn_list[index];
+					at = &pjob->ji_wattr[nth];
+					ad = &job_attr_def[nth];
+
+					if (at->at_flags & ATR_VFLAG_HOOK) {
+						(void)ad->at_encode(at,
+							&prused->ru_attr,
+							ad->at_name, NULL,
+							ATR_ENCODE_CLIENT, NULL);
+
+					}
+				}
+
+			}
+		}
+
+		/* now send info to server via tpp */
+		send_resc_used(IS_RESCUSED, count, prusedtop, msvr_stream[i]);
+
+		/* free each resc_used_update struct and associated svrattrl list  */
+		/* DO NOT use the free macro, ru_pjobid points into the job struct */
+		/* and MUST be kept.						   */
+
+		while (prusedtop) {
+			prused = prusedtop;
+			if (prused->ru_comment)
+				(void)free(prused->ru_comment);
+			free_attrlist(&prused->ru_attr);
+			prusedtop = prused->ru_next;
+			(void)free(prused);
 		}
 	}
 
-	/* now send info to server via tpp */
-	send_resc_used(IS_RESCUSED, count, prusedtop);
-
-	/* free each resc_used_update struct and associated svrattrl list  */
-	/* DO NOT use the free macro, ru_pjobid points into the job struct */
-	/* and MUST be kept.						   */
-
-	while (prusedtop) {
-		prused = prusedtop;
-		if (prused->ru_comment)
-			(void)free(prused->ru_comment);
-		free_attrlist(&prused->ru_attr);
-		prusedtop = prused->ru_next;
-		(void)free(prused);
-	}
 
 	svr_hook_resend_job_attrs = 0;	/* clear the send hooked flag */
 }
@@ -1285,7 +1294,7 @@ send_obit(job *pjob, int exval)
 		}
 #endif
 		/* now send info to server via tpp */
-		send_resc_used(IS_JOBOBIT, 1, &rud);
+		send_resc_used(IS_JOBOBIT, 1, &rud, pjob->ji_svr_stream);
 		log_event(PBSEVENT_DEBUG2, PBS_EVENTCLASS_JOB, LOG_DEBUG,
 			pjob->ji_qs.ji_jobid, "Obit sent");
 
@@ -1843,6 +1852,7 @@ send_hellosvr(int stream)
 		goto err;
 
 	server_stream = stream;
+	set_msi_stream(stream);
 
 	if (svr)
 		sprintf(log_buffer, "HELLO sent to server at %s:%d", svr, port);

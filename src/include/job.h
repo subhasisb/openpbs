@@ -441,6 +441,7 @@ struct job {
 	struct batch_request *ji_pmt_preq;		/* outstanding preempt job request for deleting jobs */
 #endif /* PBS_MOM */
 #ifdef	PBS_MOM				/* MOM ONLY */
+	int ji_svr_stream;
 	struct batch_request *ji_preq;	/* outstanding request */
 	struct grpcache *ji_grpcache;	/* cache of user's groups */
 	enum PBS_Chkpt_By ji_chkpttype; /* checkpoint type  */

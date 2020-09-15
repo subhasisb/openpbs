@@ -347,6 +347,7 @@ void encode_SHA(char*, size_t, char **);
  */
 extern int get_num_servers();
 extern int msvr_mode(void);
+extern int get_svr_index(char *, int);
 
 extern int parse_pbs_name_port(char *, char *, uint *);
 

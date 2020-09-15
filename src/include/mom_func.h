@@ -146,6 +146,7 @@ enum hup_action {
 extern enum hup_action	call_hup;
 
 extern int mock_run;
+extern int *msvr_stream;
 
 /* public funtions within MOM */
 
@@ -406,7 +407,8 @@ extern int becomeuser(job *);
 extern int becomeuser_args(char *, uid_t, gid_t, gid_t);
 extern void close_update_pipes(job *);
 extern void mom_set_use_all(void);
-void job_purge_mom(job *pjob);
+extern void job_purge_mom(job *);
+extern int set_msi_stream(int);
 
 /* From popen.c */
 extern FILE *pbs_popen(const char *, const char *);

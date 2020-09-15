@@ -2212,6 +2212,65 @@ get_num_servers()
 }
 
 /**
+ * @brief	Set the server index value for the svr name
+ *
+ * @param[in]	svrname - name of the server
+ * @param[in]	port - port number of the server
+ *
+ * @return int
+ * @retval server index
+ * @retval -1 for failure
+ */
+int
+get_svr_index(char *svrname, int port)
+{
+	int i;
+	int svrindex = -1;
+
+	for (i = 0; i < get_num_servers(); i++) {
+		if (pbs_conf.psi[i].port == port) {
+			if (strcasecmp(pbs_conf.psi[i].name, svrname) == 0) {
+				svrindex = i;
+				break;
+			} else {
+				size_t len;
+				char *psi_dot;
+				char *svr_dot;
+
+				psi_dot = strchr(pbs_conf.psi[i].name, '.');
+				svr_dot = strchr(svrname, '.');
+
+				if (psi_dot != NULL) {
+					/* pbs_conf.psi[i].name is FQDN */
+					if (svr_dot == NULL) {
+						len = strlen(svrname);
+						if (len == (psi_dot - pbs_conf.psi[i].name)) {
+							if (strncasecmp(pbs_conf.psi[i].name, svrname, len) == 0) {
+								svrindex = i;
+								break;
+							}	
+						}
+					}
+				} else if (svr_dot != NULL) {
+					/* svrname is FQDN */
+					if (psi_dot == NULL) {
+						len = strlen(pbs_conf.psi[i].name);
+						if (len == (svr_dot - svrname)) {
+							if (strncasecmp(pbs_conf.psi[i].name, svrname, len) == 0) {
+								svrindex = i;
+								break;
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return svrindex;
+}
+
+/**
  * @brief	Get the server name and port number from svrname:port string
  *
  * @param[in]	svr_id - id in the format server_name:port

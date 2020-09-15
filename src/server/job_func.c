@@ -359,6 +359,7 @@ job_alloc(void)
 	pj->ji_stdout = 0;
 	pj->ji_stderr = 0;
 	pj->ji_setup = NULL;
+	pj->ji_svr_stream = -1;
 #else	/* SERVER */
 	pj->ji_discarding = 0;
 	pj->ji_prunreq = NULL;

@@ -368,10 +368,10 @@ req_runjob(struct batch_request *preq)
 	if (parent == NULL)
 		return; /* note, req_reject already called */
 
-	if (need_to_run_elsewhere(preq)) {
+	/*if (need_to_run_elsewhere(preq)) {
 		move_and_runjob(preq, parent);
 		return;
-	}
+	}*/
 
 	/* the job must be in an execution queue */
 	if (parent->ji_qhdr->qu_qs.qu_type != QTYPE_Execution) {

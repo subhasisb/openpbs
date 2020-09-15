@@ -278,6 +278,7 @@ struct batch_request {
 	int tpp_ack;				/* send acks for this tpp stream? */
 	char *tppcmd_msgid;			/* msg id for tpp commands */
 	struct batch_reply rq_reply;		/* the reply area for this request */
+	int tpp_stream;
 	union indep_request {
 		struct rq_auth rq_auth;
 		int rq_connect;

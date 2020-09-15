@@ -72,8 +72,7 @@ struct resc_used_update {
 	if (x->ru_comment) (void)free(x->ru_comment); \
 	(void)free(x);
 
-extern void	send_resc_used(int cmd, int count,
-	struct resc_used_update *ptop);
+extern void	send_resc_used(int cmd, int count, struct resc_used_update *ptop, int);
 extern void	ack_obit(int stream, char *jobid);
 extern void	reject_obit(int stream, char *jobid);
 extern void	job_obit(struct resc_used_update *, int s);

@@ -680,6 +680,41 @@ process_cluster_addrs(int stream)
 	return 0;
 }
 
+void
+set_svr_stream(job *pjob, int stream)
+{
+	if (pjob)
+		pjob->ji_svr_stream = stream;
+}
+
+int
+set_msi_stream(int stream) {
+	struct	sockaddr_in	*addr;
+	struct	in_addr	ipaddr;
+	ulong	port;
+	struct hostent *hp;
+	int i;
+
+	for (i = 0; i < get_num_servers(); i++) {
+		if (msvr_stream[i] == stream)
+			return 0;
+	}
+
+	addr = tpp_getaddr(stream);
+	ipaddr = addr->sin_addr;
+	port = ntohs(addr->sin_port);
+
+	hp = gethostbyaddr((void *)&ipaddr, sizeof(struct in_addr), AF_INET);
+
+	i = get_svr_index(hp->h_name, port);
+	if (i != -1) {
+		msvr_stream[i] = stream;
+		return 0;
+	}
+
+	return -1;
+}
+
 /**
  * @brief
  *	This handles input coming from another server over a DIS on tpp stream.
@@ -740,6 +775,8 @@ is_request(int stream, int version)
 	   This is one such occassion. So trigger hello exchange now */
 	if (server_stream == -1)
 		send_hellosvr(stream);
+	else 
+		set_msi_stream(stream);
 
 	command = disrsi(stream, &ret);
 	if (ret != DIS_SUCCESS)
@@ -816,6 +853,7 @@ is_request(int stream, int version)
 				goto err;
 
 			pjob = find_job(jobid);
+			set_svr_stream(pjob, stream);
 
 			/* Allowing only to delete a job that has actually
 			 * started (i.e. not in JOB_SUBSTATE_PRERUN), would
@@ -863,6 +901,7 @@ is_request(int stream, int version)
 			if (ret != DIS_SUCCESS)
 				n = -1;			/* default to -1 */
 			pjob = find_job(jobid);
+			set_svr_stream(pjob, stream);
 			if (pjob) {
 				long runver;
 
@@ -1330,57 +1369,57 @@ state_to_server(int what_to_update, int combine_msg)
  */
 
 void
-send_resc_used(int cmd, int count, struct resc_used_update *rud)
+send_resc_used(int cmd, int count, struct resc_used_update *rud, int stream)
 {
 	int	ret;
 
-	if (count == 0 || rud == NULL || server_stream < 0)
+	if (count == 0 || rud == NULL || stream < 0)
 		return;
 	DBPRT(("send_resc_used update to server on stream %d\n", server_stream))
 
-	ret = is_compose(server_stream, cmd);
+	ret = is_compose(stream, cmd);
 	if (ret != DIS_SUCCESS)
 		goto err;
 
-	ret = diswui(server_stream, count);
+	ret = diswui(stream, count);
 	if (ret != DIS_SUCCESS)
 		goto err;
 
 	while (rud) {
-		ret = diswst(server_stream, rud->ru_pjobid);
+		ret = diswst(stream, rud->ru_pjobid);
 		if (ret != DIS_SUCCESS)
 			goto err;
 
 		if (rud->ru_comment) {
 			/* non-null comment: send "1" followed by comment */
-			ret = diswsi(server_stream, 1);
+			ret = diswsi(stream, 1);
 			if (ret != DIS_SUCCESS)
 				goto err;
-			ret = diswst(server_stream, rud->ru_comment);
+			ret = diswst(stream, rud->ru_comment);
 			if (ret != DIS_SUCCESS)
 				goto err;
 		} else {
 			/* null comment: send "0" */
-			ret = diswsi(server_stream, 0);
+			ret = diswsi(stream, 0);
 			if (ret != DIS_SUCCESS)
 				goto err;
 		}
-		ret =diswsi(server_stream, rud->ru_status);
+		ret =diswsi(stream, rud->ru_status);
 		if (ret != DIS_SUCCESS)
 			goto err;
 
-		ret = diswsi(server_stream, rud->ru_hop);
+		ret = diswsi(stream, rud->ru_hop);
 		if (ret != DIS_SUCCESS)
 			goto err;
 
-		ret = encode_DIS_svrattrl(server_stream,
+		ret = encode_DIS_svrattrl(stream,
 			(svrattrl *)GET_NEXT(rud->ru_attr));
 		if (ret != DIS_SUCCESS)
 			goto err;
 
 		rud = rud->ru_next;
 	}
-	dis_flush(server_stream);
+	dis_flush(stream);
 	return;
 
 err:
