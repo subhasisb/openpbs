@@ -279,6 +279,14 @@ status_job(job *pjob, struct batch_request *preq, svrattrl *pal, pbs_list_head *
 	int old_atyp_flags = 0;
 	int revert_state_r = 0;
 	int rc = 0;
+	struct batch_reply *preply = &preq->rq_reply;
+
+	/* first flush if buffer is full */
+	if (preply->brp_count >= MAX_JOBS_PER_REPLY) {
+		rc = reply_send_status_part(preq);
+		if (rc != PBSE_NONE)
+			return rc;
+	}
 
 	/* see if the client is authorized to status this job */
 
@@ -394,17 +402,25 @@ status_job(job *pjob, struct batch_request *preq, svrattrl *pal, pbs_list_head *
 int
 status_subjob(job *pjob, struct batch_request *preq, svrattrl *pal, int subj, pbs_list_head *pstathd, int *bad, int dosubjobs, struct timeval from_tm)
 {
-	int limit = (int) JOB_ATR_LAST;
+	int limit = (int)JOB_ATR_LAST;
 	struct brp_status *pstat;
-	job		  *psubjob;	/* ptr to job to status */
-	char		   realstate;
-	int		   rc = 0;
-	int		   oldeligflags = 0;
-	int		   oldatypflags = 0;
-	char 		   *old_subjob_comment = NULL;
+	job *psubjob; /* ptr to job to status */
+	char realstate;
+	int rc = 0;
+	int oldeligflags = 0;
+	int oldatypflags = 0;
+	char *old_subjob_comment = NULL;
 	char sjst;
 	int sjsst;
 	char *objname;
+	struct batch_reply *preply = &preq->rq_reply;
+
+	/* first flush if buffer is full */
+	if (preply->brp_count >= MAX_JOBS_PER_REPLY) {
+		rc = reply_send_status_part(preq);
+		if (rc != PBSE_NONE)
+			return rc;
+	}
 
 	/* see if the client is authorized to status this job */
 

@@ -94,6 +94,8 @@ extern pbs_license_counts license_counts;
 
 extern int status_attrib(svrattrl *, void *, attribute_def *, attribute *, int, int, pbs_list_head *, int *, struct timeval);
 extern int status_nodeattrib(svrattrl *, struct pbsnode *, int, int, pbs_list_head *, int *, struct timeval);
+extern int
+add_subjobs(struct batch_request *preq, job *pjob, char *statelist, struct brp_select ***pselx, int dosubjobs, struct timeval from_tm);
 
 extern int svr_chk_histjob(job *);
 
@@ -132,12 +134,9 @@ static int status_resv(resc_resv *, struct batch_request *, pbs_list_head *);
 static int
 do_stat_of_a_job(struct batch_request *preq, job *pjob, int dohistjobs, int dosubjobs, struct timeval from_tm)
 {
-	int i;
 	svrattrl *pal;
-	job *parent;
-	job *prev;
 	int rc;
-	deleted_obj_t *dj, *dj_prev;
+	
 	struct batch_reply *preply = &preq->rq_reply;
 
 	/* if history job and not asking for them, just return */
@@ -156,55 +155,8 @@ do_stat_of_a_job(struct batch_request *preq, job *pjob, int dohistjobs, int dosu
 			&& (pjob->ji_qs.ji_svrflags & JOB_SVFLG_ArrayJob)
 			&& (rc == PBSE_NONE || rc == PBSE_PERM)
 			&& pjob->ji_ajinfo != NULL) {
-			if (IS_FULLSTAT(from_tm)) {
-				if (pjob->ji_ajinfo->tkm_ct != pjob->ji_ajinfo->tkm_subjsct[JOB_STATE_QUEUED]) {
-					for (i = pjob->ji_ajinfo->tkm_start; i <= pjob->ji_ajinfo->tkm_end; i += pjob->ji_ajinfo->tkm_step) {
-						if (range_contains(pjob->ji_ajinfo->trm_quelist, i))
-							continue;
-						rc = status_subjob(pjob, preq, pal, i, &preply->brp_un.brp_status, &bad, 1, from_tm);
-						if (rc && rc != PBSE_PERM)
-							break;
-					}
-				}
-			} else {
-				log_eventf(PBSEVENT_DEBUG3, PBS_EVENTCLASS_JOB, LOG_DEBUG, pjob->ji_qs.ji_jobid, "diffstat array subjobs");
-				parent = pjob; /* save parent job pointer */
-				pjob = (job *) GET_PRIOR(parent->ji_ajinfo->subjobs_timed);
-				/* traverse backwards to find the oldest job matching (>=) the provided from time stamp */
-				while (pjob && (rc == PBSE_NONE)) {
-					log_eventf(PBSEVENT_DEBUG3, PBS_EVENTCLASS_JOB, LOG_DEBUG, pjob->ji_qs.ji_jobid,
-						"diffstat considering subjob subjob_tm={%d,%d}, from_tm={%d,%d}", 
-						pjob->update_tm.tv_sec, pjob->update_tm.tv_usec, from_tm.tv_sec, from_tm.tv_usec);
 
-					if (!(TS_NEWER(pjob->update_tm, from_tm)))
-						break;
-
-					prev = (job *)GET_PRIOR(pjob->ji_timed_link); /* save prev ptr as pjob can change in status_job */
-					rc = status_job(pjob, preq, pal, &preply->brp_un.brp_status, &bad, dosubjobs, from_tm);
-					if (rc && rc != PBSE_PERM)
-						break;
-
-					pjob = prev;
-				}
-
-				/* adding entries for deleted subjobs - not as deleted ids, since subjobs are listed till job array goes away!!! */
-				dj = (deleted_obj_t *) GET_PRIOR(parent->ji_ajinfo->subjobs_deleted);
-				while (dj) {
-					log_eventf(PBSEVENT_DEBUG3, PBS_EVENTCLASS_JOB, LOG_DEBUG, dj->obj_id,
-						"diffstat considering deleted subjob subjob_tm={%d,%d}, from_tm={%d,%d}", 
-						dj->tm_deleted.tv_sec, dj->tm_deleted.tv_usec, from_tm.tv_sec, from_tm.tv_usec);
-
-					if (!(TS_NEWER(dj->tm_deleted, from_tm)))
-						break;
-
-					dj_prev = (deleted_obj_t *) GET_PRIOR(dj->deleted_obj_link);
-
-					rc = status_subjob(parent, preq, pal, strtoul(dj->obj_id, NULL, 10), &preply->brp_un.brp_status, &bad, 0, from_tm);
-					if (rc && rc != PBSE_PERM)
-						break;
-					dj = dj_prev;
-				}
-			}
+			rc = add_subjobs(preq, pjob, NULL, NULL, dosubjobs, from_tm);
 		}
 	}
 
@@ -289,11 +241,6 @@ stat_a_jobidname(struct batch_request *preq, char *name, int dohistjobs, int dos
 			else if (i == 1)
 				break;
 			for (i = start; i <= end; i += step) {
-				if (preply->brp_count >= MAX_JOBS_PER_REPLY) {
-					rc = reply_send_status_part(preq);
-					if (rc != PBSE_NONE)
-						return rc;
-				}
 				rc = status_subjob(pjob, preq, pal, i, &preply->brp_un.brp_status, &bad, 0, from_tm);
 				if (rc && rc != PBSE_PERM)
 					return rc;
@@ -485,11 +432,6 @@ req_stat_job(struct batch_request *preq)
 						preply->latestObj = pjob->update_tm;
 
 				pjob = (job *) GET_NEXT(type == 2 ? pjob->ji_jobque : pjob->ji_alljobs);
-				if (preply->brp_count >= MAX_JOBS_PER_REPLY && pjob) {
-					rc = reply_send_status_part(preq);
-					if (rc != PBSE_NONE)
-						return;
-				}
 			}
 
 			/* Finally check if the latest job purge time is more recent, if so update with that */

@@ -88,7 +88,6 @@ build_selist(svrattrl *, int perm, struct  select_list **,
 static void free_sellist(struct select_list *pslist);
 static int  sel_attr(attribute *, struct select_list *);
 static int  select_job(job *, struct select_list *, int, int);
-static int  select_subjob(char, struct select_list *);
 
 /**
  * @brief
@@ -218,31 +217,138 @@ chk_job_statenum(char state_ltr, char *statelist)
 /**
  * @brief
  * 		add_select_entry - add one jobid entry to the select return
- *
- * @param[in]	jid	-	jobid entry
- * @param[in,out]	pselx	-	select return
+ * 
+ * @param[in] preq - statjob, SelectJob Request or Select-status Job Request
+ * @param[in] jid	-	jobid entry
+ * @param[in,out] pselx	-	select return
  *
  * @return	int
- * @retval	0	: error and not added
- * @retval	1	: added
+ * @retval	-1	: error and not added
+ * @retval	 0	: success
  */
 static int
-add_select_entry(char *jid, struct brp_select ***pselx)
+add_select_entry(struct batch_request *preq, char *jid, struct brp_select ***pselx)
 {
 	struct brp_select *pselect;
+	struct batch_reply *preply = &preq->rq_reply;
 
 	if (jid == NULL)
-		return 0;
+		return -1;
 
 	pselect = (struct brp_select *)malloc(sizeof(struct brp_select));
 	if (pselect == NULL)
-		return 0;
+		return -1;
 
 	pselect->brp_next = NULL;
 	(void)strcpy(pselect->brp_jobid, jid);
 	**pselx = pselect;
 	*pselx = &pselect->brp_next;
-	return 1;
+
+	preply->brp_count++;
+
+	return 0;
+}
+
+/**
+ * @brief
+ * 	Add qualifiying subjobs (or all subjobs) to the stat reply
+ *  Used for statjob, selectjob and selstat, basically all stats
+ * 
+ * @param[in] preq - statjob, SelectJob Request or Select-status Job Request
+ * @param[in] pjob  pointer to job
+ * @param[in] dosub  treat as a normal job or array job
+ * @param[in] statelist  If statelist is NULL, then no need to check anything,
+ * 						just add the subjobs to the return list.
+ * @param[in,out] pselx	 select return
+ * @param[in] dosubjobs - select subjobs as well? 
+ * @param[in] from_tm - in case of diffstat, the timestamp to stat updates from
+ *
+ * @return	int
+ * @retval	-1	: error and not added
+ * @retval	 0	: success
+ */
+int
+add_subjobs(struct batch_request *preq, job *pjob, char *statelist, struct brp_select ***pselx, int dosubjobs, struct timeval from_tm)
+{
+	int i;
+	int rc = 0;
+	job *parent;
+	job *prev;
+	int bad;
+	deleted_obj_t *dj, *dj_prev;
+	struct batch_reply *preply = &preq->rq_reply;
+	svrattrl *plist = NULL;
+
+	if (preq->rq_type == PBS_BATCH_SelStat) {
+		plist = (svrattrl *) GET_NEXT(preq->rq_ind.rq_select.rq_rtnattr);
+	}
+
+	if (IS_FULLSTAT(from_tm)) {
+		for (i = pjob->ji_ajinfo->tkm_start; i <= pjob->ji_ajinfo->tkm_end; i += pjob->ji_ajinfo->tkm_step) {
+			char sjst = JOB_STATE_LTR_QUEUED;
+
+			if (range_contains(pjob->ji_ajinfo->trm_quelist, i) && ((preq->rq_type != PBS_BATCH_SelectJobs)))
+				continue; /* don't return queued subjobs for stats (except select) IFL will expand it */
+			
+			/*
+			* If statelist is NULL, then no need to check anything,
+			* just add the subjobs to the return list.
+			*/
+			job *sj = get_subjob_and_state(pjob, i, &sjst, NULL);
+			if (sjst == JOB_STATE_LTR_UNKNOWN)
+				continue;
+
+			if (statelist == NULL || chk_job_statenum(sjst, statelist)) {
+				if (preq->rq_type == PBS_BATCH_SelectJobs) {
+					if (add_select_entry(preq, sj ? sj->ji_qs.ji_jobid : create_subjob_id(pjob->ji_qs.ji_jobid, i), pselx) != 0)
+						return -1;
+				} else {
+					rc = status_subjob(pjob, preq, plist, i, &preply->brp_un.brp_status, &bad, 0, from_tm);
+					if (rc && rc != PBSE_PERM)
+						return -1;
+				}
+			}
+		}
+	} else {
+		log_eventf(PBSEVENT_DEBUG3, PBS_EVENTCLASS_JOB, LOG_DEBUG, pjob->ji_qs.ji_jobid, "diffstat array subjobs");
+		parent = pjob; /* save parent job pointer */
+		pjob = (job *) GET_PRIOR(parent->ji_ajinfo->subjobs_timed);
+		/* traverse backwards to find the oldest job matching (>=) the provided from time stamp */
+		while (pjob && (rc == PBSE_NONE)) {
+			log_eventf(PBSEVENT_DEBUG3, PBS_EVENTCLASS_JOB, LOG_DEBUG, pjob->ji_qs.ji_jobid,
+				"diffstat considering subjob subjob_tm={%d,%d}, from_tm={%d,%d}", 
+				pjob->update_tm.tv_sec, pjob->update_tm.tv_usec, from_tm.tv_sec, from_tm.tv_usec);
+
+			if (!(TS_NEWER(pjob->update_tm, from_tm)))
+				break;
+
+			prev = (job *)GET_PRIOR(pjob->ji_timed_link); /* save prev ptr as pjob can change in status_job */
+			rc = status_job(pjob, preq, plist, &preply->brp_un.brp_status, &bad, dosubjobs, from_tm);
+			if (rc && rc != PBSE_PERM)
+				break;
+
+			pjob = prev;
+		}
+
+		/* adding entries for deleted subjobs - not as deleted ids, since subjobs are listed till job array goes away!!! */
+		dj = (deleted_obj_t *) GET_PRIOR(parent->ji_ajinfo->subjobs_deleted);
+		while (dj) {
+			log_eventf(PBSEVENT_DEBUG3, PBS_EVENTCLASS_JOB, LOG_DEBUG, dj->obj_id,
+				"diffstat considering deleted subjob subjob_tm={%d,%d}, from_tm={%d,%d}", 
+				dj->tm_deleted.tv_sec, dj->tm_deleted.tv_usec, from_tm.tv_sec, from_tm.tv_usec);
+
+			if (!(TS_NEWER(dj->tm_deleted, from_tm)))
+				break;
+
+			dj_prev = (deleted_obj_t *) GET_PRIOR(dj->deleted_obj_link);
+
+			rc = status_subjob(parent, preq, plist, strtoul(dj->obj_id, NULL, 10), &preply->brp_un.brp_status, &bad, 0, from_tm);
+			if (rc && rc != PBSE_PERM)
+				break;
+			dj = dj_prev;
+		}
+	}
+	return 0;
 }
 
 /**
@@ -250,50 +356,38 @@ add_select_entry(char *jid, struct brp_select ***pselx)
  * 		add_select_array_entries - add one jobid entry to the select return
  *		for each subjob whose state matches
  *
- * @param[in]	pjob	-	pointer to job
- * @param[in]	dosub	-	treat as a normal job or array job
- * @param[in]	statelist	-	If statelist is NULL, then no need to check anything,
+ * @param[in] preq - statjob, SelectJob Request or Select-status Job Request
+ * @param[in] pjob - pointer to job
+ * @param[in] dosub -	treat as a normal job or array job
+ * @param[in] statelist -	If statelist is NULL, then no need to check anything,
  * 								just add the subjobs to the return list.
- * @param[in,out]	pselx	-	select return
- * @param[in]	psel	-	pointer to select list
+ * @param[in,out] pselx	- select return
+ * @param[in] psel - pointer to select list
  *
  * @return	int
- * @retval	0	: error and not added
- * @retval	>0	: no. of entries added
+ * @retval	-1	: error and not added
+ * @retval	 0	: success
  */
 static int
-add_select_array_entries(job *pjob, int dosub, char *statelist,
+add_select_array_entries(struct batch_request *preq, 
+	job *pjob, int dosub, char *statelist,
 	struct brp_select ***pselx,
-	struct select_list *psel)
+	struct select_list *psel,
+	struct timeval from_tm)
 {
-	int	 ct = 0;
-	int	 i;
+	int rc = 0;
 
 	if (pjob->ji_qs.ji_svrflags & JOB_SVFLG_SubJob)
 		return 0;
-	else if ((dosub == 0) ||
-		(pjob->ji_qs.ji_svrflags & JOB_SVFLG_ArrayJob) == 0) {
+	else if ((dosub == 0) || (pjob->ji_qs.ji_svrflags & JOB_SVFLG_ArrayJob) == 0) {
 		/* is or treat as a normal job */
-		ct = add_select_entry(pjob->ji_qs.ji_jobid, pselx);
+		rc = add_select_entry(preq, pjob->ji_qs.ji_jobid, pselx);
 	} else {
 		/* Array Job */
-		for (i = pjob->ji_ajinfo->tkm_start ; i <= pjob->ji_ajinfo->tkm_end ; i += pjob->ji_ajinfo->tkm_step) {
-			/*
-			 * If statelist is NULL, then no need to check anything,
-			 * just add the subjobs to the return list.
-			 */
-			char sjst;
-			job *sj = get_subjob_and_state(pjob, i, &sjst, NULL);
-			if (sjst == JOB_STATE_LTR_UNKNOWN)
-				continue;
-			if ((statelist == NULL) ||
-				(select_subjob(sjst, psel))) {
-				ct += add_select_entry(sj ? sj->ji_qs.ji_jobid : create_subjob_id(pjob->ji_qs.ji_jobid, i), pselx);
-			}
-		}
+		rc = add_subjobs(preq, pjob, statelist, pselx, dosub, from_tm);
 	}
 
-	return ct;
+	return rc;
 }
 
 /**
@@ -324,7 +418,7 @@ add_selstat_reply(struct batch_request *preq, job *pjob, struct select_list *sel
 {
 	struct batch_reply *preply = &preq->rq_reply;
 	svrattrl *plist;
-	int i, rc;
+	int rc;
 	int bad = 0;
 
 	if (server.sv_attr[SVR_ATR_query_others].at_val.at_long || svr_authorize_jobreq(preq, pjob) == 0) {
@@ -344,7 +438,7 @@ add_selstat_reply(struct batch_request *preq, job *pjob, struct select_list *sel
 
 				/* Select Jobs Reply */
 
-				preply->brp_count += add_select_array_entries(pjob, dosubjobs, statelist, pselx, selistp);
+				add_select_array_entries(preq, pjob, dosubjobs, statelist, pselx, selistp, from_tm);
 
 			} else if ((pjob->ji_qs.ji_svrflags & JOB_SVFLG_SubJob) == 0 || dosubjobs == 2) {
 
@@ -352,32 +446,8 @@ add_selstat_reply(struct batch_request *preq, job *pjob, struct select_list *sel
 
 				plist = (svrattrl *) GET_NEXT(preq->rq_ind.rq_select.rq_rtnattr);
 				if (dosubjobs == 1 && pjob->ji_ajinfo) {
-					for (i = pjob->ji_ajinfo->tkm_start ; i <= pjob->ji_ajinfo->tkm_end ; i += pjob->ji_ajinfo->tkm_step) {
-						char sjst = JOB_STATE_LTR_QUEUED;
-
-						get_subjob_and_state(pjob, i, &sjst, NULL);
-						if (sjst == JOB_STATE_LTR_UNKNOWN)
-							return 0;
-						if (statelist == 0 || chk_job_statenum(sjst, statelist)) {
-							if (preq->rq_type != PBS_BATCH_SelectJobs && preply->brp_count >= MAX_JOBS_PER_REPLY) {
-								rc = reply_send_status_part(preq);
-								if (rc != PBSE_NONE)
-									return -2;
-								preply->brp_count = 0;
-							}
-							rc = status_subjob(pjob, preq, plist, i, &preply->brp_un.brp_status, &bad, 0, from_tm);
-							if (rc && rc != PBSE_PERM)
-								return -1;
-							plist = (svrattrl *) GET_NEXT(preq->rq_ind.rq_select.rq_rtnattr);
-						}
-					}
+					return (add_subjobs(preq, pjob, statelist, pselx, dosubjobs, from_tm));
 				} else {
-					if (preq->rq_type != PBS_BATCH_SelectJobs && preply->brp_count >= MAX_JOBS_PER_REPLY) {
-						rc = reply_send_status_part(preq);
-						if (rc != PBSE_NONE)
-							return -2;
-						preply->brp_count = 0;
-					}
 					rc = status_job(pjob, preq, plist, &preply->brp_un.brp_status, &bad, 0, from_tm);
 					if (rc && rc != PBSE_PERM)
 						return -1;
@@ -425,7 +495,7 @@ req_selectjobs(struct batch_request *preq)
 		 * if the letter T (or t) is in the extend string, select subjobs
 		 *
 		 * if the letter S is in the extend string, select real jobs,
-		 * regualar and running subjobs as it is requested by the Scheduler.
+		 * regular and running subjobs as it is requested by the Scheduler.
 		 */
 		if (strchr(preq->rq_extend, 'T') || strchr(preq->rq_extend, 't'))
 			dosubjobs = 1;
@@ -494,7 +564,8 @@ req_selectjobs(struct batch_request *preq)
 			preply->latestObj = pjob->update_tm;
 
 		/* traverse backwards to find the oldest job matching (>=) the provided from time stamp */
-		while (pjob && (rc == PBSE_NONE)) {
+		//(bhroam) while (pjob && (rc == PBSE_NONE)) {
+		for (; pjob && (rc == PBSE_NONE); pjob = (job *) GET_PRIOR(pjob->ji_timed_link)) {
 			if (!(TS_NEWER(pjob->update_tm, from_tm)))
 				break;
 			rc = add_selstat_reply(preq, pjob, selistp, pstate, &pselx, dosubjobs, dohistjobs, from_tm);  /* stat backwards, IFL will reverse */
@@ -537,7 +608,7 @@ out:
  * @param[in]	psel	-	selection list
  * @param[in]	dosubjobs	-	Does it needs to check the subjob.
  * @param[in]	dohistjobs	-	If not being asked for history jobs specifically,
- * 									then just skip them otherwise include them.
+ * 								then just skip them otherwise include them.
  *
  * @return	int
  * @retval	0	: no match
@@ -877,47 +948,4 @@ build_selist(svrattrl *plist, int perm, struct select_list **pselist, pbs_queue 
 		plist = (svrattrl *)GET_NEXT(plist->al_link);
 	}
 	return (0);
-}
-
-/**
- * @brief
- *		Select subjob by matching the specified state with select_list
- *
- * @par
- *		Linkage scope: Local(static)
- *
- * @par Functionality:
- *		This function walks through the select list (which is basically a \n
- *		linked list of attribute structures built by build_selist()). Skips \n
- *		the select_list structure if the index is not JOB_ATR_state.
- *
- * @see	add_select_array_entries()
- *
- * @param[in]	state	-	state of the subjob
- * @param[in]	psel	-	pointer to select list
- *
- * @return	int
- *
- * @retval	0	- failure: no match
- * @retval	1	- success: selected subjob
- *
- * @par MT-safety: NO
- *
- */
-
-static int
-select_subjob(char state, struct select_list *psel)
-{
-	attribute *selstate;
-
-	for (; psel; psel = psel->sl_next) {
-		if (psel->sl_atindx != JOB_ATR_state)
-			continue;
-		selstate = &psel->sl_attr;
-		if (selstate == NULL)
-			continue;
-		if (!chk_job_statenum(state, selstate->at_val.at_str))
-			return (0);
-	}
-	return (1);
 }

@@ -3384,10 +3384,11 @@ job_no_args:
 							(send_attrl(sock, display_attribs) == 0) &&
 							(send_opts(sock) == 0)) {
 							if (dorecv(sock, (char *) &pbs_errno, sizeof(int)) == 0) {
-								if (pbs_errno != PBSE_NONE)
-									any_failed = pbs_errno;
-
 								if (!(pbs_errno == PBSE_STALE_DIFFQUERY || pbs_errno == PBSE_FORCE_CLIENT_UPDATE)) {/* we need to retry in case of these */
+
+									if (pbs_errno != PBSE_NONE)
+										any_failed = pbs_errno; /* record the error in this iter */
+
 									close(sock);
 									sock = -1;
 									continue; /* to the next operand */
@@ -3469,9 +3470,12 @@ job_no_args:
 					char buf[100];
 					/* get all jobs first time anyway */
 					sprintf(buf, "%s%s", (hist_enabled) ? "xt" : "t", extend);
+					pbs_errno = PBSE_NONE;
 					p_status = pbs_statjob(conn, NULL, NULL, buf);
-					update_cache(p_status);
-					p_status = build_resp_from_cache(conn, query_job_list);
+					if (pbs_errno == PBSE_NONE) {
+						update_cache(p_status);
+						p_status = build_resp_from_cache(conn, query_job_list);
+					}
 				} else {
 					if ((dest_set == 0) || (new_atropl == 0)) {
 						p_status = pbs_statjob(conn, query_job_list, display_attribs, extend);
@@ -3904,8 +3908,7 @@ print_svr_error(int sd)
 			else
 				fprintf(stderr, "qstat: Error %d\n", pbs_errno);
 		}
-	}
-	if (strchr(extend, (int) 'x') && (hist_enabled == 0)) {
+	} else if (strchr(extend, (int) 'x') && (hist_enabled == 0)) {
 		errmsg = pbse_to_txt(PBSE_JOBHISTNOTSET);
 		fprintf(stderr, "qstat: %s\n", errmsg);
 	}
@@ -4006,7 +4009,6 @@ talk_to_fg(int sock, int sd_svr, char **err_op)
 		}
 	} else {
 		print_svr_error(sd_svr);
-		rc = 1;
 	}
 
 	if (dosend(sock, (char *) &pbs_errno, sizeof(int)) != 0) {
