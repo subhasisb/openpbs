@@ -4011,6 +4011,9 @@ talk_to_fg(int sock, int sd_svr, char **err_op)
 		print_svr_error(sd_svr);
 	}
 
+	if (pbs_errno == PBSE_STALE_DIFFQUERY || pbs_errno == PBSE_FORCE_CLIENT_UPDATE)
+		rc = 1;
+
 	if (dosend(sock, (char *) &pbs_errno, sizeof(int)) != 0) {
 		*err_op = "send data to foreground";
 		rc = 2;
