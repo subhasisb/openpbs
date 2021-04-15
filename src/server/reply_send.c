@@ -368,7 +368,7 @@ reply_send(struct batch_request *request)
 		 */
 		if (rc == PBSE_NONE) {
 			if (request->rq_reply.brp_choice == BATCH_REPLY_CHOICE_Status && request->rq_reply.brp_auxcode == 1)
-				log_eventf(PBSEVENT_DEBUG3, PBS_EVENTCLASS_SERVER, LOG_DEBUG, msg_daemonname, "diffstate returned %d objects", request->rq_reply.brp_count);
+				log_eventf(PBSEVENT_DEBUG3, PBS_EVENTCLASS_SERVER, LOG_DEBUG, msg_daemonname, "diffstat returned %d objects", request->rq_reply.brp_count);
 			rc = dis_reply_write(sfds, request);
 		}
 	}

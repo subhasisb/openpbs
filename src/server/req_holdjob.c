@@ -331,7 +331,7 @@ req_releasejob(struct batch_request *preq)
 				old_hold = get_jattr_long(psubjob, JOB_ATR_hold);
 				rc =
 #endif
-					set_jattr_with_attr(pjob, JOB_ATR_hold, &temphold, DECR);
+					set_jattr_with_attr(psubjob, JOB_ATR_hold, &temphold, DECR);
 					
 #ifndef NAS /* localmod 105 Always reset etime on release */
 				if (!rc && (old_hold != get_jattr_long(psubjob, JOB_ATR_hold))) {
