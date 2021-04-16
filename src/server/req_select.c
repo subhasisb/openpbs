@@ -206,6 +206,7 @@ static attribute_def state_sel = {
 static int
 chk_job_statenum(char state_ltr, char *statelist)
 {
+	log_errf(-1, __func__, "statlist=%s, state_ltr=%c", statelist, state_ltr);
 	if (statelist == NULL)
 		return 1;
 
@@ -287,7 +288,7 @@ add_subjobs(struct batch_request *preq, job *pjob, char *statelist, struct brp_s
 		for (i = pjob->ji_ajinfo->tkm_start; i <= pjob->ji_ajinfo->tkm_end; i += pjob->ji_ajinfo->tkm_step) {
 			char sjst = JOB_STATE_LTR_QUEUED;
 
-			if (range_contains(pjob->ji_ajinfo->trm_quelist, i) && ((preq->rq_type != PBS_BATCH_SelectJobs)))
+			if ((preq->rq_type != PBS_BATCH_SelectJobs) && (range_contains(pjob->ji_ajinfo->trm_quelist, i)))
 				continue; /* don't return queued subjobs for stats (except select) IFL will expand it */
 			
 			/*
@@ -564,16 +565,16 @@ req_selectjobs(struct batch_request *preq)
 			preply->latestObj = pjob->update_tm;
 
 		/* traverse backwards to find the oldest job matching (>=) the provided from time stamp */
-		//(bhroam) while (pjob && (rc == PBSE_NONE)) {
 		for (; pjob && (rc == PBSE_NONE); pjob = (job *) GET_PRIOR(pjob->ji_timed_link)) {
 			if (!(TS_NEWER(pjob->update_tm, from_tm)))
 				break;
+			if (pque && pjob->ji_qhdr != pque)
+				continue;
 			rc = add_selstat_reply(preq, pjob, selistp, pstate, &pselx, dosubjobs, dohistjobs, from_tm);  /* stat backwards, IFL will reverse */
 			if( rc == -2)
 				return; /* critical error in reply_send, so simply bail out */
 			else if (rc == -1)
 				goto out;
-			pjob = (job *) GET_PRIOR(pjob->ji_timed_link);
 		}
 
 		/* now stat deleted jobs */
@@ -593,6 +594,7 @@ req_selectjobs(struct batch_request *preq)
 		}
 	}
 out:
+	free(pstate);
 	free_sellist(selistp);
 	if (rc)
 		req_reject(rc, 0, preq);
@@ -867,12 +869,12 @@ build_selentry(svrattrl *plist, attribute_def *pdef, int perm, struct select_lis
  *		Function returns non-zero on an error, also returns into last
  *		four entries of the parameter list.
  *
- * @param[in]	plist	-	svrattrl structure from which we decode the select list
- * @param[in]	perm	-	permission
- * @param[out]	pselist	-	RETURN : select list
- * @param[out]	pque	-	RETURN : queue ptr if limit to que
+ * @param[in]	plist	svrattrl structure from which we decode the select list
+ * @param[in]	perm	permission
+ * @param[out]	pselist	RETURN : select list
+ * @param[out]	pque	RETURN : queue ptr if limit to que
  * @param[out]	bad	-	RETURN - index of bad attr
- * @param[out]	pstate	-	RETURN - pointer to required state
+ * @param[out]	pstate	RETURN - pointer to required state
  *
  * @return	int
  * @retval	0	: success
@@ -883,11 +885,12 @@ static int
 build_selist(svrattrl *plist, int perm, struct select_list **pselist, pbs_queue **pque, int *bad, char **pstate)
 {
 	struct select_list *entry;
-	int		    i;
-	char		   *pc;
-	attribute_def	   *pdef;
+	int i;
+	char *pc;
+	attribute_def *pdef;
 	struct select_list *prior = NULL;
-	int		    rc;
+	int rc;
+	char *st = NULL;
 
 	/* set permission for decode_resc() */
 
@@ -925,7 +928,7 @@ build_selist(svrattrl *plist, int perm, struct select_list **pselist, pbs_queue 
 
 			if (i == JOB_ATR_state) {
 				pdef = &state_sel;
-				*pstate = plist->al_value;
+				pbs_strcat(&st, NULL, plist->al_value);
 			} else {
 				pdef = job_attr_def + i;
 			}
@@ -947,5 +950,8 @@ build_selist(svrattrl *plist, int perm, struct select_list **pselist, pbs_queue 
 		}
 		plist = (svrattrl *)GET_NEXT(plist->al_link);
 	}
+
+	*pstate = st;
+	
 	return (0);
 }

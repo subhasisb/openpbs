@@ -285,6 +285,7 @@ req_stat_job(struct batch_request *preq)
 	char *pnxtjid = NULL;
 	int sock = preq->rq_conn;
 	conn_t *conn = NULL;
+	int eligible_time_enabled = 0;
 	struct timeval from_tm = {0, 0};
 
 	if (preq->prot != PROT_TPP) {
@@ -383,14 +384,20 @@ req_stat_job(struct batch_request *preq)
 		if (pjob)
 			preply->latestObj = pjob->update_tm;
 
+		if (get_sattr_long(SVR_ATR_EligibleTimeEnable) == TRUE)
+			eligible_time_enabled = 1;
+
 		/* traverse backwards to find the oldest job matching (>=) the provided from time stamp */
 		while (pjob && (rc == PBSE_NONE)) {
 			log_eventf(PBSEVENT_DEBUG3, PBS_EVENTCLASS_JOB, LOG_DEBUG, pjob->ji_qs.ji_jobid,
 				"diffstat considering job, job_tm={%d,%d}, from_tm={%d,%d}", 
 				pjob->update_tm.tv_sec, pjob->update_tm.tv_usec, from_tm.tv_sec, from_tm.tv_usec);
 					
-			if (!(TS_NEWER(pjob->update_tm, from_tm)))
-				break;
+			if (!(eligible_time_enabled) && (get_jattr_long(pjob, JOB_ATR_accrue_type) == JOB_ELIGIBLE)) {
+				/* stat the job if eligible time is to be returned, since that would have changed anyway */
+				if (!(TS_NEWER(pjob->update_tm, from_tm)))
+					break;
+			}
 
 			prev = (job *)GET_PRIOR(pjob->ji_timed_link); /* save this since the pjob could be modified */
 			rc = do_stat_of_a_job(preq, pjob, dohistjobs, dosubjobs, from_tm); /* stat backwards, IFL will reverse */

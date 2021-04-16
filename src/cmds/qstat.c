@@ -2473,6 +2473,7 @@ update_cache(struct batch_status *stat_upd)
 	int full_stat = 0;
 	int array;
 	char *p;
+	char *oper = NULL;
 	struct batch_status *next, *bs, *bs_next;
 
 	if (!stat_upd)
@@ -2492,9 +2493,10 @@ update_cache(struct batch_status *stat_upd)
 	while(stat_upd) {
 		next = stat_upd->next;
 
-		if (full_stat)
+		if (full_stat) {
+			oper = "cc_append";
 			rc = cc_append(stat_upd);
-		else if ((stat_upd->attribs) && (strcmp(stat_upd->attribs->name, "deleted") == 0)) {
+		} else if ((stat_upd->attribs) && (strcmp(stat_upd->attribs->name, "deleted") == 0)) {
 			if ((strstr(stat_upd->name, "[]")))
 				array = 1;	
 			else
@@ -2503,16 +2505,17 @@ update_cache(struct batch_status *stat_upd)
 			bs = cc_get_next(stat_upd->name, NULL); /* get pointer to next bs, before deleting this */
 			do {
 				bs_next = cc_get_next(NULL, bs);
+				oper = "cc_delete";
 				rc = cc_delete(bs);
 				bs = bs_next;
 			} while ((array == 1) && (rc == 0) && (bs) && (p = strstr(bs->name, "[")) && (*(p+1) != ']')); /* if subjob */
 		} else {
+			oper = "cc_update";
 			rc = cc_update(stat_upd);
 		}
 		
 		if (rc != 0) {
-			fprintf(stderr, "Failed to add/update/delete job %s in index\n", stat_upd->name);
-			fprintf(stderr, "Out of memory\n");
+			fprintf(stderr, "Failed to %s job %s cache\n", oper, stat_upd->name);
 			exit(1);
 		}
 		stat_upd = next;			
@@ -3892,30 +3895,6 @@ cnvt_est_start_time(char *est_time, int wide)
 
 /**
  * @brief
- *	check and print last error from the server operation
- *
- * @param[in] sd - server fd
- *
- */
-static void
-print_svr_error(int sd)
-{
-	char *errmsg;
-	if (pbs_errno != PBSE_NONE) {
-		if (pbs_errno != PBSE_STALE_DIFFQUERY && pbs_errno != PBSE_FORCE_CLIENT_UPDATE) {
-			if ((errmsg = pbs_geterrmsg(sd)) != NULL)
-				fprintf(stderr, "qstat: %s\n", errmsg);
-			else
-				fprintf(stderr, "qstat: Error %d\n", pbs_errno);
-		}
-	} else if (strchr(extend, (int) 'x') && (hist_enabled == 0)) {
-		errmsg = pbse_to_txt(PBSE_JOBHISTNOTSET);
-		fprintf(stderr, "qstat: %s\n", errmsg);
-	}
-}
-
-/**
- * @brief
  *	callback function called from background process to talk to foreground process
  *
  * @param[in] sock - communication fd
@@ -4008,7 +3987,9 @@ talk_to_fg(int sock, int sd_svr, char **err_op)
 			}
 		}
 	} else {
-		print_svr_error(sd_svr);
+		if (pbs_errno != PBSE_STALE_DIFFQUERY && pbs_errno != PBSE_FORCE_CLIENT_UPDATE) {
+			check_error(sd_svr, "");
+		}
 	}
 
 	if (pbs_errno == PBSE_STALE_DIFFQUERY || pbs_errno == PBSE_FORCE_CLIENT_UPDATE)

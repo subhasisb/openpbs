@@ -386,8 +386,10 @@ cc_append(struct batch_status *bs)
 	if (!bs)
 		return 1;
 
-	if (pbs_idx_insert(cc_idx, bs->name, bs) != PBS_IDX_RET_OK) 
+	if (pbs_idx_insert(cc_idx, bs->name, bs) != PBS_IDX_RET_OK) {
+		fprintf(stderr, "Failed to insert object %s in index\n", bs->name);
 		return 1;
+	}
 
 	bs->prev = cc_tail;
 	bs->next = NULL;
