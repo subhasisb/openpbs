@@ -294,6 +294,11 @@ status_job(job *pjob, struct batch_request *preq, svrattrl *pal, pbs_list_head *
 
 	/* calc eligible time on the fly and return, don't save. */
 	if (get_sattr_long(SVR_ATR_EligibleTimeEnable) == TRUE) {
+		log_errf(-1, __func__, "job %s, accrue_type=%d, to set eligible_time to %d", 
+			pjob->ji_qs.ji_jobid, 
+			get_jattr_long(pjob, JOB_ATR_accrue_type),
+			time_now - get_jattr_long(pjob, JOB_ATR_sample_starttime));
+			
 		if (get_jattr_long(pjob, JOB_ATR_accrue_type) == JOB_ELIGIBLE) {
 			oldtime = get_jattr_long(pjob, JOB_ATR_eligible_time);
 			set_jattr_l_slim(pjob, JOB_ATR_eligible_time,

@@ -325,9 +325,13 @@ is_nattr_set(const struct pbsnode *pnode, int attr_idx)
 void
 free_nattr(struct pbsnode *pnode, int attr_idx)
 {
+	attribute *pattr = get_nattr(pnode, attr_idx);
 	update_node_timedlist(pnode);
 	if (pnode != NULL)
-		free_attr(node_attr_def, get_nattr(pnode, attr_idx), attr_idx);
+		free_attr(node_attr_def, pattr, attr_idx);
+#ifndef PBS_MOM
+	post_attr_set_unset(pattr);
+#endif
 }
 
 /**
@@ -341,8 +345,12 @@ free_nattr(struct pbsnode *pnode, int attr_idx)
 void
 clear_nattr(struct pbsnode *pnode, int attr_idx)
 {
+	attribute *pattr = get_nattr(pnode, attr_idx);
 	update_node_timedlist(pnode);
-	clear_attr(get_nattr(pnode, attr_idx), &node_attr_def[attr_idx]);
+	clear_attr(pattr, &node_attr_def[attr_idx]);
+#ifndef PBS_MOM
+	post_attr_set_unset(pattr);
+#endif
 }
 
 /**
