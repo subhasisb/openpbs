@@ -319,14 +319,14 @@ status_job(job *pjob, struct batch_request *preq, svrattrl *pal, pbs_list_head *
 	if (pstat == NULL)
 		return (PBSE_SYSTEM);
 	CLEAR_LINK(pstat->brp_stlink);
-	if ((pjob->ji_qs.ji_svrflags & JOB_SVFLG_ArrayJob) != 0 && dosubjobs) {
+	if ((pjob->ji_qs.ji_svrflags & JOB_SVFLG_ArrayJob) != 0) {
 		pstat->brp_objtype = MGR_OBJ_JOBARRAY_PARENT;
 		/* in case of diffstat, we must also send the array_indices_remaining attribute, so that
 		 * IFL can synthesize updates for queued subjobs as well
 		 * To do that, we touch the timestamp of the Array_indicies_remaining attribute
 		 */
 		gettimeofday(&(get_jattr(pjob, JOB_ATR_array_indices_remaining)->update_tm), NULL);
-	} else if ((pjob->ji_qs.ji_svrflags & JOB_SVFLG_SubJob) != 0 && dosubjobs)
+	} else if ((pjob->ji_qs.ji_svrflags & JOB_SVFLG_SubJob) != 0)
 		pstat->brp_objtype = MGR_OBJ_SUBJOB;
 	else
 		pstat->brp_objtype = MGR_OBJ_JOB;
@@ -445,10 +445,7 @@ status_subjob(job *pjob, struct batch_request *preq, svrattrl *pal, int subj, pb
 	if (pstat == NULL)
 		return (PBSE_SYSTEM);
 	CLEAR_LINK(pstat->brp_stlink);
-	if (dosubjobs)
-		pstat->brp_objtype = MGR_OBJ_SUBJOB;
-	else
-		pstat->brp_objtype = MGR_OBJ_JOB;
+	pstat->brp_objtype = MGR_OBJ_SUBJOB;
 	(void)strcpy(pstat->brp_objname, objname);
 	CLEAR_HEAD(pstat->brp_attr);
 	append_link(pstathd, &pstat->brp_stlink, pstat);
@@ -465,7 +462,6 @@ status_subjob(job *pjob, struct batch_request *preq, svrattrl *pal, int subj, pb
 	realstate = get_job_state(pjob);
 	set_job_state(pjob, sjst);
 
-	
 	log_eventf(PBSEVENT_DEBUG3, PBS_EVENTCLASS_JOB, LOG_DEBUG, pjob->ji_qs.ji_jobid, "Added subjob with state=%c to diffstat reply", sjst);
 
 	if (sjst == JOB_STATE_LTR_EXPIRED || sjst == JOB_STATE_LTR_FINISHED) {

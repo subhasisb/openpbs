@@ -6920,7 +6920,7 @@ set_nodes(void *pobj, int objtype, char *execvnod_in, char **execvnod_out, char 
 				tmp_pl->next = presv->ri_pbsnode_list;
 				tmp_pl->vnode = (phowl + i)->hw_pnd;
 				
-				mark_attr_set(get_nattr(tmp_pl->vnode, ND_ATR_resvs));
+				mark_nattr_set(tmp_pl->vnode, ND_ATR_resvs);
 
 				presv->ri_pbsnode_list = tmp_pl;
 				presv->ri_vnodect++;
@@ -7098,8 +7098,8 @@ free_resvNodes(resc_resv *presv)
 			DBPRT(("Freeing resvinfo on node %s from reservation %s\n",
 				pnode->nd_name, presv->ri_qs.ri_resvID))
 
-			mark_attr_set(get_nattr(pnode, ND_ATR_resvs));
-
+			mark_nattr_set(pnode, ND_ATR_resvs);
+			
 			if (prev == NULL) {
 				pnode->nd_resvp = rinfp->next;
 				free(rinfp);

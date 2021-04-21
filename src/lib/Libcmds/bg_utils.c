@@ -709,8 +709,7 @@ recv_dyn_string(int sock, char **buf)
 	if (dorecv(sock, (char *) &len, sizeof(int)) == 0) {
 		if ((*buf = malloc(len + 1))) {
 			rc = dorecv(sock, *buf, len);
-			if ((rc == -1) || /* failed to receive data */
-				(*buf[0] == '\0')) { /* empty string, return NULL in that case, but not error */
+			if (rc == -1) {
 				free(*buf);
 				*buf = NULL;
 			}

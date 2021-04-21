@@ -510,6 +510,8 @@ int set_nattr_short_slim(struct pbsnode *pnode, int attr_idx, short val, enum ba
 int is_nattr_set(const struct pbsnode *pnode, int attr_idx);
 void free_nattr(struct pbsnode *pnode, int attr_idx);
 void clear_nattr(struct pbsnode *pnode, int attr_idx);
+void mark_nattr_set(struct pbsnode *pnode, int attr_idx);
+void mark_nattr_not_set(struct pbsnode *pnode, int attr_idx);
 void set_nattr_jinfo(struct pbsnode *pnode, int attr_idx, struct pbsnode *val);
 
 #ifdef	__cplusplus

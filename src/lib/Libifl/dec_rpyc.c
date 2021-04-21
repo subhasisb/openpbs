@@ -427,6 +427,9 @@ again:
 						pbs_statfree(pstcmd);
 					return rc;
 				}
+#ifdef CLI_DEBUG
+				fprintf(stderr, "IFL read object=%s\n", pstcmd->name);
+#endif				
 				if (reply->brp_type == MGR_OBJ_JOBARRAY_PARENT) {
 					char *remain;
 					if (pstcmd_ja != NULL) {
@@ -460,9 +463,6 @@ again:
 						pstcmd_ja = NULL;
 					}
 normal:
-#ifdef CLI_DEBUG
-					fprintf(stderr, "IFL added object=%s\n", pstcmd->name);
-#endif
 					if (reply->brp_auxcode == 1) { /* diffstat reply, so reverse order */
 						pstcmd->next = *pstcx;
 						*pstcx = pstcmd;

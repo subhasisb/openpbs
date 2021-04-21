@@ -354,6 +354,44 @@ clear_nattr(struct pbsnode *pnode, int attr_idx)
 }
 
 /**
+ * @brief	Mark a node attribute as "set"
+ *
+ * @param[in]	pnode - pointer to node
+ * @param[in]	attr_idx - attribute index to set
+ *
+ * @return	void
+ */
+void
+mark_nattr_set(struct pbsnode *pnode, int attr_idx)
+{
+	if (pnode != NULL) {
+		mark_attr_set(get_nattr(pnode, attr_idx));
+#ifndef PBS_MOM
+		update_node_timedlist(pnode);
+#endif
+	}
+}
+
+/**
+ * @brief	Mark a node attribute as "not set"
+ *
+ * @param[in]	pnode - pointer to node
+ * @param[in]	attr_idx - attribute index to set
+ *
+ * @return	void
+ */
+void
+mark_nattr_not_set(struct pbsnode *pnode, int attr_idx)
+{
+	if (pnode != NULL) {
+		mark_attr_not_set(get_nattr(pnode, attr_idx));
+#ifndef PBS_MOM
+		update_node_timedlist(pnode);
+#endif
+	}
+}
+
+/**
  * @brief	Special setter func to set node's job info value
  *
  * @param[in]	pnode - pointer to node
