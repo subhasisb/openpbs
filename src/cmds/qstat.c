@@ -2610,7 +2610,7 @@ build_resp_from_cache(int con, char *query_jobids_list)
 
 	pbs_errno = PBSE_NONE;
 
-	if (!query_jobids_list) {
+	if (!query_jobids_list || query_jobids_list[0] == '\0') {
 		add_jobs_from_cache(&phead, NULL);
 	} else {
 		name = strtok_r(query_jobids_list, ",", &query_ctx);
@@ -2621,7 +2621,7 @@ build_resp_from_cache(int con, char *query_jobids_list)
 	}
 
 	/* set errors */
-	if (query_jobids_list && !phead) {
+	if (query_jobids_list && query_jobids_list[0] != '\0' && !phead) {
 		if (pbs_errno == PBSE_NONE)
 			pbs_errno = PBSE_UNKJOBID; /* no job found, set PBSE_UNKJOBID, if not other error is already set */
 		pbs_seterrmsg(con, pbse_to_txt(pbs_errno));

@@ -257,14 +257,17 @@ int
 reply_send_status_part(struct batch_request *preq)
 {
 	int rc = PBSE_SYSTEM;
+
 	if (preq->rq_conn >= 0) {
 		struct batch_reply *preply = &preq->rq_reply;
+		int orig_brp_choice = preply->brp_choice;
+
 		preply->brp_is_part = 1;
 		rc = dis_reply_write(preq->rq_conn, preq);
 		if (rc != PBSE_NONE)
 			return rc;
 		reply_free(&preq->rq_reply);
-		preply->brp_choice = BATCH_REPLY_CHOICE_Status;
+		preply->brp_choice = orig_brp_choice;
 		CLEAR_HEAD(preply->brp_un.brp_status);
 		preply->brp_count = 0;
 	}

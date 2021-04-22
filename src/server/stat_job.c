@@ -319,17 +319,38 @@ status_job(job *pjob, struct batch_request *preq, svrattrl *pal, pbs_list_head *
 	if (pstat == NULL)
 		return (PBSE_SYSTEM);
 	CLEAR_LINK(pstat->brp_stlink);
-	if ((pjob->ji_qs.ji_svrflags & JOB_SVFLG_ArrayJob) != 0) {
-		pstat->brp_objtype = MGR_OBJ_JOBARRAY_PARENT;
-		/* in case of diffstat, we must also send the array_indices_remaining attribute, so that
-		 * IFL can synthesize updates for queued subjobs as well
-		 * To do that, we touch the timestamp of the Array_indicies_remaining attribute
-		 */
-		gettimeofday(&(get_jattr(pjob, JOB_ATR_array_indices_remaining)->update_tm), NULL);
-	} else if ((pjob->ji_qs.ji_svrflags & JOB_SVFLG_SubJob) != 0)
-		pstat->brp_objtype = MGR_OBJ_SUBJOB;
-	else
-		pstat->brp_objtype = MGR_OBJ_JOB;
+
+	/* 
+	 * In sched selstat, sched wants to see only real jobs (passes 'S' in extend), 
+	 * not queued subjobs, in this case dosubjobs == 2.
+	 *  
+	 * So do not set the brp_objtype = MGR_OBJ_JOBARRAY_PARENT
+	 * or MGR_OBJ_SUBJOB, which will lead IFL to expand queued jobs
+	 * in the case of dosubjobs == 2
+	 * 
+	 * However, client statjobs, they might pass 't' to extend, dosubjobs == 1 in
+	 * that case, and clients do want the queued jobs to be expanded by IFL.
+	 * 
+	 * So, set the brp_objtype = MGR_OBJ_JOBARRAY_PARENT/MGR_OBJ_SUBJOB in the case
+	 * dosubjobs == 1
+	 * 
+	 */
+	if (dosubjobs == 1) {
+		if ((pjob->ji_qs.ji_svrflags & JOB_SVFLG_ArrayJob) != 0) {
+			pstat->brp_objtype = MGR_OBJ_JOBARRAY_PARENT;
+			/* in case of diffstat, we must also send the array_indices_remaining attribute, so that
+			 * IFL can synthesize updates for queued subjobs as well
+			 * To do that, we touch the timestamp of the Array_indicies_remaining attribute
+			 */
+			gettimeofday(&(get_jattr(pjob, JOB_ATR_array_indices_remaining)->update_tm), NULL);
+		} else if ((pjob->ji_qs.ji_svrflags & JOB_SVFLG_SubJob) != 0)
+			pstat->brp_objtype = MGR_OBJ_SUBJOB;
+		else
+			pstat->brp_objtype = MGR_OBJ_JOB;
+	} else {
+		pstat->brp_objtype = MGR_OBJ_JOB; /* this is dosubjobs == 0 or 2, so set nothing for expansion */
+	}
+	
 	(void)strcpy(pstat->brp_objname, pjob->ji_qs.ji_jobid);
 	CLEAR_HEAD(pstat->brp_attr);
 
@@ -444,8 +465,14 @@ status_subjob(job *pjob, struct batch_request *preq, svrattrl *pal, int subj, pb
 	pstat = (struct brp_status *)malloc(sizeof(struct brp_status));
 	if (pstat == NULL)
 		return (PBSE_SYSTEM);
+	
 	CLEAR_LINK(pstat->brp_stlink);
-	pstat->brp_objtype = MGR_OBJ_SUBJOB;
+
+	if (dosubjobs == 1) /* this is the if 't' in extend, allow IFL to expand quued jobs */
+		pstat->brp_objtype = MGR_OBJ_SUBJOB;
+	else
+		pstat->brp_objtype = MGR_OBJ_JOB;
+
 	(void)strcpy(pstat->brp_objname, objname);
 	CLEAR_HEAD(pstat->brp_attr);
 	append_link(pstathd, &pstat->brp_stlink, pstat);

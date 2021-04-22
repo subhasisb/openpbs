@@ -290,7 +290,7 @@ add_subjobs(struct batch_request *preq, job *pjob, char *statelist, struct brp_s
 		for (i = pjob->ji_ajinfo->tkm_start; i <= pjob->ji_ajinfo->tkm_end; i += pjob->ji_ajinfo->tkm_step) {
 			char sjst = JOB_STATE_LTR_QUEUED;
 
-			if ((preq->rq_type == PBS_BATCH_StatusJob) && (range_contains(pjob->ji_ajinfo->trm_quelist, i)))
+			if ((dosubjobs == 1) && (range_contains(pjob->ji_ajinfo->trm_quelist, i)))
 				continue; /* don't return queued subjobs for statjob, IFL will expand it */
 			
 			/*
@@ -308,7 +308,7 @@ add_subjobs(struct batch_request *preq, job *pjob, char *statelist, struct brp_s
 				}
 			} else {
 				if (statelist == NULL || chk_job_statenum(sjst, statelist)) {
-					rc = status_subjob(pjob, preq, plist, i, &preply->brp_un.brp_status, &bad, 0, from_tm);
+					rc = status_subjob(pjob, preq, plist, i, &preply->brp_un.brp_status, &bad, dosubjobs, from_tm);
 					if (rc && rc != PBSE_PERM)
 						return -1;
 				}
@@ -347,7 +347,7 @@ add_subjobs(struct batch_request *preq, job *pjob, char *statelist, struct brp_s
 
 			dj_prev = (deleted_obj_t *) GET_PRIOR(dj->deleted_obj_link);
 
-			rc = status_subjob(parent, preq, plist, strtoul(dj->obj_id, NULL, 10), &preply->brp_un.brp_status, &bad, 0, from_tm);
+			rc = status_subjob(parent, preq, plist, strtoul(dj->obj_id, NULL, 10), &preply->brp_un.brp_status, &bad, dosubjobs, from_tm);
 			if (rc && rc != PBSE_PERM)
 				break;
 			dj = dj_prev;
@@ -453,7 +453,7 @@ add_selstat_reply(struct batch_request *preq, job *pjob, struct select_list *sel
 				if (dosubjobs == 1 && pjob->ji_ajinfo) {
 					return (add_subjobs(preq, pjob, statelist, pselx, selistp, dosubjobs, from_tm));
 				} else {
-					rc = status_job(pjob, preq, plist, &preply->brp_un.brp_status, &bad, 0, from_tm);
+					rc = status_job(pjob, preq, plist, &preply->brp_un.brp_status, &bad, dosubjobs, from_tm);
 					if (rc && rc != PBSE_PERM)
 						return -1;
 				}

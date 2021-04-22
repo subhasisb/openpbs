@@ -95,7 +95,7 @@ extern pbs_license_counts license_counts;
 extern int status_attrib(svrattrl *, void *, attribute_def *, attribute *, int, int, pbs_list_head *, int *, struct timeval);
 extern int status_nodeattrib(svrattrl *, struct pbsnode *, int, int, pbs_list_head *, int *, struct timeval);
 extern int
-add_subjobs(struct batch_request *preq, job *pjob, char *statelist, struct brp_select ***pselx, int dosubjobs, struct timeval from_tm);
+add_subjobs(struct batch_request *preq, job *pjob, char *statelist, struct brp_select ***pselx, struct select_list *psel, int dosubjobs, struct timeval from_tm);
 
 extern int svr_chk_histjob(job *);
 
@@ -156,7 +156,7 @@ do_stat_of_a_job(struct batch_request *preq, job *pjob, int dohistjobs, int dosu
 			&& (rc == PBSE_NONE || rc == PBSE_PERM)
 			&& pjob->ji_ajinfo != NULL) {
 
-			rc = add_subjobs(preq, pjob, NULL, NULL, dosubjobs, from_tm);
+			rc = add_subjobs(preq, pjob, NULL, NULL, NULL, dosubjobs, from_tm);
 		}
 	}
 
@@ -207,7 +207,7 @@ stat_a_jobidname(struct batch_request *preq, char *name, int dohistjobs, int dos
 		idx = get_index_from_jid(name);
 		if (idx != -1) {
 			pal = (svrattrl *) GET_NEXT(preq->rq_ind.rq_status.rq_attr);
-			rc = status_subjob(pjob, preq, pal, idx, &preply->brp_un.brp_status, &bad, 0, from_tm);
+			rc = status_subjob(pjob, preq, pal, idx, &preply->brp_un.brp_status, &bad, dosubjobs, from_tm);
 		} else
 			rc = PBSE_UNKJOBID;
 		return rc; /* no job still needs to be stat-ed */
@@ -241,7 +241,7 @@ stat_a_jobidname(struct batch_request *preq, char *name, int dohistjobs, int dos
 			else if (i == 1)
 				break;
 			for (i = start; i <= end; i += step) {
-				rc = status_subjob(pjob, preq, pal, i, &preply->brp_un.brp_status, &bad, 0, from_tm);
+				rc = status_subjob(pjob, preq, pal, i, &preply->brp_un.brp_status, &bad, dosubjobs, from_tm);
 				if (rc && rc != PBSE_PERM)
 					return rc;
 			}
