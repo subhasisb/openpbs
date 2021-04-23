@@ -327,7 +327,8 @@ add_subjobs(struct batch_request *preq, job *pjob, char *statelist, struct brp_s
 			if (!(TS_NEWER(pjob->update_tm, from_tm)))
 				break;
 
-			prev = (job *)GET_PRIOR(pjob->ji_timed_link); /* save prev ptr as pjob can change in status_job */
+			/* important: save prev ptr as pjob's position can change in the timed list */
+			prev = (job *)GET_PRIOR(pjob->ji_timed_link);
 			rc = status_job(pjob, preq, plist, &preply->brp_un.brp_status, &bad, dosubjobs, from_tm);
 			if (rc && rc != PBSE_PERM)
 				break;
@@ -345,6 +346,7 @@ add_subjobs(struct batch_request *preq, job *pjob, char *statelist, struct brp_s
 			if (!(TS_NEWER(dj->tm_deleted, from_tm)))
 				break;
 
+			/* important: save prev ptr as my node's position can change in the timed list */
 			dj_prev = (deleted_obj_t *) GET_PRIOR(dj->deleted_obj_link);
 
 			rc = status_subjob(parent, preq, plist, strtoul(dj->obj_id, NULL, 10), &preply->brp_un.brp_status, &bad, dosubjobs, from_tm);
@@ -483,6 +485,7 @@ req_selectjobs(struct batch_request *preq)
 {
 	int bad = 0;
 	job *pjob;
+	job *prev;
 	svrattrl *plist;
 	pbs_queue *pque;
 	struct batch_reply *preply;
@@ -569,9 +572,14 @@ req_selectjobs(struct batch_request *preq)
 			preply->latestObj = pjob->update_tm;
 
 		/* traverse backwards to find the oldest job matching (>=) the provided from time stamp */
-		for (; pjob && (rc == PBSE_NONE); pjob = (job *) GET_PRIOR(pjob->ji_timed_link)) {
+		for (; pjob && (rc == PBSE_NONE); pjob = prev) {
+			
+			/* important: save prev ptr as pjob's position can change in the timed list */
+			prev = (job *)GET_PRIOR(pjob->ji_timed_link);
+
 			if (!(TS_NEWER(pjob->update_tm, from_tm)))
 				break;
+
 			if (pque && pjob->ji_qhdr != pque)
 				continue;
 			rc = add_selstat_reply(preq, pjob, selistp, pstate, &pselx, dosubjobs, dohistjobs, from_tm);  /* stat backwards, IFL will reverse */

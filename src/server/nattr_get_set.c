@@ -172,7 +172,9 @@ set_nattr_generic(struct pbsnode *pnode, int attr_idx, char *val, char *rscn, en
 	if (pnode == NULL || val == NULL)
 		return 1;
 
+#ifndef PBS_MOM
 	update_node_timedlist(pnode);
+#endif
 	return set_attr_generic(get_nattr(pnode, attr_idx), &node_attr_def[attr_idx], val, rscn, op);
 }
 
@@ -194,7 +196,9 @@ set_nattr_str_slim(struct pbsnode *pnode, int attr_idx, char *val, char *rscn)
 	if (pnode == NULL || val == NULL)
 		return 1;
 
+#ifndef PBS_MOM
 	update_node_timedlist(pnode);
+#endif
 	return set_attr_generic(get_nattr(pnode, attr_idx), &node_attr_def[attr_idx], val, rscn, INTERNAL);
 }
 
@@ -216,7 +220,9 @@ set_nattr_l_slim(struct pbsnode *pnode, int attr_idx, long val, enum batch_op op
 	if (pnode == NULL)
 		return 1;
 
+#ifndef PBS_MOM
 	update_node_timedlist(pnode);
+#endif
 	set_attr_l(get_nattr(pnode, attr_idx), val, op);
 
 	return 0;
@@ -240,7 +246,9 @@ set_nattr_b_slim(struct pbsnode *pnode, int attr_idx, long val, enum batch_op op
 	if (pnode == NULL)
 		return 1;
 
+#ifndef PBS_MOM
 	update_node_timedlist(pnode);
+#endif
 	set_attr_b(get_nattr(pnode, attr_idx), val, op);
 
 	return 0;
@@ -264,7 +272,9 @@ set_nattr_c_slim(struct pbsnode *pnode, int attr_idx, char val, enum batch_op op
 	if (pnode == NULL)
 		return 1;
 
+#ifndef PBS_MOM
 	update_node_timedlist(pnode);
+#endif
 	set_attr_c(get_nattr(pnode, attr_idx), val, op);
 
 	return 0;
@@ -288,7 +298,9 @@ set_nattr_short_slim(struct pbsnode *pnode, int attr_idx, short val, enum batch_
 	if (pnode == NULL)
 		return 1;
 
+#ifndef PBS_MOM
 	update_node_timedlist(pnode);
+#endif
 	set_attr_short(get_nattr(pnode, attr_idx), val, op);
 
 	return 0;
@@ -326,10 +338,11 @@ void
 free_nattr(struct pbsnode *pnode, int attr_idx)
 {
 	attribute *pattr = get_nattr(pnode, attr_idx);
-	update_node_timedlist(pnode);
+
 	if (pnode != NULL)
 		free_attr(node_attr_def, pattr, attr_idx);
 #ifndef PBS_MOM
+	update_node_timedlist(pnode);
 	post_attr_set_unset(pattr);
 #endif
 }
@@ -346,9 +359,9 @@ void
 clear_nattr(struct pbsnode *pnode, int attr_idx)
 {
 	attribute *pattr = get_nattr(pnode, attr_idx);
-	update_node_timedlist(pnode);
 	clear_attr(pattr, &node_attr_def[attr_idx]);
 #ifndef PBS_MOM
+	update_node_timedlist(pnode);
 	post_attr_set_unset(pattr);
 #endif
 }
@@ -405,10 +418,10 @@ set_nattr_jinfo(struct pbsnode *pnode, int attr_idx, struct pbsnode *val)
 {
 	attribute *attr = get_nattr(pnode, attr_idx);
 	attr->at_val.at_jinfo = val;
-	attr->at_flags = ATR_SET_MOD_MCACHE;
-	update_node_timedlist(pnode);
+	mark_nattr_set(pnode, attr_idx);
 }
 
+#ifndef PBS_MOM
 /**
  * @brief
  * 		set this node at the right place in the jobs list sorted on update time
@@ -424,13 +437,11 @@ set_nattr_jinfo(struct pbsnode *pnode, int attr_idx, struct pbsnode *val)
 void
 update_node_timedlist(pbsnode *pnode)
 {
-#ifndef PBS_MOM
-	/* the time updation functionlity is required only for server daemon */
 	pbsnode *platest;
 
 	if (!pnode) 
 		return; /* null, newobj, or dup'd node for hook processing, ignore */
-	 
+
 	gettimeofday(&pnode->update_tm, NULL); /* update the current timestamp */ 
 
 	platest = (pbsnode *) GET_PRIOR(svr_allnodes_timed);
@@ -443,5 +454,5 @@ update_node_timedlist(pbsnode *pnode)
 		delete_link(&pnode->nd_allnodes_timed);
 		insert_link(&platest->nd_allnodes_timed, &pnode->nd_allnodes_timed, pnode, LINK_INSET_AFTER); /* link after 'latest' node in server's list */
 	}
-#endif
 }
+#endif

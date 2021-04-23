@@ -6932,6 +6932,7 @@ stat_deleted_ids(pbs_list_head *head, struct timeval from_tm, pbs_list_head *pst
 
 		(*count)++;
 
+		/* important: save prev ptr as my node's position can change in the timed list */
 		nxt = (deleted_obj_t *) GET_PRIOR(dj->deleted_obj_link);
 		if (time_now - dj->tm_deleted.tv_sec > DEL_OBJ_TIME) {
 			/* too old, remove from deleted objs list */

@@ -2570,7 +2570,7 @@ deallocate_job_from_node(char *jobid, struct pbsnode *pnode)
 		return (0);
 	}
 
-	mark_attr_set(get_nattr(pnode, ND_ATR_jobs));
+	mark_nattr_set(pnode, ND_ATR_jobs);
 	still_has_jobs = 0;
 	for (np = pnode->nd_psn; np; np = np->next) {
 
@@ -6801,7 +6801,7 @@ set_nodes(void *pobj, int objtype, char *execvnod_in, char **execvnod_out, char 
 		for (i = 0; i < ndindex; ++i) {
 
 			pnode = (phowl+i)->hw_pnd;
-			mark_attr_set(get_nattr(pnode, ND_ATR_jobs));
+			mark_nattr_set(pnode, ND_ATR_jobs);
 
 			if ((svr_init == TRUE) &&
 			    ((check_job_substate(pjob, JOB_SUBSTATE_SUSPEND) ||

@@ -399,7 +399,8 @@ req_stat_job(struct batch_request *preq)
 					break;
 			}
 
-			prev = (job *)GET_PRIOR(pjob->ji_timed_link); /* save this since the pjob could be modified */
+			/* important: save prev ptr as pjob's position can change in the timed list */
+			prev = (job *)GET_PRIOR(pjob->ji_timed_link);
 			rc = do_stat_of_a_job(preq, pjob, dohistjobs, dosubjobs, from_tm); /* stat backwards, IFL will reverse */
 			pjob = prev;
 		}
@@ -668,7 +669,8 @@ req_stat_node(struct batch_request *preq)
 			if (!(TS_NEWER(pnode->update_tm, from_tm)))
 				break;
 
-			prev = (pbsnode *)GET_PRIOR(pnode->nd_allnodes_timed); /* save since status_node could update pnode */
+			/* important: save prev ptr as pnode's position can change in the timed list */
+			prev = (pbsnode *)GET_PRIOR(pnode->nd_allnodes_timed);
 			rc = status_node(pnode, preq, &preply->brp_un.brp_status, from_tm); /* stat backwards, IFL will reverse */
 			pnode = prev;
 		}

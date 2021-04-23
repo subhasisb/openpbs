@@ -5659,6 +5659,7 @@ update_job_timedlist_inner(pbs_list_head *head, job *pjob, struct timeval update
 	}
 }
 
+#ifndef PBS_MOM
 /**
  * @brief
  * 		set this job at the right place in the jobs list sorted on update time
@@ -5691,3 +5692,4 @@ update_job_timedlist(job *pjob)
 		update_job_timedlist_inner(&svr_alljobs_timed, pjob, update_tm);
 	}
 }
+#endif
