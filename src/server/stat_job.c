@@ -335,7 +335,7 @@ status_job(job *pjob, struct batch_request *preq, svrattrl *pal, pbs_list_head *
 	 * dosubjobs == 1
 	 * 
 	 */
-	if (dosubjobs == 1) {
+	if ((dosubjobs == 1) && (preq->rq_type == PBS_BATCH_StatusJob)) {
 		if ((pjob->ji_qs.ji_svrflags & JOB_SVFLG_ArrayJob) != 0) {
 			pstat->brp_objtype = MGR_OBJ_JOBARRAY_PARENT;
 			/* in case of diffstat, we must also send the array_indices_remaining attribute, so that
@@ -371,7 +371,6 @@ status_job(job *pjob, struct batch_request *preq, svrattrl *pal, pbs_list_head *
 	rc = status_attrib(pal, job_attr_idx, job_attr_def, pjob->ji_wattr, JOB_ATR_LAST, preq->rq_perm, &pstat->brp_attr, bad, from_tm);
 	if ((rc != 0) || (!GET_NEXT(pstat->brp_attr))) {
 		free(pstat);
-		log_errf(-1, __func__, "**** not attribute ***");
 		if (IS_FULLSTAT(from_tm))
 			return (PBSE_NOATTR);
 		else

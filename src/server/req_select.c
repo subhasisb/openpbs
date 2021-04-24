@@ -290,7 +290,7 @@ add_subjobs(struct batch_request *preq, job *pjob, char *statelist, struct brp_s
 		for (i = pjob->ji_ajinfo->tkm_start; i <= pjob->ji_ajinfo->tkm_end; i += pjob->ji_ajinfo->tkm_step) {
 			char sjst = JOB_STATE_LTR_QUEUED;
 
-			if ((dosubjobs == 1) && (range_contains(pjob->ji_ajinfo->trm_quelist, i)))
+			if ((preq->rq_type == PBS_BATCH_StatusJob) && (dosubjobs == 1) && (range_contains(pjob->ji_ajinfo->trm_quelist, i)))
 				continue; /* don't return queued subjobs for statjob, IFL will expand it */
 			
 			/*
