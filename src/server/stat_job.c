@@ -292,6 +292,17 @@ status_job(job *pjob, struct batch_request *preq, svrattrl *pal, pbs_list_head *
 		if (svr_authorize_jobreq(preq, pjob))
 			return (PBSE_PERM);
 
+
+
+	if (!IS_FULLSTAT(from_tm) && (dosubjobs == 2)) {
+			if (check_job_state(pjob, JOB_STATE_LTR_FINISHED)) {
+				/* this is the scheduler selstat, and job just moved to F state (diffstat)
+				 * the scheduler does not need Finished jobs, just tell the scheduler that
+				 * this job is dead/deleted
+				 */
+			}
+	}
+
 	/* calc eligible time on the fly and return, don't save. */
 	if (get_sattr_long(SVR_ATR_EligibleTimeEnable) == TRUE) {
 		log_errf(-1, __func__, "job %s, accrue_type=%d, to set eligible_time to %d", 

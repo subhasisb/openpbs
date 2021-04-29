@@ -6885,6 +6885,40 @@ append_deleted_ids(pbs_list_head *head, char *id)
 	}
 }
 
+/**
+ * @brief
+ * 		add a single deleted id to the batch reply
+ *
+ * @param[in]	id - the id to add
+ * @param[in]	preply - pointer to the reply structure to add to
+ *
+ * @return	int
+ * @retval	0 - success
+ * @retval	!0 - Error - pbs errno
+ *
+ * @par MT-Safe: Yes
+ * @par Side Effects: None
+ *
+ */
+int 
+add_deleted_id(char *id, struct batch_reply *preply)
+{
+	struct brp_status *pstat = NULL;
+	pstat = (struct brp_status *) malloc(sizeof(struct brp_status));
+	if (pstat == NULL)
+		return PBSE_SYSTEM;
+
+	CLEAR_LINK(pstat->brp_stlink);
+	pstat->brp_objtype = MGR_OBJ_DELETED;
+	strcpy(pstat->brp_objname, id);
+	CLEAR_HEAD(pstat->brp_attr);
+	append_link(&preply->brp_un.brp_status, &pstat->brp_stlink, pstat);
+	preply->brp_count++;
+
+	log_errf(-1, __func__, "*** Adding deleted id %s to selstat reply!!", id);
+
+	return 0;
+}
 
 /**
  * @brief
@@ -6892,23 +6926,23 @@ append_deleted_ids(pbs_list_head *head, char *id)
  *
  * @param[in]	phead - list head for this object type
  * @param[in]	from_tm - ids deleted after this timestamp only
- * @param[in]	pstathd - the stat reply list head
+ * @param[in]	preply - ptr to the reply structure
  * @param[out]	last_purge_ts - return the last purged ts
- * @param[out]	count - update the count of objects added to the stat reply
- * @param[out]	latestObj - return the latest timestamp that is stat'd
  *
- * @return	void
+ * @return	int
+ * @retval	0 - success
+ * @retval	!0 - Error - pbs errno
  *
  * @par MT-Safe: Yes
  * @par Side Effects: None
  *
  */
-void
-stat_deleted_ids(pbs_list_head *head, struct timeval from_tm, pbs_list_head *pstathd, struct timeval *last_purge_ts, int *count, struct timeval *latestObj)
+int
+stat_deleted_ids(pbs_list_head *head, struct timeval from_tm, struct batch_reply *preply, struct timeval *last_purge_ts)
 {
 	deleted_obj_t *dj, *nxt;
 	struct timeval lastdo = {0,0};
-	struct brp_status *pstat = NULL;
+	int rc = 0;
 
 	dj = (deleted_obj_t *) GET_PRIOR((*head));
 	if (dj)
@@ -6918,19 +6952,8 @@ stat_deleted_ids(pbs_list_head *head, struct timeval from_tm, pbs_list_head *pst
 		if (!(TS_NEWER(dj->tm_deleted, from_tm)))
 			break;
 
-		pstat = (struct brp_status *) malloc(sizeof(struct brp_status));
-		if (pstat == NULL)
-			return;
-
-		CLEAR_LINK(pstat->brp_stlink);
-		pstat->brp_objtype = MGR_OBJ_DELETED;
-		strcpy(pstat->brp_objname, dj->obj_id);
-		CLEAR_HEAD(pstat->brp_attr);
-		append_link(pstathd, &pstat->brp_stlink, pstat);
-
-		log_errf(-1, __func__, "*** Adding deleted id %s to stat reply!!", dj->obj_id);
-
-		(*count)++;
+		if ((rc = add_deleted_id(dj->obj_id, preply)) != 0)
+			return rc;
 
 		/* important: save prev ptr as my node's position can change in the timed list */
 		nxt = (deleted_obj_t *) GET_PRIOR(dj->deleted_obj_link);
@@ -6944,8 +6967,10 @@ stat_deleted_ids(pbs_list_head *head, struct timeval from_tm, pbs_list_head *pst
 		dj = nxt;
 	}
 
-	if (TS_NEWER(lastdo, (*latestObj)))
-		*latestObj = lastdo;
+	if (TS_NEWER(lastdo, preply->latestObj))
+		preply->latestObj = lastdo;
+
+	return 0;
 }
 
 /**

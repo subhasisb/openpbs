@@ -290,8 +290,10 @@ add_subjobs(struct batch_request *preq, job *pjob, char *statelist, struct brp_s
 		for (i = pjob->ji_ajinfo->tkm_start; i <= pjob->ji_ajinfo->tkm_end; i += pjob->ji_ajinfo->tkm_step) {
 			char sjst = JOB_STATE_LTR_QUEUED;
 
-			if ((preq->rq_type == PBS_BATCH_StatusJob) && (dosubjobs == 1) && (range_contains(pjob->ji_ajinfo->trm_quelist, i)))
-				continue; /* don't return queued subjobs for statjob, IFL will expand it */
+			/* don't return queued subjobs for statjob, IFL will expand it */
+			/* don't return queued subjobs in case of dosubjobs == 2, since that only means actual running jobs */
+			if (((preq->rq_type == PBS_BATCH_StatusJob) || (dosubjobs == 2)) && (range_contains(pjob->ji_ajinfo->trm_quelist, i)))
+				continue;
 			
 			/*
 			* If statelist is NULL, then no need to check anything,
@@ -319,7 +321,7 @@ add_subjobs(struct batch_request *preq, job *pjob, char *statelist, struct brp_s
 		parent = pjob; /* save parent job pointer */
 		pjob = (job *) GET_PRIOR(parent->ji_ajinfo->subjobs_timed);
 		/* traverse backwards to find the oldest job matching (>=) the provided from time stamp */
-		while (pjob && (rc == PBSE_NONE)) {
+		while (pjob && (rc == PBSE_NONE || rc == PBSE_PERM)) {
 			log_eventf(PBSEVENT_DEBUG3, PBS_EVENTCLASS_JOB, LOG_DEBUG, pjob->ji_qs.ji_jobid,
 				"diffstat considering subjob subjob_tm={%d,%d}, from_tm={%d,%d}", 
 				pjob->update_tm.tv_sec, pjob->update_tm.tv_usec, from_tm.tv_sec, from_tm.tv_usec);
@@ -330,15 +332,13 @@ add_subjobs(struct batch_request *preq, job *pjob, char *statelist, struct brp_s
 			/* important: save prev ptr as pjob's position can change in the timed list */
 			prev = (job *)GET_PRIOR(pjob->ji_timed_link);
 			rc = status_job(pjob, preq, plist, &preply->brp_un.brp_status, &bad, dosubjobs, from_tm);
-			if (rc && rc != PBSE_PERM)
-				break;
 
 			pjob = prev;
 		}
 
 		/* adding entries for deleted subjobs - not as deleted ids, since subjobs are listed till job array goes away!!! */
 		dj = (deleted_obj_t *) GET_PRIOR(parent->ji_ajinfo->subjobs_deleted);
-		while (dj) {
+		while ((rc == 0 || rc == PBSE_PERM) && (dj)) {
 			log_eventf(PBSEVENT_DEBUG3, PBS_EVENTCLASS_JOB, LOG_DEBUG, dj->obj_id,
 				"diffstat considering deleted subjob subjob_tm={%d,%d}, from_tm={%d,%d}", 
 				dj->tm_deleted.tv_sec, dj->tm_deleted.tv_usec, from_tm.tv_sec, from_tm.tv_usec);
@@ -349,13 +349,15 @@ add_subjobs(struct batch_request *preq, job *pjob, char *statelist, struct brp_s
 			/* important: save prev ptr as my node's position can change in the timed list */
 			dj_prev = (deleted_obj_t *) GET_PRIOR(dj->deleted_obj_link);
 
-			rc = status_subjob(parent, preq, plist, strtoul(dj->obj_id, NULL, 10), &preply->brp_un.brp_status, &bad, dosubjobs, from_tm);
-			if (rc && rc != PBSE_PERM)
-				break;
+			if (dosubjobs == 2) { /* sched special, mark deleted subjobs as deleted as well */
+				rc = add_deleted_id(dj->obj_id, preply);
+			} else {
+				rc = status_subjob(parent, preq, plist, strtoul(dj->obj_id, NULL, 10), &preply->brp_un.brp_status, &bad, dosubjobs, from_tm);
+			}
 			dj = dj_prev;
 		}
 	}
-	return 0;
+	return rc;
 }
 
 /**
@@ -458,6 +460,10 @@ add_selstat_reply(struct batch_request *preq, job *pjob, struct select_list *sel
 					rc = status_job(pjob, preq, plist, &preply->brp_un.brp_status, &bad, dosubjobs, from_tm);
 					if (rc && rc != PBSE_PERM)
 						return -1;
+
+					if (dosubjobs && (pjob->ji_qs.ji_svrflags & JOB_SVFLG_ArrayJob) && pjob->ji_ajinfo != NULL) {
+						return (add_subjobs(preq, pjob, statelist, pselx, selistp, dosubjobs, from_tm));
+					}
 				}
 			}
 		}
@@ -590,7 +596,7 @@ req_selectjobs(struct batch_request *preq)
 		}
 
 		/* now stat deleted jobs */
-		stat_deleted_ids(&svr_alljobs_deleted, from_tm, &preply->brp_un.brp_status, &last_job_purge_ts, &preply->brp_count, &preply->latestObj);
+		rc = stat_deleted_ids(&svr_alljobs_deleted, from_tm, preply, &last_job_purge_ts);
 	} else { /* full stat */
 		/* now start checking for jobs that match the selection criteria */
 		pjob = (pque) ? (job *) GET_NEXT(pque->qu_jobs) : (job *) GET_NEXT(svr_alljobs);	

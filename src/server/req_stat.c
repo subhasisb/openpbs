@@ -406,7 +406,7 @@ req_stat_job(struct batch_request *preq)
 		}
 
 		/* now stat deleted jobs */
-		stat_deleted_ids(&svr_alljobs_deleted, from_tm, &preply->brp_un.brp_status, &last_job_purge_ts, &preply->brp_count, &preply->latestObj);
+		rc = stat_deleted_ids(&svr_alljobs_deleted, from_tm, preply, &last_job_purge_ts);
 	} else { /* full stat */
 		if (type == 1) {
 			/*
@@ -676,7 +676,7 @@ req_stat_node(struct batch_request *preq)
 		}
 
 		/* now stat deleted nodes */
-		stat_deleted_ids(&svr_allnodes_deleted, from_tm, &preply->brp_un.brp_status, &last_node_purge_ts, &preply->brp_count, &preply->latestObj);
+		rc = stat_deleted_ids(&svr_allnodes_deleted, from_tm, preply, &last_node_purge_ts);
 	} else { /* full stat */
 		if (type == 0) { /* get status of the named node */
 			rc = status_node(pnode, preq, &preply->brp_un.brp_status, from_tm);
