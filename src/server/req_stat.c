@@ -94,10 +94,10 @@ extern pbs_license_counts license_counts;
 
 extern int status_attrib(svrattrl *, void *, attribute_def *, attribute *, int, int, pbs_list_head *, int *, struct timeval);
 extern int status_nodeattrib(svrattrl *, struct pbsnode *, int, int, pbs_list_head *, int *, struct timeval);
-extern int
-add_subjobs(struct batch_request *preq, job *pjob, char *statelist, struct brp_select ***pselx, struct select_list *psel, int dosubjobs, struct timeval from_tm);
-
 extern int svr_chk_histjob(job *);
+extern int add_subjobs(struct batch_request *preq, job *pjob, 
+		char *statelist, struct select_list *psel, struct brp_select ***pselx, 
+		int dohistjobs, int dosubjobs, struct timeval from_tm);
 
 
 /* Private Data Definitions */
@@ -123,6 +123,9 @@ static int status_resv(resc_resv *, struct batch_request *, pbs_list_head *);
  *
  * @param[in,out] preq       - pointer to the stat job batch request, reply updated
  * @param[in]     pjob       - pointer to the job to be statused
+ * @param[in]     statelist  - list of states to select
+ * @param[in]     selistp    - ptr to the select list
+ * @param[in/out] pselx      - select return
  * @param[in]     dohistjobs - flag to include job if it is a history job
  * @param[in]     dosubjobs  - flag to expand a Array job to include all subjobs
  * @param[in]	  from_tm    - from timestamp in case of diffstat
@@ -131,39 +134,37 @@ static int status_resv(resc_resv *, struct batch_request *, pbs_list_head *);
  * @retval PBSE_NONE  - no error
  * @retval !PBSE_NONE - PBS error code to return to client
  */
-static int
-do_stat_of_a_job(struct batch_request *preq, job *pjob, int dohistjobs, int dosubjobs, struct timeval from_tm)
+int
+do_stat_of_a_job(struct batch_request *preq, job *pjob, 
+	char *statelist, struct select_list *psel, struct brp_select ***pselx,
+	int dohistjobs, int dosubjobs, struct timeval from_tm)
 {
 	svrattrl *pal;
-	int rc;
+	int rc = PBSE_NONE;
 	
 	struct batch_reply *preply = &preq->rq_reply;
 
-	/* if history job and not asking for them, just return */
-	if (!dohistjobs
-			&& (check_job_state(pjob, JOB_STATE_LTR_FINISHED)
-					|| check_job_state(pjob, JOB_STATE_LTR_MOVED))) {
-		return (PBSE_NONE); /* just return nothing */
-	}
-
-	pal = (svrattrl *) GET_NEXT(preq->rq_ind.rq_status.rq_attr);
+	if (preq->rq_type == PBS_BATCH_StatusJob) 
+		pal = (svrattrl *) GET_NEXT(preq->rq_ind.rq_status.rq_attr);
+	else
+		pal = (svrattrl *) GET_NEXT(preq->rq_ind.rq_select.rq_rtnattr);
 
 	if ((pjob->ji_qs.ji_svrflags & JOB_SVFLG_SubJob) == 0) {
 		/* this is not a subjob, go ahead and build the status reply for this job */
-		rc = status_job(pjob, preq, pal, &preply->brp_un.brp_status, &bad, dosubjobs, from_tm);
+		rc = status_job(pjob, preq, pal, &preply->brp_un.brp_status, &bad, dohistjobs, dosubjobs, from_tm);
 		if (dosubjobs
 			&& (pjob->ji_qs.ji_svrflags & JOB_SVFLG_ArrayJob)
 			&& (rc == PBSE_NONE || rc == PBSE_PERM)
 			&& pjob->ji_ajinfo != NULL) {
 
-			rc = add_subjobs(preq, pjob, NULL, NULL, NULL, dosubjobs, from_tm);
+			rc = add_subjobs(preq, pjob, statelist, psel, pselx, dohistjobs, dosubjobs, from_tm);
 		}
 	}
 
 	if (rc == PBSE_PERM)
 		rc = PBSE_NONE;
 			
-	return PBSE_NONE;
+	return rc;
 }
 
 /**
@@ -207,7 +208,7 @@ stat_a_jobidname(struct batch_request *preq, char *name, int dohistjobs, int dos
 		idx = get_index_from_jid(name);
 		if (idx != -1) {
 			pal = (svrattrl *) GET_NEXT(preq->rq_ind.rq_status.rq_attr);
-			rc = status_subjob(pjob, preq, pal, idx, &preply->brp_un.brp_status, &bad, dosubjobs, from_tm);
+			rc = status_subjob(pjob, preq, pal, idx, &preply->brp_un.brp_status, &bad, dohistjobs, dosubjobs, from_tm);
 		} else
 			rc = PBSE_UNKJOBID;
 		return rc; /* no job still needs to be stat-ed */
@@ -218,7 +219,7 @@ stat_a_jobidname(struct batch_request *preq, char *name, int dohistjobs, int dos
 			return PBSE_UNKJOBID;
 		else if (!dohistjobs && (rc = svr_chk_histjob(pjob)) != PBSE_NONE)
 			return rc;
-		return do_stat_of_a_job(preq, pjob, dohistjobs, dosubjobs, from_tm);
+		return do_stat_of_a_job(preq, pjob, NULL, NULL, NULL, dohistjobs, dosubjobs, from_tm);
 	} else {
 		/* range of sub jobs */
 		range = get_range_from_jid(name);
@@ -241,7 +242,7 @@ stat_a_jobidname(struct batch_request *preq, char *name, int dohistjobs, int dos
 			else if (i == 1)
 				break;
 			for (i = start; i <= end; i += step) {
-				rc = status_subjob(pjob, preq, pal, i, &preply->brp_un.brp_status, &bad, dosubjobs, from_tm);
+				rc = status_subjob(pjob, preq, pal, i, &preply->brp_un.brp_status, &bad, dohistjobs, dosubjobs, from_tm);
 				if (rc && rc != PBSE_PERM)
 					return rc;
 			}
@@ -322,7 +323,7 @@ req_stat_job(struct batch_request *preq)
 	}
 
 	log_eventf(PBSEVENT_DEBUG3, PBS_EVENTCLASS_SERVER, LOG_DEBUG, msg_daemonname, 
-		"jobstat: dosubjobs=%d, dohistjob=%d, from_tm={%d,%d}", dosubjobs, dohistjobs, from_tm.tv_sec, from_tm.tv_usec);
+		"jobstat: dohistjob=%d, dosubjobs=%d, from_tm={%d,%d}",  dohistjobs, dosubjobs, from_tm.tv_sec, from_tm.tv_usec);
 
 	/*
 	 * first, validate the name of the requested object, either
@@ -401,7 +402,7 @@ req_stat_job(struct batch_request *preq)
 
 			/* important: save prev ptr as pjob's position can change in the timed list */
 			prev = (job *)GET_PRIOR(pjob->ji_timed_link);
-			rc = do_stat_of_a_job(preq, pjob, dohistjobs, dosubjobs, from_tm); /* stat backwards, IFL will reverse */
+			rc = do_stat_of_a_job(preq, pjob, NULL, NULL, NULL, dohistjobs, dosubjobs, from_tm); /* stat backwards, IFL will reverse */
 			pjob = prev;
 		}
 
@@ -429,7 +430,7 @@ req_stat_job(struct batch_request *preq)
 		} else {
 			pjob = (job *) GET_NEXT(type == 2 ? pque->qu_jobs : svr_alljobs);
 			while (pjob) {
-				rc = do_stat_of_a_job(preq, pjob, dohistjobs, dosubjobs, from_tm);
+				rc = do_stat_of_a_job(preq, pjob, NULL, NULL, NULL, dohistjobs, dosubjobs, from_tm);
 				if (rc != PBSE_NONE) {
 					req_reject(rc, bad, preq);
 					return;

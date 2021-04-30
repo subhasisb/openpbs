@@ -260,6 +260,7 @@ status_attrib(svrattrl *pal, void *pidx, attribute_def *padef, attribute *pattr,
  * @param[in]	    pal	     -	specific attributes to status
  * @param[in,out]	pstathd	 -	RETURN: head of list to append status to
  * @param[out]	    bad	     -	RETURN: index of first bad attribute
+ * @param[in]		dohistjobs	return history jobs?
  * @param[in]		dosubjobs -	flag to expand a Array job to include all subjobs
  * @param[in]       from_tm -  timestamp from when to stat jobs, in case of diffstat
  *
@@ -271,12 +272,15 @@ status_attrib(svrattrl *pal, void *pidx, attribute_def *padef, attribute *pattr,
  */
 
 int
-status_job(job *pjob, struct batch_request *preq, svrattrl *pal, pbs_list_head *pstathd, int *bad,  int dosubjobs, struct timeval from_tm)
+status_job(job *pjob, struct batch_request *preq, 
+	svrattrl *pal, pbs_list_head *pstathd, int *bad,  
+	int dohistjobs, int dosubjobs, struct timeval from_tm)
 {
 	struct brp_status *pstat;
 	long oldtime = 0;
 	int revert_state_r = 0;
 	int rc = 0;
+	char state;
 	struct batch_reply *preply = &preq->rq_reply;
 
 	/* first flush if buffer is full */
@@ -292,15 +296,16 @@ status_job(job *pjob, struct batch_request *preq, svrattrl *pal, pbs_list_head *
 		if (svr_authorize_jobreq(preq, pjob))
 			return (PBSE_PERM);
 
-
-
-	if (!IS_FULLSTAT(from_tm) && (dosubjobs == 2)) {
-			if (check_job_state(pjob, JOB_STATE_LTR_FINISHED)) {
-				/* this is the scheduler selstat, and job just moved to F state (diffstat)
-				 * the scheduler does not need Finished jobs, just tell the scheduler that
-				 * this job is dead/deleted
-				 */
-			}
+	/* if history job and not asking for them */
+	state = get_job_state(pjob);
+	if (!dohistjobs
+			&& ((state == JOB_STATE_LTR_FINISHED) || (state == JOB_STATE_LTR_MOVED) || (state == JOB_STATE_LTR_EXPIRED))) {
+		
+		/* if this is diffstat from scheduler, then we must send the history as "deleted" job */
+		if ((dosubjobs == 2) && (!IS_FULLSTAT(from_tm)))
+			return (add_deleted_id(pjob->ji_qs.ji_jobid, preply));
+		else
+			return (PBSE_NONE);
 	}
 
 	/* calc eligible time on the fly and return, don't save. */
@@ -413,6 +418,7 @@ status_job(job *pjob, struct batch_request *preq, svrattrl *pal, pbs_list_head *
  * @param[in]		subj	-	if not = -1 then include subjob [n]
  * @param[in,out]	pstathd	-	RETURN: head of list to append status to
  * @param[out]		bad	-	RETURN: index of first bad attribute
+ * @param[in]		dohistjos - return history jobs?
  * @param[in]		dosubjobs -	flag to expand a Array job to include all subjobs
  * @param[in]       from_tm -  timestamp from when to stat jobs, in case of diffstat
  *
@@ -423,7 +429,8 @@ status_job(job *pjob, struct batch_request *preq, svrattrl *pal, pbs_list_head *
  * @retval	PBSE_IVALREQ	: something wrong with the flags
  */
 int
-status_subjob(job *pjob, struct batch_request *preq, svrattrl *pal, int subj, pbs_list_head *pstathd, int *bad, int dosubjobs, struct timeval from_tm)
+status_subjob(job *pjob, struct batch_request *preq, svrattrl *pal, int subj, pbs_list_head *pstathd, int *bad, 
+	int dohistjobs, int dosubjobs, struct timeval from_tm)
 {
 	int limit = (int)JOB_ATR_LAST;
 	struct brp_status *pstat;
@@ -456,7 +463,7 @@ status_subjob(job *pjob, struct batch_request *preq, svrattrl *pal, int subj, pb
 
 	psubjob = get_subjob_and_state(pjob, subj, &sjst, &sjsst);
 	if (psubjob)
-		return status_job(psubjob, preq, pal, pstathd, bad, dosubjobs, from_tm);
+		return status_job(psubjob, preq, pal, pstathd, bad, dohistjobs, dosubjobs, from_tm);
 
 	if (sjst == JOB_STATE_LTR_UNKNOWN)
 		return PBSE_UNKJOBID;

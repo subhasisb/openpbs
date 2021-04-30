@@ -403,8 +403,8 @@ struct stat_cntl {
 	char sc_jobid[PBS_MAXSVRJOBID + 1];
 };
 
-extern int status_job(job *, struct batch_request *, svrattrl *, pbs_list_head *, int *, int, struct timeval);
-extern int status_subjob(job *, struct batch_request *, svrattrl *, int, pbs_list_head *, int *, int, struct timeval);
+extern int status_job(job *, struct batch_request *, svrattrl *, pbs_list_head *, int *, int, int, struct timeval);
+extern int status_subjob(job *, struct batch_request *, svrattrl *, int, pbs_list_head *, int *, int, int, struct timeval);
 extern int stat_to_mom(job *, struct stat_cntl *);
 
 #endif /* STAT_CNTL */
