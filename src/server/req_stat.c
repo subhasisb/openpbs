@@ -150,8 +150,11 @@ do_stat_of_a_job(struct batch_request *preq, job *pjob,
 		pal = (svrattrl *) GET_NEXT(preq->rq_ind.rq_select.rq_rtnattr);
 
 	if ((pjob->ji_qs.ji_svrflags & JOB_SVFLG_SubJob) == 0) {
-		/* this is not a subjob, go ahead and build the status reply for this job */
-		rc = status_job(pjob, preq, pal, &preply->brp_un.brp_status, &bad, dohistjobs, dosubjobs, from_tm);
+		if (!((preq->rq_type == PBS_BATCH_SelStat) && (dosubjobs == 1))) {
+			/* skip status job in case of selstat, not from scheduler (dosubjobs == 1) */
+			rc = status_job(pjob, preq, pal, &preply->brp_un.brp_status, &bad, dohistjobs, dosubjobs, from_tm);
+		}
+
 		if (dosubjobs
 			&& (pjob->ji_qs.ji_svrflags & JOB_SVFLG_ArrayJob)
 			&& (rc == PBSE_NONE || rc == PBSE_PERM)

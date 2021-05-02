@@ -1943,7 +1943,7 @@ make_subjob_attrs_from_array(struct batch_status *array)
 
 	for (oattr = oattr_list; oattr != NULL; oattr = oattr->next) {
 		if (strstr(oattr->name, ATTR_array)) /* skip array attributes */
-			continue;
+			break;
 
 		/* duplicate everything else */
 		nattr = dup_attrl(oattr);
