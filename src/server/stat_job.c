@@ -77,6 +77,7 @@ extern char	     statechars[];
 extern time_t time_now;
 
 /* convenience macro to check for diffstat and print attribute name and value to logs */
+#ifdef DEBUG
 #define LOG_DIFFSTAT_ATTR(x, from_tm, msg) if (!IS_FULLSTAT(from_tm)) { \
 							log_eventf(PBSEVENT_DEBUG4, PBS_EVENTCLASS_SERVER, LOG_DEBUG, \
 								msg_daemonname, \
@@ -86,6 +87,9 @@ extern time_t time_now;
 								(x)->al_atopl.resource ? (x)->al_atopl.resource : "", \
 								(x)->al_atopl.value ? (x)->al_atopl.value : ""); \
 						}
+#else
+#define LOG_DIFFSTAT_ATTR(x, from_tm, msg)
+#endif
 
 /**
  * @brief
@@ -149,8 +153,8 @@ svrcached(attribute *pat, pbs_list_head *phead, attribute_def *pdef, struct time
 			}
 		} else if (!IS_FULLSTAT(from_tm)) {
 			/* attribute was not set, but was modified, so add "unset" in case of diffstat */
-			log_eventf(PBSEVENT_DEBUG4, PBS_EVENTCLASS_SERVER, LOG_DEBUG, msg_daemonname, "Encoding unset attribute %s", pdef->at_name);
 			encode_unset(pat, phead, pdef->at_name, NULL, ATR_ENCODE_CLIENT, &working); /* we must encode empty attrs since MODCACHE flag will vanish */
+			LOG_DIFFSTAT_ATTR(working, from_tm, "Adding attr (unset)");
 		}
 	} else if (encoded) {
 		/* can use the existing cached svrattrl structure */
@@ -191,8 +195,8 @@ svrcached(attribute *pat, pbs_list_head *phead, attribute_def *pdef, struct time
 		}
 	} else if (!IS_FULLSTAT(from_tm)) {
 		/* not encoded, so value is not set, but in diffstat we need to encode empty anyway, if attr timestamp has changed */
-		log_eventf(PBSEVENT_DEBUG4, PBS_EVENTCLASS_SERVER, LOG_DEBUG, msg_daemonname, "Encoding unset attribute %s", pdef->at_name);
 		encode_unset(pat, phead, pdef->at_name, NULL, ATR_ENCODE_CLIENT, &working); /* we must encode empty attrs since MODCACHE flag will vanish */
+		LOG_DIFFSTAT_ATTR(working, from_tm, "Adding attr (unset)");
 	}
 }
 
@@ -310,11 +314,6 @@ status_job(job *pjob, struct batch_request *preq,
 
 	/* calc eligible time on the fly and return, don't save. */
 	if (get_sattr_long(SVR_ATR_EligibleTimeEnable) == TRUE) {
-		log_errf(-1, __func__, "job %s, accrue_type=%d, to set eligible_time to %d", 
-			pjob->ji_qs.ji_jobid, 
-			get_jattr_long(pjob, JOB_ATR_accrue_type),
-			time_now - get_jattr_long(pjob, JOB_ATR_sample_starttime));
-			
 		if (get_jattr_long(pjob, JOB_ATR_accrue_type) == JOB_ELIGIBLE) {
 			oldtime = get_jattr_long(pjob, JOB_ATR_eligible_time);
 			set_jattr_l_slim(pjob, JOB_ATR_eligible_time,
