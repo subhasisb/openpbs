@@ -180,6 +180,7 @@ query_nodes(int pbs_sd, server_info *sinfo)
 	char extend_buf[128];
 	static struct attrl *attrib = NULL;
 	bool node_deleted = false;
+	static struct timeval last_query_time = {0, 0};
 	const char *nodeattrs[] = {
 		ATTR_NODE_state,
 		ATTR_NODE_Mom,
@@ -220,9 +221,12 @@ query_nodes(int pbs_sd, server_info *sinfo)
 			attrib = temp_attrl;
 		}
 	}
+	if (requery_universe)
+		last_query_time = {0, 0};
 
-	if (last_cycle_time.tv_sec > 0)
-		snprintf(extend_buf, sizeof(extend_buf), "%ld:%ld", last_cycle_time.tv_sec, last_cycle_time.tv_usec);
+	if (last_query_time.tv_sec > 0)
+			//snprintf(extend_buf, sizeof(extend_buf), "%ld:%ld", last_query_time.tv_sec, last_query_time.tv_usec);
+			extend_buf[0] = '\0';
 	else
 		extend_buf[0] = '\0';
 	/* get nodes from PBS server */
@@ -231,6 +235,8 @@ query_nodes(int pbs_sd, server_info *sinfo)
 		log_eventf(PBSEVENT_SCHED, PBS_EVENTCLASS_NODE, LOG_INFO, "", "Error getting nodes: %s", err);
 		return NULL;
 	}
+	/* IFL succeeded, get the last queried timestamp returned by server */
+	last_query_time = pbs_get_last_stat_ts();
 
 	for (cur_node = nodes; cur_node != NULL; cur_node = cur_node->next) {
 		num_nodes++;
