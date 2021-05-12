@@ -87,7 +87,7 @@ build_selist(svrattrl *, int perm, struct  select_list **,
 	pbs_queue **, int *bad, char **pstate);
 static void free_sellist(struct select_list *pslist);
 static int  sel_attr(attribute *, struct select_list *);
-static int  select_job(job *, struct select_list *, int, int);
+static int  select_job(job *, struct select_list *, int, int, struct timeval);
 static int  select_subjob(char, struct select_list *);
 
 
@@ -332,7 +332,7 @@ add_subjobs(struct batch_request *preq, job *pjob,
 		/* traverse backwards to find the oldest job matching (>=) the provided from time stamp */
 		while (pjob && (rc == PBSE_NONE || rc == PBSE_PERM)) {
 			log_eventf(PBSEVENT_DEBUG3, PBS_EVENTCLASS_JOB, LOG_DEBUG, pjob->ji_qs.ji_jobid,
-				"diffstat considering subjob subjob_tm={%d,%d}, from_tm={%d,%d}", 
+				"diffstat considering subjob subjob_tm={%ld:%ld}, from_tm={%ld:%ld}", 
 				pjob->update_tm.tv_sec, pjob->update_tm.tv_usec, from_tm.tv_sec, from_tm.tv_usec);
 
 			if (!(TS_NEWER(pjob->update_tm, from_tm)))
@@ -349,7 +349,7 @@ add_subjobs(struct batch_request *preq, job *pjob,
 		dj = (deleted_obj_t *) GET_PRIOR(parent->ji_ajinfo->subjobs_deleted);
 		while ((rc == 0 || rc == PBSE_PERM) && (dj)) {
 			log_eventf(PBSEVENT_DEBUG3, PBS_EVENTCLASS_JOB, LOG_DEBUG, dj->obj_id,
-				"diffstat considering deleted subjob subjob_tm={%d,%d}, from_tm={%d,%d}", 
+				"diffstat considering deleted subjob subjob_tm={%ld:%ld}, from_tm={%ld:%ld}", 
 				dj->tm_deleted.tv_sec, dj->tm_deleted.tv_usec, from_tm.tv_sec, from_tm.tv_usec);
 
 			if (!(TS_NEWER(dj->tm_deleted, from_tm)))
@@ -448,7 +448,7 @@ add_selstat_reply(struct batch_request *preq, job *pjob,
 		* must be checked against the state of each Subjob
 		*/
 
-		if (select_job(pjob, selistp, dohistjobs, dosubjobs)) {
+		if (select_job(pjob, selistp, dohistjobs, dosubjobs, from_tm)) {
 
 			/* job is selected, include in reply */
 			if (preq->rq_type == PBS_BATCH_SelectJobs) {
@@ -559,21 +559,17 @@ req_selectjobs(struct batch_request *preq)
 	preply->brp_count = 0;
 
 	log_eventf(PBSEVENT_DEBUG3, PBS_EVENTCLASS_SERVER, LOG_DEBUG, msg_daemonname, 
-		"select: dohistjob=%d, dosubjobs=%d, from_tm={%d,%d}",  dohistjobs, dosubjobs, from_tm.tv_sec, from_tm.tv_usec);
+		"select: dohistjob=%d, dosubjobs=%d, from_tm={%ld:%ld}",
+		dohistjobs, dosubjobs, from_tm.tv_sec, from_tm.tv_usec);
 
 	rc = PBSE_NONE;
-	preply->latestObj.tv_sec = 0;
-	preply->latestObj.tv_usec = 0;
 	if (!IS_FULLSTAT(from_tm)) { /* if not a full stat = diff stat */
-		if ((last_job_purge_ts.tv_sec != 0) && TS_NEWER(last_job_purge_ts, from_tm)) {
-			/* oops too old timestamp, reject */
-			req_reject(PBSE_STALE_DIFFQUERY, 0, preq);
+		if (TS_NEWER(last_job_purge_ts, from_tm)) {
+			req_reject(PBSE_STALE_DIFFQUERY, 0, preq); /* oops too old timestamp, reject */
 			return;
 		}
 		preply->brp_auxcode = 1; /* diffstat reply */
 		pjob = (job *) GET_PRIOR(svr_alljobs_timed);
-		if (pjob)
-			preply->latestObj = pjob->update_tm;
 
 		/* traverse backwards to find the oldest job matching (>=) the provided from time stamp */
 		for (; pjob && (rc == PBSE_NONE); pjob = prev) {
@@ -582,7 +578,7 @@ req_selectjobs(struct batch_request *preq)
 			prev = (job *)GET_PRIOR(pjob->ji_timed_link);
 
 			log_eventf(PBSEVENT_DEBUG3, PBS_EVENTCLASS_JOB, LOG_DEBUG, pjob->ji_qs.ji_jobid,
-				"diffstat considering job, job_tm={%d,%d}, from_tm={%d,%d}", 
+				"diffstat considering job, job_tm={%ld:%ld}, from_tm={%ld:%ld}", 
 				pjob->update_tm.tv_sec, pjob->update_tm.tv_usec, from_tm.tv_sec, from_tm.tv_usec);
 
 			if (!(TS_NEWER(pjob->update_tm, from_tm)))
@@ -630,7 +626,8 @@ out:
  * @param[in]	psel	-	selection list
  * @param[in]	dohistjobs	-	If not being asked for history jobs specifically,
  * 								then just skip them otherwise include them.
- * @param[in]	dosubjobs	-	Does it needs to check the subjob.
+ * @param[in]	dosubjobs	-	Does it needs to check the subjob
+ * @param[in]	from_tm 	- in case of diffstat, the timestamp to stat updates from
  *
  * @return	int
  * @retval	0	: no match
@@ -638,17 +635,23 @@ out:
  */
 
 static int
-select_job(job *pjob, struct select_list *psel, int dohistjobs, int dosubjobs)
+select_job(job *pjob, struct select_list *psel, int dohistjobs, int dosubjobs, struct timeval from_tm)
 {
 
 	/*
 	 * If not being asked for history jobs specifically, then just skip
 	 * them otherwise include them. i.e. if the batch request has the special
 	 * extended flag 'x'.
+	 * 
+	 * Exception is for dosubjobs == 2(scheduler) in case of diffstat needs to know
+	 * which jobs went to history, so to send them as "deleted" allow selection here
+	 * 
 	 */
-	if ((!dohistjobs) && ((check_job_state(pjob, JOB_STATE_LTR_FINISHED)) ||
-		(check_job_state(pjob, JOB_STATE_LTR_MOVED)))) {
-		return 0;
+	if ((!dohistjobs) && ((check_job_state(pjob, JOB_STATE_LTR_FINISHED)) || (check_job_state(pjob, JOB_STATE_LTR_MOVED)))) {
+		if ((dosubjobs == 2) && (!IS_FULLSTAT(from_tm))) { /* allow histjobs for doshubjob=2 in case of diffstat */
+			; /* continue */
+		} else
+			return 0;
 	}
 
 	if ((dosubjobs == 2) && (pjob->ji_qs.ji_svrflags & JOB_SVFLG_SubJob)) {

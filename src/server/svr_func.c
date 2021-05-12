@@ -6944,13 +6944,9 @@ int
 stat_deleted_ids(pbs_list_head *head, struct timeval from_tm, struct batch_reply *preply, struct timeval *last_purge_ts)
 {
 	deleted_obj_t *dj, *nxt;
-	struct timeval lastdo = {0,0};
 	int rc = 0;
 
 	dj = (deleted_obj_t *) GET_PRIOR((*head));
-	if (dj)
-		lastdo = dj->tm_deleted;
-
 	while (dj) {
 		if (!(TS_NEWER(dj->tm_deleted, from_tm)))
 			break;
@@ -6969,9 +6965,6 @@ stat_deleted_ids(pbs_list_head *head, struct timeval from_tm, struct batch_reply
 		}
 		dj = nxt;
 	}
-
-	if (TS_NEWER(lastdo, preply->latestObj))
-		preply->latestObj = lastdo;
 
 	return 0;
 }

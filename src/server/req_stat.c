@@ -326,7 +326,8 @@ req_stat_job(struct batch_request *preq)
 	}
 
 	log_eventf(PBSEVENT_DEBUG3, PBS_EVENTCLASS_SERVER, LOG_DEBUG, msg_daemonname, 
-		"jobstat: dohistjob=%d, dosubjobs=%d, from_tm={%d,%d}",  dohistjobs, dosubjobs, from_tm.tv_sec, from_tm.tv_usec);
+		"jobstat: dohistjob=%d, dosubjobs=%d, from_tm={%ld:%ld}",
+		dohistjobs, dosubjobs, from_tm.tv_sec, from_tm.tv_usec);
 
 	/*
 	 * first, validate the name of the requested object, either
@@ -375,18 +376,13 @@ req_stat_job(struct batch_request *preq)
 	}
 
 	rc = PBSE_NONE;
-	preply->latestObj.tv_sec = 0;
-	preply->latestObj.tv_usec = 0;
-	if (!IS_FULLSTAT(from_tm)) { /* if not a full stat = diff stat */
-		if ((last_job_purge_ts.tv_sec != 0) && TS_NEWER(last_job_purge_ts, from_tm)) {
-			/* oops too old timestamp, reject */
-			req_reject(PBSE_STALE_DIFFQUERY, 0, preq);
+	if (!IS_FULLSTAT(from_tm)) { /* diff stat */
+		if (TS_NEWER(last_job_purge_ts, from_tm)) {
+			req_reject(PBSE_STALE_DIFFQUERY, 0, preq); /* oops too old timestamp, reject */
 			return;
 		}
 		preply->brp_auxcode = 1; /* diffstat reply */
 		pjob = (job *) GET_PRIOR(svr_alljobs_timed);
-		if (pjob)
-			preply->latestObj = pjob->update_tm;
 
 		if (get_sattr_long(SVR_ATR_EligibleTimeEnable) == TRUE)
 			eligible_time_enabled = 1;
@@ -394,7 +390,7 @@ req_stat_job(struct batch_request *preq)
 		/* traverse backwards to find the oldest job matching (>=) the provided from time stamp */
 		while (pjob && (rc == PBSE_NONE)) {
 			log_eventf(PBSEVENT_DEBUG3, PBS_EVENTCLASS_JOB, LOG_DEBUG, pjob->ji_qs.ji_jobid,
-				"diffstat considering job, job_tm={%d,%d}, from_tm={%d,%d}", 
+				"diffstat considering job, job_tm={%ld:%ld}, from_tm={%ld:%ld}", 
 				pjob->update_tm.tv_sec, pjob->update_tm.tv_usec, from_tm.tv_sec, from_tm.tv_usec);
 					
 			if (!(eligible_time_enabled) && (get_jattr_long(pjob, JOB_ATR_accrue_type) == JOB_ELIGIBLE)) {
@@ -438,17 +434,8 @@ req_stat_job(struct batch_request *preq)
 					req_reject(rc, bad, preq);
 					return;
 				}
-
-				/* we are not walking a time sorted list, so compare and update timestamp to get the most recent */
-				if (TS_NEWER(pjob->update_tm, preply->latestObj))
-						preply->latestObj = pjob->update_tm;
-
 				pjob = (job *) GET_NEXT(type == 2 ? pjob->ji_jobque : pjob->ji_alljobs);
 			}
-
-			/* Finally check if the latest job purge time is more recent, if so update with that */
-			if (TS_NEWER(last_job_purge_ts, preply->latestObj))
-				preply->latestObj = last_job_purge_ts;
 		}
 	}
 
@@ -655,18 +642,13 @@ req_stat_node(struct batch_request *preq)
 	preply->brp_count = 0;
 
 	rc = PBSE_NONE;
-	preply->latestObj.tv_sec = 0;
-	preply->latestObj.tv_usec = 0;
 	if (!IS_FULLSTAT(from_tm)) { /* not fullstat = diffstat */
-		if ((last_node_purge_ts.tv_sec != 0) && TS_NEWER(last_node_purge_ts, from_tm)) {
-			/* oops too old timestamp, reject */
-			req_reject(PBSE_STALE_DIFFQUERY, 0, preq);
+		if (TS_NEWER(last_node_purge_ts, from_tm)) {
+			req_reject(PBSE_STALE_DIFFQUERY, 0, preq); /* oops too old timestamp, reject */
 			return;
 		}
 		preply->brp_auxcode = 1; /* diffstat reply */
-		pnode = (pbsnode *) GET_PRIOR(svr_allnodes_timed);
-		if (pnode)
-			preply->latestObj = pnode->update_tm;
+		pnode = (pbsnode *) GET_PRIOR(svr_allnodes_timed);;
 
 		/* traverse backwards to find the oldest job matching (>=) the provided from time stamp */
 		while (pnode && (rc == PBSE_NONE)) {
@@ -685,23 +667,11 @@ req_stat_node(struct batch_request *preq)
 		if (type == 0) { /* get status of the named node */
 			rc = status_node(pnode, preq, &preply->brp_un.brp_status, from_tm);
 		} else { /* get status of all nodes */
-			preply->latestObj.tv_sec = 0;
-			preply->latestObj.tv_usec = 0;
 			for (i = 0; i < svr_totnodes; i++) {
-				pnode = pbsndlist[i];
-
-				rc = status_node(pnode, preq, &preply->brp_un.brp_status, from_tm);
+				rc = status_node(pbsndlist[i], preq, &preply->brp_un.brp_status, from_tm);
 				if (rc)
 					break;
-
-				/* we are not walking a time sorted list, so compare and update timestamp to get the most recent */
-				if (TS_NEWER(pnode->update_tm, preply->latestObj))
-					preply->latestObj = pnode->update_tm;
 			}
-
-			/* Finally check if the latest job purge time is more recent, if so update with that */
-			if (TS_NEWER(last_node_purge_ts, preply->latestObj))
-				preply->latestObj = last_node_purge_ts;
 		}
 	}
 	

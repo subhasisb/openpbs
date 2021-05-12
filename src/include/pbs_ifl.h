@@ -578,7 +578,7 @@ enum resv_states { RESV_NONE, RESV_UNCONFIRMED, RESV_CONFIRMED, RESV_WAIT,
 	RESV_BEING_ALTERED, RESV_IN_CONFLICT };
 
 /* timeval timestamp comparison macro, is x newer than y */
-#define TS_NEWER(x, y) ((y.tv_sec == 0) || ((x.tv_sec > y.tv_sec) || ((x.tv_sec == y.tv_sec) && (x.tv_usec > y.tv_usec))))
+#define TS_NEWER(x, y) ((x.tv_sec > y.tv_sec) || ((x.tv_sec == y.tv_sec) && (x.tv_usec > y.tv_usec)))
 #define IS_FULLSTAT(x) ((x).tv_sec == 0)
 
 #ifdef _USRDLL		/* This is only for building Windows DLLs

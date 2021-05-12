@@ -263,6 +263,8 @@ reply_send_status_part(struct batch_request *preq)
 		int orig_brp_choice = preply->brp_choice;
 
 		preply->brp_is_part = 1;
+		gettimeofday(&preply->brp_ts, NULL); /* add just reply timestamp */
+		
 		rc = dis_reply_write(preq->rq_conn, preq);
 		if (rc != PBSE_NONE)
 			return rc;
@@ -370,11 +372,15 @@ reply_send(struct batch_request *request)
 		 * Otherwise, the reply is to be sent to a remote client
 		 */
 		if (rc == PBSE_NONE) {
-			if (request->rq_type == PBS_BATCH_StatusJob || request->rq_type == PBS_BATCH_SelStat)
+			struct batch_reply *preply = &request->rq_reply;
+
+			gettimeofday(&preply->brp_ts, NULL); /* add just reply timestamp */
+
+			if (request->rq_type == PBS_BATCH_StatusJob || request->rq_type == PBS_BATCH_SelStat || request->rq_type == PBS_BATCH_StatusNode)
 				log_eventf(PBSEVENT_DEBUG3, PBS_EVENTCLASS_SERVER, LOG_DEBUG, msg_daemonname, 
-					"brp_choice=%d: %s returned %d objects, last_stat_tm={%d:%d}", 
-					request->rq_reply.brp_choice, (request->rq_reply.brp_auxcode) ? "Diffstat" : "Regular stat",
-					request->rq_reply.brp_count, request->rq_reply.latestObj.tv_sec, request->rq_reply.latestObj.tv_usec);
+					"brp_choice %d, %s returned %d objects, last_stat_tm={%ld:%ld}", 
+					preply->brp_choice, (preply->brp_auxcode) ? "diffstat" : "regular-stat",
+					preply->brp_count, preply->brp_ts.tv_sec, preply->brp_ts.tv_usec);
 
 			rc = dis_reply_write(sfds, request);
 		}

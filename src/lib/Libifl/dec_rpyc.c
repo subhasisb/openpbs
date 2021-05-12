@@ -407,15 +407,15 @@ again:
 			if (rc)
 				return rc;
 			reply->brp_count += ct;
-			reply->latestObj.tv_sec = disrul(sock, &rc);
+			reply->brp_ts.tv_sec = disrul(sock, &rc);
 			if (rc) 
 				return rc;
-			reply->latestObj.tv_usec = disrul(sock, &rc);
+			reply->brp_ts.tv_usec = disrul(sock, &rc);
 			if (rc) 
 				return rc;
 
 #ifdef CLI_DEBUG
-			fprintf(stderr, "IFL stat: diffstat=%d, count=%d, latestobj={%ld:%ld}\n",  reply->brp_auxcode,  reply->brp_count,  reply->latestObj.tv_sec, reply->latestObj.tv_usec);
+			fprintf(stderr, "IFL stat: diffstat=%d, count=%d, stat_ts={%ld:%ld}\n",  reply->brp_auxcode,  reply->brp_count,  reply->brp_ts.tv_sec, reply->brp_ts.tv_usec);
 #endif
 
 			while (ct--) {

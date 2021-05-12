@@ -215,7 +215,7 @@ struct batch_reply
 	int brp_count;
 	int brp_type;
 	struct batch_status *last;
-	struct timeval latestObj; /* timestamp of latest object for diff queries */
+	struct timeval brp_ts; /* timestamp of this response */
 	union {
 		char brp_jid[PBS_MAXSVRJOBID + 1];
 		struct brp_select *brp_select; /* select replies */
