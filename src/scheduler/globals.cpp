@@ -199,3 +199,4 @@ std::vector<prev_job_info> last_running;
 
 /* fairshare tree */
 fairshare_head *fstree;
+bool requery_universe = false;
