@@ -370,8 +370,12 @@ reply_send(struct batch_request *request)
 		 * Otherwise, the reply is to be sent to a remote client
 		 */
 		if (rc == PBSE_NONE) {
-			if (request->rq_reply.brp_choice == BATCH_REPLY_CHOICE_Status && request->rq_reply.brp_auxcode == 1)
-				log_eventf(PBSEVENT_DEBUG3, PBS_EVENTCLASS_SERVER, LOG_DEBUG, msg_daemonname, "diffstat returned %d objects", request->rq_reply.brp_count);
+			if (request->rq_type == PBS_BATCH_StatusJob || request->rq_type == PBS_BATCH_SelStat)
+				log_eventf(PBSEVENT_DEBUG3, PBS_EVENTCLASS_SERVER, LOG_DEBUG, msg_daemonname, 
+					"brp_choice=%d: %s returned %d objects, last_stat_tm={%d:%d}", 
+					request->rq_reply.brp_choice, (request->rq_reply.brp_auxcode) ? "Diffstat" : "Regular stat",
+					request->rq_reply.brp_count, request->rq_reply.latestObj.tv_sec, request->rq_reply.latestObj.tv_usec);
+
 			rc = dis_reply_write(sfds, request);
 		}
 	}

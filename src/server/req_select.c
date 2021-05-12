@@ -581,6 +581,10 @@ req_selectjobs(struct batch_request *preq)
 			/* important: save prev ptr as pjob's position can change in the timed list */
 			prev = (job *)GET_PRIOR(pjob->ji_timed_link);
 
+			log_eventf(PBSEVENT_DEBUG3, PBS_EVENTCLASS_JOB, LOG_DEBUG, pjob->ji_qs.ji_jobid,
+				"diffstat considering job, job_tm={%d,%d}, from_tm={%d,%d}", 
+				pjob->update_tm.tv_sec, pjob->update_tm.tv_usec, from_tm.tv_sec, from_tm.tv_usec);
+
 			if (!(TS_NEWER(pjob->update_tm, from_tm)))
 				break;
 

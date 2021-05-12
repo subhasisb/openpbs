@@ -382,7 +382,9 @@ status_job(job *pjob, struct batch_request *preq,
 
 	/* add attributes to the status reply */
 	*bad = 0;
-	log_eventf(PBSEVENT_DEBUG3, PBS_EVENTCLASS_JOB, LOG_DEBUG, pjob->ji_qs.ji_jobid, "Added job to diffstat reply");
+	if (!IS_FULLSTAT(from_tm)) {
+		log_eventf(PBSEVENT_DEBUG3, PBS_EVENTCLASS_JOB, LOG_DEBUG, pjob->ji_qs.ji_jobid, "Added job to diffstat reply");
+	}
 	rc = status_attrib(pal, job_attr_idx, job_attr_def, pjob->ji_wattr, JOB_ATR_LAST, preq->rq_perm, &pstat->brp_attr, bad, from_tm);
 	if ((rc != 0) || (!GET_NEXT(pstat->brp_attr))) {
 		free(pstat);
