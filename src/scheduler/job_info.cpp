@@ -533,7 +533,6 @@ query_jobs(status *policy, int pbs_sd, queue_info *qinfo, resource_resv **pjobs,
 	schd_error *err;
 	time_t server_time;
 	char extend_buf[128];
-	static struct timeval last_query_time = {0, 0};
 
 	const char *jobattrs[] = {
 		ATTR_p,
@@ -578,11 +577,9 @@ query_jobs(status *policy, int pbs_sd, queue_info *qinfo, resource_resv **pjobs,
 		return pjobs;
 
 	opl.value = const_cast<char *>(queue_name.c_str());
-	if (requery_universe)
-		last_query_time = {0, 0};
 
-	if (last_query_time.tv_sec > 0)
-		snprintf(extend_buf, sizeof(extend_buf), "S,%ld:%ld", last_query_time.tv_sec, last_query_time.tv_usec);
+	if (last_job_query_time.tv_sec > 0)
+		snprintf(extend_buf, sizeof(extend_buf), "S,%ld:%ld", last_job_query_time.tv_sec, last_job_query_time.tv_usec);
 	else
 		pbs_strncpy(extend_buf, "S", sizeof(extend_buf));
 
@@ -618,7 +615,7 @@ query_jobs(status *policy, int pbs_sd, queue_info *qinfo, resource_resv **pjobs,
 		return pjobs;
 	}
 	/* IFL succeeded, get the last queried timestamp returned by server */
-	last_query_time = pbs_get_last_stat_ts();
+	last_job_query_time = pbs_get_last_stat_ts();
 
 	err = new_schd_error();
 	if(err == NULL) {

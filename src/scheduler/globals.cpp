@@ -200,4 +200,6 @@ std::vector<prev_job_info> last_running;
 /* fairshare tree */
 fairshare_head *fstree;
 struct timeval last_cycle_time = {0, 0};
+struct timeval last_job_query_time = {0, 0};
+struct timeval last_node_query_time = {0, 0};
 bool requery_universe = false;

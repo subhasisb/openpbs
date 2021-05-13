@@ -615,6 +615,8 @@ scheduling_cycle(int sd, const sched_cmd *cmd)
 		}
 		requery_universe = false;
 		memset(&last_cycle_time, 0, sizeof(last_cycle_time));
+		memset(&last_job_query_time, 0, sizeof(last_job_query_time));
+		memset(&last_node_query_time, 0, sizeof(last_node_query_time));
 	}
 
 	/* Decide whether we need to send "can't run" type updates this cycle */
