@@ -58,7 +58,7 @@ extern "C" {
  * to keep track of objects that are deleted.
  * Currently, deleted nodes and jobs are only tracked
  * 
- * see req_stat, append_deleted_ids()
+ * see req_stat, remember_deleted_ids()
  */
 typedef struct {
 	pbs_list_link deleted_obj_link;
@@ -151,8 +151,8 @@ extern void panic_stop_db();
 extern void free_db_attr_list(pbs_db_attr_list_t *);
 extern void req_stat_svr_ready(struct work_task *);
 extern void update_node_timedlist(pbsnode *);
-extern void append_deleted_ids(pbs_list_head *, char *);
-extern int add_deleted_id(char *, struct batch_reply *);
+extern void remember_deleted_ids(pbs_list_head *, char *);
+extern int status_deleted_id(char *, struct batch_reply *);
 extern int stat_deleted_ids(pbs_list_head *, struct timeval, struct batch_reply *, struct timeval *);
 extern deleted_obj_t *find_deleted_id(pbs_list_head *, char *);
 struct timeval parse_ts_from_extend(char *);

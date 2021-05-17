@@ -547,11 +547,11 @@ job_free(job *pj)
 
 	/* append to the global deleted ids list in case of noral jobs */
 	if ((pj->ji_qs.ji_svrflags & JOB_SVFLG_SubJob) == 0)
-		append_deleted_ids(&svr_alljobs_deleted, pj->ji_qs.ji_jobid);
+		remember_deleted_ids(&svr_alljobs_deleted, pj->ji_qs.ji_jobid);
 	else {
 		/* append to the deleted ids list in the parent job in case of subjobs */
 		if (pj->ji_parentaj && pj->ji_parentaj->ji_ajinfo)
-			append_deleted_ids(&pj->ji_parentaj->ji_ajinfo->subjobs_deleted, (char *) uLTostr(get_index_from_jid(pj->ji_qs.ji_jobid), 10) );
+			remember_deleted_ids(&pj->ji_parentaj->ji_ajinfo->subjobs_deleted, pj->ji_qs.ji_jobid);
 	}
 
 	if (pj->ji_ajinfo) {

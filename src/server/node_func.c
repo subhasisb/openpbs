@@ -661,7 +661,7 @@ effective_node_delete(struct pbsnode *pnode)
 	svr_totnodes--;
 	
 	delete_link(&pnode->nd_allnodes_timed);
-	append_deleted_ids(&svr_allnodes_deleted, pnode->nd_name);
+	remember_deleted_ids(&svr_allnodes_deleted, pnode->nd_name);
 
 	free_pnode(pnode);
 
