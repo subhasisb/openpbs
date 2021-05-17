@@ -269,7 +269,7 @@ update_sj_parent(job *parent, job *sj, char *sjid, char oldstate, char newstate)
 	if (oldstate == JOB_STATE_LTR_QUEUED || oldstate == JOB_STATE_LTR_EXPIRED || oldstate == JOB_STATE_LTR_FINISHED) {
 		if (newstate == JOB_STATE_LTR_EXPIRED || newstate == JOB_STATE_LTR_FINISHED) {
 			if (parent && parent->ji_ajinfo)
-				append_deleted_ids(&parent->ji_ajinfo->subjobs_deleted, (char *) uLTostr(get_index_from_jid(sjid), 10));
+				remember_deleted_ids(&parent->ji_ajinfo->subjobs_deleted, sjid);
 		}
 	}
 

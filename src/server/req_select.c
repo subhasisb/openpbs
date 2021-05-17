@@ -326,7 +326,6 @@ add_subjobs(struct batch_request *preq, job *pjob,
 			}
 		}
 	} else {
-		log_eventf(PBSEVENT_DEBUG3, PBS_EVENTCLASS_JOB, LOG_DEBUG, pjob->ji_qs.ji_jobid, "diffstat array subjobs");
 		parent = pjob; /* save parent job pointer */
 		pjob = (job *) GET_PRIOR(parent->ji_ajinfo->subjobs_timed);
 		/* traverse backwards to find the oldest job matching (>=) the provided from time stamp */
@@ -348,8 +347,8 @@ add_subjobs(struct batch_request *preq, job *pjob,
 		/* adding entries for deleted subjobs - not as deleted ids, since subjobs are listed till job array goes away!!! */
 		dj = (deleted_obj_t *) GET_PRIOR(parent->ji_ajinfo->subjobs_deleted);
 		while ((rc == 0 || rc == PBSE_PERM) && (dj)) {
-			log_eventf(PBSEVENT_DEBUG3, PBS_EVENTCLASS_JOB, LOG_DEBUG, dj->obj_id,
-				"diffstat considering deleted subjob subjob_tm={%ld:%ld}, from_tm={%ld:%ld}", 
+			log_eventf(PBSEVENT_DEBUG3, PBS_EVENTCLASS_JOB, LOG_DEBUG,  dj->obj_id,
+				"diffstat considering deleted subjob job_tm={%ld:%ld}, from_tm={%ld:%ld}",
 				dj->tm_deleted.tv_sec, dj->tm_deleted.tv_usec, from_tm.tv_sec, from_tm.tv_usec);
 
 			if (!(TS_NEWER(dj->tm_deleted, from_tm)))
@@ -359,9 +358,9 @@ add_subjobs(struct batch_request *preq, job *pjob,
 			dj_prev = (deleted_obj_t *) GET_PRIOR(dj->deleted_obj_link);
 
 			if (dosubjobs == 2) { /* sched special, mark deleted subjobs as deleted as well */
-				rc = add_deleted_id(dj->obj_id, preply);
+				rc = status_deleted_id(dj->obj_id, preply);
 			} else {
-				rc = status_subjob(parent, preq, plist, strtoul(dj->obj_id, NULL, 10), &preply->brp_un.brp_status, &bad, 
+				rc = status_subjob(parent, preq, plist, get_index_from_jid(dj->obj_id), &preply->brp_un.brp_status, &bad, 
 							dohistjobs, dosubjobs, from_tm);
 			}
 			dj = dj_prev;

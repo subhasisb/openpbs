@@ -6859,7 +6859,7 @@ void memory_debug_log(struct work_task *ptask) {
  *
  */
 void
-append_deleted_ids(pbs_list_head *head, char *id)
+remember_deleted_ids(pbs_list_head *head, char *id)
 {
 	deleted_obj_t *dj;
 
@@ -6901,7 +6901,7 @@ append_deleted_ids(pbs_list_head *head, char *id)
  *
  */
 int 
-add_deleted_id(char *id, struct batch_reply *preply)
+status_deleted_id(char *id, struct batch_reply *preply)
 {
 	struct brp_status *pstat = NULL;
 	pstat = (struct brp_status *) malloc(sizeof(struct brp_status));
@@ -6915,8 +6915,7 @@ add_deleted_id(char *id, struct batch_reply *preply)
 	append_link(&preply->brp_un.brp_status, &pstat->brp_stlink, pstat);
 	preply->brp_count++;
 
-	log_errf(-1, __func__, "*** Adding deleted id %s to selstat reply!!", id);
-
+	log_eventf(PBSEVENT_DEBUG3, PBS_EVENTCLASS_JOB, LOG_DEBUG, id, "adding deleted id to response");
 	return 0;
 }
 
@@ -6948,7 +6947,7 @@ stat_deleted_ids(pbs_list_head *head, struct timeval from_tm, struct batch_reply
 		if (!(TS_NEWER(dj->tm_deleted, from_tm)))
 			break;
 
-		if ((rc = add_deleted_id(dj->obj_id, preply)) != 0)
+		if ((rc = status_deleted_id(dj->obj_id, preply)) != 0)
 			return rc;
 
 		/* important: save prev ptr as my node's position can change in the timed list */

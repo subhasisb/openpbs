@@ -307,7 +307,7 @@ status_job(job *pjob, struct batch_request *preq,
 		
 		/* if this is diffstat from scheduler, then we must send the history as "deleted" job */
 		if ((dosubjobs == 2) && (!IS_FULLSTAT(from_tm)))
-			return (add_deleted_id(pjob->ji_qs.ji_jobid, preply));
+			return (status_deleted_id(pjob->ji_qs.ji_jobid, preply));
 		else
 			return (PBSE_NONE);
 	}
