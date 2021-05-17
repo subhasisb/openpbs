@@ -457,25 +457,6 @@ free_job_work_tasks(job *pj)
 }
 #endif
 
-/**
- * @brief
- * 	free the deleted ids list
- *
- * @param[in] phead - the deleted ids list to free
- *
- * @return	void
- */
-void
-free_deleted_id_list(pbs_list_head *phead)
-{
-	deleted_obj_t *dobj;
-
-	while ((dobj = GET_NEXT((*phead)))) {
-		delete_link(&dobj->deleted_obj_link);
-		free(dobj->obj_id);
-		free(dobj);
-	}
-}
 
 /**
  * @brief

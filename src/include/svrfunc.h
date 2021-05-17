@@ -284,6 +284,8 @@ extern void req_reservationOccurrenceEnd(struct batch_request *);
 extern void req_failover(struct batch_request *);
 extern int put_failover(int, struct batch_request *);
 extern void set_last_used_time_node(void *, int);
+extern void free_deleted_id_list(pbs_list_head *phead);
+extern void touch_deleted_subjob_list(job *aj);
 
 #endif /* _BATCH_REQUEST_H */
 

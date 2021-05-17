@@ -253,7 +253,7 @@ req_rerunjob(struct batch_request *preq)
 		return;
 
 	} else if (jt == IS_ARRAY_ArrayJob) {
-
+		struct timeval ts;
 		/* The Array Job itself ... */
 
 		if (!check_job_state(parent, JOB_STATE_LTR_BEGUN)) {
@@ -271,6 +271,15 @@ req_rerunjob(struct batch_request *preq)
 		 * since all the deleted subjobs will be moved to Q state
 		 */
 		parent->ji_ajinfo->tkm_dsubjsct = 0;
+		free_deleted_id_list(&parent->ji_ajinfo->subjobs_deleted);
+		
+		/* 
+		 * an array job might be requeued, we need to update timestamps on all the parents attribs, 
+		 * so that it is retransmitted to cached clients
+		 */
+		gettimeofday(&ts, NULL);
+		for (i = 0; i < JOB_ATR_LAST; i++)
+			get_jattr(parent, i)->update_tm = ts;
 
 		for (i = parent->ji_ajinfo->tkm_start; i <= parent->ji_ajinfo->tkm_end; i += parent->ji_ajinfo->tkm_step) {
 			pjob = get_subjob_and_state(parent, i, &sjst, NULL);
@@ -285,6 +294,7 @@ req_rerunjob(struct batch_request *preq)
 				update_sj_parent(parent, NULL, create_subjob_id(parent->ji_qs.ji_jobid, i), sjst, JOB_STATE_LTR_QUEUED);
 			}
 		}
+
 		/* if not waiting on any running subjobs, can reply; else */
 		/* it is taken care of when last running subjob responds  */
 		if (--preq->rq_refct == 0)
