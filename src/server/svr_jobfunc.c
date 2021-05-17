@@ -332,17 +332,6 @@ svr_enquejob(job *pjob, char *selectspec)
 	if (!is_jattr_set(pjob, JOB_ATR_project))
 		set_jattr_str_slim(pjob, JOB_ATR_project, PBS_DEFAULT_PROJECT, NULL);
 
-	/* if array job and being requeued, update timestamp of any deleted subjobs for diffstat
-	 * SUBHTODO: Why?
-	 */
-	if ((pjob->ji_qs.ji_svrflags & JOB_SVFLG_ArrayJob)) {
-		deleted_obj_t *dobj = GET_NEXT(pjob->ji_ajinfo->subjobs_deleted);
-		while (dobj) {
-			gettimeofday(&dobj->tm_deleted, NULL);
-			dobj = GET_NEXT(dobj->deleted_obj_link);
-		}
-	}
-
 	/* update any entity count and entity resources usage for the queue */
 	if (!(pjob->ji_qs.ji_svrflags & JOB_SVFLG_SubJob) ||
 			(get_sattr_long(SVR_ATR_State) == SV_STATE_INIT))
@@ -490,6 +479,10 @@ svr_dequejob(job *pjob)
 
 	/* clear any default resource values */
 	clear_default_resc(pjob);
+
+	/* if job is array job, then touch timestamp of deleted subjob list */
+	if (pjob->ji_qs.ji_svrflags & JOB_SVFLG_ArrayJob)
+		touch_deleted_subjob_list(pjob);
 }
 
 /**
@@ -5661,7 +5654,6 @@ update_job_timedlist_inner(pbs_list_head *head, job *pjob, struct timeval update
 	}
 }
 
-#ifndef PBS_MOM
 /**
  * @brief
  * 		set this job at the right place in the jobs list sorted on update time
@@ -5694,4 +5686,43 @@ update_job_timedlist(job *pjob)
 		update_job_timedlist_inner(&svr_alljobs_timed, pjob, update_tm);
 	}
 }
-#endif
+
+/**
+ * @brief
+ * 	free the deleted ids list
+ *
+ * @param[in] phead - the deleted ids list to free
+ *
+ * @return	void
+ */
+void
+free_deleted_id_list(pbs_list_head *phead)
+{
+	deleted_obj_t *dobj;
+
+	while ((dobj = GET_NEXT((*phead)))) {
+		delete_link(&dobj->deleted_obj_link);
+		free(dobj->obj_id);
+		free(dobj);
+	}
+}
+
+/**
+ * @brief
+ * 	update timestamps of all items in a array jobs deleted list
+ *
+ * @param[in] aj - array job ptr
+ *
+ * @return	void
+ */
+void
+touch_deleted_subjob_list(job *aj)
+{
+	deleted_obj_t *dj;
+
+	for (dj = (deleted_obj_t *) GET_PRIOR(aj->ji_ajinfo->subjobs_deleted); 
+		dj; 
+		dj = (deleted_obj_t *) GET_PRIOR(dj->deleted_obj_link)) {
+			gettimeofday(&dj->tm_deleted, NULL);
+	}
+}
