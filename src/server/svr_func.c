@@ -1392,6 +1392,9 @@ eligibletime_action(attribute *pattr, void *pobject, int actmode)
 		if (get_sattr_long(SVR_ATR_scheduling))
 			set_scheduler_flag(SCH_SCHEDULE_ETE_ON, NULL);
 
+	} else {
+		/* if being unset ask all connected clients to refresh */
+		force_cli_daemons_update(PBS_NET_CONN_FROM_QSTAT_DAEMON);
 	}
 
 	return 0;

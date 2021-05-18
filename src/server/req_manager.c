@@ -1541,9 +1541,10 @@ mgr_server_unset(struct batch_request *preq, conn_t *conn)
 				set_sattr_str_slim(SVR_ATR_maxarraysize, TOSTR(PBS_MAX_ARRAY_JOB_DFL), NULL);
 			else if(strcasecmp(plist->al_name, ATTR_max_concurrent_prov) == 0)
 				set_sattr_str_slim(SVR_ATR_max_concurrent_prov, TOSTR(PBS_MAX_CONCURRENT_PROV), NULL);
-			else if(strcasecmp(plist->al_name, ATTR_EligibleTimeEnable) == 0)
+			else if(strcasecmp(plist->al_name, ATTR_EligibleTimeEnable) == 0) {
 				set_sattr_l_slim(SVR_ATR_EligibleTimeEnable, 0, SET);
-			else if(strcasecmp(plist->al_name, ATTR_license_linger) == 0) {
+				force_cli_daemons_update(PBS_NET_CONN_FROM_QSTAT_DAEMON);
+			} else if(strcasecmp(plist->al_name, ATTR_license_linger) == 0) {
 				set_sattr_l_slim(SVR_ATR_license_linger, PBS_LIC_LINGER_TIME, SET);
 				licensing_control.licenses_linger_time = PBS_LIC_LINGER_TIME;
 			} else if(strcasecmp(plist->al_name, ATTR_license_max) == 0) {
