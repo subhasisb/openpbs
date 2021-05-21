@@ -1652,7 +1652,6 @@ update_resources_list_error:
 resc_resv *
 resv_alloc(char *resvid)
 {
-	int i;
 	resc_resv *resvp;
 	char *dot = NULL;
 	char *svr_inst_id = NULL;
@@ -1672,8 +1671,8 @@ resv_alloc(char *resvid)
 	 * the working attributes to "unspecified"
 	 */
 	resvp->ri_qs.ri_rsversion = RSVERSION;
-	for (i = 0; i < RESV_ATR_LAST; i++)
-		clear_rattr(resvp, i);
+
+	attr_arr_alloc(&resvp->ri_wattr, RESV_ATR_LAST);
 
 	if ((dot = strchr(resvid, (int)'.')) != 0)
 		*dot = '\0';
@@ -1762,6 +1761,7 @@ resv_free(resc_resv *presv)
 		*dot = '.';
 
 	/* now free the main structure */
+	attr_arr_free(&presv->ri_wattr);
 	free(presv);
 }
 

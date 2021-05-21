@@ -203,11 +203,8 @@ init_server_attrs()
 {
 	resource_def    *prdef = NULL;
 	resource        *presc = NULL;
-	int 		i = 0;
 
-
-	for (i = 0; i < SVR_ATR_LAST; i++)
-		clear_attr(get_sattr(i), &svr_attr_def[i]);
+	attr_arr_alloc(&server.sv_attr, SVR_ATR_LAST);
 
 	set_sattr_str_slim(SVR_ATR_scheduler_iteration, TOSTR(PBS_SCHEDULE_CYCLE), NULL);
 

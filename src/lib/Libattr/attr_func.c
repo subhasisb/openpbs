@@ -1913,12 +1913,16 @@ void
 attr_arr_alloc(attribute_arr *attr_arr, int count)
 {
 	attr_arr->count = count;
-	attr_arr->arr = calloc(count, sizeof(struct attribute));
+	attr_arr->arr = calloc(count, sizeof(struct attribute *));
 }
 
 void
 attr_arr_free(attribute_arr *attr_arr)
 {
+	int i;
+
+	for(i =0; i < attr_arr->count; i++)
+		free(attr_arr->arr[i]);
+
 	free(attr_arr->arr);
-	attr_arr->arr = NULL;
 }

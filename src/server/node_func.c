@@ -320,10 +320,8 @@ initialize_pbsnode(struct pbsnode *pnode, char *pname, int ntype)
 	pnode->nd_nummslots = 1;
 	CLEAR_LINK(pnode->nd_link);
 
-	/* first, clear the attributes */
-
-	for (i = 0; i < ND_ATR_LAST; i++)
-		clear_attr(get_nattr(pnode, i), &node_attr_def[i]);
+	/* first, allocate the attributes */
+	attr_arr_alloc(&pnode->nd_attr, ND_ATR_LAST);
 
 	/* then, setup certain attributes */
 	set_nattr_l_slim(pnode, ND_ATR_state, pnode->nd_state, SET);
@@ -532,6 +530,7 @@ free_pnode(struct pbsnode *pnode)
 		if (is_attr_set(pnode->nd_attr.arr[i]))
 			node_attr_def[i].at_free(pnode->nd_attr.arr[i]);
 	}
+	attr_arr_free(&pnode->nd_attr);
 	free(pnode); /* delete the pnode from memory */
 }
 

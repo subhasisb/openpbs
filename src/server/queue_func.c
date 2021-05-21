@@ -106,7 +106,6 @@ extern void	*svr_db_conn;
 pbs_queue *
 que_alloc(char *name)
 {
-	int i;
 	pbs_queue *pq;
 
 	pq = (pbs_queue *) calloc(1, sizeof(pbs_queue));
@@ -130,9 +129,7 @@ que_alloc(char *name)
 	append_link(&svr_queues, &pq->qu_link, pq);
 	server.sv_qs.sv_numque++;
 
-	/* set the working attributes to "unspecified" */
-	for (i = 0; i < (int) QA_ATR_LAST; i++)
-		clear_attr(get_qattr(pq, i), &que_attr_def[i]);
+	attr_arr_alloc(&pq->qu_attr, QA_ATR_LAST);
 
 	return (pq);
 }
@@ -172,6 +169,9 @@ que_free(pbs_queue *pq)
 	if (pbs_idx_delete(queues_idx, pq->qu_qs.qu_name) != PBS_IDX_RET_OK)
 		log_eventf(PBSEVENT_ERROR | PBSEVENT_FORCE, PBS_EVENTCLASS_QUEUE, LOG_ERR,
 			   "Failed to delete queue %s from index", pq->qu_qs.qu_name);
+
+	attr_arr_free(&pq->qu_attr);
+	
 	(void) free(pq);
 }
 

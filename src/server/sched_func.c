@@ -401,7 +401,6 @@ validate_job_formula_exit:
 pbs_sched *
 sched_alloc(char *sched_name)
 {
-	int i;
 	pbs_sched *psched;
 
 	psched = calloc(1, sizeof(pbs_sched));
@@ -421,10 +420,7 @@ sched_alloc(char *sched_name)
 	psched->newobj = 1;
 	append_link(&svr_allscheds, &psched->sc_link, psched);
 
-	/* set the working attributes to "unspecified" */
-
-	for (i = 0; i < (int) SCHED_ATR_LAST; i++)
-		clear_sched_attr(psched, i);
+	attr_arr_alloc(&psched->sch_attr, SCHED_ATR_LAST);
 
 	return (psched);
 }
@@ -493,6 +489,8 @@ sched_free(pbs_sched *psched)
 
 	for (i = 0; i < (int) SCHED_ATR_LAST; i++)
 		free_sched_attr(psched, i);
+
+	attr_arr_free(&psched->sch_attr);
 
 	/* now free the main structure */
 	delete_link(&psched->sc_link);
