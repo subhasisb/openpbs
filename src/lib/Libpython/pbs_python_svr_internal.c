@@ -2005,9 +2005,9 @@ py_resource_string_value(pbs_resource_value *resc_val)
 int
 pbs_python_populate_attributes_to_python_class(PyObject *py_instance,
 	PyObject **attr_py_array,
-	attribute *attr_data_array,
+	attribute_arr *attr_data_array,
 	attribute_def *attr_def_array,
-	int attr_def_array_size, char *perf_label, char *perf_action)
+	char *perf_label, char *perf_action)
 {
 	int i = 0; /* index */
 	int encode_rv = 0;  /* at_encode functions return value */
@@ -2024,8 +2024,8 @@ pbs_python_populate_attributes_to_python_class(PyObject *py_instance,
 	pbs_resource_value *resc_val;
 
 	hook_perf_stat_start(perf_label, perf_action, 0);
-	for (i = 0; i < attr_def_array_size; i++) {
-		attr_p = attr_data_array + i;
+	for (i = 0; i < attr_data_array->count; i++) {
+		attr_p = attr_data_array->arr[i];
 		attr_def_p = attr_def_array + i;
 
 		memset(&pheadp, 0, sizeof(pheadp));
@@ -3360,9 +3360,9 @@ _pps_helper_get_queue(pbs_queue *pque, const char *que_name, char *perf_label)
 	snprintf(perf_action, sizeof(perf_action), "%s:%s", HOOK_PERF_POPULATE, hook_debug.objname);
 	tmp_rc = pbs_python_populate_attributes_to_python_class(py_que,
 		py_que_attr_types,
-		que->qu_attr,
+		&que->qu_attr,
 		que_attr_def,
-		QA_ATR_LAST, perf_label, perf_action);
+		perf_label, perf_action);
 	if (tmp_rc == -1) {
 		log_err(PBSE_INTERNAL, __func__,
 			"partially populated python queue object");
@@ -3504,9 +3504,9 @@ _pps_helper_get_server(char *perf_label)
 	snprintf(perf_action, sizeof(perf_action), "%s:%s", HOOK_PERF_POPULATE, hook_debug.objname);
 	tmp_rc = pbs_python_populate_attributes_to_python_class(py_svr,
 		py_svr_attr_types,
-		server.sv_attr,
+		&server.sv_attr,
 		svr_attr_def,
-		SVR_ATR_LAST, perf_label, perf_action);
+		perf_label, perf_action);
 
 	if (tmp_rc == -1) {
 		log_err(PBSE_INTERNAL, __func__,
@@ -3630,9 +3630,9 @@ _pps_helper_get_job(job *pjob_o, const char *jobid, const char *qname, char *per
 	snprintf(perf_action, sizeof(perf_action), "%s:%s", HOOK_PERF_POPULATE, hook_debug.objname);
 	tmp_rc = pbs_python_populate_attributes_to_python_class(py_job,
 		py_job_attr_types,
-		pjob->ji_wattr,
+		&pjob->ji_wattr,
 		job_attr_def,
-		JOB_ATR_LAST, perf_label, perf_action);
+		perf_label, perf_action);
 
 	if (tmp_rc == -1) {
 		log_err(PBSE_INTERNAL, __func__,
@@ -3766,9 +3766,9 @@ _pps_helper_get_resv(resc_resv *presv_o, const char *resvid, char *perf_label)
 	snprintf(perf_action, sizeof(perf_action), "%s:%s", HOOK_PERF_POPULATE, hook_debug.objname);
 	tmp_rc = pbs_python_populate_attributes_to_python_class(py_resv,
 		py_resv_attr_types,
-		presv->ri_wattr,
+		&presv->ri_wattr,
 		resv_attr_def,
-		RESV_ATR_LAST, perf_label, perf_action);
+		perf_label, perf_action);
 
 	if (tmp_rc == -1) {
 		log_err(PBSE_INTERNAL, __func__,
@@ -3890,9 +3890,9 @@ _pps_helper_get_vnode(struct pbsnode *pvnode_o, const char *vname, char *perf_la
 	snprintf(perf_action, sizeof(perf_action), "%s:%s", HOOK_PERF_POPULATE, hook_debug.objname);
 	tmp_rc = pbs_python_populate_attributes_to_python_class(py_vnode,
 		py_vnode_attr_types,
-		pvnode->nd_attr,
+		&pvnode->nd_attr,
 		node_attr_def,
-		ND_ATR_LAST, perf_label, perf_action);
+		perf_label, perf_action);
 
 	if (tmp_rc == -1) {
 		log_err(PBSE_INTERNAL, __func__,
@@ -9429,7 +9429,7 @@ _pbs_python_do_vnode_set(void)
 
 		plist = (svrattrl *)GET_NEXT(vn_set_req->rq_attr);
 
-		rc = mgr_set_attr(pnode->nd_attr, node_attr_idx, node_attr_def, ND_ATR_LAST,
+		rc = mgr_set_attr(&pnode->nd_attr, node_attr_idx, node_attr_def,
 			plist, ATR_PERM_ALLOW_INDIRECT, &bad, (void *)pnode, ATR_ACTION_ALTER);
 
 		if (rc != 0) {

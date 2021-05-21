@@ -1050,7 +1050,7 @@ svr_chkque(job *pjob, pbs_queue *pque, char *hostname, int mtype)
 	/* if not already set, set up a uid/gid/name */
 
 	if (!is_jattr_set(pjob, JOB_ATR_euser) || !is_jattr_set(pjob, JOB_ATR_egroup)) {
-		if ((i = set_objexid((void*)pjob, JOB_OBJECT, pjob->ji_wattr)) != 0)
+		if ((i = set_objexid((void*)pjob, JOB_OBJECT, ATTR_LIST_HEAD(pjob->ji_wattr))) != 0)
 			return (i);  /* PBSE_BADUSER or GRP */
 	}
 

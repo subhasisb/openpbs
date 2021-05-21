@@ -534,7 +534,7 @@ status_que(pbs_queue *pque, struct batch_request *preq, pbs_list_head *pstathd)
 
 	bad = 0;
 	pal = (svrattrl *)GET_NEXT(preq->rq_ind.rq_status.rq_attr);
-	if (status_attrib(pal, que_attr_idx, que_attr_def, pque->qu_attr, QA_ATR_LAST,
+	if (status_attrib(pal, que_attr_idx, que_attr_def, ATTR_LIST_HEAD(pque->qu_attr), pque->qu_attr.count,
 		preq->rq_perm, &pstat->brp_attr, &bad))
 		rc = PBSE_NOATTR;
 
@@ -787,7 +787,7 @@ req_stat_svr(struct batch_request *preq)
 
 	bad = 0;
 	pal = (svrattrl *)GET_NEXT(preq->rq_ind.rq_status.rq_attr);
-	if (status_attrib(pal, svr_attr_idx, svr_attr_def, server.sv_attr, SVR_ATR_LAST,
+	if (status_attrib(pal, svr_attr_idx, svr_attr_def, ATTR_LIST_HEAD(server.sv_attr), server.sv_attr.count,
 		preq->rq_perm, &pstat->brp_attr, &bad))
 		reply_badattr(PBSE_NOATTR, bad, pal, preq);
 	else
@@ -893,7 +893,7 @@ status_sched(pbs_sched *psched, struct batch_request *preq, pbs_list_head *pstat
 
 	bad = 0;
 	pal = (svrattrl *)GET_NEXT(preq->rq_ind.rq_status.rq_attr);
-	if (status_attrib(pal, sched_attr_idx, sched_attr_def, psched->sch_attr, SCHED_ATR_LAST,
+	if (status_attrib(pal, sched_attr_idx, sched_attr_def, ATTR_LIST_HEAD(psched->sch_attr), psched->sch_attr.count,
 		preq->rq_perm, &pstat->brp_attr, &bad))
 		reply_badattr(PBSE_NOATTR, bad, pal, preq);
 
@@ -1112,8 +1112,8 @@ status_resv(resc_resv *presv, struct batch_request *preq, pbs_list_head *pstathd
 	bad = 0;	/*global: record ordinal position where got error*/
 	pal = (svrattrl *) GET_NEXT(preq->rq_ind.rq_status.rq_attr);
 
-	if (status_attrib(pal, resv_attr_idx, resv_attr_def, presv->ri_wattr,
-		RESV_ATR_LAST, preq->rq_perm, &pstat->brp_attr, &bad) == 0)
+	if (status_attrib(pal, resv_attr_idx, resv_attr_def, ATTR_LIST_HEAD(presv->ri_wattr),
+		presv->ri_wattr.count, preq->rq_perm, &pstat->brp_attr, &bad) == 0)
 		return (0);
 	else
 		return (PBSE_NOATTR);

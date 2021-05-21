@@ -1134,7 +1134,7 @@ shallow_vnode_dup(struct pbsnode *vnode)
 	vnode_dup->nd_pque = vnode->nd_pque;
 	vnode_dup->nd_svrflags = vnode->nd_svrflags;
 	for (i = 0; i < ND_ATR_LAST; i++) {
-		vnode_dup->nd_attr[i] = vnode->nd_attr[i];
+		vnode_dup->nd_attr.arr[i] = vnode->nd_attr.arr[i];
 	}
 	return vnode_dup;
 }
@@ -1229,7 +1229,7 @@ set_vnode_state(struct pbsnode *pnode, unsigned long state_bits, enum vnode_stat
 		set_nattr_l_slim(pnode, ND_ATR_last_state_change_time, time_int_val, SET);
 
 	/* Write the vnode state change event to server log */
-	last_time_int = (int)vnode_o->nd_attr[(int)ND_ATR_last_state_change_time].at_val.at_long;
+	last_time_int = (int)vnode_o->nd_attr.arr[(int)ND_ATR_last_state_change_time]->at_val.at_long;
 	log_eventf(PBSEVENT_DEBUG2, PBS_EVENTCLASS_NODE, LOG_INFO, pnode->nd_name,
 		"set_vnode_state;vnode.state=0x%lx vnode_o.state=0x%lx "
 		"vnode.last_state_change_time=%d vnode_o.last_state_change_time=%d "
@@ -6687,8 +6687,8 @@ set_nodes(void *pobj, int objtype, char *execvnod_in, char **execvnod_out, char 
 					if ((phowl + ndindex)->hw_pnd->nd_moms)
 						(phowl + ndindex)->hw_mom = (phowl + ndindex)->hw_pnd->nd_moms[0];
 					else {
-						(phowl + ndindex)->hw_mom_host = (phowl + ndindex)->hw_pnd->nd_attr[ND_ATR_Mom].at_val.at_str;
-						(phowl + ndindex)->hw_mom_port = (phowl + ndindex)->hw_pnd->nd_attr[ND_ATR_Port].at_val.at_long;
+						(phowl + ndindex)->hw_mom_host = (phowl + ndindex)->hw_pnd->nd_attr.arr[ND_ATR_Mom]->at_val.at_str;
+						(phowl + ndindex)->hw_mom_port = (phowl + ndindex)->hw_pnd->nd_attr.arr[ND_ATR_Port]->at_val.at_long;
 					}
 					*pehnxt = '/';
 					(phowl + ndindex)->hw_index = atoi(++pehnxt);

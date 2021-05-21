@@ -1868,9 +1868,9 @@ decode_project(attribute *patr, char *name, char *rescn, char *val)
  *
  */
 attribute *
-_get_attr_by_idx(attribute *list, int attr_idx)
+_get_attr_by_idx(attribute_arr *list, int attr_idx)
 {
-	return &(list[attr_idx]);
+	return (list->arr[attr_idx]);
 }
 
 /**
@@ -1907,4 +1907,18 @@ get_attr_list(const attribute *pattr)
 		return pattr->at_val.at_list;
 	else
 		return dummy;
+}
+
+void
+attr_arr_alloc(attribute_arr *attr_arr, int count)
+{
+	attr_arr->count = count;
+	attr_arr->arr = calloc(count, sizeof(struct attribute));
+}
+
+void
+attr_arr_free(attribute_arr *attr_arr)
+{
+	free(attr_arr->arr);
+	attr_arr->arr = NULL;
 }

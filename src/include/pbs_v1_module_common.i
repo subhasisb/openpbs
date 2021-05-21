@@ -194,7 +194,7 @@ mgr_log_attr(char *msg, struct svrattrl *plist, int logclass,
 }
 
 int
-mgr_set_attr(attribute *pattr, void *pidx, attribute_def *pdef, int limit,
+mgr_set_attr(attribute_arr *parr, void *pidx, attribute_def *pdef,
 		svrattrl *plist, int privil, int *bad, void *parent, int mode) {
 	return (0);
 }

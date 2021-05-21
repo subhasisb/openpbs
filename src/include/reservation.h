@@ -230,7 +230,7 @@ struct resc_resv {
 	 * The following array holds the decode	 format of the attributes.
 	 * Its presence is for rapid access to the attributes.
 	 */
-	attribute		ri_wattr[RESV_ATR_LAST];  /*reservation's attributes*/
+	attribute_arr		ri_wattr;  /*reservation's attributes*/
 	short			newobj;
 };
 

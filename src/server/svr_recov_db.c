@@ -130,7 +130,7 @@ svr_to_db(struct server *ps, pbs_db_svr_info_t *pdbsvr)
 
 	pdbsvr->sv_jobidnumber = ps->sv_qs.sv_lastid;
 
-	if ((encode_attr_db(svr_attr_def, ps->sv_attr, (int)SVR_ATR_LAST, &pdbsvr->db_attr_list, 1)) != 0) /* encode all attributes */
+	if ((encode_attr_db(svr_attr_def, &ps->sv_attr, &pdbsvr->db_attr_list, 1)) != 0) /* encode all attributes */
 		return -1;
 
 	if (ps->newobj) /* object was never saved or loaded before */
@@ -152,7 +152,7 @@ svr_to_db(struct server *ps, pbs_db_svr_info_t *pdbsvr)
 int
 db_to_svr(struct server *ps, pbs_db_svr_info_t *pdbsvr)
 {
-	if ((decode_attr_db(ps, &pdbsvr->db_attr_list.attrs, svr_attr_idx, svr_attr_def, ps->sv_attr, SVR_ATR_LAST, 0)) != 0)
+	if ((decode_attr_db(ps, &pdbsvr->db_attr_list.attrs, svr_attr_idx, svr_attr_def, &ps->sv_attr)) != 0)
 		return -1;
 
 	ps->newobj = 0;
@@ -178,7 +178,7 @@ sched_to_db(struct pbs_sched *ps, pbs_db_sched_info_t *pdbsched)
 
 	strcpy(pdbsched->sched_name, ps->sc_name);
 
-	if ((encode_attr_db(sched_attr_def, ps->sch_attr, (int)SCHED_ATR_LAST, &pdbsched->db_attr_list, 0)) != 0)
+	if ((encode_attr_db(sched_attr_def, &ps->sch_attr, &pdbsched->db_attr_list, 0)) != 0)
 		return -1;
 
 	if (ps->newobj) /* was never loaded or saved before */
@@ -200,7 +200,7 @@ db_to_sched(struct pbs_sched *ps, pbs_db_sched_info_t *pdbsched)
 {
 	strcpy(ps->sc_name, pdbsched->sched_name);
 
-	if ((decode_attr_db(ps, &pdbsched->db_attr_list.attrs, sched_attr_idx, sched_attr_def, ps->sch_attr, SCHED_ATR_LAST, 0)) != 0)
+	if ((decode_attr_db(ps, &pdbsched->db_attr_list.attrs, sched_attr_idx, sched_attr_def, &ps->sch_attr)) != 0)
 		return -1;
 
 	ps->newobj = 0;

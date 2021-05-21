@@ -309,7 +309,7 @@ status_job(job *pjob, struct batch_request *preq, svrattrl *pal, pbs_list_head *
 	/* add attributes to the status reply */
 
 	*bad = 0;
-	if (status_attrib(pal, job_attr_idx, job_attr_def, pjob->ji_wattr, JOB_ATR_LAST, preq->rq_perm, &pstat->brp_attr, bad))
+	if (status_attrib(pal, job_attr_idx, job_attr_def, ATTR_LIST_HEAD(pjob->ji_wattr), JOB_ATR_LAST, preq->rq_perm, &pstat->brp_attr, bad))
 		return (PBSE_NOATTR);
 
 	/* reset eligible time, it was calctd on the fly, real calctn only when accrue_type changes */
@@ -461,7 +461,7 @@ status_subjob(job *pjob, struct batch_request *preq, svrattrl *pal, int subj, pb
 		mark_jattr_not_set(pjob, JOB_ATR_accrue_type);
 	}
 
-	if (status_attrib(pal, job_attr_idx, job_attr_def, pjob->ji_wattr, limit, preq->rq_perm, &pstat->brp_attr, bad))
+	if (status_attrib(pal, job_attr_idx, job_attr_def, ATTR_LIST_HEAD(pjob->ji_wattr), limit, preq->rq_perm, &pstat->brp_attr, bad))
 		rc =  PBSE_NOATTR;
 
 	/* Set the parent state back to what it really is */

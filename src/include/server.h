@@ -92,7 +92,7 @@ struct server {
 		long long sv_jobidnumber; /* next number to use in new jobid  */
 		long long sv_lastid;	  /* block increment to avoid many saves */
 	} sv_qs;
-	attribute sv_attr[SVR_ATR_LAST]; /* the server attributes */
+	attribute_arr sv_attr; /* the server attributes */
 	short newobj;
 	time_t sv_started;		       /* time server started */
 	time_t sv_hotcycle;		       /* if RECOV_HOT,time of last restart */

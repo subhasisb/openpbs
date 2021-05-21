@@ -108,8 +108,6 @@ void on_job_exit(struct work_task *);
 
 /* Local Private Functions */
 
-static void job_init_wattr(job *);
-
 #ifndef PBS_MOM		/* SERVER ONLY */
 static void post_resv_purge(struct work_task *pwt);
 #endif
@@ -375,7 +373,7 @@ job_alloc(void)
 
 	/* set the working attributes to "unspecified" */
 
-	job_init_wattr(pj);
+	attr_arr_alloc(&pj->ji_wattr, JOB_ATR_LAST);
 
 #ifndef PBS_MOM
 	set_job_state(pj, JOB_STATE_LTR_TRANSIT);
@@ -597,30 +595,10 @@ job_free(job *pj)
 	/* which are malloced and shared with the parent Array Job */
 	/* They will be freed when the parent is removed           */
 
+	attr_arr_free(&pj->ji_wattr);
+
 	pj->ji_qs.ji_jobid[0] = 'X';	/* as a "freed" marker */
 	free(pj);	/* now free the main structure */
-}
-
-/**
- * @brief
- * 		job_init_wattr - initialize job working attribute array
- *		set the types and the "unspecified value" flag
- *
- * @see
- * 		job_alloc
- *
- * @param[in]	pj - pointer to job structure
- *
- * @return	void
- */
-static void
-job_init_wattr(job *pj)
-{
-	int	i;
-
-	for (i=0; i<(int)JOB_ATR_LAST; i++) {
-		clear_attr(get_jattr(pj, i), &job_attr_def[i]);
-	}
 }
 
 
@@ -1705,7 +1683,7 @@ resv_alloc(char *resvid)
 		free(resvp);
 		return NULL;
 	}
-	set_attr_generic(&resvp->ri_wattr[RESV_ATR_server_inst_id],
+	set_attr_generic(resvp->ri_wattr.arr[RESV_ATR_server_inst_id],
 			 &resv_attr_def[RESV_ATR_server_inst_id], svr_inst_id, NULL, INTERNAL);
 
 	/*

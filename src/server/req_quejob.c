@@ -2501,7 +2501,7 @@ req_resvSub(struct batch_request *preq)
 
 	/* determine values for the "euser" and "egroup" attributes */
 
-	if ((rc = set_objexid((void *)presv, RESC_RESV_OBJECT, presv->ri_wattr))) {
+	if ((rc = set_objexid((void *)presv, RESC_RESV_OBJECT, ATTR_LIST_HEAD(presv->ri_wattr)))) {
 		resv_free(presv);
 		req_reject(rc, 0, preq);
 		return;

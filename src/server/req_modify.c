@@ -453,7 +453,7 @@ modify_job_attr(job *pjob, svrattrl *plist, int perm, int *bad)
 	else
 		allow_unkn = (int)JOB_ATR_UNKN;
 
-	pattr = pjob->ji_wattr;
+	pattr = ATTR_LIST_HEAD(pjob->ji_wattr);
 
 	/* call attr_atomic_set to decode and set a copy of the attributes.
 	 * We need 2 copies: 1 for copying to pattr and 1 for calling the action functions
@@ -634,7 +634,7 @@ modify_job_attr(job *pjob, svrattrl *plist, int perm, int *bad)
 		}
 	}
 	if (rc) {
-		attr_atomic_copy(pjob->ji_wattr, attr_save, job_attr_def, JOB_ATR_LAST);
+		attr_atomic_copy(ATTR_LIST_HEAD(pjob->ji_wattr), attr_save, job_attr_def, JOB_ATR_LAST);
 		free(pre_copy);
 		attr_atomic_kill(newattr, job_attr_def, JOB_ATR_LAST);
 		attr_atomic_kill(attr_save, job_attr_def, JOB_ATR_LAST);
@@ -1328,7 +1328,7 @@ modify_resv_attr(resc_resv *presv, svrattrl *plist, int perm, int *bad)
 		return PBSE_INTERNAL;
 
 	allow_unkn = -1;
-	pattr = presv->ri_wattr;
+	pattr = ATTR_LIST_HEAD(presv->ri_wattr);
 
 	/* call attr_atomic_set to decode and set a copy of the attributes */
 

@@ -185,6 +185,13 @@ struct attribute {
 };
 typedef struct attribute attribute;
 
+#define ATTR_LIST_HEAD(x) (*(x).arr)
+
+typedef struct {
+	short count;
+	attribute **arr;
+} attribute_arr;
+
 /*
  * The following structure is used to define an attribute for any parent
  * object.  The structure declares the attribute's name, value type, and
@@ -518,7 +525,7 @@ extern int	svr_max_conc_prov_action(attribute *, void *, int);
 
 /* Manager functions */
 extern void	mgr_log_attr(char *, struct svrattrl *, int, char *, char *);
-extern int	mgr_set_attr(attribute *, void *, attribute_def *, int, svrattrl *, int, int *, void *, int);
+extern int	mgr_set_attr(attribute_arr *, void *, attribute_def *, svrattrl *, int, int *, void *, int);
 /* Extern functions (at_action) called  from job_attr_def*/
 
 extern int job_set_wait(attribute *, void *, int);
@@ -598,9 +605,8 @@ extern int action_resc_resv(attribute *pattr, void *pobject, int actmode);
 
 /* Functions used to save and recover the attributes from the database */
 extern int encode_single_attr_db(attribute_def *padef, attribute *pattr, pbs_db_attr_list_t *db_attr_list);
-extern int encode_attr_db(attribute_def *padef, attribute *pattr, int numattr,  pbs_db_attr_list_t *db_attr_list, int all);
-extern int decode_attr_db(void *parent, pbs_list_head *attr_list,
-	void *padef_idx, attribute_def *padef, attribute *pattr, int limit, int unknown);
+extern int encode_attr_db(attribute_def *padef, attribute_arr *parr, pbs_db_attr_list_t *db_attr_list, int all);
+extern int decode_attr_db(void *parent, pbs_list_head *attr_list, void *padef_idx, attribute_def *padef, attribute_arr *parr);
 
 extern int is_attr(int, char *, int);
 
@@ -629,9 +635,13 @@ long long get_attr_ll(const attribute *pattr);
 char *get_attr_str(const attribute *pattr);
 struct array_strings *get_attr_arst(const attribute *pattr);
 int is_attr_set(const attribute *pattr);
-attribute *_get_attr_by_idx(attribute *list, int attr_idx);
+attribute *_get_attr_by_idx(attribute_arr *list, int attr_idx);
 pbs_list_head get_attr_list(const attribute *pattr);
 void free_attr(attribute_def *attr_def, attribute *pattr, int attr_idx);
+
+
+void attr_arr_alloc(attribute_arr *attr_arr, int count);
+void attr_arr_free(attribute_arr *attr_arr);
 
 /* "type" to pass to acl_check() */
 #define ACL_Host  1

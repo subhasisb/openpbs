@@ -126,7 +126,7 @@ db_to_node(struct pbsnode *pnode, pbs_db_node_info_t *pdbnd)
 	if (pnode->nd_pque)
 		strcpy(pnode->nd_pque->qu_qs.qu_name, pdbnd->nd_pque);
 
-	if ((decode_attr_db(pnode, &pdbnd->db_attr_list.attrs, node_attr_idx, node_attr_def, pnode->nd_attr, ND_ATR_LAST, 0)) != 0)
+	if ((decode_attr_db(pnode, &pdbnd->db_attr_list.attrs, node_attr_idx, node_attr_def, &pnode->nd_attr)) != 0)
 		return -1;
 
 	pnode->nd_svrflags &= ~NODE_NEWOBJ;
@@ -239,7 +239,7 @@ node_to_db(struct pbsnode *pnode, pbs_db_node_info_t *pdbnd)
 	else
 		pdbnd->nd_pque[0] = 0;
 
-	if ((encode_attr_db(node_attr_def, pnode->nd_attr, ND_ATR_LAST, &pdbnd->db_attr_list, 0)) != 0)
+	if ((encode_attr_db(node_attr_def, &pnode->nd_attr, &pdbnd->db_attr_list, 0)) != 0)
 		return -1;
 
 	/* MSTODO: how can we optimize this loop - eliminate this? */

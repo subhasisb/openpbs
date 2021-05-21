@@ -270,7 +270,7 @@ set_objexid(void *pobj, int objtype, attribute *attrry)
 		idx_egroup = (int)JOB_ATR_egroup;
 		idx_acct = (int)JOB_ATR_account;
 		obj_attr_def = job_attr_def;
-		objattrs = ((job *)pobj)->ji_wattr;
+		objattrs = ATTR_LIST_HEAD(((job *)pobj)->ji_wattr);
 		owner = get_jattr_str(pobj, idx_owner);
 		paclRoot = get_sattr(SVR_ATR_AclRoot);
 		bad_euser = PBSE_BADUSER;
@@ -283,7 +283,7 @@ set_objexid(void *pobj, int objtype, attribute *attrry)
 		idx_egroup = (int)RESV_ATR_egroup;
 		idx_acct = (int)RESV_ATR_account;
 		obj_attr_def = resv_attr_def;
-		objattrs = ((resc_resv *)pobj)->ri_wattr;
+		objattrs = ATTR_LIST_HEAD(((resc_resv *)pobj)->ri_wattr);
 		owner = get_rattr_str(pobj, idx_owner);
 		paclRoot = get_sattr(SVR_ATR_AclRoot);
 		bad_euser = PBSE_R_UID;

@@ -462,7 +462,7 @@ send_job_resc_updates(int mtfd)
 	     pjob = GET_NEXT(pjob->ji_alljobs)) {
 		if ((pjob->ji_qs.ji_svrflags & JOB_SVFLG_RescUpdt_Rqd) &&
 		    (pjob->ji_qs.ji_svrflags & JOB_SVFLG_RescAssn)) {
-			psvr_ru = init_psvr_ru(pjob, INCR, pjob->ji_wattr[JOB_ATR_exec_vnode].at_val.at_str, FALSE);
+			psvr_ru = init_psvr_ru(pjob, INCR, pjob->ji_wattr.arr[JOB_ATR_exec_vnode]->at_val.at_str, FALSE);
 			if (psvr_ru) {
 				append_link(&ru_head, &psvr_ru->ru_link, psvr_ru);
 				ct++;
@@ -965,7 +965,7 @@ init_node_from_bstat(struct batch_status *bstat, server_t *psvr)
 
 		pnode->nd_svrflags |= NODE_ALIEN;
 		convert_attrl_to_svrattrl(cur->attribs, &attrs);
-		if ((decode_attr_db(pnode, &attrs, node_attr_idx, node_attr_def, pnode->nd_attr, ND_ATR_LAST, 0)) != 0) {
+		if ((decode_attr_db(pnode, &attrs, node_attr_idx, node_attr_def, &pnode->nd_attr)) != 0) {
 			log_errf(PBSE_INTERNAL, __func__, "Decoding of node %s received from peer server has failed!",
 				 pnode->nd_name);
 			free(pnode);

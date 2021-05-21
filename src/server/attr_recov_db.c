@@ -136,9 +136,11 @@ encode_single_attr_db(attribute_def *padef, attribute *pattr, pbs_db_attr_list_t
  *
  */
 int
-encode_attr_db(attribute_def *padef, attribute *pattr, int numattr, pbs_db_attr_list_t *db_attr_list, int all)
+encode_attr_db(attribute_def *padef, attribute_arr *parr, pbs_db_attr_list_t *db_attr_list, int all)
 {
 	int i;
+	attribute *pattr = ATTR_LIST_HEAD(*(parr));
+	int numattr = parr->count;
 
 	db_attr_list->attr_count = 0;
 
@@ -167,8 +169,6 @@ encode_attr_db(attribute_def *padef, attribute *pattr, int numattr, pbs_db_attr_
  * @param[in]     padef_idx - Search index of this attribute array
  * @param[in]	  padef - Address of parent's attribute definition array
  * @param[in,out] pattr - Address of the parent objects attribute array
- * @param[in]	  limit - Number of attributes in the list
- * @param[in]	  unknown	- The index of the unknown attribute if any
  *
  * @return      Error code
  * @retval	 0  - Success
@@ -177,12 +177,15 @@ encode_attr_db(attribute_def *padef, attribute *pattr, int numattr, pbs_db_attr_
  *
  */
 int
-decode_attr_db(void *parent, pbs_list_head *attr_list, void *padef_idx, struct attribute_def *padef, struct attribute *pattr, int limit, int unknown)
+decode_attr_db(void *parent, pbs_list_head *attr_list, void *padef_idx, struct attribute_def *padef, attribute_arr *parr)
 {
 	int index;
 	svrattrl *pal = (svrattrl *)0;
 	svrattrl *tmp_pal = (svrattrl *)0;
 	void **palarray = NULL;
+	attribute *pattr = ATTR_LIST_HEAD((*parr));
+	int limit = parr->count;
+	int unknown = limit -1;
 
 	if ((palarray = calloc(limit, sizeof(void *))) == NULL) {
 		log_err(-1, __func__, "Out of memory");

@@ -1018,7 +1018,7 @@ req_modifyjob(struct batch_request *preq)
 	/* modify the jobs attributes */
 
 	bad = 0;
-	pattr = pjob->ji_wattr;
+	pattr = ATTR_LIST_HEAD(pjob->ji_wattr);
 
 	/* call attr_atomic_set to decode and set a copy of the attributes */
 

@@ -265,7 +265,7 @@ struct pbsnode {
 	pbs_list_link un_lic_link;		/*Link to unlicense list */
 	int nd_svrflags;	/* server flags */
 	pbs_list_link nd_link;	/* Link to holding svr list in case if this is an alien node */
-	attribute nd_attr[ND_ATR_LAST];
+	attribute_arr nd_attr;
 };
 typedef struct pbsnode pbs_node;
 

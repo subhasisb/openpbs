@@ -1612,13 +1612,13 @@ action_entlim_chk(attribute *pattr, void *pobject, int actmode)
 	}
 
 	/* flags says wrong (old) style in use, but need to double check */
-	if ((i = is_attrs_in_list_set(svr_oldstyle, server.sv_attr)) != -1) {
+	if ((i = is_attrs_in_list_set(svr_oldstyle, ATTR_LIST_HEAD(server.sv_attr))) != -1) {
 		log_mixed_limit_controls(NULL, i, "old");
 		return PBSE_MIXENTLIMS;
 	}
 	pq = (pbs_queue *)GET_NEXT(svr_queues);
 	while (pq) {
-		if ((i=is_attrs_in_list_set(que_oldstyle, pq->qu_attr)) != -1) {
+		if ((i=is_attrs_in_list_set(que_oldstyle, ATTR_LIST_HEAD(pq->qu_attr))) != -1) {
 			log_mixed_limit_controls(pq, i, "old");
 			return PBSE_MIXENTLIMS;
 		}
@@ -1829,13 +1829,13 @@ int actmode;
 	}
 
 	/* flags says wrong (new) style in use, but need to double check */
-	if ((i = is_attrs_in_list_set(svr_newstyle, server.sv_attr)) != -1) {
+	if ((i = is_attrs_in_list_set(svr_newstyle, ATTR_LIST_HEAD(server.sv_attr))) != -1) {
 		log_mixed_limit_controls(NULL, i, "new");
 		return PBSE_MIXENTLIMS;
 	}
 	pq = (pbs_queue *)GET_NEXT(svr_queues);
 	while (pq) {
-		if ((i=is_attrs_in_list_set(que_newstyle, pq->qu_attr)) != -1) {
+		if ((i=is_attrs_in_list_set(que_newstyle, ATTR_LIST_HEAD(pq->qu_attr))) != -1) {
 			log_mixed_limit_controls(pq, i, "new");
 			return PBSE_MIXENTLIMS;
 		}

@@ -93,7 +93,7 @@ typedef struct pbs_sched {
 	char sc_name[PBS_MAXSCHEDNAME + 1];			      /* name of sched this sched */
 	struct preempt_ordering preempt_order[PREEMPT_ORDER_MAX + 1]; /* preempt order for this sched */
 	int sc_cycle_started;					      /* indicates whether sched cycle is started or not, 0 - not started, 1 - started */
-	attribute sch_attr[SCHED_ATR_LAST];			      /* sched object's attributes  */
+	attribute_arr sch_attr;			      /* sched object's attributes  */
 	short newobj;						      /* is this new sched obj? */
 } pbs_sched;
 

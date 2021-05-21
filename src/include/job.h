@@ -606,7 +606,7 @@ struct job {
 	 * Its presence is for rapid acces to the attributes.
 	 */
 
-	attribute ji_wattr[JOB_ATR_LAST]; /* decoded attributes  */
+	attribute_arr ji_wattr; /* decoded attributes  */
 
 	short newobj; /* newly created job? */
 };

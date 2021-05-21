@@ -238,7 +238,7 @@ job_save_fs(job *pjob)
 			} else if (save_struct((char *)&pjob->ji_extended,
 				extndsize) != 0) {
 				redo++;
-			} else if (save_attr_fs(job_attr_def, pjob->ji_wattr,
+			} else if (save_attr_fs(job_attr_def, ATTR_LIST_HEAD(pjob->ji_wattr),
 				(int)JOB_ATR_LAST) != 0) {
 				redo++;
 			} else if (save_flush() != 0) {
@@ -434,7 +434,7 @@ job_recov_fs(char *filename)
 
 	/* read in working attributes */
 
-	if (recov_attr_fs(fds, pj, job_attr_idx, job_attr_def, pj->ji_wattr, (int)JOB_ATR_LAST,
+	if (recov_attr_fs(fds, pj, job_attr_idx, job_attr_def, ATTR_LIST_HEAD(pj->ji_wattr), (int)JOB_ATR_LAST,
 		(int)JOB_ATR_UNKN) != 0) {
 		sprintf(log_buffer, "error reading attributes portion of %s",
 			pbs_recov_filename);

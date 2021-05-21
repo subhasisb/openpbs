@@ -88,7 +88,7 @@ struct pbs_queue {
 
 	/* the queue attributes */
 
-	attribute qu_attr[QA_ATR_LAST];
+	attribute_arr qu_attr;
 	short newobj;
 };
 typedef struct pbs_queue pbs_queue;

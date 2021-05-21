@@ -51,7 +51,7 @@
 attribute *
 get_sattr(int attr_idx)
 {
-	return &(server.sv_attr[attr_idx]);
+	return (server.sv_attr.arr[attr_idx]);
 }
 
 /**
