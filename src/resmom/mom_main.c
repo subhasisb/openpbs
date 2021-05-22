@@ -564,6 +564,7 @@ static struct specials addspecial[] = {
 };
 
 void	*job_attr_idx = NULL;
+attribute_def_info *job_attr_defn = NULL;
 char	*log_file = NULL;
 char	*path_log;
 #ifndef	WIN32
@@ -7379,8 +7380,8 @@ main(int argc, char *argv[])
 
 #endif /* !WIN32 */
 
-	if ((job_attr_idx = cr_attrdef_idx(job_attr_def, JOB_ATR_LAST)) == NULL) {
-		log_err(errno, __func__, "Failed creating job attribute search index");
+	if (create_attr_defn(&job_attr_defn, &job_attr_idx, job_attr_def, JOB_ATR_LAST) == -1) {
+		log_err(errno, __func__, "Failed creating job attribute definition");
 		return (-1);
 	}
 	if (cr_rescdef_idx(svr_resc_def, svr_resc_size) != 0) {

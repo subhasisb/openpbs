@@ -56,7 +56,7 @@ attribute *
 get_rattr(const resc_resv *presv, int attr_idx)
 {
 	if (presv != NULL)
-		return _get_attr_by_idx((attribute_arr *)&presv->ri_wattr, attr_idx);
+		return _get_attr_by_idx(&presv->ri_wattr, attr_idx);
 	return NULL;
 }
 
@@ -151,7 +151,7 @@ set_rattr_generic(resc_resv *presv, int attr_idx, char *val, char *rscn, enum ba
 	if (presv == NULL || val == NULL)
 		return 1;
 
-	return set_attr_generic(get_rattr(presv, attr_idx), &resv_attr_def[attr_idx], val, rscn, op);
+	return set_attr_generic(get_attr_ptr(&presv->ri_wattr, attr_idx), &resv_attr_def[attr_idx], val, rscn, op);
 }
 
 /**
@@ -172,7 +172,7 @@ set_rattr_str_slim(resc_resv *presv, int attr_idx, char *val, char *rscn)
 	if (presv == NULL || val == NULL)
 		return 1;
 
-	return set_attr_generic(get_rattr(presv, attr_idx), &resv_attr_def[attr_idx], val, rscn, INTERNAL);
+	return set_attr_generic(get_attr_ptr(&presv->ri_wattr, attr_idx), &resv_attr_def[attr_idx], val, rscn, INTERNAL);
 }
 
 /**
@@ -193,7 +193,7 @@ set_rattr_l_slim(resc_resv *presv, int attr_idx, long val, enum batch_op op)
 	if (presv == NULL)
 		return 1;
 
-	set_attr_l(get_rattr(presv, attr_idx), val, op);
+	set_attr_l(get_attr_ptr(&presv->ri_wattr, attr_idx), val, op);
 
 	return 0;
 }
@@ -216,7 +216,7 @@ set_rattr_b_slim(resc_resv *presv, int attr_idx, long val, enum batch_op op)
 	if (presv == NULL)
 		return 1;
 
-	set_attr_b(get_rattr(presv, attr_idx), val, op);
+	set_attr_b(get_attr_ptr(&presv->ri_wattr, attr_idx), val, op);
 
 	return 0;
 }
@@ -239,7 +239,7 @@ set_rattr_c_slim(resc_resv *presv, int attr_idx, char val, enum batch_op op)
 	if (presv == NULL)
 		return 1;
 
-	set_attr_c(get_rattr(presv, attr_idx), val, op);
+	set_attr_c(get_attr_ptr(&presv->ri_wattr, attr_idx), val, op);
 
 	return 0;
 }

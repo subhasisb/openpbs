@@ -53,7 +53,7 @@ attribute *
 get_nattr(const struct pbsnode *pnode, int attr_idx)
 {
 	if (pnode != NULL)
-		return _get_attr_by_idx((attribute_arr *) &pnode->nd_attr.arr, attr_idx);
+		return _get_attr_by_idx(&pnode->nd_attr, attr_idx);
 	return NULL;
 }
 
@@ -167,7 +167,7 @@ set_nattr_generic(struct pbsnode *pnode, int attr_idx, char *val, char *rscn, en
 	if (pnode == NULL || val == NULL)
 		return 1;
 
-	return set_attr_generic(get_nattr(pnode, attr_idx), &node_attr_def[attr_idx], val, rscn, op);
+	return set_attr_generic(get_attr_ptr(&pnode->nd_attr, attr_idx), &node_attr_def[attr_idx], val, rscn, op);
 }
 
 /**
@@ -188,7 +188,7 @@ set_nattr_str_slim(struct pbsnode *pnode, int attr_idx, char *val, char *rscn)
 	if (pnode == NULL || val == NULL)
 		return 1;
 
-	return set_attr_generic(get_nattr(pnode, attr_idx), &node_attr_def[attr_idx], val, rscn, INTERNAL);
+	return set_attr_generic(get_attr_ptr(&pnode->nd_attr, attr_idx), &node_attr_def[attr_idx], val, rscn, INTERNAL);
 }
 
 /**
@@ -209,7 +209,7 @@ set_nattr_l_slim(struct pbsnode *pnode, int attr_idx, long val, enum batch_op op
 	if (pnode == NULL)
 		return 1;
 
-	set_attr_l(get_nattr(pnode, attr_idx), val, op);
+	set_attr_l(get_attr_ptr(&pnode->nd_attr, attr_idx), val, op);
 
 	return 0;
 }
@@ -232,7 +232,7 @@ set_nattr_b_slim(struct pbsnode *pnode, int attr_idx, long val, enum batch_op op
 	if (pnode == NULL)
 		return 1;
 
-	set_attr_b(get_nattr(pnode, attr_idx), val, op);
+	set_attr_b(get_attr_ptr(&pnode->nd_attr, attr_idx), val, op);
 
 	return 0;
 }
@@ -255,7 +255,7 @@ set_nattr_c_slim(struct pbsnode *pnode, int attr_idx, char val, enum batch_op op
 	if (pnode == NULL)
 		return 1;
 
-	set_attr_c(get_nattr(pnode, attr_idx), val, op);
+	set_attr_c(get_attr_ptr(&pnode->nd_attr, attr_idx), val, op);
 
 	return 0;
 }
@@ -278,7 +278,7 @@ set_nattr_short_slim(struct pbsnode *pnode, int attr_idx, short val, enum batch_
 	if (pnode == NULL)
 		return 1;
 
-	set_attr_short(get_nattr(pnode, attr_idx), val, op);
+	set_attr_short(get_attr_ptr(&pnode->nd_attr, attr_idx), val, op);
 
 	return 0;
 }
@@ -344,7 +344,7 @@ clear_nattr(struct pbsnode *pnode, int attr_idx)
 void
 set_nattr_jinfo(struct pbsnode *pnode, int attr_idx, struct pbsnode *val)
 {
-	attribute *attr = get_nattr(pnode, attr_idx);
+	attribute *attr = get_attr_ptr(&pnode->nd_attr, attr_idx);
 	attr->at_val.at_jinfo = val;
 	attr->at_flags = ATR_SET_MOD_MCACHE;
 }

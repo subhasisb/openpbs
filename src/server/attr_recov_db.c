@@ -125,7 +125,6 @@ encode_single_attr_db(attribute_def *padef, attribute *pattr, pbs_db_attr_list_t
  * @brief
  *	Encode the given attributes to the database structure of type pbs_db_attr_list_t
  *
- * @param[in]	padef - Address of parent's attribute definition array
  * @param[in]	pattr - Address of the parent objects attribute array
  * @param[in]	numattr - Number of attributes in the list
  * @param[in]	all  - Encode all attributes
@@ -136,25 +135,24 @@ encode_single_attr_db(attribute_def *padef, attribute *pattr, pbs_db_attr_list_t
  *
  */
 int
-encode_attr_db(attribute_def *padef, attribute_arr *parr, pbs_db_attr_list_t *db_attr_list, int all)
+encode_attr_db(attribute_arr *parr, pbs_db_attr_list_t *db_attr_list, int all)
 {
 	int i;
-	attribute *pattr = ATTR_LIST_HEAD(*(parr));
-	int numattr = parr->count;
+	int numattr = parr->defn->count;
 
 	db_attr_list->attr_count = 0;
 
 	CLEAR_HEAD(db_attr_list->attrs);
 
 	for (i = 0; i < numattr; i++) {
-		if (!((pattr + i)->at_flags & ATR_VFLAG_MODIFY))
+		if (!parr->arr[i] || !(parr->arr[i]->at_flags & ATR_VFLAG_MODIFY))
 			continue;
 
-		if ((((padef + i)->at_flags & ATR_DFLAG_NOSAVM) == 0) || all) {
-			if (encode_single_attr_db((padef + i), (pattr + i), db_attr_list) != 0)
+		if ((((parr->defn->def + i)->at_flags & ATR_DFLAG_NOSAVM) == 0) || all) {
+			if (encode_single_attr_db((parr->defn->def + i), parr->arr[i], db_attr_list) != 0)
 				return -1;
 
-			(pattr+i)->at_flags &= ~ATR_VFLAG_MODIFY;
+			parr->arr[i]->at_flags &= ~ATR_VFLAG_MODIFY;
 		}
 	}
 	return 0;
@@ -166,8 +164,6 @@ encode_attr_db(attribute_def *padef, attribute_arr *parr, pbs_db_attr_list_t *db
  *
  * @param[in]	  parent - pointer to parent object
  * @param[in]	  attr_list - recovered/to be decoded attribute list
- * @param[in]     padef_idx - Search index of this attribute array
- * @param[in]	  padef - Address of parent's attribute definition array
  * @param[in,out] pattr - Address of the parent objects attribute array
  *
  * @return      Error code
@@ -177,14 +173,13 @@ encode_attr_db(attribute_def *padef, attribute_arr *parr, pbs_db_attr_list_t *db
  *
  */
 int
-decode_attr_db(void *parent, pbs_list_head *attr_list, void *padef_idx, struct attribute_def *padef, attribute_arr *parr)
+decode_attr_db(void *parent, pbs_list_head *attr_list, attribute_arr *parr)
 {
 	int index;
 	svrattrl *pal = (svrattrl *)0;
 	svrattrl *tmp_pal = (svrattrl *)0;
 	void **palarray = NULL;
-	attribute *pattr = ATTR_LIST_HEAD((*parr));
-	int limit = parr->count;
+	int limit = parr->defn->count;
 	int unknown = limit -1;
 
 	if ((palarray = calloc(limit, sizeof(void *))) == NULL) {
@@ -200,7 +195,7 @@ decode_attr_db(void *parent, pbs_list_head *attr_list, void *padef_idx, struct a
 
 	for (pal = (svrattrl *) GET_NEXT(*attr_list); pal != NULL; pal = (svrattrl *) GET_NEXT(pal->al_link)) {
 		/* find the attribute definition based on the name */
-		index = find_attr(padef_idx, padef, pal->al_name);
+		index = find_attr(parr->defn->idx, parr->defn->def, pal->al_name);
 		if (index < 0) {
 
 			/*
@@ -254,15 +249,21 @@ decode_attr_db(void *parent, pbs_list_head *attr_list, void *padef_idx, struct a
 		 */
 		pal = palarray[index];
 		while (pal) {
-			if ((padef[index].at_type == ATR_TYPE_ENTITY) && is_attr_set(&pattr[index])) {
+			/* is pattr even allocated? if not allocate it here */
+			if (!parr->arr[index]) {
+				parr->arr[index] = malloc(sizeof(attribute));
+				clear_attr(parr->arr[index], &parr->defn->def[index]);
+			}
+
+			if ((parr->defn->def[index].at_type == ATR_TYPE_ENTITY) && is_attr_set(parr->arr[index])) {
 				/* for INCR case of entity limit, decode locally */
-				set_attr_generic(&pattr[index], &padef[index], pal->al_value, pal->al_resc, INCR);
+				set_attr_generic(parr->arr[index], &parr->defn->def[index], pal->al_value, pal->al_resc, INCR);
 			} else {
-				set_attr_generic(&pattr[index], &padef[index], pal->al_value, pal->al_resc, INTERNAL);
+				set_attr_generic(parr->arr[index], &parr->defn->def[index], pal->al_value, pal->al_resc, INTERNAL);
 				int act_rc = 0;
-				if (padef[index].at_action)
-					if ((act_rc = (padef[index].at_action(&pattr[index], parent, ATR_ACTION_RECOV)))) {
-						log_errf(act_rc, __func__, "Action function failed for %s attr, errn %d", (padef+index)->at_name, act_rc);
+				if (parr->defn->def[index].at_action)
+					if ((act_rc = (parr->defn->def[index].at_action(parr->arr[index], parent, ATR_ACTION_RECOV)))) {
+						log_errf(act_rc, __func__, "Action function failed for %s attr, errn %d", (parr->defn->def + index)->at_name, act_rc);
 						for ( index++; index <= limit; index++) {
 							while (pal) {
 								tmp_pal = pal->al_sister;
@@ -279,7 +280,7 @@ decode_attr_db(void *parent, pbs_list_head *attr_list, void *padef_idx, struct a
 						return -1;
 					}
 			}
-			(pattr+index)->at_flags = (pal->al_flags & ~ATR_VFLAG_MODIFY) | ATR_VFLAG_MODCACHE;
+			(parr->arr[index])->at_flags = (pal->al_flags & ~ATR_VFLAG_MODIFY) | ATR_VFLAG_MODCACHE;
 
 			tmp_pal = pal->al_sister;
 			pal = tmp_pal;

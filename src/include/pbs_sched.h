@@ -80,6 +80,7 @@ enum sched_atr {
 };
 
 extern void *sched_attr_idx;
+extern attribute_def_info *sched_attr_defn;
 extern attribute_def sched_attr_def[];
 
 typedef struct pbs_sched {

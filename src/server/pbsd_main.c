@@ -906,6 +906,14 @@ main(int argc, char **argv)
 	CLEAR_HEAD(svr_creds_cache);
 	CLEAR_HEAD(unlicensed_nodes_list);
 
+	/* initialize the server object much before pbsd_init since we use it anyways before init */
+	memset(&server, 0, sizeof(server));
+	if (create_attr_defn(&svr_attr_defn, &svr_attr_idx, svr_attr_def, SVR_ATR_LAST) == -1) {
+		log_err(errno, __func__, "Failed creating server attribute definitio");
+		return (-1);
+	}
+	attr_arr_alloc(&server.sv_attr, svr_attr_defn);
+
 	/* initialize paths that we will need */
 	path_priv       = build_path(pbs_conf.pbs_home_path, PBS_SVR_PRIVATE,
 		suffix_slash);

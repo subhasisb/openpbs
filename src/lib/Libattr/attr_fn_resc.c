@@ -304,11 +304,9 @@ set_resc(attribute *old, attribute *new, enum batch_op op)
 
 	newresc = (resource *)GET_NEXT(new->at_val.at_list);
 	while (newresc != NULL) {
-
 		local_op = op;
 
 		/* search for old that has same definition as new */
-
 		oldresc = find_resc_entry(old, newresc->rs_defin);
 		if (oldresc == NULL) {
 			/* add new resource to list */
@@ -325,9 +323,7 @@ set_resc(attribute *old, attribute *new, enum batch_op op)
 		 * value; if the new resource is unset (no value), then the
 		 * old resource is unset by freeing it.
 		 */
-
 		if (newresc->rs_value.at_flags & ATR_VFLAG_SET) {
-
 			/*
 			 * An indirect resource is a string of the form
 			 * "@<node>", it may be of a different type than the
@@ -340,18 +336,15 @@ set_resc(attribute *old, attribute *new, enum batch_op op)
 			}
 			if (newresc->rs_value.at_flags & ATR_VFLAG_INDIRECT) {
 				oldresc->rs_defin->rs_free(&oldresc->rs_value);
-				rc = set_str(&oldresc->rs_value,
-					&newresc->rs_value, local_op);
+				rc = set_str(&oldresc->rs_value, &newresc->rs_value, local_op);
 				oldresc->rs_value.at_flags |= ATR_VFLAG_INDIRECT;
 			} else {
-				rc = oldresc->rs_defin->rs_set(&oldresc->rs_value,
-					&newresc->rs_value, local_op);
+				rc = oldresc->rs_defin->rs_set(&oldresc->rs_value, &newresc->rs_value, local_op);
 				oldresc->rs_value.at_flags &= ~ATR_VFLAG_INDIRECT;
 			}
 			if (rc != 0)
 				return (rc);
-			oldresc->rs_value.at_flags |=
-				(newresc->rs_value.at_flags & ATR_VFLAG_DEFLT);
+			oldresc->rs_value.at_flags |= (newresc->rs_value.at_flags & ATR_VFLAG_DEFLT);
 		} else {
 			oldresc->rs_defin->rs_free(&oldresc->rs_value);
 		}
@@ -392,7 +385,7 @@ comp_resc(attribute *attr, attribute *with)
 	comp_resc_lt = 0;
 	comp_resc_nc = 0;
 
-	if ((attr == NULL) || (with == NULL))
+	if (with == NULL)
 		return (-1);
 
 	wiresc = (resource *)GET_NEXT(with->at_val.at_list);
@@ -401,7 +394,7 @@ comp_resc(attribute *attr, attribute *with)
 			atresc = find_resc_entry(attr, wiresc->rs_defin);
 			if (atresc != NULL) {
 				if (atresc->rs_value.at_flags & ATR_VFLAG_SET) {
-					if ((rc=atresc->rs_defin->rs_comp(&atresc->rs_value, 				      &wiresc->rs_value)) > 0)
+					if ((rc=atresc->rs_defin->rs_comp(&atresc->rs_value, &wiresc->rs_value)) > 0)
 						comp_resc_gt++;
 					else if (rc < 0)
 						comp_resc_lt++;
@@ -530,6 +523,8 @@ resource *
 find_resc_entry(const attribute *pattr, resource_def *rscdf)
 {
 	resource *pr;
+	if (!pattr) 
+		return NULL;
 
 	pr = (resource *)GET_NEXT(pattr->at_val.at_list);
 	while (pr != NULL) {

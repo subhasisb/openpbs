@@ -373,7 +373,7 @@ job_alloc(void)
 
 	/* set the working attributes to "unspecified" */
 
-	attr_arr_alloc(&pj->ji_wattr, JOB_ATR_LAST);
+	attr_arr_alloc(&pj->ji_wattr, job_attr_defn);
 
 #ifndef PBS_MOM
 	set_job_state(pj, JOB_STATE_LTR_TRANSIT);
@@ -1672,7 +1672,7 @@ resv_alloc(char *resvid)
 	 */
 	resvp->ri_qs.ri_rsversion = RSVERSION;
 
-	attr_arr_alloc(&resvp->ri_wattr, RESV_ATR_LAST);
+	attr_arr_alloc(&resvp->ri_wattr, resv_attr_defn);
 
 	if ((dot = strchr(resvid, (int)'.')) != 0)
 		*dot = '\0';

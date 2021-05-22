@@ -241,7 +241,7 @@ determine_egroup(void *pobj, int objtype, attribute *pattr)
  */
 
 int
-set_objexid(void *pobj, int objtype, attribute *attrry)
+set_objexid(void *pobj, int objtype, attribute_arr *attrry)
 {
 	int addflags = 0;
 	int isowner;
@@ -253,8 +253,7 @@ set_objexid(void *pobj, int objtype, attribute *attrry)
 	int idx_owner, idx_euser, idx_egroup;
 	int idx_acct;
 	int bad_euser, bad_egrp;
-	attribute *objattrs;
-	attribute_def *obj_attr_def;
+	attribute_arr *objattrs;
 	attribute *paclRoot; /*future: aclRoot resv != aclRoot job*/
 	char **pmem;
 	struct group *gpent;
@@ -269,8 +268,7 @@ set_objexid(void *pobj, int objtype, attribute *attrry)
 		idx_euser = (int)JOB_ATR_euser;
 		idx_egroup = (int)JOB_ATR_egroup;
 		idx_acct = (int)JOB_ATR_account;
-		obj_attr_def = job_attr_def;
-		objattrs = ATTR_LIST_HEAD(((job *)pobj)->ji_wattr);
+		objattrs = &((job *)pobj)->ji_wattr;
 		owner = get_jattr_str(pobj, idx_owner);
 		paclRoot = get_sattr(SVR_ATR_AclRoot);
 		bad_euser = PBSE_BADUSER;
@@ -282,8 +280,7 @@ set_objexid(void *pobj, int objtype, attribute *attrry)
 		idx_euser = (int)RESV_ATR_euser;
 		idx_egroup = (int)RESV_ATR_egroup;
 		idx_acct = (int)RESV_ATR_account;
-		obj_attr_def = resv_attr_def;
-		objattrs = ATTR_LIST_HEAD(((resc_resv *)pobj)->ri_wattr);
+		objattrs = &((resc_resv *)pobj)->ri_wattr;
 		owner = get_rattr_str(pobj, idx_owner);
 		paclRoot = get_sattr(SVR_ATR_AclRoot);
 		bad_euser = PBSE_R_UID;
@@ -295,11 +292,10 @@ set_objexid(void *pobj, int objtype, attribute *attrry)
 	 * if not set, fall back to the object's User_List, which may
 	 * actually be the same as what is passed into this function
 	 */
-
-	if ((attrry + idx_ul)->at_flags & ATR_VFLAG_SET)
-		pattr = attrry + idx_ul;
+	if (is_attr_set(attrry->arr[idx_ul]))
+		pattr = attrry->arr[idx_ul];
 	else
-		pattr = &objattrs[idx_ul];
+		pattr = get_attr_ptr(objattrs, idx_ul);
 
 	if ((puser = determine_euser(pobj, objtype, pattr, &isowner)) == NULL)
 		return (bad_euser);
@@ -320,16 +316,16 @@ set_objexid(void *pobj, int objtype, attribute *attrry)
 			return (bad_euser);
 	}
 
-	pattr = &objattrs[idx_euser];
-	free_attr(obj_attr_def, pattr, idx_euser);
-	set_attr_generic(pattr, &obj_attr_def[idx_euser], puser, NULL, INTERNAL);
+	pattr = get_attr_ptr(objattrs, idx_euser);
+	free_attr(objattrs->defn->def, pattr, idx_euser);
+	set_attr_generic(pattr, &objattrs->defn->def[idx_euser], puser, NULL, INTERNAL);
 
 	if (pwent != NULL) {
 		/* if account (qsub -A) is not specified, set to empty string */
 
-		pattr = &objattrs[idx_acct];
+		pattr = get_attr_ptr(objattrs, idx_acct);
 		if (!is_attr_set(pattr))
-			set_attr_generic(pattr, &obj_attr_def[idx_acct], "\0", NULL, INTERNAL);
+			set_attr_generic(pattr, &objattrs->defn->def[idx_acct], "\0", NULL, INTERNAL);
 
 		/*
 		 * now figure out (for this host) the effective/execute "group name"
@@ -342,10 +338,10 @@ set_objexid(void *pobj, int objtype, attribute *attrry)
 		 * be same as what was passed
 		 */
 
-		if (is_attr_set(attrry + idx_gl))
-			pattr = attrry + idx_gl;
+		if (is_attr_set(attrry->arr[idx_gl]))
+			pattr = attrry->arr[idx_gl];
 		else
-			pattr = &objattrs[idx_gl];
+			pattr = get_attr_ptr(objattrs, idx_gl);
 		if ((pgrpn = determine_egroup(pobj, objtype, pattr)) != NULL) {
 
 			/* user specified a group, group must exists and either	   */
@@ -399,11 +395,14 @@ set_objexid(void *pobj, int objtype, attribute *attrry)
 
 	}
 
-	pattr = attrry + idx_egroup;
-	free_attr(obj_attr_def, pattr, idx_egroup);
+	pattr = attrry->arr[idx_egroup];
+	if (pattr)
+		free_attr(objattrs->defn->def, pattr, idx_egroup);
+	else
+		pattr = get_attr_ptr(attrry, idx_egroup);
 
 	if (addflags != 0) {
-		set_attr_generic(pattr, &obj_attr_def[idx_egroup], pgrpn, NULL, INTERNAL);
+		set_attr_generic(pattr, &objattrs->defn->def[idx_egroup], pgrpn, NULL, INTERNAL);
 		pattr->at_flags |= addflags;
 	}
 

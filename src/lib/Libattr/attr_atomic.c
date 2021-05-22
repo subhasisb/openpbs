@@ -56,12 +56,6 @@
  * @file	attr_atomic.c
  * @brief
  * 	This file contains general functions for manipulating an attribute array.
- *
- * @par	Included is:
- *	attr_atomic_set()
- *	attr_atomic_kill()
- *
- * 	The prototypes are declared in "attr_func.h"
  */
 
 /* Global Variables */
@@ -77,7 +71,6 @@ extern int resc_access_perm;	/* see lib/Libattr/attr_fn_resc.c */
  * @param[in] new - Pointer to the new/updated attribute
  * @param[in] pdef_idx - Search index for the attribute def array
  * @param[in] pdef - Pointer to the attribute definition
- * @param[in] limit - The index up to which to search for a definition
  * @param[in] unkn - Whether to allow unknown resources or not
  * @param[in] privil - Permissions of the caller requesting the operation
  * @param[out] badattr - Pointer to the attribute index in case of a failed
@@ -90,24 +83,24 @@ extern int resc_access_perm;	/* see lib/Libattr/attr_fn_resc.c */
  */
 
 int
-attr_atomic_set(struct svrattrl *plist, attribute *old, attribute *new, void *pdef_idx, attribute_def *pdef, int limit, int unkn, int privil, int *badattr)
+attr_atomic_set(struct svrattrl *plist, attribute_arr *old, attribute_arr *new, int unkn, int privil, int *badattr)
 {
-	int	    acc;
-	int	    index;
-	int	    listidx;
-	resource   *prc;
-	int	    rc;
-	attribute   temp;
-	int	    privil2;
-
-	for (index=0; index<limit; index++)
-		clear_attr(new+index, pdef+index);
+	int acc;
+	int index;
+	int listidx;
+	resource *prc;
+	int rc;
+	attribute temp;
+	int privil2;
+	attribute_def *pdef = old->defn->def;
+	int limit = new->defn->count;
+	attribute *nattr;
 
 	resc_access_perm = privil;      /* set privilege for decode_resc()  */
 
 	for (listidx=1,rc=PBSE_NONE; (rc==PBSE_NONE) && (plist!=NULL); plist=(struct svrattrl *)GET_NEXT(plist->al_link),listidx++) {
 
-		if ((index = find_attr(pdef_idx, pdef, plist->al_name)) < 0) {
+		if ((index = find_attr(old->defn->idx, old->defn->def, plist->al_name)) < 0) {
 			if (unkn < 0) {	          /*unknown attr isn't allowed*/
 				rc =  PBSE_NOATTR;
 				break;
@@ -125,7 +118,7 @@ attr_atomic_set(struct svrattrl *plist, attribute *old, attribute *new, void *pd
 		}
 		resc_access_perm = privil2;/* set privilege for decode_resc() */
 
-		acc = (pdef+index)->at_flags & ATR_DFLAG_ACCESS;
+		acc = (pdef + index)->at_flags & ATR_DFLAG_ACCESS;
 		if ((acc & privil2 & ATR_DFLAG_WRACC) == 0) {
 			if (privil2 & ATR_DFLAG_SvWR) {
 				/*from a daemon, just ignore this attribute*/
@@ -139,9 +132,8 @@ attr_atomic_set(struct svrattrl *plist, attribute *old, attribute *new, void *pd
 
 		/* decode new value */
 
-		clear_attr(&temp, pdef+index);
-		if ((rc = (pdef+index)->at_decode(&temp, plist->al_name,
-			plist->al_resc, plist->al_value)) != 0) {
+		clear_attr(&temp, pdef + index);
+		if ((rc = (pdef + index)->at_decode(&temp, plist->al_name, plist->al_resc, plist->al_value)) != 0) {
 			/* Even if the decode failed, it is possible for list types to
 			 * have allocated some memory.  Call at_free() to free that.
 			 */
@@ -156,18 +148,21 @@ attr_atomic_set(struct svrattrl *plist, attribute *old, attribute *new, void *pd
 
 		/* duplicate current value, if set AND not already dup-ed */
 
-		if (((old + index)->at_flags & ATR_VFLAG_SET) &&
-			!((new + index)->at_flags & ATR_VFLAG_SET)) {
-			if ((rc = (pdef + index)->at_set(new + index, old + index, SET)) != 0)
+		if (old->arr[index] && 
+			(old->arr[index]->at_flags & ATR_VFLAG_SET) &&
+			(!new->arr[index] || !(new->arr[index]->at_flags & ATR_VFLAG_SET))) {
+			
+			nattr = get_attr_ptr(new, index);
+			if ((rc = (pdef + index)->at_set(nattr, old->arr[index], SET)) != 0)
 				break;
 			/*
 			 * we need to know if the value is changed during
 			 * the next step, so clear MODIFY here; including
 			 * within resources.
 			 */
-			(new + index)->at_flags &= ~ATR_MOD_MCACHE;
-			if ((new + index)->at_type == ATR_TYPE_RESC) {
-				prc = (resource *)GET_NEXT((new+index)->at_val.at_list);
+			new->arr[index]->at_flags &= ~ATR_MOD_MCACHE;
+			if (new->arr[index]->at_type == ATR_TYPE_RESC) {
+				prc = (resource *)GET_NEXT(new->arr[index]->at_val.at_list);
 				while (prc) {
 					prc->rs_value.at_flags &= ~ATR_MOD_MCACHE;
 					prc = (resource *)GET_NEXT(prc->rs_link);
@@ -182,14 +177,15 @@ attr_atomic_set(struct svrattrl *plist, attribute *old, attribute *new, void *pd
 			plist->al_op = SET;
 
 		if (temp.at_flags & ATR_VFLAG_SET) {
-			rc=(pdef + index)->at_set(new + index, &temp, plist->al_op);
+			nattr = get_attr_ptr(new, index);
+			rc=(pdef + index)->at_set(nattr, &temp, plist->al_op);
 			if (rc) {
 				(pdef + index)->at_free(&temp);
 				break;
 			}
 		} else if (temp.at_flags & ATR_VFLAG_MODIFY) {
-			(pdef + index)->at_free(new + index);
-			(new + index)->at_flags |= ATR_MOD_MCACHE; /* SET was removed by at_free */
+			(pdef + index)->at_free(new->arr[index]);
+			new->arr[index]->at_flags |= ATR_MOD_MCACHE; /* SET was removed by at_free */
 		}
 
 		(pdef+index)->at_free(&temp);
@@ -198,7 +194,7 @@ attr_atomic_set(struct svrattrl *plist, attribute *old, attribute *new, void *pd
 	if (rc != PBSE_NONE) {
 		*badattr = listidx;
 		for (index=0; index<limit; index++)
-			(pdef + index)->at_free(new + index);
+			(pdef + index)->at_free(new->arr[index]);
 	}
 
 	return rc;
@@ -214,21 +210,19 @@ attr_atomic_set(struct svrattrl *plist, attribute *old, attribute *new, void *pd
  *	the array itself is freed.
  *
  * @param[in] temp - pointer  to attribute structure
- * @param[in] pdef - pointer to attribute_def structure
- * @param[in] limit -  Last attribute in the list
  *
  * @return 	Void
  *
  */
 
 void
-attr_atomic_kill(attribute *temp, attribute_def *pdef, int limit)
+attr_atomic_kill(attribute_arr *temp)
 {
 	int i;
 
-	for (i = 0; i < limit; i++)
-		(pdef + i)->at_free(temp + i);
-	free(temp);
+	for (i = 0; i < temp->defn->count; i++)
+		if (temp->arr[i])
+			(temp->defn->def + i)->at_free(temp->arr[i]);
 }
 
 /**
@@ -245,18 +239,23 @@ attr_atomic_kill(attribute *temp, attribute_def *pdef, int limit)
  */
 
 void
-attr_atomic_copy(attribute *to, attribute *from, attribute_def *pdef, int limit)
+attr_atomic_copy(attribute_arr *to, attribute_arr *from)
 {
 	int i;
-	for (i = 0; i < limit; i++) {
-		if (((to + i)->at_flags & ATR_VFLAG_SET) && (pdef + i)->at_set != set_null)
-			(pdef + i)->at_free(to + i);
 
-		if ((pdef + i)->at_set != set_null)
-			clear_attr(to + i, pdef + i);
-		if ((from + i)->at_flags & ATR_VFLAG_SET) {
-			(pdef + i)->at_set((to + i), (from + i), SET);
-			(to + i)->at_flags = (from + i)->at_flags;
+	for (i = 0; i < to->defn->count; i++) {
+		if (to->arr[i]) {
+			if ((to->arr[i]->at_flags & ATR_VFLAG_SET) && ((to->defn->def + i)->at_set != set_null))
+				(to->defn->def + i)->at_free(to->arr[i]);
+
+			if ((to->defn->def + i)->at_set != set_null)
+				clear_attr(to->arr[i], to->defn->def + i);
+		}
+
+		if (from->arr[i] && (from->arr[i]->at_flags & ATR_VFLAG_SET)) {
+			attribute *to_attr = get_attr_ptr(to, i); /* create memory for index i */
+			(to->defn->def + i)->at_set(to_attr, from->arr[i], SET);
+			to_attr->at_flags = from->arr[i]->at_flags;
 		}
 	}
 }

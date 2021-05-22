@@ -232,7 +232,7 @@ acl_check(attribute *pattr, char *name, int type)
 	if (name == NULL)
 		return (default_rtn);
 
-	if (!(pattr->at_flags & ATR_VFLAG_SET) ||
+	if (!pattr || !(pattr->at_flags & ATR_VFLAG_SET) ||
 		((pas = pattr->at_val.at_arst) == NULL) ||
 		(pas->as_usedptr == 0)) {
 

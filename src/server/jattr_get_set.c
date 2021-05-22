@@ -53,7 +53,7 @@ attribute *
 get_jattr(const job *pjob, int attr_idx)
 {
 	if (pjob != NULL)
-		return _get_attr_by_idx((attribute_arr *) &pjob->ji_wattr, attr_idx);
+		return _get_attr_by_idx(&pjob->ji_wattr, attr_idx);
 	return NULL;
 }
 
@@ -307,7 +307,7 @@ void
 set_job_state(job *pjob, char val)
 {
 	if (pjob != NULL)
-		set_attr_c(get_jattr(pjob, JOB_ATR_state), val, SET);
+		set_attr_c(get_attr_ptr(&pjob->ji_wattr, JOB_ATR_state), val, SET);
 }
 
 /**
@@ -344,7 +344,7 @@ set_jattr_generic(job *pjob, int attr_idx, char *val, char *rscn, enum batch_op 
 	if (pjob == NULL || val == NULL)
 		return 1;
 
-	return set_attr_generic(get_jattr(pjob, attr_idx), &job_attr_def[attr_idx], val, rscn, op);
+	return set_attr_generic(get_attr_ptr(&pjob->ji_wattr, attr_idx), &job_attr_def[attr_idx], val, rscn, op);
 }
 
 /**
@@ -365,7 +365,7 @@ set_jattr_str_slim(job *pjob, int attr_idx, char *val, char *rscn)
 	if (pjob == NULL || val == NULL)
 		return 1;
 
-	return set_attr_generic(get_jattr(pjob, attr_idx), &job_attr_def[attr_idx], val, rscn, INTERNAL);
+	return set_attr_generic(get_attr_ptr(&pjob->ji_wattr, attr_idx), &job_attr_def[attr_idx], val, rscn, INTERNAL);
 }
 
 /**
@@ -386,7 +386,7 @@ set_jattr_l_slim(job *pjob, int attr_idx, long val, enum batch_op op)
 	if (pjob == NULL)
 		return 1;
 
-	set_attr_l(get_jattr(pjob, attr_idx), val, op);
+	set_attr_l(get_attr_ptr(&pjob->ji_wattr, attr_idx), val, op);
 
 	return 0;
 }
@@ -409,7 +409,7 @@ set_jattr_ll_slim(job *pjob, int attr_idx, long long val, enum batch_op op)
 	if (pjob == NULL)
 		return 1;
 
-	set_attr_ll(get_jattr(pjob, attr_idx), val, op);
+	set_attr_ll(get_attr_ptr(&pjob->ji_wattr, attr_idx), val, op);
 
 	return 0;
 }
@@ -433,7 +433,7 @@ set_jattr_b_slim(job *pjob, int attr_idx, long val, enum batch_op op)
 	if (pjob == NULL)
 		return 1;
 
-	set_attr_b(get_jattr(pjob, attr_idx), val, op);
+	set_attr_b(get_attr_ptr(&pjob->ji_wattr, attr_idx), val, op);
 
 	return 0;
 }
@@ -456,7 +456,7 @@ set_jattr_c_slim(job *pjob, int attr_idx, char val, enum batch_op op)
 	if (pjob == NULL)
 		return 1;
 
-	set_attr_c(get_jattr(pjob, attr_idx), val, op);
+	set_attr_c(get_attr_ptr(&pjob->ji_wattr, attr_idx), val, op);
 
 	return 0;
 }

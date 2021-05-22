@@ -438,10 +438,10 @@ modify_job_attr(job *pjob, svrattrl *plist, int perm, int *bad)
 	int	   changed_resc;
 	int	   allow_unkn;
 	long	   i;
-	attribute *newattr;
-	attribute *pre_copy;
-	attribute *attr_save;
-	attribute *pattr;
+	attribute_arr newattr;
+	attribute_arr pre_copy;
+	attribute_arr attr_save;
+
 	resource  *prc;
 	int	   rc;
 	char	   newstate = -1;
@@ -453,48 +453,44 @@ modify_job_attr(job *pjob, svrattrl *plist, int perm, int *bad)
 	else
 		allow_unkn = (int)JOB_ATR_UNKN;
 
-	pattr = ATTR_LIST_HEAD(pjob->ji_wattr);
-
 	/* call attr_atomic_set to decode and set a copy of the attributes.
 	 * We need 2 copies: 1 for copying to pattr and 1 for calling the action functions
 	 * We can't use the same copy for the action functions because copying to pattr
 	 * is a shallow copy and array pointers will be cleared during the copy.
 	 */
 
-	newattr = calloc(JOB_ATR_LAST, sizeof(attribute));
-	if (newattr == NULL)
-		return PBSE_SYSTEM;
-	rc = attr_atomic_set(plist, pattr, newattr, job_attr_idx, job_attr_def, JOB_ATR_LAST, allow_unkn, perm, bad);
+	attr_arr_alloc(&newattr, job_attr_defn);
+	rc = attr_atomic_set(plist, &pjob->ji_wattr, &newattr, allow_unkn, perm, bad);
 	if (rc) {
-		attr_atomic_kill(newattr, job_attr_def, JOB_ATR_LAST);
+		attr_atomic_kill(&newattr);
 		return rc;
 	}
 
-	pre_copy = calloc(JOB_ATR_LAST, sizeof(attribute));
-	if(pre_copy == NULL) {
-		attr_atomic_kill(newattr, job_attr_def, JOB_ATR_LAST);
+	attr_arr_alloc(&pre_copy, job_attr_defn);
+	if(pre_copy.arr == NULL) {
+		attr_atomic_kill(&newattr);
 		return PBSE_SYSTEM;
 	}
-	attr_atomic_copy(pre_copy, newattr, job_attr_def, JOB_ATR_LAST);
+	attr_atomic_copy(&pre_copy, &newattr);
 
-	attr_save = calloc(JOB_ATR_LAST, sizeof(attribute));
-	if (attr_save == NULL) {
-		attr_atomic_kill(newattr, job_attr_def, JOB_ATR_LAST);
-		attr_atomic_kill(pre_copy, job_attr_def, JOB_ATR_LAST);
+	attr_arr_alloc(&attr_save, job_attr_defn);
+	if (attr_save.arr == NULL) {
+		attr_atomic_kill(&newattr);
+		attr_atomic_kill(&pre_copy);
 		return PBSE_SYSTEM;
 	}
 
-	attr_atomic_copy(attr_save, pattr, job_attr_def, JOB_ATR_LAST);
+	attr_atomic_copy(&attr_save, &pjob->ji_wattr);
 
 	/* If resource limits are being changed ... */
 
-	changed_resc = is_attr_set(&newattr[JOB_ATR_resource]);
+	changed_resc = is_attr_set(newattr.arr[JOB_ATR_resource]);
 	if ((rc == 0) && (changed_resc != 0)) {
 
 		/* first, remove ATR_VFLAG_DEFLT from any value which was set */
 		/* it can no longer be a "default" as it explicitly changed   */
 
-		prc = (resource *)GET_NEXT(newattr[(int)JOB_ATR_resource].at_val.at_list);
+		prc = (resource *)GET_NEXT(newattr.arr[(int)JOB_ATR_resource]->at_val.at_list);
 		while (prc) {
 			if ((prc->rs_value.at_flags & (ATR_VFLAG_MODIFY|ATR_VFLAG_DEFLT)) == (ATR_VFLAG_MODIFY|ATR_VFLAG_DEFLT))
 				prc->rs_value.at_flags &= ~ATR_VFLAG_DEFLT;
@@ -503,7 +499,7 @@ modify_job_attr(job *pjob, svrattrl *plist, int perm, int *bad)
 				/* if being changed at all, see if "select" */
 				if (prc->rs_defin == &svr_resc_def[RESC_SELECT]) {
 					/* select is modified, recalc chunk sums */
-					rc = set_chunk_sum(&prc->rs_value, &newattr[(int)JOB_ATR_resource]);
+					rc = set_chunk_sum(&prc->rs_value, newattr.arr[(int)JOB_ATR_resource]);
 					if (rc)
 						break;
 				}
@@ -519,7 +515,7 @@ modify_job_attr(job *pjob, svrattrl *plist, int perm, int *bad)
 
 				/* regular user cannot raise the limits of a running job */
 
-				if ((comp_resc(get_jattr(pjob, JOB_ATR_resource), &newattr[(int)JOB_ATR_resource]) == -1) ||
+				if ((comp_resc(get_jattr(pjob, JOB_ATR_resource), newattr.arr[(int)JOB_ATR_resource]) == -1) ||
 					comp_resc_lt)
 					rc = PBSE_PERM;
 
@@ -529,22 +525,17 @@ modify_job_attr(job *pjob, svrattrl *plist, int perm, int *bad)
 
 
 			if (rc == 0) {
-				rc =  chk_resc_limits(&newattr[(int)JOB_ATR_resource],
-					pjob->ji_qhdr);
+				rc =  chk_resc_limits(newattr.arr[(int)JOB_ATR_resource], pjob->ji_qhdr);
 			}
 			if (rc == 0) {
-				rc = check_entity_resc_limit_max(pjob, pjob->ji_qhdr,
-					&newattr[(int)JOB_ATR_resource]);
+				rc = check_entity_resc_limit_max(pjob, pjob->ji_qhdr, newattr.arr[(int)JOB_ATR_resource]);
 				if (rc == 0) {
-					rc = check_entity_resc_limit_queued(pjob, pjob->ji_qhdr,
-						&newattr[(int)JOB_ATR_resource]);
+					rc = check_entity_resc_limit_queued(pjob, pjob->ji_qhdr, newattr.arr[(int)JOB_ATR_resource]);
 					if (rc == 0)
 					{
-						rc = check_entity_resc_limit_max(pjob, NULL,
-							&newattr[(int)JOB_ATR_resource]);
+						rc = check_entity_resc_limit_max(pjob, NULL, newattr.arr[(int)JOB_ATR_resource]);
 						if (rc == 0)
-							rc = check_entity_resc_limit_queued(pjob, NULL,
-								&newattr[(int)JOB_ATR_resource]);
+							rc = check_entity_resc_limit_queued(pjob, NULL, newattr.arr[(int)JOB_ATR_resource]);
 					}
 				}
 			}
@@ -553,31 +544,29 @@ modify_job_attr(job *pjob, svrattrl *plist, int perm, int *bad)
 
 	/* special check on permissions for hold */
 
-	if ((rc == 0) &&
-		(newattr[(int)JOB_ATR_hold].at_flags & ATR_VFLAG_MODIFY)) {
+	if ((rc == 0) && (newattr.arr[(int)JOB_ATR_hold]->at_flags & ATR_VFLAG_MODIFY)) {
 		svrattrl *hold_e = find_name_in_svrattrl(plist, ATTR_h);
 		/* don't perform permission check if Hold_Types attribute */
 		/* was set in a hook script (special privilege) */
 		if ((hold_e == NULL) ||
 			((hold_e->al_flags & ATR_VFLAG_HOOK) == 0)) {
-			i = newattr[(int)JOB_ATR_hold].at_val.at_long ^
-				(pattr+(int)JOB_ATR_hold)->at_val.at_long;
+			i = newattr.arr[(int)JOB_ATR_hold]->at_val.at_long ^ pjob->ji_wattr.arr[JOB_ATR_hold]->at_val.at_long;
 			rc = chk_hold_priv(i, perm);
 		}
 	}
 
 
 	if ((rc == 0) &&
-		((newattr[(int)JOB_ATR_userlst].at_flags & ATR_VFLAG_MODIFY) ||
-			(newattr[(int)JOB_ATR_grouplst].at_flags & ATR_VFLAG_MODIFY))) {
+		((newattr.arr[(int)JOB_ATR_userlst]->at_flags & ATR_VFLAG_MODIFY) ||
+			(newattr.arr[(int)JOB_ATR_grouplst]->at_flags & ATR_VFLAG_MODIFY))) {
 		/* Need to reset execution uid and gid */
-		rc = set_objexid((void *)pjob, JOB_OBJECT, newattr);
+		rc = set_objexid((void *)pjob, JOB_OBJECT, &newattr);
 	}
 
 	if (rc) {
-		attr_atomic_kill(newattr, job_attr_def, JOB_ATR_LAST);
-		attr_atomic_kill(attr_save, job_attr_def, JOB_ATR_LAST);
-		attr_atomic_kill(pre_copy, job_attr_def, JOB_ATR_LAST);
+		attr_atomic_kill(&newattr);
+		attr_atomic_kill(&attr_save);
+		attr_atomic_kill(&pre_copy);
 		return (rc);
 	}
 
@@ -585,15 +574,15 @@ modify_job_attr(job *pjob, svrattrl *plist, int perm, int *bad)
 
 	if (changed_resc) {
 		account_entity_limit_usages(pjob, NULL,
-				&newattr[(int)JOB_ATR_resource], INCR, ETLIM_ACC_ALL_RES);
+				newattr.arr[(int)JOB_ATR_resource], INCR, ETLIM_ACC_ALL_RES);
 		account_entity_limit_usages(pjob, pjob->ji_qhdr,
-				&newattr[(int)JOB_ATR_resource], INCR, ETLIM_ACC_ALL_RES);
+				newattr.arr[(int)JOB_ATR_resource], INCR, ETLIM_ACC_ALL_RES);
 	}
 
 	/* Now copy the new values into the job attribute array for the purposes of running the action functions */
 
 	for (i = 0; i < JOB_ATR_LAST; i++) {
-		if (newattr[i].at_flags & ATR_VFLAG_MODIFY) {
+		if (newattr.arr[i]->at_flags & ATR_VFLAG_MODIFY) {
 			/*
 			 * The function update_eligible_time() expects it is the only one setting accrue_type.
 			 * If we set it here, it will get confused.  There is no action function for accrue_type,
@@ -601,16 +590,15 @@ modify_job_attr(job *pjob, svrattrl *plist, int perm, int *bad)
 			 */
 			if (i == JOB_ATR_accrue_type)
 				continue;
-			free_attr(job_attr_def, &pattr[i], i);
-			if ((pre_copy[i].at_type == ATR_TYPE_LIST) ||
-				(pre_copy[i].at_type == ATR_TYPE_RESC)) {
-				list_move(&pre_copy[i].at_val.at_list,
-					  &pattr[i].at_val.at_list);
+			free_attr(job_attr_def, pjob->ji_wattr.arr[i], i);
+			if ((pre_copy.arr[i]->at_type == ATR_TYPE_LIST) ||
+				(pre_copy.arr[i]->at_type == ATR_TYPE_RESC)) {
+				list_move(&pre_copy.arr[i]->at_val.at_list, &pjob->ji_wattr.arr[i]->at_val.at_list);
 			} else {
-				pattr[i] = pre_copy[i];
+				pjob->ji_wattr.arr[i] = pre_copy.arr[i];
 			}
 			/* ATR_VFLAG_MODCACHE will be included if set */
-			pattr[i].at_flags = pre_copy[i].at_flags;
+			pjob->ji_wattr.arr[i]->at_flags = pre_copy.arr[i]->at_flags;
 		}
 	}
 
@@ -619,13 +607,12 @@ modify_job_attr(job *pjob, svrattrl *plist, int perm, int *bad)
 		 * the attribute already has the modify flag before we added the new attributes to it.
 		 * We only want to call the action functions for attributes which are being modified by this function.
 		 */
-		if (newattr[i].at_flags & ATR_VFLAG_MODIFY) {
+		if (newattr.arr[i]->at_flags & ATR_VFLAG_MODIFY) {
 			if ((job_attr_def[i].at_flags & ATR_DFLAG_NOSAVM))
 				continue;
 
 			if (job_attr_def[i].at_action) {
-				rc = job_attr_def[i].at_action(&newattr[i],
-					pjob, ATR_ACTION_ALTER);
+				rc = job_attr_def[i].at_action(newattr.arr[i], pjob, ATR_ACTION_ALTER);
 				if (rc) {
 					*bad = i;
 					break;
@@ -634,38 +621,36 @@ modify_job_attr(job *pjob, svrattrl *plist, int perm, int *bad)
 		}
 	}
 	if (rc) {
-		attr_atomic_copy(ATTR_LIST_HEAD(pjob->ji_wattr), attr_save, job_attr_def, JOB_ATR_LAST);
-		free(pre_copy);
-		attr_atomic_kill(newattr, job_attr_def, JOB_ATR_LAST);
-		attr_atomic_kill(attr_save, job_attr_def, JOB_ATR_LAST);
+		attr_atomic_copy(&pjob->ji_wattr, &attr_save);
+		attr_atomic_kill(&newattr);
+		attr_atomic_kill(&attr_save);
 		return (rc);
 	}
 
 	/* The action functions may have modified the attributes, need to set them to newattr2 */
 	for (i = 0; i < JOB_ATR_LAST; i++) {
-		if (newattr[i].at_flags & ATR_VFLAG_MODIFY) {
-			free_attr(job_attr_def, &pattr[i], i);
+		if (newattr.arr[i]->at_flags & ATR_VFLAG_MODIFY) {
+			free_attr(job_attr_def, pjob->ji_wattr.arr[i], i);
 			switch (i) {
 				case JOB_ATR_state:
-					newstate = get_attr_c(&newattr[i]);
+					newstate = get_attr_c(newattr.arr[i]);
 					break;
 				case JOB_ATR_substate:
-					newsubstate = get_attr_l(&newattr[i]);
+					newsubstate = get_attr_l(newattr.arr[i]);
 					break;
 				case JOB_ATR_accrue_type:
-					newaccruetype = get_attr_l(&newattr[i]);
+					newaccruetype = get_attr_l(newattr.arr[i]);
 					break;
 				default:
-					if ((newattr[i].at_type == ATR_TYPE_LIST) ||
-					    (newattr[i].at_type == ATR_TYPE_RESC)) {
-						list_move(&newattr[i].at_val.at_list,
-							  &pattr[i].at_val.at_list);
+					if ((newattr.arr[i]->at_type == ATR_TYPE_LIST) ||
+					    (newattr.arr[i]->at_type == ATR_TYPE_RESC)) {
+						list_move(&newattr.arr[i]->at_val.at_list, &pjob->ji_wattr.arr[i]->at_val.at_list);
 					} else {
-						pattr[i] = newattr[i];
+						pjob->ji_wattr.arr[i] = newattr.arr[i];
 					}
 			}
 			/* ATR_VFLAG_MODCACHE will be included if set */
-			pattr[i].at_flags = newattr[i].at_flags;
+			pjob->ji_wattr.arr[i]->at_flags = newattr.arr[i]->at_flags;
 		}
 	}
 
@@ -676,9 +661,7 @@ modify_job_attr(job *pjob, svrattrl *plist, int perm, int *bad)
 	if (newaccruetype != -1)
 		update_eligible_time(newaccruetype, pjob);
 
-	free(newattr);
-	free(pre_copy);
-	attr_atomic_kill(attr_save, job_attr_def, JOB_ATR_LAST);
+	attr_atomic_kill(&attr_save);
 	return (0);
 }
 
@@ -1320,56 +1303,55 @@ modify_resv_attr(resc_resv *presv, svrattrl *plist, int perm, int *bad)
 {
 	int	   allow_unkn = 0;
 	long	   i = 0;
-	attribute  newattr[(int)RESV_ATR_LAST];
-	attribute *pattr;
+	attribute_arr  newattr;
 	int	   rc = 0;
 
 	if (presv == NULL || plist == NULL)
 		return PBSE_INTERNAL;
 
-	allow_unkn = -1;
-	pattr = ATTR_LIST_HEAD(presv->ri_wattr);
 
+	attr_arr_alloc(&newattr, resv_attr_defn);
+	allow_unkn = -1;
+	
 	/* call attr_atomic_set to decode and set a copy of the attributes */
 
-	rc = attr_atomic_set(plist, pattr, newattr, resv_attr_idx, resv_attr_def, RESV_ATR_LAST, allow_unkn, perm, bad);
+	rc = attr_atomic_set(plist, &presv->ri_wattr, &newattr, allow_unkn, perm, bad);
 	if (rc == 0) {
-		for (i = 0; i < RESV_ATR_LAST; i++) {
-			if (newattr[i].at_flags & ATR_VFLAG_MODIFY) {
+		for (i = 0; i < resv_attr_defn->count; i++) {
+			if (newattr.arr[i]->at_flags & ATR_VFLAG_MODIFY) {
 				if (resv_attr_def[i].at_action) {
-					rc = resv_attr_def[i].at_action(&newattr[i],
-						presv, ATR_ACTION_ALTER);
+					rc = resv_attr_def[i].at_action(newattr.arr[i], presv, ATR_ACTION_ALTER);
 					if (rc)
 						break;
 				}
 			}
 		}
 		if ((rc == 0) &&
-			((newattr[(int)RESV_ATR_userlst].at_flags & ATR_VFLAG_MODIFY) ||
-			(newattr[(int)RESV_ATR_grouplst].at_flags & ATR_VFLAG_MODIFY))) {
+			((newattr.arr[(int)RESV_ATR_userlst]->at_flags & ATR_VFLAG_MODIFY) ||
+			(newattr.arr[(int)RESV_ATR_grouplst]->at_flags & ATR_VFLAG_MODIFY))) {
 			/* Need to reset execution uid and gid */
-			rc = set_objexid((void *)presv, JOB_OBJECT, newattr);
+			rc = set_objexid((void *)presv, JOB_OBJECT, &newattr);
 		}
 
 	}
 	if (rc) {
-		for (i = 0; i < RESV_ATR_LAST; i++)
-			resv_attr_def[i].at_free(newattr+i);
+		for (i = 0; i < resv_attr_defn->count; i++)
+			resv_attr_def[i].at_free(newattr.arr[i]);
 		return (rc);
 	}
 
 	/* Now copy the new values into the reservation attribute array */
 
-	for (i = 0; i < RESV_ATR_LAST; i++) {
-		if (newattr[i].at_flags & ATR_VFLAG_MODIFY) {
-			resv_attr_def[i].at_free(pattr+i);
-			if ((newattr[i].at_type == ATR_TYPE_LIST) || (newattr[i].at_type == ATR_TYPE_RESC)) {
-				list_move(&newattr[i].at_val.at_list, &(pattr+i)->at_val.at_list);
+	for (i = 0; i < resv_attr_defn->count; i++) {
+		if (newattr.arr[i]->at_flags & ATR_VFLAG_MODIFY) {
+			resv_attr_def[i].at_free(presv->ri_wattr.arr[i]);
+			if ((newattr.arr[i]->at_type == ATR_TYPE_LIST) || (newattr.arr[i]->at_type == ATR_TYPE_RESC)) {
+				list_move(&newattr.arr[i]->at_val.at_list, &presv->ri_wattr.arr[i]->at_val.at_list);
 			} else {
-				*(pattr+i) = newattr[i];
+				presv->ri_wattr.arr[i] = newattr.arr[i];
 			}
 			/* ATR_VFLAG_MODCACHE will be included if set */
-			(pattr+i)->at_flags = newattr[i].at_flags;
+			presv->ri_wattr.arr[i]->at_flags = newattr.arr[i]->at_flags;
 		}
 	}
 

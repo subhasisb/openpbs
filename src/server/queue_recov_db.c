@@ -96,7 +96,7 @@ que_to_db(pbs_queue *pque, pbs_db_que_info_t *pdbque)
 	strcpy(pdbque->qu_name, pque->qu_qs.qu_name);
 	pdbque->qu_type = pque->qu_qs.qu_type;
 
-	if ((encode_attr_db(que_attr_def, &pque->qu_attr, &pdbque->db_attr_list, 0)) != 0)
+	if ((encode_attr_db(&pque->qu_attr, &pdbque->db_attr_list, 0)) != 0)
 		return -1;
 
 	if (pque->newobj) /* object was never saved or loaded before */
@@ -126,7 +126,7 @@ db_to_que(pbs_queue *pque, pbs_db_que_info_t *pdbque)
 	strcpy(pque->qu_qs.qu_name, pdbque->qu_name);
 	pque->qu_qs.qu_type = pdbque->qu_type;
 
-	if ((decode_attr_db(pque, &pdbque->db_attr_list.attrs, que_attr_idx, que_attr_def, &pque->qu_attr)) != 0)
+	if ((decode_attr_db(pque, &pdbque->db_attr_list.attrs, &pque->qu_attr)) != 0)
 		return -1;
 
 	compare_obj_hash(&pque->qu_qs, sizeof(pque->qu_qs), pque->qs_hash);

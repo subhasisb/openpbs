@@ -574,6 +574,9 @@ comp_arst(attribute *attr, attribute *with)
 void
 free_arst(attribute *attr)
 {
+	if (!attr)
+		return;
+		
 	if ((attr->at_flags & ATR_VFLAG_SET) && (attr->at_val.at_arst)) {
 		(void)free(attr->at_val.at_arst->as_buf);
 		(void)free((char *)attr->at_val.at_arst);

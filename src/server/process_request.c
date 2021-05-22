@@ -587,8 +587,7 @@ process_request(int sfds)
 		}
 
 		if (isanode == NULL) {
-			if ((acl_check(get_sattr(SVR_ATR_acl_hosts),
-				request->rq_host, ACL_Host) == 0) &&
+			if ((acl_check(get_sattr(SVR_ATR_acl_hosts), request->rq_host, ACL_Host) == 0) &&
 				(strcasecmp(server_host, request->rq_host) != 0)) {
 					req_reject(PBSE_BADHOST, 0, request);
 					close_client(sfds);

@@ -420,7 +420,7 @@ sched_alloc(char *sched_name)
 	psched->newobj = 1;
 	append_link(&svr_allscheds, &psched->sc_link, psched);
 
-	attr_arr_alloc(&psched->sch_attr, SCHED_ATR_LAST);
+	attr_arr_alloc(&psched->sch_attr, sched_attr_defn);
 
 	return (psched);
 }

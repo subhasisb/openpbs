@@ -224,6 +224,7 @@ typedef struct resc_limit {		/* per node limits for Mom	*/
 
 extern attribute_def job_attr_def[];
 extern void *job_attr_idx;
+extern attribute_def_info *job_attr_defn;
 
 #ifndef PBS_MOM
 
@@ -1006,7 +1007,7 @@ extern void  job_free(job *);
 extern int   modify_job_attr(job *, svrattrl *, int, int *);
 extern char *prefix_std_file(job *, int);
 extern void  cat_default_std(job *, int, char *, char **);
-extern int   set_objexid(void *, int, attribute *);
+extern int   set_objexid(void *, int, attribute_arr *);
 #if 0
 extern int   site_check_user_map(job *, char *);
 #endif

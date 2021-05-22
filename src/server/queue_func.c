@@ -129,7 +129,7 @@ que_alloc(char *name)
 	append_link(&svr_queues, &pq->qu_link, pq);
 	server.sv_qs.sv_numque++;
 
-	attr_arr_alloc(&pq->qu_attr, QA_ATR_LAST);
+	attr_arr_alloc(&pq->qu_attr, que_attr_defn);
 
 	return (pq);
 }

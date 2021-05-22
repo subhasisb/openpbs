@@ -2024,7 +2024,7 @@ pbs_python_populate_attributes_to_python_class(PyObject *py_instance,
 	pbs_resource_value *resc_val;
 
 	hook_perf_stat_start(perf_label, perf_action, 0);
-	for (i = 0; i < attr_data_array->count; i++) {
+	for (i = 0; i < attr_data_array->defn->count; i++) {
 		attr_p = attr_data_array->arr[i];
 		attr_def_p = attr_def_array + i;
 
@@ -9429,8 +9429,7 @@ _pbs_python_do_vnode_set(void)
 
 		plist = (svrattrl *)GET_NEXT(vn_set_req->rq_attr);
 
-		rc = mgr_set_attr(&pnode->nd_attr, node_attr_idx, node_attr_def,
-			plist, ATR_PERM_ALLOW_INDIRECT, &bad, (void *)pnode, ATR_ACTION_ALTER);
+		rc = mgr_set_attr(&pnode->nd_attr, plist, ATR_PERM_ALLOW_INDIRECT, &bad, (void *)pnode, ATR_ACTION_ALTER);
 
 		if (rc != 0) {
 			char	*pbse_err;

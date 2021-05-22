@@ -185,13 +185,6 @@ struct attribute {
 };
 typedef struct attribute attribute;
 
-#define ATTR_LIST_HEAD(x) (*(x).arr)
-
-typedef struct {
-	short count;
-	attribute **arr;
-} attribute_arr;
-
 /*
  * The following structure is used to define an attribute for any parent
  * object.  The structure declares the attribute's name, value type, and
@@ -212,6 +205,17 @@ struct attribute_def {
 	unsigned int at_parent:ATRPART;	/* type of parent object	*/
 };
 typedef struct attribute_def attribute_def;
+
+typedef struct {
+	short count;
+	attribute_def *def;
+	void *idx;
+} attribute_def_info;
+
+typedef struct {
+	attribute_def_info *defn;
+	attribute **arr;
+} attribute_arr;
 
 /**
  * This structure is used by IFL verification mechanism to associate
@@ -261,7 +265,7 @@ typedef struct ecl_attribute_def ecl_attribute_def;
 
 #define ATR_MOD_MCACHE (ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE)
 #define ATR_SET_MOD_MCACHE (ATR_VFLAG_SET | ATR_MOD_MCACHE)
-#define ATR_UNSET(X) (X)->at_flags = (((X)->at_flags & ~ATR_VFLAG_SET) | ATR_MOD_MCACHE)
+#define ATR_UNSET(X) if ((X)) (X)->at_flags = (((X)->at_flags & ~ATR_VFLAG_SET) | ATR_MOD_MCACHE)
 
 /* Defines for Parent Object type field in the attribute definition	*/
 /* really only used for telling queue types apart			*/
@@ -313,6 +317,7 @@ struct array_strings {
 /*
  * specific attribute value function prototypes
  */
+extern attribute *get_attr_ptr(attribute_arr *arr, int attr_idx);
 extern struct attrl *attropl2attrl(struct attropl *from);
 struct attrl *new_attrl(void);
 struct attrl *dup_attrl(struct attrl *oattr);
@@ -321,8 +326,7 @@ void free_attrl(struct attrl *at);
 void free_attrl_list(struct attrl *at_list);
 extern void clear_attr(attribute *pattr, attribute_def *pdef);
 extern int  find_attr  (void *attrdef_idx, attribute_def *attr_def, char *name);
-extern int  recov_attr_fs(int fd, void *parent, void *padef_idx, attribute_def *padef,
-	attribute *pattr, int limit, int unknown);
+extern int  recov_attr_fs(int fd, void *parent, attribute_arr *pattr);
 extern void free_null  (attribute *attr);
 extern void free_none  (attribute *attr);
 extern svrattrl *attrlist_alloc(int szname, int szresc, int szval);
@@ -330,14 +334,14 @@ extern svrattrl *attrlist_create(char *aname, char *rname, int szval);
 extern void free_svrattrl(svrattrl *pal);
 extern void free_attrlist(pbs_list_head *attrhead);
 extern void free_svrcache(attribute *attr);
-extern int  attr_atomic_set(svrattrl *plist, attribute *old,
-	attribute *nattr, void *adef_idx, attribute_def *pdef, int limit,
-	int unkn, int privil, int *badattr);
-extern int  attr_atomic_node_set(svrattrl *plist, attribute *old,
-	attribute *nattr, attribute_def *pdef, int limit,
-	int unkn, int privil, int *badattr);
-extern void attr_atomic_kill(attribute *temp, attribute_def *pdef, int);
-extern void attr_atomic_copy(attribute *old, attribute *nattr, attribute_def *pdef, int limit);
+
+/* attribute array atomic functions */
+extern int  attr_atomic_set(svrattrl *plist, attribute_arr *old,
+	attribute_arr *nattr, int unkn, int privil, int *badattr);
+extern int  attr_atomic_node_set(svrattrl *plist, attribute_arr *old,
+	attribute_arr *nattr, attribute_def *pdef, int unkn, int privil, int *badattr);
+extern void attr_atomic_kill(attribute_arr *temp);
+extern void attr_atomic_copy(attribute_arr *old, attribute_arr *nattr);
 
 extern int copy_svrattrl_list(pbs_list_head *from_phead, pbs_list_head *to_head);
 extern int convert_attrl_to_svrattrl(struct attrl *from_list, pbs_list_head *to_head);
@@ -483,7 +487,7 @@ extern int   check_duplicates(struct array_strings *strarr);
 
 extern char *arst_string(char *str, attribute *pattr);
 extern void  attrl_fixlink(pbs_list_head *svrattrl);
-extern int   save_attr_fs(attribute_def *, attribute *, int);
+extern int   save_attr_fs(attribute_arr *);
 
 extern int      encode_state(const attribute *, pbs_list_head *, char *,
 	char *, int, svrattrl **rtnl);
@@ -525,7 +529,7 @@ extern int	svr_max_conc_prov_action(attribute *, void *, int);
 
 /* Manager functions */
 extern void	mgr_log_attr(char *, struct svrattrl *, int, char *, char *);
-extern int	mgr_set_attr(attribute_arr *, void *, attribute_def *, svrattrl *, int, int *, void *, int);
+extern int	mgr_set_attr(attribute_arr *, svrattrl *, int, int *, void *, int);
 /* Extern functions (at_action) called  from job_attr_def*/
 
 extern int job_set_wait(attribute *, void *, int);
@@ -605,8 +609,8 @@ extern int action_resc_resv(attribute *pattr, void *pobject, int actmode);
 
 /* Functions used to save and recover the attributes from the database */
 extern int encode_single_attr_db(attribute_def *padef, attribute *pattr, pbs_db_attr_list_t *db_attr_list);
-extern int encode_attr_db(attribute_def *padef, attribute_arr *parr, pbs_db_attr_list_t *db_attr_list, int all);
-extern int decode_attr_db(void *parent, pbs_list_head *attr_list, void *padef_idx, attribute_def *padef, attribute_arr *parr);
+extern int encode_attr_db(attribute_arr *parr, pbs_db_attr_list_t *db_attr_list, int all);
+extern int decode_attr_db(void *parent, pbs_list_head *attr_list, attribute_arr *parr);
 
 extern int is_attr(int, char *, int);
 
@@ -615,6 +619,8 @@ extern int set_attr_resc(struct attrl **attrib, const char *attrib_name, const c
 
 extern svrattrl *make_attr(char *attr_name, char *attr_resc, char *attr_value, int attr_flags);
 extern void *cr_attrdef_idx(attribute_def *adef, int limit);
+extern int create_attr_defn(attribute_def_info **defn, void **idx, attribute_def *def, int count);
+
 
 /* Attr setters */
 int set_attr_generic(attribute *pattr, attribute_def *pdef, char *value, char *rescn, enum batch_op op);
@@ -635,12 +641,12 @@ long long get_attr_ll(const attribute *pattr);
 char *get_attr_str(const attribute *pattr);
 struct array_strings *get_attr_arst(const attribute *pattr);
 int is_attr_set(const attribute *pattr);
-attribute *_get_attr_by_idx(attribute_arr *list, int attr_idx);
+attribute *_get_attr_by_idx(const attribute_arr *list, int attr_idx);
 pbs_list_head get_attr_list(const attribute *pattr);
 void free_attr(attribute_def *attr_def, attribute *pattr, int attr_idx);
 
 
-void attr_arr_alloc(attribute_arr *attr_arr, int count);
+void attr_arr_alloc(attribute_arr *attr_arr, attribute_def_info *defn);
 void attr_arr_free(attribute_arr *attr_arr);
 
 /* "type" to pass to acl_check() */

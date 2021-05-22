@@ -993,15 +993,14 @@ req_py_spawn(struct batch_request *preq)
 void
 req_modifyjob(struct batch_request *preq)
 {
-	int		 bad = 0;
-	int		 i;
-	attribute	 newattr[(int)JOB_ATR_LAST];
-	attribute	*pattr;
-	job		*pjob;
-	svrattrl	*plist;
-	int		 rc;
-	int		 recreate_nodes = 0;
-	char		*new_peh = NULL;
+	int bad = 0;
+	int i;
+	attribute_arr newattr;
+	job *pjob;
+	svrattrl *plist;
+	int rc;
+	int recreate_nodes = 0;
+	char *new_peh = NULL;
 
 	pjob = find_job(preq->rq_ind.rq_modify.rq_objname);
 	if (pjob == NULL) {
@@ -1018,36 +1017,34 @@ req_modifyjob(struct batch_request *preq)
 	/* modify the jobs attributes */
 
 	bad = 0;
-	pattr = ATTR_LIST_HEAD(pjob->ji_wattr);
 
 	/* call attr_atomic_set to decode and set a copy of the attributes */
-
-	rc = attr_atomic_set(plist, pattr, newattr, job_attr_idx, job_attr_def, JOB_ATR_LAST, -1, ATR_DFLAG_MGWR | ATR_DFLAG_MOM, &bad);
+	attr_arr_alloc(&newattr, job_attr_defn);
+	rc = attr_atomic_set(plist, &pjob->ji_wattr, &newattr, -1, ATR_DFLAG_MGWR | ATR_DFLAG_MOM, &bad);
 	if (rc) {
 		/* leave old values, free the new ones */
-		for (i=0; i<JOB_ATR_LAST; i++)
-			free_attr(job_attr_def, &newattr[i], i);
+		for (i = 0; i < newattr.defn->count; i++)
+			free_attr(job_attr_def, newattr.arr[i], i);
 		req_reject(rc, 0, preq);
 		return;
 	}
 
 	/* OK, now copy the new values into the job attribute array */
 
-	for (i=0; i<JOB_ATR_LAST; i++) {
-		if (newattr[i].at_flags & ATR_VFLAG_MODIFY) {
+	for (i = 0; i < newattr.defn->count; i++) {
+		if (newattr.arr[i]->at_flags & ATR_VFLAG_MODIFY) {
 
 			if (job_attr_def[i].at_action)
-				(void)job_attr_def[i].at_action(&newattr[i],
-					pjob, ATR_ACTION_ALTER);
-			free_attr(job_attr_def, &pattr[i], i);
-			if ((newattr[i].at_type == ATR_TYPE_LIST) ||
-				(newattr[i].at_type == ATR_TYPE_RESC)) {
-				list_move(&newattr[i].at_val.at_list,
-					&(pattr+i)->at_val.at_list);
+				(void)job_attr_def[i].at_action(newattr.arr[i], pjob, ATR_ACTION_ALTER);
+
+			free_attr(job_attr_def, pjob->ji_wattr.arr[i], i);
+
+			if ((newattr.arr[i]->at_type == ATR_TYPE_LIST) || (newattr.arr[i]->at_type == ATR_TYPE_RESC)) {
+				list_move(&newattr.arr[i]->at_val.at_list, &pjob->ji_wattr.arr[i]->at_val.at_list);
 			} else {
-				*(pattr+i) = newattr[i];
+				*(pjob->ji_wattr.arr[i]) = *newattr.arr[i];
 			}
-			(pattr+i)->at_flags = newattr[i].at_flags;
+			pjob->ji_wattr.arr[i]->at_flags = newattr.arr[i]->at_flags;
 			if ((i == JOB_ATR_exec_vnode) ||
 			    (i == JOB_ATR_exec_host)  ||
 			    (i == JOB_ATR_exec_host2) ||
@@ -1074,24 +1071,17 @@ req_modifyjob(struct batch_request *preq)
 		/* Send IM_DELETE_JOB2 request to the sister moms not in */
 		/* 'new_peh', to kill the job on that sister and */
 		/* report resources_used info. */
-		(void)send_sisters_inner(pjob, IM_DELETE_JOB2,
-							NULL, new_peh);
+		(void)send_sisters_inner(pjob, IM_DELETE_JOB2, NULL, new_peh);
 
 		if ((rc = job_nodes(pjob)) != 0) {
-			snprintf(log_buffer, sizeof(log_buffer)-1,
-			   "failed updating internal nodes data (rc=%d)", rc);
-			log_event(PBSEVENT_ERROR, PBS_EVENTCLASS_JOB,
-				LOG_NOTICE, pjob->ji_qs.ji_jobid,
-							log_buffer);
+			snprintf(log_buffer, sizeof(log_buffer)-1, "failed updating internal nodes data (rc=%d)", rc);
+			log_event(PBSEVENT_ERROR, PBS_EVENTCLASS_JOB, LOG_NOTICE, pjob->ji_qs.ji_jobid, log_buffer);
 			reply_text(preq, rc, log_buffer);
 			return;
 		}
 
-
-		if (generate_pbs_nodefile(pjob, NULL, 0,
-			log_buffer, LOG_BUF_SIZE-1) != 0) {
-			log_event(PBSEVENT_ERROR, PBS_EVENTCLASS_JOB,
-			 LOG_NOTICE, pjob->ji_qs.ji_jobid, log_buffer);
+		if (generate_pbs_nodefile(pjob, NULL, 0, log_buffer, LOG_BUF_SIZE-1) != 0) {
+			log_event(PBSEVENT_ERROR, PBS_EVENTCLASS_JOB, LOG_NOTICE, pjob->ji_qs.ji_jobid, log_buffer);
 			reply_text(preq, rc, log_buffer);
 			return;
 		}
@@ -1108,10 +1098,8 @@ req_modifyjob(struct batch_request *preq)
 	}
 
 	(void)job_save(pjob);
-	(void)sprintf(log_buffer, msg_manager, msg_jobmod,
-		preq->rq_user, preq->rq_host);
-	log_event(PBSEVENT_JOB, PBS_EVENTCLASS_JOB, LOG_DEBUG,
-		pjob->ji_qs.ji_jobid, log_buffer);
+	(void)sprintf(log_buffer, msg_manager, msg_jobmod, preq->rq_user, preq->rq_host);
+	log_event(PBSEVENT_JOB, PBS_EVENTCLASS_JOB, LOG_DEBUG, pjob->ji_qs.ji_jobid, log_buffer);
 	reply_ack(preq);
 }
 

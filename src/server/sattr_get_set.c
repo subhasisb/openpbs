@@ -128,7 +128,7 @@ get_sattr_long(int attr_idx)
 int
 set_sattr_generic(int attr_idx, char *val, char *rscn, enum batch_op op)
 {
-	return set_attr_generic(get_sattr(attr_idx), &svr_attr_def[attr_idx], val, rscn, op);
+	return set_attr_generic(get_attr_ptr(&server.sv_attr, attr_idx), &svr_attr_def[attr_idx], val, rscn, op);
 }
 
 /**
@@ -145,7 +145,7 @@ set_sattr_generic(int attr_idx, char *val, char *rscn, enum batch_op op)
 int
 set_sattr_str_slim(int attr_idx, char *val, char *rscn)
 {
-	return set_attr_generic(get_sattr(attr_idx), &svr_attr_def[attr_idx], val, rscn, INTERNAL);
+	return set_attr_generic(get_attr_ptr(&server.sv_attr, attr_idx), &svr_attr_def[attr_idx], val, rscn, INTERNAL);
 }
 
 /**
@@ -162,7 +162,7 @@ set_sattr_str_slim(int attr_idx, char *val, char *rscn)
 int
 set_sattr_l_slim(int attr_idx, long val, enum batch_op op)
 {
-	set_attr_l(get_sattr(attr_idx), val, op);
+	set_attr_l(get_attr_ptr(&server.sv_attr, attr_idx), val, op);
 	return 0;
 }
 
@@ -180,7 +180,7 @@ set_sattr_l_slim(int attr_idx, long val, enum batch_op op)
 int
 set_sattr_b_slim(int attr_idx, long val, enum batch_op op)
 {
-	set_attr_b(get_sattr(attr_idx), val, op);
+	set_attr_b(get_attr_ptr(&server.sv_attr, attr_idx), val, op);
 	return 0;
 }
 
@@ -198,10 +198,9 @@ set_sattr_b_slim(int attr_idx, long val, enum batch_op op)
 int
 set_sattr_c_slim(int attr_idx, char val, enum batch_op op)
 {
-	set_attr_c(get_sattr(attr_idx), val, op);
+	set_attr_c(get_attr_ptr(&server.sv_attr, attr_idx), val, op);
 	return 0;
 }
-
 
 /**
  * @brief	Check if a server attribute is set
@@ -215,7 +214,12 @@ set_sattr_c_slim(int attr_idx, char val, enum batch_op op)
 int
 is_sattr_set(int attr_idx)
 {
-	return is_attr_set(get_sattr(attr_idx));
+	attribute *pattr = get_sattr(attr_idx);
+
+	if (pattr)
+		return is_attr_set(pattr);
+	else 
+		return 0;
 }
 
 /**
@@ -228,5 +232,8 @@ is_sattr_set(int attr_idx)
 void
 free_sattr(int attr_idx)
 {
-	free_attr(svr_attr_def, get_sattr(attr_idx), attr_idx);
+	attribute *pattr = get_sattr(attr_idx);
+	free_attr(svr_attr_def, pattr, attr_idx);
+	free(pattr);
+	server.sv_attr.arr[attr_idx] = NULL;
 }

@@ -104,7 +104,7 @@ job_to_db(job *pjob, pbs_db_job_info_t *dbjob)
 	if (check_job_state(pjob, JOB_STATE_LTR_FINISHED))
 		save_all_attrs = 1;
 
-	if ((encode_attr_db(job_attr_def, &pjob->ji_wattr, &dbjob->db_attr_list, save_all_attrs)) != 0)
+	if ((encode_attr_db(&pjob->ji_wattr, &dbjob->db_attr_list, save_all_attrs)) != 0)
 		return -1;
 
 	if (pjob->newobj) /* object was never saved/loaded before */
@@ -205,7 +205,7 @@ db_to_job(job *pjob,  pbs_db_job_info_t *dbjob)
 	strcpy(pjob->ji_extended.ji_ext.ji_jid, dbjob->ji_jid);
 	pjob->ji_extended.ji_ext.ji_credtype = dbjob->ji_credtype;
 
-	if ((decode_attr_db(pjob, &dbjob->db_attr_list.attrs, job_attr_idx, job_attr_def, &pjob->ji_wattr)) != 0)
+	if ((decode_attr_db(pjob, &dbjob->db_attr_list.attrs, &pjob->ji_wattr)) != 0)
 		return -1;
 
 	compare_obj_hash(&pjob->ji_qs, sizeof(pjob->ji_qs), pjob->qs_hash);
@@ -370,7 +370,7 @@ resv_to_db(resc_resv *presv,  pbs_db_resv_info_t *dbresv)
 
 	strcpy(dbresv->ri_resvid, presv->ri_qs.ri_resvID);
 
-	if ((encode_attr_db(resv_attr_def, &presv->ri_wattr, &(dbresv->db_attr_list), 0)) != 0)
+	if ((encode_attr_db(&presv->ri_wattr, &(dbresv->db_attr_list), 0)) != 0)
 		return -1;
 
 	if (presv->newobj) /* object was never saved or loaded before */
@@ -415,7 +415,7 @@ db_to_resv(resc_resv *presv, pbs_db_resv_info_t *dbresv)
 	presv->ri_qs.ri_svrflags = dbresv->ri_svrflags;
 	presv->ri_qs.ri_tactive = dbresv->ri_tactive;
 
-	if ((decode_attr_db(presv, &dbresv->db_attr_list.attrs, resv_attr_idx, resv_attr_def, &presv->ri_wattr)) != 0)
+	if ((decode_attr_db(presv, &dbresv->db_attr_list.attrs, &presv->ri_wattr)) != 0)
 		return -1;
 
 	compare_obj_hash(&presv->ri_qs, sizeof(presv->ri_qs), presv->qs_hash);

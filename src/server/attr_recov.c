@@ -216,48 +216,39 @@ save_flush(void)
  *		attribute of the parent (queue or server).  They are kept in their
  *		own file.
  *
- * @param[in]	padef - Address of parent's attribute definition array
  * @param[in]	pattr - Address of the parent objects attribute array
- * @param[in]	numattr - Number of attributes in the list
  *
  * @return      Error code
  * @retval	 0  - Success
  * @retval	-1  - Failure
  */
 int
-save_attr_fs(attribute_def *padef, attribute *pattr, int numattr)
+save_attr_fs(attribute_arr *parr)
 {
-	svrattrl	 dummy;
-	int		 errct = 0;
-	pbs_list_head 	 lhead;
-	int		 i;
-	svrattrl	*pal;
-	int		 rc;
+	svrattrl dummy;
+	int errct = 0;
+	pbs_list_head lhead;
+	int i;
+	svrattrl *pal;
+	int rc;
 
 	/* encode each attribute which has a value (not non-set) */
 
 	CLEAR_HEAD(lhead);
 
-	for (i = 0; i < numattr; i++) {
+	for (i = 0; i < parr->defn->count; i++) {
 
-		if ((padef+i)->at_type != ATR_TYPE_ACL) {
+		if ((parr->defn->def + i)->at_type != ATR_TYPE_ACL) {
 
 			/* note access lists are not saved this way */
-
-			rc = (padef+i)->at_encode(pattr+i, &lhead,
-				(padef+i)->at_name,
-				NULL, ATR_ENCODE_SAVE, NULL);
-
+			rc = (parr->defn->def + i)->at_encode(parr->arr[i], &lhead, (parr->defn->def + i)->at_name, NULL, ATR_ENCODE_SAVE, NULL);
 			if (rc < 0)
 				errct++;
 
-			(pattr+i)->at_flags &= ~ATR_VFLAG_MODIFY;
+			parr->arr[i]->at_flags &= ~ATR_VFLAG_MODIFY;
 
 			/* now that it has been encoded, block and save it */
-
-			while ((pal = (svrattrl *)GET_NEXT(lhead)) !=
-				NULL) {
-
+			while ((pal = (svrattrl *)GET_NEXT(lhead)) != NULL) {
 				if (save_struct((char *)pal, pal->al_tsize) < 0)
 					errct++;
 				delete_link(&pal->al_link);
@@ -274,7 +265,6 @@ save_attr_fs(attribute_def *padef, attribute *pattr, int numattr)
 	dummy.al_tsize = ENDATTRIBUTES;
 	if (save_struct((char *)&dummy, sizeof(dummy)) < 0)
 		errct++;
-
 
 	if (errct)
 		return (-1);
@@ -306,7 +296,7 @@ save_attr_fs(attribute_def *padef, attribute *pattr, int numattr)
  */
 
 int
-recov_attr_fs(int fd, void *parent, void *padef_idx, attribute_def *padef, attribute *pattr, int limit, int unknown)
+recov_attr_fs(int fd, void *parent, attribute_arr *parr)
 {
 	int	  amt;
 	int	  len;
@@ -314,6 +304,7 @@ recov_attr_fs(int fd, void *parent, void *padef_idx, attribute_def *padef, attri
 	svrattrl *pal = NULL;
 	int	  palsize = 0;
 	svrattrl *tmpal = NULL;
+	int unknown = parr->defn->count - 1;
 
 	pal = (svrattrl *)malloc(sizeof(svrattrl));
 	if (!pal)
@@ -397,7 +388,7 @@ recov_attr_fs(int fd, void *parent, void *padef_idx, attribute_def *padef, attri
 
 		/* find the attribute definition based on the name */
 
-		index = find_attr(padef_idx, padef, pal->al_name);
+		index = find_attr(parr->defn->idx, parr->defn->def, pal->al_name);
 		if (index < 0) {
 			/*
 			 * There are two ways this could happen:
@@ -427,17 +418,17 @@ recov_attr_fs(int fd, void *parent, void *padef_idx, attribute_def *padef, attri
 		 * call set_entity to do the INCR.
 		 */
 
-		if (((padef+index)->at_type != ATR_TYPE_ENTITY) || (pal->al_atopl.op != INCR)) {
-			int rc = set_attr_generic(pattr+index, padef+index, pal->al_value, pal->al_resc, INTERNAL);
+		if (((parr->defn->def + index)->at_type != ATR_TYPE_ENTITY) || (pal->al_atopl.op != INCR)) {
+			int rc = set_attr_generic(parr->arr[index], parr->defn->def + index, pal->al_value, pal->al_resc, INTERNAL);
 			if (! rc) {
-				if ((padef+index)->at_action)
-					(void)(padef+index)->at_action(pattr+index, parent, ATR_ACTION_RECOV);
+				if ((parr->defn->def +index)->at_action)
+					(void)(parr->defn->def + index)->at_action(parr->arr[index], parent, ATR_ACTION_RECOV);
 			}
 		} else {
 			/* for INCR case of entity limit, decode locally */
-			set_attr_generic(pattr+index, padef+index, pal->al_value, pal->al_resc, INCR);
+			set_attr_generic(parr->arr[index], parr->defn->def + index, pal->al_value, pal->al_resc, INCR);
 		}
-		(pattr+index)->at_flags = pal->al_flags & ~ATR_VFLAG_MODIFY;
+		parr->arr[index]->at_flags = pal->al_flags & ~ATR_VFLAG_MODIFY;
 	}
 
 	(void)free(pal);

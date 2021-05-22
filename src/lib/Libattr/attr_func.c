@@ -125,6 +125,27 @@ cr_attrdef_idx(attribute_def *adef, int limit)
 	return attrdef_idx;
 }
 
+int
+create_attr_defn(attribute_def_info **defn, void **idx, attribute_def *def, int count)
+{
+	void *lidx;
+	attribute_def_info *ldefn;
+	
+	if ((lidx = cr_attrdef_idx(def, count)) == NULL) {
+		log_err(errno, __func__, "Failed creating job attribute search index");
+		return (-1);
+	}
+
+	ldefn = malloc(sizeof(attribute_def_info));
+	ldefn->count = count;
+	ldefn->def = def;
+	ldefn->idx = lidx;
+
+	*defn = ldefn;
+	*idx = lidx;
+
+	return 0;
+}
 
 /**
  * @brief
@@ -207,6 +228,9 @@ free_svrcache(attribute *attr)
 void
 free_null(attribute *attr)
 {
+	if (!attr)
+		return;
+		
 	memset(&attr->at_val, 0, sizeof(attr->at_val));
 	if (attr->at_type == ATR_TYPE_SIZE)
 		attr->at_val.at_size.atsv_shift = 10;
@@ -1868,7 +1892,7 @@ decode_project(attribute *patr, char *name, char *rescn, char *val)
  *
  */
 attribute *
-_get_attr_by_idx(attribute_arr *list, int attr_idx)
+_get_attr_by_idx(const attribute_arr *list, int attr_idx)
 {
 	return (list->arr[attr_idx]);
 }
@@ -1910,10 +1934,10 @@ get_attr_list(const attribute *pattr)
 }
 
 void
-attr_arr_alloc(attribute_arr *attr_arr, int count)
+attr_arr_alloc(attribute_arr *attr_arr, attribute_def_info *defn)
 {
-	attr_arr->count = count;
-	attr_arr->arr = calloc(count, sizeof(struct attribute *));
+	attr_arr->defn = defn;
+	attr_arr->arr = calloc(defn->count, sizeof(struct attribute *));
 }
 
 void
@@ -1921,8 +1945,20 @@ attr_arr_free(attribute_arr *attr_arr)
 {
 	int i;
 
-	for(i =0; i < attr_arr->count; i++)
+	for(i =0; i < attr_arr->defn->count; i++)
 		free(attr_arr->arr[i]);
 
 	free(attr_arr->arr);
+}
+
+attribute *
+get_attr_ptr(attribute_arr *arr, int attr_idx)
+{
+	attribute *pattr = arr->arr[attr_idx];
+	if (!pattr) {	
+		pattr = malloc(sizeof(struct attribute));
+		clear_attr(pattr, &arr->defn->def[attr_idx]);
+		arr->arr[attr_idx] = pattr;
+	}
+	return pattr;
 }

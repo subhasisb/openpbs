@@ -291,5 +291,8 @@ set_attr_l(attribute *pattr, long value, enum batch_op op)
 long
 get_attr_l(const attribute *pattr)
 {
+	if (!pattr)
+		return 0;
+
 	return  pattr->at_val.at_long;
 }

@@ -1010,8 +1010,7 @@ chk_resc_limits(attribute *pattr, pbs_queue *pque)
 	/* Check min and max walltime of a STF job against "walltime" resource limit on queue and server */
 	if (resc_minwt != NULL && PBSE_EXCQRESC == chk_wt_limits_STF(resc_minwt, resc_maxwt, pque, pattr))
 		return (PBSE_EXCQRESC);
-	if ((comp_resc(get_qattr(pque, QA_ATR_ResourceMin), pattr) == -1) ||
-		comp_resc_gt)
+	if ((comp_resc(get_qattr(pque, QA_ATR_ResourceMin), pattr) == -1) || comp_resc_gt)
 		return (PBSE_EXCQRESC);
 
 	/* now check individual resources against queue or server maximum */
@@ -1050,7 +1049,7 @@ svr_chkque(job *pjob, pbs_queue *pque, char *hostname, int mtype)
 	/* if not already set, set up a uid/gid/name */
 
 	if (!is_jattr_set(pjob, JOB_ATR_euser) || !is_jattr_set(pjob, JOB_ATR_egroup)) {
-		if ((i = set_objexid((void*)pjob, JOB_OBJECT, ATTR_LIST_HEAD(pjob->ji_wattr))) != 0)
+		if ((i = set_objexid((void*)pjob, JOB_OBJECT, &pjob->ji_wattr)) != 0)
 			return (i);  /* PBSE_BADUSER or GRP */
 	}
 
@@ -2102,8 +2101,7 @@ set_deflt_resc(attribute *jb, attribute *dflt, int selflg)
 					ATR_VFLAG_SET) == 0)) {
 
 					if (prescjb == NULL)
-						prescjb = add_resource_entry(jb,
-							prescdt->rs_defin);
+						prescjb = add_resource_entry(jb, prescdt->rs_defin);
 					if (prescjb) {
 						if (prescdt->rs_defin->rs_set(&prescjb->rs_value, &prescdt->rs_value, SET) == 0)
 							prescjb->rs_value.at_flags |= (ATR_VFLAG_SET|ATR_VFLAG_DEFLT);
@@ -2134,14 +2132,14 @@ set_deflt_resc(attribute *jb, attribute *dflt, int selflg)
 int
 set_resc_deflt(void *pobj, int objtype, pbs_queue *pque)
 {
-	static resc_resv  *presv;
-	job	   *pjob;
-	attribute  *pdest = NULL;
-	attribute  *psched = NULL;
-	resource   *presc;
+	static resc_resv *presv;
+	job *pjob;
+	attribute *pdest = NULL;
+	attribute *psched = NULL;
+	resource *presc;
 	resource_def *prdefsl;
 	resource_def *prdefpc;
-	int           rc;
+	int rc;
 
 	switch (objtype) {
 		case	JOB_OBJECT:
@@ -2150,16 +2148,16 @@ set_resc_deflt(void *pobj, int objtype, pbs_queue *pque)
 			if (pque == NULL)
 				pque = pjob->ji_qhdr;
 			assert(pque != NULL);
-			pdest = get_jattr(pjob, JOB_ATR_resource);
-			psched = get_jattr(pjob, JOB_ATR_SchedSelect);
+			pdest = get_attr_ptr(&pjob->ji_wattr, JOB_ATR_resource);
+			psched = get_attr_ptr(&pjob->ji_wattr, JOB_ATR_SchedSelect);
 			break;
 
 		case	RESC_RESV_OBJECT:
 			presv = (resc_resv *)pobj;
 			assert(presv != NULL);
 			pque = NULL;
-			pdest = get_rattr(presv, RESV_ATR_resource);
-			psched = get_rattr(presv, RESV_ATR_SchedSelect);
+			pdest = get_attr_ptr(&presv->ri_wattr, RESV_ATR_resource);
+			psched = get_attr_ptr(&presv->ri_wattr, RESV_ATR_SchedSelect);
 			break;
 
 		default:
@@ -2169,8 +2167,7 @@ set_resc_deflt(void *pobj, int objtype, pbs_queue *pque)
 
 	/* set defaults based on the Queue's resources_default */
 	if (pque) {
-		set_deflt_resc(pdest,
-			get_qattr(pque, QA_ATR_ResourceDefault), 1);
+		set_deflt_resc(pdest, get_qattr(pque, QA_ATR_ResourceDefault), 1);
 	}
 
 	/* set defaults based on the Server' resources_default */

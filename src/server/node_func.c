@@ -321,7 +321,7 @@ initialize_pbsnode(struct pbsnode *pnode, char *pname, int ntype)
 	CLEAR_LINK(pnode->nd_link);
 
 	/* first, allocate the attributes */
-	attr_arr_alloc(&pnode->nd_attr, ND_ATR_LAST);
+	attr_arr_alloc(&pnode->nd_attr, node_attr_defn);
 
 	/* then, setup certain attributes */
 	set_nattr_l_slim(pnode, ND_ATR_state, pnode->nd_state, SET);
@@ -347,8 +347,8 @@ initialize_pbsnode(struct pbsnode *pnode, char *pname, int ntype)
 	set_nattr_l_slim(pnode, ND_ATR_Sharing, VNS_DFLT_SHARED, SET);
 	(get_nattr(pnode, ND_ATR_Sharing))->at_flags |= ATR_VFLAG_DEFLT;
 
-	pat1 = get_nattr(pnode, ND_ATR_ResourceAvail);
-	pat2 = get_nattr(pnode, ND_ATR_ResourceAssn);
+	pat1 = get_attr_ptr(&pnode->nd_attr, ND_ATR_ResourceAvail);
+	pat2 = get_attr_ptr(&pnode->nd_attr, ND_ATR_ResourceAssn);
 
 	prd  = &svr_resc_def[RESC_ARCH];
 	(void)add_resource_entry(pat1, prd);
@@ -384,9 +384,12 @@ initialize_pbsnode(struct pbsnode *pnode, char *pname, int ntype)
 	}
 
 	/* clear the modify flags */
+	for (i=0; i<(int)ND_ATR_LAST; i++) {
+		attribute *pattr = get_nattr(pnode, i);
+		if (pattr)
+			pattr->at_flags &= ~ATR_VFLAG_MODIFY;
+	}
 
-	for (i=0; i<(int)ND_ATR_LAST; i++)
-		(get_nattr(pnode, i))->at_flags &= ~ATR_VFLAG_MODIFY;
 	return (PBSE_NONE);
 }
 

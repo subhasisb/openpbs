@@ -280,6 +280,8 @@ comp_str(attribute *attr, attribute *with)
 void
 free_str(attribute *attr)
 {
+	if (!attr) return;
+	
 	if ((attr->at_flags & ATR_VFLAG_SET) && (attr->at_val.at_str)) {
 		(void)free(attr->at_val.at_str);
 	}

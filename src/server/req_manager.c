@@ -656,19 +656,20 @@ unset_indirect(resource *presc, void *pidx, attribute_def *pdef, char *name, voi
  */
 
 static int
-mgr_set_attr2(attribute_arr *parr, void *pidx, attribute_def *pdef, svrattrl *plist, int privil, int *bad, void *parent, int mode, int allow_unkresc)
+mgr_set_attr2(attribute_arr *parr, svrattrl *plist, int privil, int *bad, void *parent, int mode, int allow_unkresc)
 {
-	int		 index;
-	attribute	*new;
-	attribute	*pre_copy;
-	attribute	*pnew;
-	attribute	*pold;
-	attribute	*attr_save;
-	int		 rc;
-	resource	*presc;
-	resource	*oldpresc;
-	int limit = parr->count;
-	attribute *pattr = ATTR_LIST_HEAD(*parr);
+	int index;
+	attribute_arr new;
+	attribute_arr pre_copy;
+	attribute_arr attr_save;
+
+	attribute *pnew;
+	attribute *pold;
+
+	int rc;
+	resource *presc;
+	resource *oldpresc;
+	int limit = parr->defn->count;
 
 	if (plist == NULL)
 		return (PBSE_NONE);
@@ -683,60 +684,65 @@ mgr_set_attr2(attribute_arr *parr, void *pidx, attribute_def *pdef, svrattrl *pl
 	 * attributes prior to any change.  If any action function fails, we copy
 	 * attr_copy back to the real attributes before leaving the function.
 	 */
-
-	new = (attribute *)calloc((unsigned int)limit, sizeof(attribute));
-	if (new == NULL)
+	attr_arr_alloc(&new, parr->defn);
+	if (new.arr == NULL)
 		return (PBSE_SYSTEM);
 
 	/* Below says if 'allow_unkresc' is TRUE, then set 'unkn' param
 	 * of attr_atomic_set() to '1'; otherwise, set it to '-1' meaning
 	 * not to allow unknown resource
 	 */
-	if ((rc = attr_atomic_set(plist, pattr, new, pidx, pdef, limit, (allow_unkresc?1:-1), privil, bad)) != 0) {
-		attr_atomic_kill(new, pdef, limit);
+	if ((rc = attr_atomic_set(plist, parr, &new, (allow_unkresc?1:-1), privil, bad)) != 0) {
+		attr_atomic_kill(&new);
+		attr_arr_free(&new);
 		return (rc);
 	}
 
-	pre_copy = (attribute *)calloc((unsigned int)limit, sizeof(attribute));
-	if (pre_copy == NULL) {
-		attr_atomic_kill(new, pdef, limit);
+	attr_arr_alloc(&pre_copy, parr->defn);
+	if (pre_copy.arr == NULL) {
+		attr_atomic_kill(&new);
+		attr_arr_free(&pre_copy);
 		return (PBSE_SYSTEM);
 	}
 
-	attr_atomic_copy(pre_copy, new, pdef, limit);
+	attr_atomic_copy(&pre_copy, &new);
 
-	attr_save = calloc((unsigned int)limit, sizeof(attribute));
-	if (attr_save == NULL) {
-		attr_atomic_kill(new, pdef, limit);
-		attr_atomic_kill(pre_copy, pdef, limit);
+	attr_arr_alloc(&attr_save, parr->defn);
+	if (attr_save.arr == NULL) {
+		attr_atomic_kill(&new);
+		attr_arr_free(&new);
+		attr_atomic_kill(&pre_copy);
+		attr_arr_free(&pre_copy);
 		return (PBSE_SYSTEM);
 	}
 
-	attr_atomic_copy(attr_save, pattr, pdef, limit);
+	attr_atomic_copy(&attr_save, parr);
 
 	for (index = 0; index < limit; index++) {
-		pnew = pre_copy + index;
-		pold = pattr + index;
-		if (pnew->at_flags & ATR_VFLAG_MODIFY) {
+		pnew = pre_copy.arr[index];
+		if (pnew && pnew->at_flags & ATR_VFLAG_MODIFY) {
 			/* Special test, aka kludge, for entity-limits, make sure
 			 * not accepting an entity without an actual limit; i.e.
 			 * [u:user] instead of [u:user=limit].  The [u:user] form
 			 * is allowed in the "unset" attribute function in which
 			 * case the entry isn't present when it gets here
 			 */
-
-			if ((pdef+index)->at_type == ATR_TYPE_ENTITY) {
+			pold = get_attr_ptr(parr, index); /* allocate memory if necessary */
+			if ((parr->defn->def + index)->at_type == ATR_TYPE_ENTITY) {
 				svr_entlim_leaf_t *pleaf;
 				void *unused = NULL;
 
-				while ((pleaf = entlim_get_next((new+index)->at_val.at_enty.ae_tree, &unused)) != NULL) {
+				while ((pleaf = entlim_get_next(new.arr[index]->at_val.at_enty.ae_tree, &unused)) != NULL) {
 
 					/* entry that is Modified, and not Set meant it had a null value - illegal */
 					if ((pleaf->slf_limit.at_flags & (ATR_VFLAG_SET|ATR_VFLAG_MODIFY)) == ATR_VFLAG_MODIFY) {
 						*bad = index + 1;
-						attr_atomic_kill(new, pdef, limit);
-						attr_atomic_kill(pre_copy, pdef, limit);
-						attr_atomic_kill(attr_save, pdef, limit);
+						attr_atomic_kill(&new);
+						attr_arr_free(&new);
+						attr_atomic_kill(&pre_copy);
+						attr_arr_free(&pre_copy);
+						attr_atomic_kill(&attr_save);
+						attr_arr_free(&attr_save);
 						return (PBSE_BADATVAL);
 					}
 				}
@@ -744,7 +750,7 @@ mgr_set_attr2(attribute_arr *parr, void *pidx, attribute_def *pdef, svrattrl *pl
 
 			/* now replace the old values with any modified new values */
 
-			(pdef+index)->at_free(pold);
+			(parr->defn->def + index)->at_free(pold);
 			pold->at_flags = pnew->at_flags; /* includes MODIFY */
 
 			if (pold->at_type == ATR_TYPE_LIST) {
@@ -772,7 +778,7 @@ mgr_set_attr2(attribute_arr *parr, void *pidx, attribute_def *pdef, svrattrl *pl
 						}
 					}
 				}
-				(pdef+index)->at_free(pnew);
+				(parr->defn->def + index)->at_free(pnew);
 			} else {
 				/*
 				 * copy value from new into old including pointers to
@@ -781,7 +787,7 @@ mgr_set_attr2(attribute_arr *parr, void *pidx, attribute_def *pdef, svrattrl *pl
 				 * when "new" is freed later
 				 */
 				*pold = *pnew;
-				clear_attr(pnew, pdef+index);
+				clear_attr(pnew, parr->defn->def + index);
 			}
 		}
 	}
@@ -792,29 +798,32 @@ mgr_set_attr2(attribute_arr *parr, void *pidx, attribute_def *pdef, svrattrl *pl
 		 * at_action routine for the attribute, if one exists, with the
 		 * new value.  If the action fails, undo everything.
 		 */
-		if ((new + index)->at_flags & ATR_VFLAG_MODIFY) {
-			if ((pdef + index)->at_action) {
-				rc = (pdef+index)->at_action((new+index), parent, mode);
+		if (new.arr[index] && new.arr[index]->at_flags & ATR_VFLAG_MODIFY) {
+			if ((parr->defn->def + index)->at_action) {
+				rc = (parr->defn->def + index)->at_action(new.arr[index], parent, mode);
 				if (rc) {
 					*bad = index + 1;
-					attr_atomic_kill(new, pdef, limit);
-					attr_atomic_kill(pre_copy, pdef, limit);
-					attr_atomic_copy(pattr, attr_save, pdef, limit);
-					attr_atomic_kill(attr_save, pdef, limit);
+					attr_atomic_kill(&new);
+					attr_arr_free(&new);
+					attr_atomic_kill(&pre_copy);
+					attr_arr_free(&pre_copy);
+					attr_atomic_copy(parr, &attr_save);
+					attr_atomic_kill(&attr_save);
+					attr_arr_free(&attr_save);
 					return (rc);
 				}
 			}
 		}
-
 	}
 
 	/* The action functions might have modified new.  Need to set pattr again */
-
 	for (index = 0; index < limit; index++) {
-		pnew = new + index;
-		pold = pattr + index;
-		if (pnew->at_flags & ATR_VFLAG_MODIFY) {
-			(pdef+index)->at_free(pold);
+		pnew = new.arr[index];
+		
+		if (pnew && pnew->at_flags & ATR_VFLAG_MODIFY) {
+			pold = get_attr_ptr(parr, index); /* allocate memory if necessary */
+
+			(parr->defn->def + index)->at_free(pold);
 			pold->at_flags = pnew->at_flags; /* includes MODIFY */
 
 			if (pold->at_type == ATR_TYPE_LIST) {
@@ -834,15 +843,14 @@ mgr_set_attr2(attribute_arr *parr, void *pidx, attribute_def *pdef, svrattrl *pl
 					presc = GET_NEXT(presc->rs_link)) {
 					if ((presc->rs_value.at_flags & ATR_VFLAG_MODIFY) == 0) {
 						if (presc->rs_value.at_flags & ATR_VFLAG_DEFLT) {
-							oldpresc = find_resc_entry(pold,
-										   presc->rs_defin);
+							oldpresc = find_resc_entry(pold, presc->rs_defin);
 							if (oldpresc) {
 								oldpresc->rs_value.at_flags |= ATR_VFLAG_DEFLT;
 							}
 						}
 					}
 				}
-				(pdef+index)->at_free(pnew);
+				(parr->defn->def + index)->at_free(pnew);
 			} else {
 				/*
 				 * copy value from new into old including pointers to
@@ -851,7 +859,7 @@ mgr_set_attr2(attribute_arr *parr, void *pidx, attribute_def *pdef, svrattrl *pl
 				 * when "new" is freed later
 				 */
 				*pold = *pnew;
-				clear_attr(pnew, pdef+index);
+				clear_attr(pnew, parr->defn->def + index);
 			}
 		}
 	}
@@ -860,9 +868,10 @@ mgr_set_attr2(attribute_arr *parr, void *pidx, attribute_def *pdef, svrattrl *pl
 	 * we have moved all the "external" values to the old array, thus
 	 * we just free the new array, NOT call at_free on each.
 	 */
-	free(new);
-	free(pre_copy);
-	attr_atomic_kill(attr_save, pdef, limit);
+	attr_arr_free(&new);
+	attr_arr_free(&pre_copy);
+	attr_atomic_kill(&attr_save);
+	attr_arr_free(&attr_save);
 	return (PBSE_NONE);
 }
 
@@ -886,9 +895,9 @@ mgr_set_attr2(attribute_arr *parr, void *pidx, attribute_def *pdef, svrattrl *pl
  * @retval	! PBSE_NONE - Failure
  **/
 int
-mgr_set_attr(attribute_arr *parr, void *pidx, attribute_def *pdef, svrattrl *plist, int privil, int *bad, void *parent, int mode)
+mgr_set_attr(attribute_arr *parr, svrattrl *plist, int privil, int *bad, void *parent, int mode)
 {
-	return (mgr_set_attr2(parr, pidx, pdef, plist, privil, bad, parent, mode, FALSE));
+	return (mgr_set_attr2(parr, plist, privil, bad, parent, mode, FALSE));
 }
 
 /**
@@ -905,9 +914,6 @@ mgr_set_attr(attribute_arr *parr, void *pidx, attribute_def *pdef, svrattrl *pli
  *		For "normal" attributes, unset the entire attribute.
  *
  * @param[in]	pattr	- Address of the parent objects attribute array
- * @param[in]	pidx	- Search index of the attribute array
- * @param[in]	pdef	- Address of attribute definition array
- * @param[in]	limit 	- Last attribute in the list
  * @param[in]	plist 	- List of attributes to unset.
  * @param[in]	privil	- Permission list.  A value of -1 is an override that
  * 			 				bypasses the check for permissions, used internally by
@@ -924,7 +930,7 @@ mgr_set_attr(attribute_arr *parr, void *pidx, attribute_def *pdef, svrattrl *pli
  * @retval	-1  - Failure
  */
 static int
-mgr_unset_attr(attribute_arr *parr, void *pidx, attribute_def *pdef, svrattrl *plist, int privil, int *bad, void *pobj, int ptype, enum res_op_flag rflag)
+mgr_unset_attr(attribute_arr *parr, svrattrl *plist, int privil, int *bad, void *pobj, int ptype, enum res_op_flag rflag)
 {
 	void *parent_id = NULL;
 	pbs_db_attr_list_t db_attr_list;
@@ -939,14 +945,13 @@ mgr_unset_attr(attribute_arr *parr, void *pidx, attribute_def *pdef, svrattrl *p
 	void *conn = (void *) svr_db_conn;
 	pbs_db_obj_info_t obj;
 	obj.pbs_db_un.pbs_db_job = NULL;
-	attribute *pattr = ATTR_LIST_HEAD(*parr);
 
 	/* first check the attribute exists and we have privilege to set */
 	ord = 0;
 	pl = plist;
 	while (pl) {
 		ord++;
-		index = find_attr(pidx, pdef, pl->al_name);
+		index = find_attr(parr->defn->idx, parr->defn->def, pl->al_name);
 		if (index < 0) {
 			*bad = ord;
 			return (PBSE_NOATTR);
@@ -954,11 +959,11 @@ mgr_unset_attr(attribute_arr *parr, void *pidx, attribute_def *pdef, svrattrl *p
 
 		/* have we privilege to unset the attribute ? */
 
-		if ((privil != -1) && ((pdef + index)->at_flags & privil & ATR_DFLAG_WRACC) == 0) {
+		if ((privil != -1) && ((parr->defn->def + index)->at_flags & privil & ATR_DFLAG_WRACC) == 0) {
 			*bad = ord;
 			return (PBSE_ATTRRO);
 		}
-		if (((pdef + index)->at_type == ATR_TYPE_RESC) &&
+		if (((parr->defn->def + index)->at_type == ATR_TYPE_RESC) &&
 			(pl->al_resc != NULL)) {
 
 			/* check the individual resource */
@@ -972,7 +977,7 @@ mgr_unset_attr(attribute_arr *parr, void *pidx, attribute_def *pdef, svrattrl *p
 				*bad = ord;
 				return (PBSE_PERM);
 			}
-			presc = find_resc_entry(pattr + index, prsdef);
+			presc = find_resc_entry(parr->arr[index], prsdef);
 			if (presc &&
 				(presc->rs_value.at_flags & ATR_VFLAG_TARGET)) {
 				if (rflag == INDIRECT_RES_UNLINK) {
@@ -989,7 +994,7 @@ mgr_unset_attr(attribute_arr *parr, void *pidx, attribute_def *pdef, svrattrl *p
 			}
 		}
 		if ((pnode->nd_state & INUSE_PROV) &&
-			!strcmp((pdef + index)->at_name, ATTR_NODE_current_aoe)) {
+			!strcmp((parr->defn->def + index)->at_name, ATTR_NODE_current_aoe)) {
 			*bad = ord;
 			return (PBSE_NODEPROV_NOACTION);
 		}
@@ -1002,25 +1007,25 @@ mgr_unset_attr(attribute_arr *parr, void *pidx, attribute_def *pdef, svrattrl *p
 	CLEAR_HEAD(db_attr_list.attrs);
 
 	while (plist) {
-		index = find_attr(pidx, pdef, plist->al_name);
-		if (encode_single_attr_db((pdef + index), (pattr + index), &db_attr_list) != 0)
+		index = find_attr(parr->defn->idx, parr->defn->def, plist->al_name);
+		if (encode_single_attr_db((parr->defn->def + index), parr->arr[index], &db_attr_list) != 0)
 			return (PBSE_NOATTR);
 
-		if (((pdef + index)->at_type == ATR_TYPE_RESC) &&
+		if (((parr->defn->def + index)->at_type == ATR_TYPE_RESC) &&
 			(plist->al_resc != NULL)) {
 
 			/* attribute of type resource and specified resource */
 			/* free resource member, not the attribute */
 
 			prsdef = find_resc_def(svr_resc_def, plist->al_resc);
-			presc = find_resc_entry(pattr + index, prsdef);
+			presc = find_resc_entry(parr->arr[index], prsdef);
 			if (presc) {
 				if ((ptype != PARENT_TYPE_SERVER) ||
 					(index != (int)SVR_ATR_resource_cost)) {
 
 					unset_signature(pnode, prsdef->rs_name);
 					if ((ptype == PARENT_TYPE_NODE) && (presc->rs_value.at_flags & ATR_VFLAG_INDIRECT)) {
-							unset_indirect(presc, pidx, pdef, plist->al_name, pobj, ptype);
+							unset_indirect(presc, parr->defn->idx, parr->defn->def, plist->al_name, pobj, ptype);
 							do_indirect_check = 1;
 					}
 					prsdef->rs_free(&presc->rs_value);
@@ -1031,31 +1036,31 @@ mgr_unset_attr(attribute_arr *parr, void *pidx, attribute_def *pdef, svrattrl *p
 			}
 			/* If the last resource has been delinked from  */
 			/* the attribute,  "unset" the attribute itself */
-			presc = (resource *)GET_NEXT((pattr + index)->at_val.at_list);
+			presc = (resource *)GET_NEXT(parr->arr[index]->at_val.at_list);
 			if (presc == NULL)
-				mark_attr_not_set(pattr+index);
-			(pattr+index)->at_flags |= ATR_MOD_MCACHE;
+				mark_attr_not_set(parr->arr[index]);
+			parr->arr[index]->at_flags |= ATR_MOD_MCACHE;
 
-		} else if (((pdef + index)->at_type == ATR_TYPE_ENTITY) &&
+		} else if (((parr->defn->def + index)->at_type == ATR_TYPE_ENTITY) &&
 			(plist->al_resc != NULL)) {
 
 			/* attribute of type ENTITY and specifed resource */
 			/* unset the entity limit on that resource for    */
 			/* all entities */
 
-			unset_entlim_resc(pattr + index, plist->al_resc);
+			unset_entlim_resc(parr->arr[index], plist->al_resc);
 
 		} else {
 
 			/* either the attribute is not of type ENTITY or RESC */
 			/* or there is no specific resource specified         */
-			if ((pdef + index)->at_type == ATR_TYPE_RESC) {
+			if ((parr->defn->def + index)->at_type == ATR_TYPE_RESC) {
 
 				/* if a resource type, check each for being indirect */
-				presc = (resource *)GET_NEXT((pattr + index)->at_val.at_list);
+				presc = (resource *)GET_NEXT(parr->arr[index]->at_val.at_list);
 				while (presc) {
 					if (presc->rs_value.at_flags & ATR_VFLAG_INDIRECT) {
-						unset_indirect(presc, pidx, pdef, plist->al_name, pobj, ptype);
+						unset_indirect(presc, parr->defn->idx, parr->defn->def, plist->al_name, pobj, ptype);
 						do_indirect_check = 1;
 					}
 					presc = (resource *)GET_NEXT(presc->rs_link);
@@ -1064,8 +1069,8 @@ mgr_unset_attr(attribute_arr *parr, void *pidx, attribute_def *pdef, svrattrl *p
 
 			/* now free the whole attribute */
 
-			(pdef + index)->at_free(pattr + index);
-			(pattr + index)->at_flags |= ATR_VFLAG_MODIFY;
+			(parr->defn->def + index)->at_free(parr->arr[index]);
+			parr->arr[index]->at_flags |= ATR_VFLAG_MODIFY;
 		}
 		plist = (svrattrl *)GET_NEXT(plist->al_link);
 	}
@@ -1150,7 +1155,7 @@ struct batch_request *preq;
 	/* set the queue attributes */
 
 	plist = (svrattrl *)GET_NEXT(preq->rq_ind.rq_manager.rq_attr);
-	rc = mgr_set_attr(&pque->qu_attr, que_attr_idx, que_attr_def, plist, preq->rq_perm, &bad, (void *)pque, ATR_ACTION_NEW);
+	rc = mgr_set_attr(&pque->qu_attr, plist, preq->rq_perm, &bad, (void *)pque, ATR_ACTION_NEW);
 	if (rc != 0) {
 		reply_badattr(rc, bad, plist, preq);
 		que_free(pque);
@@ -1382,8 +1387,7 @@ mgr_server_set(struct batch_request *preq, conn_t *conn)
 	/* if the unsetist has attributes, call server_unset to remove them separately */
 	ulist = (svrattrl *)GET_NEXT(unsetlist);
 	if (ulist) {
-		rc = mgr_unset_attr(&server.sv_attr, svr_attr_idx, svr_attr_def, ulist,
-				    preq->rq_perm, &bad_attr, (void *) &server, PARENT_TYPE_SERVER, INDIRECT_RES_CHECK);
+		rc = mgr_unset_attr(&server.sv_attr, ulist, preq->rq_perm, &bad_attr, (void *) &server, PARENT_TYPE_SERVER, INDIRECT_RES_CHECK);
 		if (rc != 0) {
 			reply_badattr(rc, bad_attr, ulist, preq);
 			free_attrlist(&unsetlist);
@@ -1396,7 +1400,7 @@ mgr_server_set(struct batch_request *preq, conn_t *conn)
 	if (!plist)
 		goto done;
 
-	rc = mgr_set_attr(&server.sv_attr, svr_attr_idx, svr_attr_def, plist, preq->rq_perm, &bad_attr, (void *)&server, ATR_ACTION_ALTER);
+	rc = mgr_set_attr(&server.sv_attr, plist, preq->rq_perm, &bad_attr, (void *)&server, ATR_ACTION_ALTER);
 	if (rc != 0)
 		reply_badattr(rc, bad_attr, plist, preq);
 	else {
@@ -1494,8 +1498,7 @@ mgr_server_unset(struct batch_request *preq, conn_t *conn)
 				tm_list->al_link.ll_next->ll_struct = NULL;
 				/* when unset, set scheduler_iteration to 600 seconds */
 				sprintf(tm_list->al_value, "%d", PBS_SCHEDULE_CYCLE);
-				rc = mgr_set_attr(&dflt_scheduler->sch_attr, sched_attr_idx, sched_attr_def, tm_list,
-					MGR_ONLY_SET, &bad_attr, (void *)dflt_scheduler, ATR_ACTION_ALTER);
+				rc = mgr_set_attr(&dflt_scheduler->sch_attr, tm_list, MGR_ONLY_SET, &bad_attr, (void *)dflt_scheduler, ATR_ACTION_ALTER);
 				if (rc != 0) {
 					free_svrattrl(tm_list);
 					reply_badattr(rc, bad_attr, plist, preq);
@@ -1509,8 +1512,7 @@ mgr_server_unset(struct batch_request *preq, conn_t *conn)
 	}
 	plist = (svrattrl *)GET_NEXT(preq->rq_ind.rq_manager.rq_attr);
 
-	rc = mgr_unset_attr(&server.sv_attr, svr_attr_idx, svr_attr_def, plist,
-		preq->rq_perm, &bad_attr, (void *)&server, PARENT_TYPE_SERVER, INDIRECT_RES_CHECK);
+	rc = mgr_unset_attr(&server.sv_attr, plist, preq->rq_perm, &bad_attr, (void *)&server, PARENT_TYPE_SERVER, INDIRECT_RES_CHECK);
 	if (rc != 0)
 		reply_badattr(rc, bad_attr, plist, preq);
 	else {
@@ -1560,8 +1562,7 @@ mgr_server_unset(struct batch_request *preq, conn_t *conn)
 					}
 					tm_list->al_link.ll_next->ll_struct = NULL;
 					sprintf(tm_list->al_value, "%d", 1);
-					rc = mgr_set_attr(&server.sv_attr, svr_attr_idx, svr_attr_def, tm_list,
-					NO_USER_SET, &bad_attr, (void *)&server, ATR_ACTION_ALTER);
+					rc = mgr_set_attr(&server.sv_attr, tm_list, NO_USER_SET, &bad_attr, (void *)&server, ATR_ACTION_ALTER);
 					if (rc != 0) {
 						free_svrattrl(tm_list);
 						reply_badattr(rc, bad_attr, plist, preq);
@@ -1627,8 +1628,7 @@ mgr_sched_set(struct batch_request *preq)
 	/* if the unsetlist has attributes, call server_unset to remove them separately */
 	ulist = (svrattrl *)GET_NEXT(unsetlist);
 	if (ulist) {
-		rc = mgr_unset_attr(&psched->sch_attr, sched_attr_idx, sched_attr_def, ulist,
-			preq->rq_perm, &bad_attr, (void *)psched, PARENT_TYPE_SCHED, INDIRECT_RES_CHECK);
+		rc = mgr_unset_attr(&psched->sch_attr, ulist, preq->rq_perm, &bad_attr, (void *)psched, PARENT_TYPE_SCHED, INDIRECT_RES_CHECK);
 		if (rc != 0) {
 			reply_badattr(rc, bad_attr, ulist, preq);
 			free_attrlist(&unsetlist);
@@ -1641,8 +1641,7 @@ mgr_sched_set(struct batch_request *preq)
 	if (!plist)
 		goto done;
 
-	rc = mgr_set_attr(&psched->sch_attr, sched_attr_idx, sched_attr_def,
-			plist, preq->rq_perm, &bad_attr, (void *)psched, ATR_ACTION_ALTER);
+	rc = mgr_set_attr(&psched->sch_attr, plist, preq->rq_perm, &bad_attr, (void *)psched, ATR_ACTION_ALTER);
 	if (rc != 0) {
 		reply_badattr(rc, bad_attr, plist, preq);
 		return;
@@ -1690,8 +1689,7 @@ mgr_sched_unset(struct batch_request *preq)
 					reply_badattr(-1, bad_attr, tmp_plist, preq);
 
 				t_list->al_link.ll_next->ll_struct = NULL;
-				rc = mgr_unset_attr(&server.sv_attr, svr_attr_idx, svr_attr_def, t_list,
-					-1, &bad_attr, (void *)&server, PARENT_TYPE_SERVER, INDIRECT_RES_CHECK);
+				rc = mgr_unset_attr(&server.sv_attr, t_list, -1, &bad_attr, (void *)&server, PARENT_TYPE_SERVER, INDIRECT_RES_CHECK);
 				if (rc != 0) {
 					free_svrattrl(t_list);
 					reply_badattr(rc, bad_attr, tmp_plist, preq);
@@ -1704,8 +1702,7 @@ mgr_sched_unset(struct batch_request *preq)
 	}
 
 	plist = (svrattrl *)GET_NEXT(preq->rq_ind.rq_manager.rq_attr);
-	rc = mgr_unset_attr(&psched->sch_attr, sched_attr_idx, sched_attr_def, plist,
-			preq->rq_perm, &bad_attr, (void *)psched, PARENT_TYPE_SCHED, INDIRECT_RES_CHECK);
+	rc = mgr_unset_attr(&psched->sch_attr, plist, preq->rq_perm, &bad_attr, (void *)psched, PARENT_TYPE_SCHED, INDIRECT_RES_CHECK);
 	if (rc != 0) {
 		reply_badattr(rc, bad_attr, plist, preq);
 		return;
@@ -1780,8 +1777,7 @@ mgr_queue_set(struct batch_request *preq)
 		/* if the unsetlist has attributes, call server_unset to remove them separately */
 		ulist = (svrattrl *)GET_NEXT(unsetlist);
 		if (ulist) {
-			rc = mgr_unset_attr(&pque->qu_attr, que_attr_idx, que_attr_def, ulist,
-				preq->rq_perm, &bad, (void *)pque, PARENT_TYPE_QUE_ALL, INDIRECT_RES_CHECK);
+			rc = mgr_unset_attr(&pque->qu_attr, ulist, preq->rq_perm, &bad, (void *)pque, PARENT_TYPE_QUE_ALL, INDIRECT_RES_CHECK);
 			if (rc != 0) {
 				reply_badattr(rc, bad, ulist, preq);
 				free_attrlist(&unsetlist);
@@ -1792,8 +1788,7 @@ mgr_queue_set(struct batch_request *preq)
 
 		plist = (svrattrl *)GET_NEXT(preq->rq_ind.rq_manager.rq_attr);
 		if (plist) {
-			rc = mgr_set_attr(&pque->qu_attr, que_attr_idx, que_attr_def,
-					plist, preq->rq_perm, &bad, pque, ATR_ACTION_ALTER);
+			rc = mgr_set_attr(&pque->qu_attr, plist, preq->rq_perm, &bad, pque, ATR_ACTION_ALTER);
 			if (rc != 0) {
 				reply_badattr(rc, bad, plist, preq);
 				return;
@@ -1876,8 +1871,7 @@ mgr_queue_unset(struct batch_request *preq)
 	plist = (svrattrl *)GET_NEXT(preq->rq_ind.rq_manager.rq_attr);
 
 	while (pque) {
-		rc = mgr_unset_attr(&pque->qu_attr, que_attr_idx, que_attr_def,
-			plist, preq->rq_perm, &bad_attr,
+		rc = mgr_unset_attr(&pque->qu_attr, plist, preq->rq_perm, &bad_attr,
 			(void *)pque, PARENT_TYPE_QUE_ALL, INDIRECT_RES_CHECK);
 		if (rc != 0) {
 			reply_badattr(rc, bad_attr, plist, preq);
@@ -2044,12 +2038,10 @@ mgr_node_set(struct batch_request *preq)
 				rc = 0;
 				if (j == 0) {
 					plist = (svrattrl *)GET_NEXT(unsetlist);
-					rc = mgr_unset_attr(&pnode->nd_attr, node_attr_idx, node_attr_def, plist,
-							preq->rq_perm, &bad, (void *)pnode, PARENT_TYPE_NODE, INDIRECT_RES_CHECK);
+					rc = mgr_unset_attr(&pnode->nd_attr, plist, preq->rq_perm, &bad, (void *)pnode, PARENT_TYPE_NODE, INDIRECT_RES_CHECK);
 				} else {
 					plist = (svrattrl *)GET_NEXT(setlist);
-					rc = mgr_set_attr(&pnode->nd_attr, node_attr_idx, node_attr_def, plist,
-						preq->rq_perm | ATR_PERM_ALLOW_INDIRECT, &bad, (void *)pnode, ATR_ACTION_ALTER);
+					rc = mgr_set_attr(&pnode->nd_attr, plist, preq->rq_perm | ATR_PERM_ALLOW_INDIRECT, &bad, (void *)pnode, ATR_ACTION_ALTER);
 				}
 				if (rc != 0) {
 					if (numnodes > 1) {
@@ -2363,9 +2355,7 @@ mgr_node_unset(struct batch_request *preq)
 
 			warnings_update(WARN_ngrp_ck, warn_nodes, &warn_idx, pnode);
 
-			rc = mgr_unset_attr(&pnode->nd_attr, node_attr_idx, node_attr_def,
-				plist, preq->rq_perm, &bad, (void *)pnode,
-				PARENT_TYPE_NODE, INDIRECT_RES_CHECK);
+			rc = mgr_unset_attr(&pnode->nd_attr, plist, preq->rq_perm, &bad, (void *)pnode, PARENT_TYPE_NODE, INDIRECT_RES_CHECK);
 			if (rc != 0) {
 
 				if (numnodes > 1) {
@@ -2829,9 +2819,7 @@ create_pbs_node2(char *objname, svrattrl *plist, int perms, int *bad, struct pbs
 
 	/* OK, set the attributes specified */
 
-	rc = mgr_set_attr2(&pnode->nd_attr, node_attr_idx, node_attr_def,
-			plist, perms | ATR_PERM_ALLOW_INDIRECT, bad,
-			(void *)pnode, ATR_ACTION_NEW, allow_unkresc);
+	rc = mgr_set_attr2(&pnode->nd_attr, plist, perms | ATR_PERM_ALLOW_INDIRECT, bad, (void *)pnode, ATR_ACTION_NEW, allow_unkresc);
 
 	if (rc != 0) {
 		/*
@@ -3307,8 +3295,7 @@ mgr_sched_create(struct batch_request *preq)
 		req_reject(PBSE_SYSTEM, 0, preq);
 
 	plist = (svrattrl *) GET_NEXT(preq->rq_ind.rq_manager.rq_attr);
-	rc = mgr_set_attr(&psched->sch_attr, sched_attr_idx, sched_attr_def, plist,
-			preq->rq_perm, &bad, (void *) psched, ATR_ACTION_NEW);
+	rc = mgr_set_attr(&psched->sch_attr, plist, preq->rq_perm, &bad, (void *) psched, ATR_ACTION_NEW);
 	if (rc != 0) {
 		reply_badattr(rc, bad, plist, preq);
 		sched_free(psched);
@@ -3768,7 +3755,7 @@ mgr_resource_delete(struct batch_request *preq)
 			if (is_attr_set(pattr) && (pattr->at_type == ATR_TYPE_RESC || pattr->at_type == ATR_TYPE_ENTITY)) {
 				plist = attrlist_create(que_attr_def[i].at_name, prdef->rs_name, 0);
 				plist->al_link.ll_next->ll_struct = NULL;
-				rc = mgr_unset_attr(&pq->qu_attr, que_attr_idx, que_attr_def, plist, -1, &bad, (void *)pq, PARENT_TYPE_QUE_ALL, INDIRECT_RES_CHECK);
+				rc = mgr_unset_attr(&pq->qu_attr, plist, -1, &bad, (void *)pq, PARENT_TYPE_QUE_ALL, INDIRECT_RES_CHECK);
 				if (rc != 0) {
 					log_eventf(PBSEVENT_DEBUG, PBS_EVENTCLASS_RESC, LOG_DEBUG, resc, "error unsetting resource %s.%s", que_attr_def[i].at_name, prdef->rs_name);
 					reply_badattr(rc, bad, plist, preq);
@@ -3800,7 +3787,7 @@ mgr_resource_delete(struct batch_request *preq)
 		if (is_attr_set(pattr) && (pattr->at_type == ATR_TYPE_RESC || pattr->at_type == ATR_TYPE_ENTITY)) {
 			plist = attrlist_create(svr_attr_def[i].at_name, prdef->rs_name, 0);
 			plist->al_link.ll_next->ll_struct = NULL;
-			rc = mgr_unset_attr(&server.sv_attr, svr_attr_idx, svr_attr_def, plist, -1, &bad, (void *)&server, PARENT_TYPE_SERVER, INDIRECT_RES_CHECK);
+			rc = mgr_unset_attr(&server.sv_attr, plist, -1, &bad, (void *)&server, PARENT_TYPE_SERVER, INDIRECT_RES_CHECK);
 			if (rc != 0) {
 				log_eventf(PBSEVENT_DEBUG, PBS_EVENTCLASS_RESC, LOG_DEBUG, resc, "error unsetting resource %s.%s", svr_attr_def[i].at_name, prdef->rs_name);
 				reply_badattr(rc, bad, plist, preq);
@@ -3833,7 +3820,7 @@ mgr_resource_delete(struct batch_request *preq)
 			if (is_attr_set(pattr) && (pattr->at_type == ATR_TYPE_RESC || pattr->at_type == ATR_TYPE_ENTITY)) {
 				plist = attrlist_create(node_attr_def[j].at_name, prdef->rs_name, 0);
 				plist->al_link.ll_next->ll_struct = NULL;
-				rc = mgr_unset_attr(&pbsndlist[i]->nd_attr, node_attr_idx, node_attr_def, plist, -1, &bad, (void *)pbsndlist[i], PARENT_TYPE_NODE, INDIRECT_RES_UNLINK);
+				rc = mgr_unset_attr(&pbsndlist[i]->nd_attr, plist, -1, &bad, (void *)pbsndlist[i], PARENT_TYPE_NODE, INDIRECT_RES_UNLINK);
 				if (rc != 0) {
 					log_eventf(PBSEVENT_DEBUG, PBS_EVENTCLASS_RESC, LOG_DEBUG, resc, "error unsetting resource %s.%s", node_attr_def[i].at_name, prdef->rs_name);
 					reply_badattr(rc, bad, plist, preq);

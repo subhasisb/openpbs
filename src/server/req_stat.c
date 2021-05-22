@@ -111,7 +111,7 @@ extern pbs_license_counts license_counts;
 
 /* Extern Functions */
 
-extern int status_attrib(svrattrl *, void *, attribute_def *, attribute *, int, int, pbs_list_head *, int *);
+extern int status_attrib(svrattrl *, attribute_arr *, int, int, pbs_list_head *, int *);
 extern int status_nodeattrib(svrattrl *, struct pbsnode *, int, int, pbs_list_head *, int *);
 
 extern int svr_chk_histjob(job *);
@@ -534,8 +534,7 @@ status_que(pbs_queue *pque, struct batch_request *preq, pbs_list_head *pstathd)
 
 	bad = 0;
 	pal = (svrattrl *)GET_NEXT(preq->rq_ind.rq_status.rq_attr);
-	if (status_attrib(pal, que_attr_idx, que_attr_def, ATTR_LIST_HEAD(pque->qu_attr), pque->qu_attr.count,
-		preq->rq_perm, &pstat->brp_attr, &bad))
+	if (status_attrib(pal, &pque->qu_attr, pque->qu_attr.defn->count, preq->rq_perm, &pstat->brp_attr, &bad))
 		rc = PBSE_NOATTR;
 
 	if (is_attr_set(qattr))
@@ -787,8 +786,7 @@ req_stat_svr(struct batch_request *preq)
 
 	bad = 0;
 	pal = (svrattrl *)GET_NEXT(preq->rq_ind.rq_status.rq_attr);
-	if (status_attrib(pal, svr_attr_idx, svr_attr_def, ATTR_LIST_HEAD(server.sv_attr), server.sv_attr.count,
-		preq->rq_perm, &pstat->brp_attr, &bad))
+	if (status_attrib(pal, &server.sv_attr, server.sv_attr.defn->count, preq->rq_perm, &pstat->brp_attr, &bad))
 		reply_badattr(PBSE_NOATTR, bad, pal, preq);
 	else
 		reply_send(preq);
@@ -893,8 +891,7 @@ status_sched(pbs_sched *psched, struct batch_request *preq, pbs_list_head *pstat
 
 	bad = 0;
 	pal = (svrattrl *)GET_NEXT(preq->rq_ind.rq_status.rq_attr);
-	if (status_attrib(pal, sched_attr_idx, sched_attr_def, ATTR_LIST_HEAD(psched->sch_attr), psched->sch_attr.count,
-		preq->rq_perm, &pstat->brp_attr, &bad))
+	if (status_attrib(pal, &psched->sch_attr, psched->sch_attr.defn->count, preq->rq_perm, &pstat->brp_attr, &bad))
 		reply_badattr(PBSE_NOATTR, bad, pal, preq);
 
 	return (rc);
@@ -1112,8 +1109,7 @@ status_resv(resc_resv *presv, struct batch_request *preq, pbs_list_head *pstathd
 	bad = 0;	/*global: record ordinal position where got error*/
 	pal = (svrattrl *) GET_NEXT(preq->rq_ind.rq_status.rq_attr);
 
-	if (status_attrib(pal, resv_attr_idx, resv_attr_def, ATTR_LIST_HEAD(presv->ri_wattr),
-		presv->ri_wattr.count, preq->rq_perm, &pstat->brp_attr, &bad) == 0)
+	if (status_attrib(pal, &presv->ri_wattr, presv->ri_wattr.defn->count, preq->rq_perm, &pstat->brp_attr, &bad) == 0)
 		return (0);
 	else
 		return (PBSE_NOATTR);

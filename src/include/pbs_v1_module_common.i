@@ -134,6 +134,13 @@ void *que_attr_idx = NULL;
 void *svr_attr_idx = NULL;
 void *sched_attr_idx = NULL;
 
+attribute_def_info *job_attr_defn = NULL;
+attribute_def_info *node_attr_defn = NULL;
+attribute_def_info *resv_attr_defn = NULL;
+attribute_def_info *svr_attr_defn = NULL;
+attribute_def_info *sched_attr_defn = NULL;
+attribute_def_info *que_attr_defn = NULL;
+
 #if defined(PBS_V1_COMMON_MODULE_DEFINE_STUB_FUNCS)
 /*
  *	The following are a set of unused stub functions needed so that pbs_python
@@ -188,14 +195,12 @@ write_node_state(void) {
 }
 
 void
-mgr_log_attr(char *msg, struct svrattrl *plist, int logclass,
-		char *objname, char *hookname) {
+mgr_log_attr(char *msg, struct svrattrl *plist, int logclass, char *objname, char *hookname) {
 	return;
 }
 
 int
-mgr_set_attr(attribute_arr *parr, void *pidx, attribute_def *pdef,
-		svrattrl *plist, int privil, int *bad, void *parent, int mode) {
+mgr_set_attr(attribute_arr *parr, svrattrl *plist, int privil, int *bad, void *parent, int mode) {
 	return (0);
 }
 

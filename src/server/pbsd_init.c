@@ -204,8 +204,6 @@ init_server_attrs()
 	resource_def    *prdef = NULL;
 	resource        *presc = NULL;
 
-	attr_arr_alloc(&server.sv_attr, SVR_ATR_LAST);
-
 	set_sattr_str_slim(SVR_ATR_scheduler_iteration, TOSTR(PBS_SCHEDULE_CYCLE), NULL);
 
 	server.newobj = 1;
@@ -258,7 +256,7 @@ init_server_attrs()
 
 	prdef = &svr_resc_def[RESC_NCPUS];
 	if (prdef) {
-		attribute *pattr = get_sattr(SVR_ATR_DefaultChunk);
+		attribute *pattr = get_attr_ptr(&server.sv_attr, SVR_ATR_DefaultChunk);
 		presc = add_resource_entry(pattr, prdef);
 		if (presc) {
 			presc->rs_value.at_val.at_long = 1;
@@ -266,7 +264,7 @@ init_server_attrs()
 			pattr->at_flags = ATR_VFLAG_DEFLT | ATR_SET_MOD_MCACHE;
 			(void)deflt_chunk_action(pattr, (void *)&server, ATR_ACTION_NEW);
 		}
-		pattr = get_sattr(SVR_ATR_resource_deflt);
+		pattr = get_attr_ptr(&server.sv_attr, SVR_ATR_resource_deflt);
 		presc = add_resource_entry(pattr, prdef);
 		if (presc) {
 			presc->rs_value.at_val.at_long = 1;
@@ -325,33 +323,28 @@ pbsd_init(int type)
 	int      char_in_cname = 0;
 #endif  /* RLIMIT_CORE */
 
-
-	if ((job_attr_idx = cr_attrdef_idx(job_attr_def, JOB_ATR_LAST)) == NULL) {
-		log_err(errno, __func__, "Failed creating job attribute search index");
+	if (create_attr_defn(&job_attr_defn, &job_attr_idx, job_attr_def, JOB_ATR_LAST) == -1) {
+		log_err(errno, __func__, "Failed creating job attribute definition");
 		return (-1);
 	}
-	if ((node_attr_idx = cr_attrdef_idx(node_attr_def, ND_ATR_LAST)) == NULL) {
-		log_err(errno, __func__, "Failed creating node attribute search index");
+	if (create_attr_defn(&node_attr_defn, &node_attr_idx, node_attr_def, ND_ATR_LAST) == -1) {
+		log_err(errno, __func__, "Failed creating node attribute definitio");
 		return (-1);
 	}
-	if ((que_attr_idx = cr_attrdef_idx(que_attr_def, QA_ATR_LAST)) == NULL) {
-		log_err(errno, __func__, "Failed creating queue attribute search index");
+	if (create_attr_defn(&que_attr_defn, &que_attr_idx, que_attr_def, QA_ATR_LAST) == -1) {
+		log_err(errno, __func__, "Failed creating queue attribute definitio");
 		return (-1);
 	}
-	if ((svr_attr_idx = cr_attrdef_idx(svr_attr_def, SVR_ATR_LAST)) == NULL) {
-		log_err(errno, __func__, "Failed creating server attribute search index");
+	if (create_attr_defn(&sched_attr_defn, &sched_attr_idx, sched_attr_def, SCHED_ATR_LAST) == -1) {
+		log_err(errno, __func__, "Failed creating sched attribute definitio");
 		return (-1);
 	}
-	if ((sched_attr_idx = cr_attrdef_idx(sched_attr_def, SCHED_ATR_LAST)) == NULL) {
-		log_err(errno, __func__, "Failed creating sched attribute search index");
-		return (-1);
-	}
-	if ((resv_attr_idx = cr_attrdef_idx(resv_attr_def, RESV_ATR_LAST)) == NULL) {
-		log_err(errno, __func__, "Failed creating resv attribute search index");
+	if (create_attr_defn(&resv_attr_defn, &resv_attr_idx, resv_attr_def, RESV_ATR_LAST) == -1) {
+		log_err(errno, __func__, "Failed creating resv attribute definitio");
 		return (-1);
 	}
 	if (cr_rescdef_idx(svr_resc_def, svr_resc_size) != 0) {
-		log_err(errno, __func__, "Failed creating resc definition search index");
+		log_err(errno, __func__, "Failed creating resc attribute definitio");
 		return (-1);
 	}
 
@@ -506,7 +499,6 @@ pbsd_init(int type)
 	}
 
 	/* 3. Set default server attibutes values */
-	memset(&server, 0, sizeof(server));
 	server.sv_started = time(&time_now);	/* time server started */
 	if (is_sattr_set(SVR_ATR_scheduling))
 		a_opt = get_sattr_long(SVR_ATR_scheduling);
@@ -527,6 +519,7 @@ pbsd_init(int type)
 	}
 	if (type != RECOV_CREATE) {
 		/* Server read success full ?*/
+		attribute *pattr;
 
 		if (rc != 0) {
 			log_errf(rc, __func__, msg_init_baddb);
@@ -544,7 +537,7 @@ pbsd_init(int type)
 
 		/* if server comment is a default, clear it */
 		/* it will be reset as needed               */
-		if (((get_sattr(SVR_ATR_Comment))->at_flags & (ATR_VFLAG_SET | ATR_VFLAG_DEFLT)) == (ATR_VFLAG_SET | ATR_VFLAG_DEFLT))
+		if ((pattr = get_sattr(SVR_ATR_Comment)) && (pattr->at_flags & (ATR_VFLAG_SET | ATR_VFLAG_DEFLT)) == (ATR_VFLAG_SET | ATR_VFLAG_DEFLT))
 			free_sattr(SVR_ATR_Comment);
 
 		/* now do sched db */

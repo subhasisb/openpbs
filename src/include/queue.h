@@ -65,6 +65,7 @@ enum queueattr {
 };
 
 extern void *que_attr_idx;
+extern attribute_def_info *que_attr_defn;
 extern attribute_def que_attr_def[];
 
 /* at last we come to the queue definition itself	*/

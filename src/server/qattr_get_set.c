@@ -55,7 +55,7 @@ attribute *
 get_qattr(const pbs_queue *pq, int attr_idx)
 {
 	if (pq != NULL)
-		return _get_attr_by_idx((attribute_arr *) &pq->qu_attr, attr_idx);
+		return _get_attr_by_idx(&pq->qu_attr, attr_idx);
 	return NULL;
 }
 
@@ -128,7 +128,7 @@ get_qattr_long(const pbs_queue *pq, int attr_idx)
 	if (pq != NULL)
 		return get_attr_l(get_qattr(pq, attr_idx));
 
-	return -1;
+	return 0;
 }
 
 /**
@@ -150,7 +150,7 @@ set_qattr_generic(pbs_queue *pq, int attr_idx, char *val, char *rscn, enum batch
 	if (pq == NULL || val == NULL)
 		return 1;
 
-	return set_attr_generic(get_qattr(pq, attr_idx), &que_attr_def[attr_idx], val, rscn, op);
+	return set_attr_generic(get_attr_ptr(&pq->qu_attr, attr_idx), &que_attr_def[attr_idx], val, rscn, op);
 }
 
 /**
@@ -171,7 +171,7 @@ set_qattr_str_slim(pbs_queue *pq, int attr_idx, char *val, char *rscn)
 	if (pq == NULL || val == NULL)
 		return 1;
 
-	return set_attr_generic(get_qattr(pq, attr_idx), &que_attr_def[attr_idx], val, rscn, INTERNAL);
+	return set_attr_generic(get_attr_ptr(&pq->qu_attr, attr_idx), &que_attr_def[attr_idx], val, rscn, INTERNAL);
 }
 
 /**
@@ -192,7 +192,7 @@ set_qattr_l_slim(pbs_queue *pq, int attr_idx, long val, enum batch_op op)
 	if (pq == NULL)
 		return 1;
 
-	set_attr_l(get_qattr(pq, attr_idx), val, op);
+	set_attr_l(get_attr_ptr(&pq->qu_attr, attr_idx), val, op);
 
 	return 0;
 }
@@ -215,7 +215,7 @@ set_qattr_b_slim(pbs_queue *pq, int attr_idx, long val, enum batch_op op)
 	if (pq == NULL)
 		return 1;
 
-	set_attr_b(get_qattr(pq, attr_idx), val, op);
+	set_attr_b(get_attr_ptr(&pq->qu_attr, attr_idx), val, op);
 
 	return 0;
 }
@@ -238,7 +238,7 @@ set_qattr_c_slim(pbs_queue *pq, int attr_idx, char val, enum batch_op op)
 	if (pq == NULL)
 		return 1;
 
-	set_attr_c(get_qattr(pq, attr_idx), val, op);
+	set_attr_c(get_attr_ptr(&pq->qu_attr, attr_idx), val, op);
 
 	return 0;
 }

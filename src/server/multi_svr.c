@@ -965,7 +965,7 @@ init_node_from_bstat(struct batch_status *bstat, server_t *psvr)
 
 		pnode->nd_svrflags |= NODE_ALIEN;
 		convert_attrl_to_svrattrl(cur->attribs, &attrs);
-		if ((decode_attr_db(pnode, &attrs, node_attr_idx, node_attr_def, &pnode->nd_attr)) != 0) {
+		if ((decode_attr_db(pnode, &attrs, &pnode->nd_attr)) != 0) {
 			log_errf(PBSE_INTERNAL, __func__, "Decoding of node %s received from peer server has failed!",
 				 pnode->nd_name);
 			free(pnode);
