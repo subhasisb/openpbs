@@ -95,6 +95,7 @@ struct timeval last_stat_ts = {0, 0};
 struct batch_status *p_server = NULL;
 int talk_to_fg(int sock, int sd_svr, char **err_op);
 
+struct timeval ref_tm, done_tm, spent_tm;
 int p_header = TRUE;
 char extend[50];
 
@@ -3468,6 +3469,7 @@ job_no_args:
 				else
 					show_expired = 0;
 
+				gettimeofday(&ref_tm, NULL);
 				pbs_errno = PBSE_NONE;
 				if (set_diff_stat) {
 					char buf[100];
@@ -3486,6 +3488,11 @@ job_no_args:
 						p_status = pbs_selstat(conn, new_atropl, NULL, extend);
 					}
 				}
+				gettimeofday(&done_tm, NULL);
+				timersub(&done_tm, &ref_tm, &spent_tm);
+				if (getenv("CLI_DEBUG_ATTRS") != NULL)
+					fprintf(stderr, "Response from server in = %ld.%ld\n", spent_tm.tv_sec, spent_tm.tv_usec);
+
 
 				if (added_queue) {
 					/* added queue name as first entry in atropl list,  */
@@ -3966,6 +3973,7 @@ talk_to_fg(int sock, int sd_svr, char **err_op)
 
 	pbs_errno = PBSE_NONE;
 
+	gettimeofday(&ref_tm, NULL);
 	if (now - last_time >= STAT_REFRESH_INTERVAL) {
 		char buf[100];
 		last_time = now;
@@ -3975,6 +3983,11 @@ talk_to_fg(int sock, int sd_svr, char **err_op)
 		p_status = pbs_statjob(sd_svr, NULL, NULL, buf);
 		update_cache(p_status);
 	}
+
+	gettimeofday(&done_tm, NULL);
+	timersub(&done_tm, &ref_tm, &spent_tm);
+	if (getenv("CLI_DEBUG_ATTRS") != NULL)
+		fprintf(stderr, "Response from server in = %ld.%ld\n", spent_tm.tv_sec, spent_tm.tv_usec);
 
 	if (pbs_errno == PBSE_NONE) {
 		if (cc_get_head() || query_job_list) {
