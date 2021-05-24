@@ -618,7 +618,7 @@ req_quejob(struct batch_request *preq)
 			pj->ji_qs.ji_un.ji_momt.ji_exitstat = -1;
 			if (*pj->ji_qs.ji_fileprefix == '\0'
 					&& *pj->ji_qs.ji_jobid == '\0') {
-                        	snprintf(pj->ji_qs.ji_jobid, sizeof(pj->ji_qs.ji_jobid), "%s", jid);
+                        	pj->ji_qs.ji_jobid = strdup(jid);
 			}
 			job_purge(pj);
 			req_reject(PBSE_SYSTEM, 0, preq);
@@ -1265,8 +1265,7 @@ req_jobcredential(struct batch_request *preq)
 	}
 #endif		/* PBS_MOM */
 
-	type = pj->ji_extended.ji_ext.ji_credtype =
-		preq->rq_ind.rq_jobcred.rq_type;
+	//type = pj->ji_extended.ji_ext.ji_credtype =	preq->rq_ind.rq_jobcred.rq_type;
 	cred = preq->rq_ind.rq_jobcred.rq_data;
 	len = (size_t)preq->rq_ind.rq_jobcred.rq_size;
 
@@ -1825,6 +1824,7 @@ req_commit_now(struct batch_request *preq,  job *pj)
 		req_reject(PBSE_SAVE_ERR, 0, preq);
 		return;
 	}
+	log_errf(-1, __func__, "Job %s size=%d", pj->ji_qs.ji_jobid, pj->tot);
 
 	if (pj->ji_script) {
 		strcpy(jobscr.ji_jobid, pj->ji_qs.ji_jobid);

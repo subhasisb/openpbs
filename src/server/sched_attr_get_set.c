@@ -148,7 +148,7 @@ set_sched_attr_generic(pbs_sched *psched, int attr_idx, char *val, char *rscn, e
 	if (psched == NULL || val == NULL)
 		return 1;
 
-	return set_attr_generic(get_sched_attr(psched, attr_idx), &sched_attr_def[attr_idx], val, rscn, op);
+	return set_attr_generic(get_attr_ptr(&psched->sch_attr, attr_idx), &sched_attr_def[attr_idx], val, rscn, op);
 }
 
 /**
@@ -169,7 +169,7 @@ set_sched_attr_str_slim(pbs_sched *psched, int attr_idx, char *val, char *rscn)
 	if (psched == NULL || val == NULL)
 		return 1;
 
-	return set_attr_generic(get_sched_attr(psched, attr_idx), &sched_attr_def[attr_idx], val, rscn, INTERNAL);
+	return set_attr_generic(get_attr_ptr(&psched->sch_attr, attr_idx), &sched_attr_def[attr_idx], val, rscn, INTERNAL);
 }
 
 /**
@@ -190,7 +190,7 @@ set_sched_attr_l_slim(pbs_sched *psched, int attr_idx, long val, enum batch_op o
 	if (psched == NULL)
 		return 1;
 
-	set_attr_l(get_sched_attr(psched, attr_idx), val, op);
+	set_attr_l(get_attr_ptr(&psched->sch_attr, attr_idx), val, op);
 
 	return 0;
 }
@@ -213,7 +213,7 @@ set_sched_attr_b_slim(pbs_sched *psched, int attr_idx, long val, enum batch_op o
 	if (psched == NULL)
 		return 1;
 
-	set_attr_b(get_sched_attr(psched, attr_idx), val, op);
+	set_attr_b(get_attr_ptr(&psched->sch_attr, attr_idx), val, op);
 
 	return 0;
 }
@@ -236,7 +236,7 @@ set_sched_attr_c_slim(pbs_sched *psched, int attr_idx, char val, enum batch_op o
 	if (psched == NULL)
 		return 1;
 
-	set_attr_c(get_sched_attr(psched, attr_idx), val, op);
+	set_attr_c(get_attr_ptr(&psched->sch_attr, attr_idx), val, op);
 
 	return 0;
 }
