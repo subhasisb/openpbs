@@ -257,6 +257,7 @@ get_jattr_ll(const job *pjob, int attr_idx)
 	return -1;
 }
 
+#if 0
 /**
  * @brief	Getter function for job attribute's user_encoded value
  *
@@ -294,6 +295,7 @@ get_jattr_priv_encoded(const job *pjob, int attr_idx)
 
 	return NULL;
 }
+#endif
 
 /**
  * @brief	Setter for job state

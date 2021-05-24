@@ -2755,7 +2755,7 @@ resc_limit_insert_other_res(resc_limit_t *have, char *kv_keyw, char *kv_val, int
 			return rc;
 		}
 		pres->rs_defin->rs_set(&pres->rs_value, &tmp, INCR);
-		free_svrcache(&pres->rs_value);
+		//free_svrcache(&pres->rs_value);
 		pres->rs_defin->rs_encode(&pres->rs_value, NULL, pres->rs_defin->rs_name,
 				NULL, ATR_ENCODE_CLIENT, &pres->rs_value.at_priv_encoded);
 		pres->rs_defin->rs_free(&tmp);
@@ -3126,7 +3126,7 @@ map_need_to_have_resources(char *buf, size_t buf_sz, char *have_resc,
 						pneed->rs_defin->rs_set(&pneed->rs_value, &hattr, DECR);
 						snprintf(buf, buf_sz, ":%s=%s", have_resc, have_val);
 					}
-					free_svrcache(&pneed->rs_value);
+					//free_svrcache(&pneed->rs_value);
 					pneed->rs_defin->rs_encode(&pneed->rs_value, NULL, pneed->rs_defin->rs_name,
 							NULL, ATR_ENCODE_CLIENT, &pneed->rs_value.at_priv_encoded);
 				}

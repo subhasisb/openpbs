@@ -229,8 +229,8 @@ decode_arst(attribute *patr, char *name, char *rescn, char *val)
 
 		temp.at_flags   = 0;
 		temp.at_type    = ATR_TYPE_ARST;
-		temp.at_user_encoded = NULL;
-		temp.at_priv_encoded = NULL;
+		//temp.at_user_encoded = NULL;
+		//temp.at_priv_encoded = NULL;
 		temp.at_val.at_arst = 0;
 		if ((rc = decode_arst_direct(&temp, val)) != 0)
 			return (rc);
@@ -899,8 +899,8 @@ decode_arst_bs(attribute *patr, char *name, char *rescn, char *val)
 
 		temp.at_flags   = 0;
 		temp.at_type    = ATR_TYPE_ARST;
-		temp.at_user_encoded = NULL;
-		temp.at_priv_encoded = NULL;
+		//temp.at_user_encoded = NULL;
+		//temp.at_priv_encoded = NULL;
 		temp.at_val.at_arst = 0;
 		if ((rc = decode_arst_direct_bs(&temp, val)) != 0)
 			return (rc);

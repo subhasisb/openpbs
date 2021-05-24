@@ -98,8 +98,8 @@ extern time_t time_now;
  *	If an attribute has the ATR_DFLAG_HIDDEN flag set, then no
  *	need to obtain and cache new svrattrl values.
  */
-
-static void
+#if 0
+void
 svrcached(attribute *pat, pbs_list_head *phead, attribute_def *pdef)
 {
 	svrattrl *working = NULL;
@@ -193,6 +193,7 @@ svrcached(attribute *pat, pbs_list_head *phead, attribute_def *pdef)
 		}
 	}
 }
+#endif
 
 /*
  * status_attrib - add each requested or all attributes to the status reply
@@ -232,7 +233,8 @@ int status_attrib(svrattrl *pal, attribute_arr *parr, int limit, int priv, pbs_l
 			}
 			if ((parr->defn->def + index)->at_flags & priv)
 			{
-				svrcached(parr->arr[index], phead, parr->defn->def + index);
+				(parr->defn->def + index)->at_encode(parr->arr[index], phead, (parr->defn->def + index)->at_name, NULL, ATR_ENCODE_CLIENT, NULL);
+				//svrcached(parr->arr[index], phead, parr->defn->def + index);
 			}
 			pal = (svrattrl *)GET_NEXT(pal->al_link);
 		}
@@ -243,7 +245,8 @@ int status_attrib(svrattrl *pal, attribute_arr *parr, int limit, int priv, pbs_l
 		{
 			if ((parr->defn->def + index)->at_flags & priv)
 			{
-				svrcached(parr->arr[index], phead, parr->defn->def + index);
+				(parr->defn->def + index)->at_encode(parr->arr[index], phead, (parr->defn->def + index)->at_name, NULL, ATR_ENCODE_CLIENT, NULL);
+				//svrcached(parr->arr[index], phead, parr->defn->def + index);
 			}
 		}
 	}

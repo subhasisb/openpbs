@@ -184,7 +184,7 @@ find_attr(void *attrdef_idx, attribute_def *attr_def, char *name)
  * @return	Void
  *
  */
-
+#if 0
 void
 free_svrcache(attribute *attr)
 {
@@ -213,6 +213,7 @@ free_svrcache(attribute *attr)
 	}
 	attr->at_priv_encoded = NULL;
 }
+#endif
 
 /**
  * @brief
@@ -235,8 +236,8 @@ free_null(attribute *attr)
 	if (attr->at_type == ATR_TYPE_SIZE)
 		attr->at_val.at_size.atsv_shift = 10;
 	attr->at_flags &= ~(ATR_VFLAG_SET|ATR_VFLAG_INDIRECT|ATR_VFLAG_TARGET);
-	if (attr->at_user_encoded != NULL || attr->at_priv_encoded != NULL)
-		free_svrcache(attr);
+	//if (attr->at_user_encoded != NULL || attr->at_priv_encoded != NULL)
+	//	free_svrcache(attr);
 }
 
 /**
@@ -600,9 +601,10 @@ free_none(attribute *attr)
 {
 	/* do nothing */
 	/* to be used for accrue_type attribute of job */
-	if (attr->at_user_encoded != NULL || attr->at_priv_encoded != NULL) {
+	/*if (attr->at_user_encoded != NULL || attr->at_priv_encoded != NULL) {
 		free_svrcache(attr);
 	}
+	*/
 }
 
 /**

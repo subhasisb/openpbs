@@ -1773,9 +1773,10 @@ free_depend(attribute *attr)
 		(void)free(pdp);
 	}
 	/* free any data cached for stats */
-	if (attr->at_user_encoded != NULL || attr->at_priv_encoded != NULL) {
+	/*if (attr->at_user_encoded != NULL || attr->at_priv_encoded != NULL) {
 		free_svrcache(attr);
 	}
+	*/
 	mark_attr_not_set(attr);
 }
 

@@ -179,7 +179,7 @@ union attr_val {	      /* the attribute value	*/
 struct attribute {
 	unsigned int at_flags:ATRVFLAG;	/* attribute flags	*/
 	unsigned int at_type:ATRVTYPE;	/* type of attribute    */
-	svrattrl    *at_user_encoded;	/* encoded svrattrl form for users*/
+	//svrattrl    *at_user_encoded;	/* encoded svrattrl form for users*/
 	svrattrl    *at_priv_encoded;	/* encoded svrattrl form for mgr/op*/
 	union  attr_val at_val;		/* the attribute value	*/
 };
@@ -333,7 +333,7 @@ extern svrattrl *attrlist_alloc(int szname, int szresc, int szval);
 extern svrattrl *attrlist_create(char *aname, char *rname, int szval);
 extern void free_svrattrl(svrattrl *pal);
 extern void free_attrlist(pbs_list_head *attrhead);
-extern void free_svrcache(attribute *attr);
+//extern void free_svrcache(attribute *attr);
 
 /* attribute array atomic functions */
 extern int  attr_atomic_set(svrattrl *plist, attribute_arr *old,

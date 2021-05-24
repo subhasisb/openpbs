@@ -248,6 +248,9 @@ decode_attr_db(void *parent, pbs_list_head *attr_list, attribute_arr *parr)
 		 *
 		 */
 		pal = palarray[index];
+		if (index == JOB_ATR_outpath || index == JOB_ATR_errpath)
+			continue;
+
 		while (pal) {
 			/* is pattr even allocated? if not allocate it here */
 			if (!parr->arr[index]) {

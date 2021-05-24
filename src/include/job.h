@@ -495,21 +495,21 @@ struct job {
 	pbs_list_head	ji_multinodejobs;	/* links to recovered multinode jobs */
 #else						    /* END Mom ONLY -  start Server ONLY */
 	struct batch_request *ji_pmt_preq; /* outstanding preempt job request for deleting jobs */
-	int ji_discarding;		   /* discarding job */
+	int ji_discarding:1;		   /* discarding job */
 	struct batch_request *ji_prunreq;  /* outstanding runjob request */
 	pbs_list_head ji_svrtask;	   /* links to svr work_task list */
 	struct pbs_queue *ji_qhdr;	   /* current queue header */
 	struct resc_resv *ji_myResv;	   /* !=0 job belongs to a reservation, see also, attribute JOB_ATR_myResv */
 
-	int ji_lastdest;	     /* last destin tried by route */
-	int ji_retryok;		     /* ok to retry, some reject was temp */
-	int ji_terminated;	     /* job terminated by deljob batch req */
-	int ji_deletehistory;	     /* job history should not be saved */
+	int ji_lastdest:1;	     /* last destin tried by route */
+	int ji_retryok:1;		     /* ok to retry, some reject was temp */
+	int ji_terminated:1;	     /* job terminated by deljob batch req */
+	int ji_deletehistory:1;	     /* job history should not be saved */
 	pbs_list_head ji_rejectdest; /* list of rejected destinations */
 	struct job *ji_parentaj;     /* subjob: parent Array Job */
 	ajinfo_t *ji_ajinfo;         /* ArrayJob: information about subjobs and its state counts */
 	struct jbdscrd *ji_discard;  /* see discard_job() */
-	int ji_jdcd_waiting;	     /* set if waiting on a mom for a response to discard job request */
+	int ji_jdcd_waiting:1;	     /* set if waiting on a mom for a response to discard job request */
 	char *ji_acctrec;	     /* holder for accounting info */
 	char *ji_clterrmsg;	     /* error message to return to client */
 
@@ -583,7 +583,9 @@ struct job {
 	 * This area CANNOT contain any pointers!
 	 */
 	union jobextend {
+#ifdef PBS_MOM
 		char fill[256]; /* fill to keep same size */
+#endif
 		struct {
 			char ji_jid[8];	 /* extended job save data for ALPS */
 			int ji_credtype; /* credential type */
@@ -609,7 +611,7 @@ struct job {
 
 	attribute_arr ji_wattr; /* decoded attributes  */
 
-	short newobj; /* newly created job? */
+	int newobj:1; /* newly created job? */
 };
 
 typedef struct job job;
@@ -1037,7 +1039,7 @@ struct array_strings *get_jattr_arst(const job *pjob, int attr_idx);
 pbs_list_head get_jattr_list(const job *pjob, int attr_idx);
 long get_jattr_long(const job *pjob, int attr_idx);
 long long get_jattr_ll(const job *pjob, int attr_idx);
-svrattrl *get_jattr_usr_encoded(const job *pjob, int attr_idx);
+//svrattrl *get_jattr_usr_encoded(const job *pjob, int attr_idx);
 svrattrl *get_jattr_priv_encoded(const job *pjob, int attr_idx);
 void set_job_state(job *pjob, char val);
 void set_job_substate(job *pjob, long val);
