@@ -116,7 +116,7 @@ struct rq_deletejoblist {
 struct rq_management {
 	struct rq_manage rq_manager;
 	struct batch_reply *rq_reply;
-	time_t rq_time;
+	struct timeval rq_time;
 };
 
 /* ModifyVnode - used for node state changes */
@@ -289,7 +289,7 @@ struct batch_request {
 	int rq_conn;				/* socket connection to client/server */
 	int rq_orgconn;				/* original socket if relayed to MOM */
 	int rq_extsz;				/* size of "extension" data */
-	long rq_time;				/* time batch request created */
+	struct timeval  rq_time;	/* time batch request created */
 	char rq_user[PBS_MAXUSER + 1];		/* user name request is from */
 	char rq_host[PBS_MAXHOSTNAME + 1];	/* name of host sending request */
 	void *rq_extra;				/* optional ptr to extra info */

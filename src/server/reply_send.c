@@ -63,6 +63,8 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <signal.h>
+#include <time.h>
+#include <sys/time.h>
 #include "libpbs.h"
 #include "dis.h"
 #include "log.h"
@@ -367,6 +369,15 @@ reply_send(struct batch_request *request)
 		 * Otherwise, the reply is to be sent to a remote client
 		 */
 		if (rc == PBSE_NONE) {
+			struct batch_reply *preply = &request->rq_reply;
+			struct timeval serv_time, brp_ts;
+
+			gettimeofday(&brp_ts, NULL); /* add just reply timestamp */
+			timersub(&brp_ts, &request->rq_time, &serv_time);
+
+			log_eventf(PBSEVENT_DEBUG2, PBS_EVENTCLASS_REQUEST, LOG_DEBUG, "", "Response code %d, service time %ld.%ld", 
+					preply->brp_choice, serv_time.tv_sec, serv_time.tv_usec);
+
 			rc = dis_reply_write(sfds, request);
 		}
 	}
