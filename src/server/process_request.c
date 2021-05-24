@@ -1277,7 +1277,7 @@ struct batch_request *alloc_br(int type)
 		CLEAR_LINK(req->rq_link);
 		req->rq_conn = -1;		/* indicate not connected */
 		req->rq_orgconn = -1;		/* indicate not connected */
-		req->rq_time = time_now;
+		gettimeofday(&req->rq_time, NULL);
 		req->tpp_ack = 1; /* enable acks to be passed by tpp by default */
 		req->prot = PROT_TCP; /* not tpp by default */
 		req->tppcmd_msgid = NULL; /* NULL msgid to boot */
