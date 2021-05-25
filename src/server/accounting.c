@@ -334,14 +334,6 @@ get_resc_used(job *pjob, char **resc_used, int *resc_used_size)
 	pbs_list_head temp_head;
 	CLEAR_HEAD(temp_head);
 
-	/*
-	if (get_jattr_usr_encoded(pjob, JOB_ATR_resc_used) != NULL)
-		patlist = get_jattr_usr_encoded(pjob, JOB_ATR_resc_used);
-	else if (get_jattr_priv_encoded(pjob, JOB_ATR_resc_used) != NULL)
-		patlist = get_jattr_priv_encoded(pjob, JOB_ATR_resc_used);
-	else
-	*/
-
 	encode_resc(get_jattr(pjob, JOB_ATR_resc_used),
 		&temp_head, job_attr_def[ JOB_ATR_resc_used].at_name,
 		NULL, ATR_ENCODE_CLIENT, &patlist);

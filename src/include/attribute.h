@@ -85,7 +85,7 @@ extern "C" {
 /* define the size of fields in the structures */
 
 #define ATRDFLAG 24
-#define ATRVFLAG 16
+#define ATRVFLAG 8
 
 #define ATRDTYPE  4
 #define ATRVTYPE  8
@@ -105,15 +105,15 @@ extern "C" {
  */
 
 struct svrattrl {
-	pbs_list_link	al_link;
-	struct svrattrl *al_sister;  /* co-resource svrattrl		     */
-	struct attropl	al_atopl;    /* name,resource,value, see pbs_ifl.h   */
-	int		al_tsize;    /* size of this structure (variable)    */
-	int		al_nameln;   /* len of name string (including null)  */
-	int		al_rescln;   /* len of resource name string (+ null) */
-	int		al_valln;    /* len of value, may contain many nulls */
-	unsigned int	al_flags:ATRVFLAG;  /* copy of attribute value flags */
-	int		al_refct:16; /* reference count */
+	pbs_list_link al_link;
+	struct svrattrl *al_sister;		  /* co-resource svrattrl		     */
+	struct attropl al_atopl;		  /* name,resource,value, see pbs_ifl.h   */
+	int al_tsize;					  /* size of this structure (variable)    */
+	int al_nameln;					  /* len of name string (including null)  */
+	int al_rescln;					  /* len of resource name string (+ null) */
+	int al_valln;					  /* len of value, may contain many nulls */
+	unsigned int al_flags:ATRVFLAG;   /* copy of attribute value flags */
+	int al_refct : 16;				  /* reference count */
 	/*
 	 * data follows directly after
 	 */
@@ -161,26 +161,23 @@ enum attr_type {
 	ATTR_TYPE_LONG, ATTR_TYPE_INT, ATTR_TYPE_STR,
 };
 
-union attr_val {	      /* the attribute value	*/
-	long		      at_long;	/* long integer */
-	long long		      at_ll;	/* largest long integer */
-	char		      at_char;	/* single character */
-	char 		     *at_str;	/* char string  */
-	struct array_strings *at_arst;	/* array of strings */
-	struct size_value     at_size;	/* size value */
-	pbs_list_head	      at_list;	/* list of resources,  ... */
-	struct  pbsnode	     *at_jinfo; /* ptr to node's job info  */
-	short		      at_short;	/* short int; node's state */
-	float		      at_float;	/* floating point value */
-	struct attr_entity    at_enty;	/* FGC entity tree head */
+union attr_val {				   /* the attribute value	*/
+	long at_long;				   /* long integer */
+	long long at_ll;			   /* largest long integer */
+	char at_char;				   /* single character */
+	char *at_str;				   /* char string  */
+	struct array_strings *at_arst; /* array of strings */
+	struct size_value at_size;	   /* size value */
+	pbs_list_head at_list;		   /* list of resources,  ... */
+	struct pbsnode *at_jinfo;	   /* ptr to node's job info  */
+	short at_short;				   /* short int; node's state */
+	float at_float;				   /* floating point value */
+	struct attr_entity at_enty;	   /* FGC entity tree head */
 };
-
 
 struct attribute {
 	unsigned int at_flags:ATRVFLAG;	/* attribute flags	*/
 	unsigned int at_type:ATRVTYPE;	/* type of attribute    */
-	//svrattrl    *at_user_encoded;	/* encoded svrattrl form for users*/
-	svrattrl    *at_priv_encoded;	/* encoded svrattrl form for mgr/op*/
 	union  attr_val at_val;		/* the attribute value	*/
 };
 typedef struct attribute attribute;

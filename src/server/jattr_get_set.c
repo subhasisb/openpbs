@@ -257,46 +257,6 @@ get_jattr_ll(const job *pjob, int attr_idx)
 	return -1;
 }
 
-#if 0
-/**
- * @brief	Getter function for job attribute's user_encoded value
- *
- * @param[in]	pjob - pointer to the job
- * @param[in]	attr_idx - index of the attribute to return
- *
- * @return	svrattrl *
- * @retval	user_encoded value of the attribute
- * @retval	NULL if pjob is NULL
- */
-svrattrl *
-get_jattr_usr_encoded(const job *pjob, int attr_idx)
-{
-	if (pjob != NULL)
-		return (get_jattr(pjob, attr_idx))->at_user_encoded;
-
-	return NULL;
-}
-
-/**
- * @brief	Getter function for job attribute's priv_encoded value
- *
- * @param[in]	pjob - pointer to the job
- * @param[in]	attr_idx - index of the attribute to return
- *
- * @return	svrattrl *
- * @retval	priv_encoded value of the attribute
- * @retval	NULL if pjob is NULL
- */
-svrattrl *
-get_jattr_priv_encoded(const job *pjob, int attr_idx)
-{
-	if (pjob != NULL)
-		return (get_jattr(pjob, attr_idx))->at_priv_encoded;
-
-	return NULL;
-}
-#endif
-
 /**
  * @brief	Setter for job state
  *

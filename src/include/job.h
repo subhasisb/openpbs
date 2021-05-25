@@ -1039,8 +1039,6 @@ struct array_strings *get_jattr_arst(const job *pjob, int attr_idx);
 pbs_list_head get_jattr_list(const job *pjob, int attr_idx);
 long get_jattr_long(const job *pjob, int attr_idx);
 long long get_jattr_ll(const job *pjob, int attr_idx);
-//svrattrl *get_jattr_usr_encoded(const job *pjob, int attr_idx);
-svrattrl *get_jattr_priv_encoded(const job *pjob, int attr_idx);
 void set_job_state(job *pjob, char val);
 void set_job_substate(job *pjob, long val);
 int set_jattr_str_slim(job *pjob, int attr_idx, char *val, char *rscn);

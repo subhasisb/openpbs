@@ -576,8 +576,6 @@ add_resource_entry(attribute *pattr, resource_def *prdef)
 	new->rs_defin = prdef;
 	new->rs_value.at_type = prdef->rs_type;
 	new->rs_value.at_flags = 0;
-	//new->rs_value.at_user_encoded = 0;
-	//new->rs_value.at_priv_encoded = 0;
 	prdef->rs_free(&new->rs_value);
 
 	if (pr != NULL) {

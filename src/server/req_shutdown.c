@@ -319,8 +319,6 @@ shutdown_preempt_chkpt(job *pjob)
 
 	temp.at_flags = ATR_VFLAG_SET;
 	temp.at_type  = job_attr_def[(int)JOB_ATR_hold].at_type;
-	//temp.at_user_encoded = NULL;
-	//temp.at_priv_encoded = NULL;
 	temp.at_val.at_long = HOLD_s;
 
 	phold->rq_perm = ATR_DFLAG_MGRD | ATR_DFLAG_MGWR;

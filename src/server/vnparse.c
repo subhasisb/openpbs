@@ -2755,9 +2755,6 @@ resc_limit_insert_other_res(resc_limit_t *have, char *kv_keyw, char *kv_val, int
 			return rc;
 		}
 		pres->rs_defin->rs_set(&pres->rs_value, &tmp, INCR);
-		//free_svrcache(&pres->rs_value);
-		pres->rs_defin->rs_encode(&pres->rs_value, NULL, pres->rs_defin->rs_name,
-				NULL, ATR_ENCODE_CLIENT, &pres->rs_value.at_priv_encoded);
 		pres->rs_defin->rs_free(&tmp);
 	} else {
 		pnewres = (resource *)calloc(1, sizeof(resource));
@@ -2773,8 +2770,6 @@ resc_limit_insert_other_res(resc_limit_t *have, char *kv_keyw, char *kv_val, int
 			free(pnewres);
 			return rc;
 		}
-		resc_def->rs_encode(&pnewres->rs_value, NULL, resc_def->rs_name,
-				NULL, ATR_ENCODE_CLIENT, &pnewres->rs_value.at_priv_encoded);
 		if (execv_f)
 			pnewres->rs_value.at_flags |= ATR_VFLAG_IN_EXECVNODE_FLAG;
 		if (cmp_res < 0)  /* pres will be NULL */
@@ -2913,9 +2908,8 @@ resc_limit_list_free(pbs_list_head *res_list)
 void
 resc_limit_list_print(char *header_str, pbs_list_head *res_list, int logtype)
 {
-	rl_entry		*p_entry = NULL;
-	int			i;
-	resource		*phave;
+	rl_entry *p_entry = NULL;
+	int i;
 
 	if ((header_str == NULL) || (res_list == NULL))
 		return;
@@ -2939,16 +2933,7 @@ resc_limit_list_print(char *header_str, pbs_list_head *res_list, int logtype)
 				have->chunkstr?have->chunkstr:"",
 				have->host_chunk[0].str?have->host_chunk[0].str:"",
 				have->host_chunk[1].str?have->host_chunk[1].str:"");
-		log_event(logtype, PBS_EVENTCLASS_RESC,
-			LOG_INFO, __func__, log_buffer);
-		for (phave = (resource *)GET_NEXT(have->rl_other_res);
-			phave;
-			phave = (resource *)GET_NEXT(phave->rs_link)) {
-			snprintf(log_buffer, sizeof(log_buffer), "%s[%d]: other res %s=%s",
-					header_str, i, phave->rs_defin->rs_name, phave->rs_value.at_priv_encoded->al_value);
-			log_event(logtype, PBS_EVENTCLASS_RESC,
-				LOG_INFO, __func__, log_buffer);
-		}
+		log_event(logtype, PBS_EVENTCLASS_RESC, LOG_INFO, __func__, log_buffer);
 		p_entry = (rl_entry *)GET_NEXT(p_entry->rl_link);
 		i++;
 	}
@@ -3120,15 +3105,16 @@ map_need_to_have_resources(char *buf, size_t buf_sz, char *have_resc,
 					free(tmp);
 				} else {
 					if (cmp_res > 0) {
-						snprintf(buf, buf_sz, ":%s=%s", have_resc, pneed->rs_value.at_priv_encoded->al_value);
+						svrattrl *encoded;
+						pneed->rs_defin->rs_encode(&pneed->rs_value, NULL, pneed->rs_defin->rs_name,
+							NULL, ATR_ENCODE_CLIENT, &encoded);
+						snprintf(buf, buf_sz, ":%s=%s", have_resc, encoded->al_value);
+						free_svrattrl(encoded);
 						pneed->rs_defin->rs_decode(&pneed->rs_value, NULL, NULL, "0");
 					} else {
 						pneed->rs_defin->rs_set(&pneed->rs_value, &hattr, DECR);
 						snprintf(buf, buf_sz, ":%s=%s", have_resc, have_val);
 					}
-					//free_svrcache(&pneed->rs_value);
-					pneed->rs_defin->rs_encode(&pneed->rs_value, NULL, pneed->rs_defin->rs_name,
-							NULL, ATR_ENCODE_CLIENT, &pneed->rs_value.at_priv_encoded);
 				}
 			}
 		}
@@ -3387,8 +3373,6 @@ satisfy_chunk_need(resc_limit_t *need, resc_limit_t *have, vnl_t **vnlp)
 		presnew->rs_defin = pres->rs_defin;
 		append_link(&map_need.rl_other_res, &presnew->rs_link, presnew);
 		presnew->rs_defin->rs_set(&presnew->rs_value, &pres->rs_value, SET);
-		presnew->rs_defin->rs_encode(&presnew->rs_value, NULL, presnew->rs_defin->rs_name,
-				NULL, ATR_ENCODE_CLIENT, &presnew->rs_value.at_priv_encoded);
 		if (pres->rs_value.at_flags & ATR_VFLAG_IN_EXECVNODE_FLAG)
 			presnew->rs_value.at_flags |= ATR_VFLAG_IN_EXECVNODE_FLAG;
 	}
@@ -3421,8 +3405,6 @@ satisfy_chunk_need(resc_limit_t *need, resc_limit_t *have, vnl_t **vnlp)
 			&& (pres->rs_defin->rs_comp(&pres->rs_value, &pneed->rs_value))) {
 			pres->rs_defin->rs_free(&pres->rs_value); /* ATR_VFLAG_IN_EXECVNODE_FLAG gets preserved */
 			pres->rs_defin->rs_set(&pres->rs_value, &pneed->rs_value, SET);
-			pres->rs_defin->rs_encode(&pres->rs_value, NULL, pres->rs_defin->rs_name,
-					NULL, ATR_ENCODE_CLIENT, &pres->rs_value.at_priv_encoded);
 		}
 		pneed = (resource *)GET_NEXT(pneed->rs_link);
 	}
@@ -3766,7 +3748,6 @@ pbs_release_nodes_given_select(relnodes_input_t *r_input, relnodes_input_select_
 	char		e2buf[PBS_MAXHOSTNAME+1+6+16];
 #ifndef PBS_PYTHON
 	char		*extra_res = NULL;
-	resource	*pres;
 	char		*sched_select = NULL;
 	char		*chunkschsel = NULL;
 	char		*res_in_exec_vnode = NULL;
@@ -4340,15 +4321,7 @@ pbs_release_nodes_given_select(relnodes_input_t *r_input, relnodes_input_select_
 					need.rl_vmem, need.rl_naccels,
 						need.rl_accel_mem);
         			log_event(PBSEVENT_DEBUG2, PBS_EVENTCLASS_JOB, LOG_ERR, r_input->jobid, log_buffer);
-#if !(defined(PBS_MOM) || defined(PBS_PYTHON))
-				for (pres = (resource *)GET_NEXT(need.rl_other_res);
-					pres != NULL;
-					pres = (resource *)GET_NEXT(pres->rs_link)) {
-    				snprintf(log_buffer, sizeof(log_buffer),
-    					"(%s=%s)", pres->rs_defin->rs_name, pres->rs_value.at_priv_encoded->al_value);
-           			log_event(PBSEVENT_DEBUG2, PBS_EVENTCLASS_JOB, LOG_ERR, r_input->jobid, log_buffer);
-        		}
-#endif
+
         		snprintf(log_buffer, sizeof(log_buffer), "NEED chunks for keep_select (%s)", (r_input2->select_str?r_input2->select_str:""));
         			log_event(PBSEVENT_DEBUG2, PBS_EVENTCLASS_JOB, LOG_ERR, r_input->jobid, log_buffer);
 				have_exec_vnode = return_available_vnodes(r_input->execvnode, vnl_good_master);
@@ -4371,15 +4344,7 @@ pbs_release_nodes_given_select(relnodes_input_t *r_input, relnodes_input_select_
 					need.rl_vmem, need.rl_naccels,
 						need.rl_accel_mem);
         			log_event(PBSEVENT_DEBUG2, PBS_EVENTCLASS_JOB, LOG_ERR, r_input->jobid, log_buffer);
-#if !(defined(PBS_MOM) || defined(PBS_PYTHON))
-				for (pres = (resource *)GET_NEXT(need.rl_other_res);
-					pres != NULL;
-					pres = (resource *)GET_NEXT(pres->rs_link)) {
-					snprintf(log_buffer, sizeof(log_buffer),
-						"(%s=%s)", pres->rs_defin->rs_name, pres->rs_value.at_priv_encoded->al_value);
-					log_event(PBSEVENT_DEBUG2, PBS_EVENTCLASS_JOB, LOG_ERR, r_input->jobid, log_buffer);
-				}
-#endif
+
 				snprintf(log_buffer, sizeof(log_buffer), "NEED chunks for keep_select (%s)", (r_input2->select_str?r_input2->select_str:""));
         			log_event(PBSEVENT_DEBUG2, PBS_EVENTCLASS_JOB, LOG_ERR, r_input->jobid, log_buffer);
 				have_exec_vnode = return_available_vnodes(r_input->execvnode, vnl_good_master);

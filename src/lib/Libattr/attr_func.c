@@ -177,46 +177,6 @@ find_attr(void *attrdef_idx, attribute_def *attr_def, char *name)
 
 /**
  * @brief
- * 	free_svrcache - free the cached svrattrl entries associated with an attribute
- *
- * @param[in] attr - pointer to attribute structure
- *
- * @return	Void
- *
- */
-#if 0
-void
-free_svrcache(attribute *attr)
-{
-	struct svrattrl *working;
-	struct svrattrl *sister;
-
-	working = attr->at_user_encoded;
-	if ((working != NULL) && (--working->al_refct <= 0)) {
-		while (working) {
-			sister = working->al_sister;
-			delete_link(&working->al_link);
-			(void)free(working);
-			working = sister;
-		}
-	}
-	attr->at_user_encoded = NULL;
-
-	working = attr->at_priv_encoded;
-	if ((working != NULL) && (--working->al_refct <= 0)) {
-		while (working) {
-			sister = working->al_sister;
-			delete_link(&working->al_link);
-			(void)free(working);
-			working = sister;
-		}
-	}
-	attr->at_priv_encoded = NULL;
-}
-#endif
-
-/**
- * @brief
  *	free_null - A free routine for attributes which do not
  *	have malloc-ed space ( boolean, char, long ).
  *
@@ -236,8 +196,6 @@ free_null(attribute *attr)
 	if (attr->at_type == ATR_TYPE_SIZE)
 		attr->at_val.at_size.atsv_shift = 10;
 	attr->at_flags &= ~(ATR_VFLAG_SET|ATR_VFLAG_INDIRECT|ATR_VFLAG_TARGET);
-	//if (attr->at_user_encoded != NULL || attr->at_priv_encoded != NULL)
-	//	free_svrcache(attr);
 }
 
 /**
@@ -599,12 +557,6 @@ attrl_fixlink(pbs_list_head *phead)
 void
 free_none(attribute *attr)
 {
-	/* do nothing */
-	/* to be used for accrue_type attribute of job */
-	/*if (attr->at_user_encoded != NULL || attr->at_priv_encoded != NULL) {
-		free_svrcache(attr);
-	}
-	*/
 }
 
 /**
