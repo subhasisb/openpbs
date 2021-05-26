@@ -755,6 +755,9 @@ send_job(job *jobp, pbs_net_t hostaddr, int port, int move_type,
 	struct work_task *ptask;
 	struct hostent *hp;
 	struct in_addr addr;
+	attribute *pattr_v = NULL;
+	int loaded_v = 0;
+	int rc;
 	long tempval;
 
 	/* if job has a script read it from database */
@@ -769,8 +772,26 @@ send_job(job *jobp, pbs_net_t hostaddr, int port, int move_type,
 		}
 	}
 
-	if ((move_type == MOVE_TYPE_Exec && small_job_files(jobp)) || move_type == MOVE_TYPE_Move_Run)
-		return send_job_exec(jobp, hostaddr, port, move_type, preq);
+	/* 
+	 * if JOB_ATR_varaibles is set but value is NULL, it means it was large and we had freed it
+	 * reload it from disk before sending
+	 */
+	if (is_jattr_set(jobp, JOB_ATR_variables) && ((pattr_v = get_jattr(jobp, JOB_ATR_variables)))) {
+		if (pattr_v->at_val.at_str == NULL) {
+			/* load back from DB */
+			job_recov_db(jobp->ji_qs.ji_jobid, jobp);
+			loaded_v = 1;
+		}
+	}
+
+	if ((move_type == MOVE_TYPE_Exec && small_job_files(jobp)) || move_type == MOVE_TYPE_Move_Run) {
+		rc = send_job_exec(jobp, hostaddr, port, move_type, preq);
+		if (loaded_v && pattr_v) {
+			free(pattr_v->at_val.at_str);
+			pattr_v->at_val.at_str = NULL;
+		}
+		return rc;
+	}
 
 	(void)snprintf(log_buffer, sizeof(log_buffer), "big job files, sending via subprocess");
 	log_event(PBSEVENT_DEBUG3, PBS_EVENTCLASS_JOB, LOG_INFO, jobp->ji_qs.ji_jobid, log_buffer);
@@ -808,6 +829,12 @@ send_job(job *jobp, pbs_net_t hostaddr, int port, int move_type,
 	}
 
 	if (pid != 0) {		/* The parent (main server) */
+
+		/* free the JOB_ATR_variables value here since we don't need it anymore */
+		if (loaded_v && pattr_v) {
+			free(pattr_v->at_val.at_str);
+			pattr_v->at_val.at_str = NULL;
+		}
 
 		ptask = set_task(WORK_Deferred_Child, pid, post_func, preq);
 		if (!ptask) {

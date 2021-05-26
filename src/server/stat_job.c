@@ -120,7 +120,6 @@ int status_attrib(svrattrl *pal, attribute_arr *parr, int limit, int priv, pbs_l
 			if ((parr->defn->def + index)->at_flags & priv)
 			{
 				(parr->defn->def + index)->at_encode(parr->arr[index], phead, (parr->defn->def + index)->at_name, NULL, ATR_ENCODE_CLIENT, NULL);
-				//svrcached(parr->arr[index], phead, parr->defn->def + index);
 			}
 			pal = (svrattrl *)GET_NEXT(pal->al_link);
 		}
@@ -132,7 +131,6 @@ int status_attrib(svrattrl *pal, attribute_arr *parr, int limit, int priv, pbs_l
 			if ((parr->defn->def + index)->at_flags & priv)
 			{
 				(parr->defn->def + index)->at_encode(parr->arr[index], phead, (parr->defn->def + index)->at_name, NULL, ATR_ENCODE_CLIENT, NULL);
-				//svrcached(parr->arr[index], phead, parr->defn->def + index);
 			}
 		}
 	}
@@ -185,11 +183,15 @@ int status_job(job *pjob, struct batch_request *preq, svrattrl *pal, pbs_list_he
 	else
 	{
 		/* eligible_time_enable is off so, clear set flag so that eligible_time and accrue type dont show */
-		old_elig_flags = get_jattr(pjob, JOB_ATR_eligible_time)->at_flags;
-		mark_jattr_not_set(pjob, JOB_ATR_eligible_time);
+		if (is_jattr_set(pjob, JOB_ATR_eligible_time)) {
+			old_elig_flags = get_jattr(pjob, JOB_ATR_eligible_time)->at_flags;
+			mark_jattr_not_set(pjob, JOB_ATR_eligible_time);
+		}
 
-		old_atyp_flags = get_jattr(pjob, JOB_ATR_accrue_type)->at_flags;
-		mark_jattr_not_set(pjob, JOB_ATR_accrue_type);
+		if (is_jattr_set(pjob, JOB_ATR_accrue_type)) {
+			old_atyp_flags = get_jattr(pjob, JOB_ATR_accrue_type)->at_flags;
+			mark_jattr_not_set(pjob, JOB_ATR_accrue_type);
+		}
 	}
 
 	/* allocate reply structure and fill in header portion */
@@ -240,9 +242,11 @@ int status_job(job *pjob, struct batch_request *preq, svrattrl *pal, pbs_list_he
 	else
 	{
 		/* reset the set flags */
-		get_jattr(pjob, JOB_ATR_eligible_time)->at_flags = old_elig_flags;
+		if (is_jattr_set(pjob, JOB_ATR_eligible_time))
+			get_jattr(pjob, JOB_ATR_eligible_time)->at_flags = old_elig_flags;
 
-		get_jattr(pjob, JOB_ATR_accrue_type)->at_flags = old_atyp_flags;
+		if (is_jattr_set(pjob, JOB_ATR_accrue_type))
+			get_jattr(pjob, JOB_ATR_accrue_type)->at_flags = old_atyp_flags;
 	}
 
 	if (revert_state_r)

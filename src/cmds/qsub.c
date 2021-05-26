@@ -1762,31 +1762,6 @@ do_dir(char *opts, int opt_pass, char *retmsg, size_t ret_size)
 	return (ret);
 }
 
-/*
- * @brief
- *	set_opt_defaults - if not already set, set certain job attributes to
- *	their default value
- *
- */
-static void
-set_opt_defaults(void)
-{
-	if (c_opt == FALSE)
-		set_attr_error_exit(&attrib, ATTR_c, CHECKPOINT_UNSPECIFIED);
-	if (h_opt == FALSE)
-		set_attr_error_exit(&attrib, ATTR_h, NO_HOLD);
-	if (j_opt == FALSE)
-		set_attr_error_exit(&attrib, ATTR_j, NO_JOIN);
-	if (k_opt == FALSE)
-		set_attr_error_exit(&attrib, ATTR_k, NO_KEEP);
-	if (m_opt == FALSE)
-		set_attr_error_exit(&attrib, ATTR_m, MAIL_AT_ABORT);
-	if (p_opt == FALSE)
-		set_attr_error_exit(&attrib, ATTR_p, "0");
-	if (r_opt == FALSE)
-		set_attr_error_exit(&attrib, ATTR_r, "TRUE");
-}
-
 /* End of "Options Processing" functions. */
 
 /**
@@ -3281,9 +3256,6 @@ main(int argc, char **argv, char **envp) /* qsub */
 
 	/* Enable X11 Forwarding or GUI if specified */
 	enable_gui();
-
-	/* Set option default values */
-	set_opt_defaults();
 
 	/* Parse destination string */
 	server_out[0] = '\0';

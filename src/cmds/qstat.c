@@ -1380,6 +1380,23 @@ display_statjob(struct batch_status *status, struct batch_status *prtheader, int
 	}
 	p = status;
 	while (p != NULL) {
+		int i;
+		struct def_attr {
+			char *name; 
+			char *default_value;
+			int absent;
+		};
+		struct def_attr default_attrs[] = {
+			{ATTR_c, CHECKPOINT_UNSPECIFIED, 1},
+			{ATTR_h, NO_HOLD, 1},
+			{ATTR_j, NO_JOIN, 1},
+			{ATTR_k, NO_KEEP, 1},
+			{ATTR_m, MAIL_AT_ABORT, 1},
+			{ATTR_p, "0", 1},
+			{ATTR_r, "TRUE", 1}
+		};
+		int def_attrs_count = sizeof(default_attrs) / sizeof(struct def_attr);
+
 		jid = NULL;
 		name = NULL;
 		owner = NULL;
@@ -1402,6 +1419,12 @@ display_statjob(struct batch_status *status, struct batch_status *prtheader, int
 			while (a != NULL) {
 				if (a->name != NULL) {
 					time_t epoch;
+
+					for(i = 0 ; i < def_attrs_count; i++) {
+						if (default_attrs[i].absent && strcmp(default_attrs[i].name, a->name) == 0) {
+							default_attrs[i].absent = 0;
+						}
+					}
 
 					if (strcmp(a->name, ATTR_ctime) == 0 ||
 						strcmp(a->name, ATTR_etime) == 0 ||
@@ -1459,6 +1482,12 @@ display_statjob(struct batch_status *status, struct batch_status *prtheader, int
 				a = a->next;
 				if (a)
 					printf("%s", delimiter);
+			}
+			for(i = 0 ; i < def_attrs_count; i++) {
+				if (default_attrs[i].absent) {
+					printf("%s", delimiter);
+					prt_attr(default_attrs[i].name, NULL, default_attrs[i].default_value, alt_opt & ALT_DISPLAY_w);
+				}
 			}
 			if (output_format == FORMAT_DEFAULT)
 				printf("%s", delimiter);

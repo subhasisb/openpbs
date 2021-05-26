@@ -1000,7 +1000,6 @@ extern void post_runone(struct work_task *pwt);
 extern job  *find_job(char *);
 extern char *get_variable(job *, char *);
 extern void  check_block(job *, char *);
-extern char *lookup_variable(void *, int, char *);
 extern void  issue_track(job *);
 extern void  issue_delete(job *);
 extern int   job_abt(job *, char *);

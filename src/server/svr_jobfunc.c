@@ -723,40 +723,10 @@ get_variable(job *pjob, char *variable)
 {
 	char *pc;
 
+	if (!is_jattr_set(pjob, JOB_ATR_variables))
+		return NULL;
+
 	pc = arst_string(variable, get_jattr(pjob, JOB_ATR_variables));
-	if (pc) {
-		if ((pc = strchr(pc, (int)'=')) != 0)
-			pc++;
-	}
-	return (pc);
-}
-
-
-/**
- * @brief
- * 		lookup_variable - lookup the value of a particular environment variable
- *		associated with the object.
- *
- * @param[in]	pobj	-	pointer to the object structure
- * @param[in]	objtype	-	object type
- * @param[in]	variable	-	string variable which needs to be searched in object attribute.
- *
- * @return	a pointer to the beginning of the value string
- * @retval	NULL	: pointer if the variable isn't found in the object's "variable_list"
- */
-
-char *
-lookup_variable(void *pobj, int objtype, char *variable)
-{
-	char *pc;
-	attribute *objattr;
-
-	if (objtype == JOB_OBJECT)
-		objattr = get_jattr((job *)pobj, JOB_ATR_variables);
-	else
-		objattr = get_rattr((resc_resv *)pobj, RESV_ATR_variables);
-
-	pc = arst_string(variable, objattr);
 	if (pc) {
 		if ((pc = strchr(pc, (int)'=')) != 0)
 			pc++;

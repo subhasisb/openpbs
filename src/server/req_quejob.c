@@ -888,15 +888,17 @@ req_quejob(struct batch_request *preq)
 		set_jattr_l_slim(pj, JOB_ATR_hopcount, 1, SET);
 
 		/* need to set certain environmental variables per POSIX */
-		strcpy(buf, pbs_o_que);
-		strcat(buf, pque->qu_qs.qu_name);
-		if (conn && get_variable(pj, pbs_o_host) == NULL) {
-			strcat(buf, ",");
-			strcat(buf, pbs_o_host);
-			strcat(buf, "=");
-			strcat(buf, conn->cn_physhost);
+		if (is_jattr_set(pj, JOB_ATR_variables)) {
+			strcpy(buf, pbs_o_que);
+			strcat(buf, pque->qu_qs.qu_name);
+			if (conn && get_variable(pj, pbs_o_host) == NULL) {
+				strcat(buf, ",");
+				strcat(buf, pbs_o_host);
+				strcat(buf, "=");
+				strcat(buf, conn->cn_physhost);
+			}
+			set_jattr_generic(pj, JOB_ATR_variables, buf, NULL, INCR);
 		}
-		set_jattr_generic(pj, JOB_ATR_variables, buf, NULL, INCR);
 
 		/* if JOB_ATR_outpath/JOB_ATR_errpath not set, set default */
 
@@ -1725,6 +1727,7 @@ req_commit_now(struct batch_request *preq,  job *pj)
 	void *conn = (void *) svr_db_conn;
 	char *runjob_extend = NULL;
 	struct batch_request *preq_runjob = NULL;
+	attribute *pattr;
 #endif
 
 	if (!check_job_substate(pj, JOB_SUBSTATE_TRANSIN)) {
@@ -1838,6 +1841,18 @@ req_commit_now(struct batch_request *preq,  job *pj)
 		}
 		free(pj->ji_script);
 		pj->ji_script = NULL;
+	}
+	/* 
+	 * now that job is saved, free the JOB_ATR_variables value from memory
+	 * this is special handling of this attribute since it can potentially
+	 * take a lot of space in memory. So, we free it only if it is large! 
+	 * 
+	 * We still keep the attribute structure in memory and mark it set (if set)
+	 */
+	pattr = get_jattr(pj, JOB_ATR_variables);
+	if (pattr && strlen(pattr->at_val.at_str) > 1000) {
+		free(pattr->at_val.at_str);
+		pattr->at_val.at_str = NULL;
 	}
 
 	/* Now, no need to save server here because server
