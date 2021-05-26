@@ -559,7 +559,7 @@ set_all_state(mominfo_t *pmom, int do_set, unsigned long bits, char *txt,
 		}
 
 		post_attr_set(get_nattr(pvnd, ND_ATR_state));
-		pat = get_nattr(pvnd, ND_ATR_Comment);
+		pat = get_attr_ptr(&pvnd->nd_attr, ND_ATR_Comment);
 
 		/*
 		 * change the comment only if it is a default comment (set by
@@ -1133,6 +1133,8 @@ shallow_vnode_dup(struct pbsnode *vnode)
 	vnode_dup->nd_ntype = vnode->nd_ntype;
 	vnode_dup->nd_pque = vnode->nd_pque;
 	vnode_dup->nd_svrflags = vnode->nd_svrflags;
+
+	attr_arr_alloc(&vnode_dup->nd_attr, node_attr_defn);
 	for (i = 0; i < ND_ATR_LAST; i++) {
 		vnode_dup->nd_attr.arr[i] = vnode->nd_attr.arr[i];
 	}
@@ -1229,7 +1231,7 @@ set_vnode_state(struct pbsnode *pnode, unsigned long state_bits, enum vnode_stat
 		set_nattr_l_slim(pnode, ND_ATR_last_state_change_time, time_int_val, SET);
 
 	/* Write the vnode state change event to server log */
-	last_time_int = (int)vnode_o->nd_attr.arr[(int)ND_ATR_last_state_change_time]->at_val.at_long;
+	last_time_int = (int) get_attr_ptr(&vnode_o->nd_attr, ND_ATR_last_state_change_time)->at_val.at_long;
 	log_eventf(PBSEVENT_DEBUG2, PBS_EVENTCLASS_NODE, LOG_INFO, pnode->nd_name,
 		"set_vnode_state;vnode.state=0x%lx vnode_o.state=0x%lx "
 		"vnode.last_state_change_time=%d vnode_o.last_state_change_time=%d "
@@ -1293,6 +1295,7 @@ fn_fire_event:
 	process_hooks(preq, hook_msg, sizeof(hook_msg), pbs_python_set_interrupt);
 
 fn_free_and_return:
+	free(vnode_o->nd_attr.arr);
 	free(vnode_o);
 	free_br(preq);
 }
@@ -3514,7 +3517,7 @@ update2_to_vnode(vnal_t *pvnal, int new, mominfo_t *pmom, int *madenew, int from
 				continue;  /* seeing vnl update for node just updated, don't clear */
 
 			if (i != ND_ATR_ResourceAvail) {
-				if (((get_nattr(pnode, i))->at_flags & (ATR_VFLAG_SET|ATR_VFLAG_DEFLT)) == (ATR_VFLAG_SET|ATR_VFLAG_DEFLT))
+				if (is_nattr_set(pnode, i) && ((get_nattr(pnode, i)->at_flags & (ATR_VFLAG_SET|ATR_VFLAG_DEFLT)) == (ATR_VFLAG_SET|ATR_VFLAG_DEFLT)))
 					free_nattr(pnode, i);
 			} else if (is_nattr_set(pnode, i) != 0) {
 				prs = (resource *)GET_NEXT(get_nattr_list(pnode, i));
@@ -3768,8 +3771,7 @@ update2_to_vnode(vnal_t *pvnal, int new, mominfo_t *pmom, int *madenew, int from
 				continue;
 			}
 			pattr = get_nattr(pnode, j);
-			if (from_hook || ((pattr->at_flags & \
-			   (ATR_VFLAG_SET|ATR_VFLAG_DEFLT)) != ATR_VFLAG_SET)) {
+			if (pattr && (from_hook || (pattr->at_flags & (ATR_VFLAG_SET|ATR_VFLAG_DEFLT)) != ATR_VFLAG_SET)) {
 				/* if not from_hook, will only set attribute */
 				/* values that have the ATR_VFLAG_DEFLT flag */
 				/* only, which means it wasn't set externally */
@@ -3815,8 +3817,7 @@ update2_to_vnode(vnal_t *pvnal, int new, mominfo_t *pmom, int *madenew, int from
 					pattr->at_flags |= ATR_VFLAG_DEFLT;
 
 				if (strcasecmp(psrp->vna_name, ATTR_NODE_VnodePool) == 0) {
-					if ((bad = node_attr_def[j].at_action(pattr,
-					     pnode, ATR_ACTION_ALTER)) == 0) {
+					if ((bad = node_attr_def[j].at_action(pattr, pnode, ATR_ACTION_ALTER)) == 0) {
 						pattr->at_flags |= ATR_VFLAG_DEFLT;
 					} else {
 						snprintf(log_buffer, sizeof(log_buffer),
@@ -3828,12 +3829,9 @@ update2_to_vnode(vnal_t *pvnal, int new, mominfo_t *pmom, int *madenew, int from
 					}
 				}
 			}
-			if ((strcasecmp(psrp->vna_name,
-				ATTR_NODE_TopologyInfo) == 0) ||
-				(strcasecmp(psrp->vna_name,
-				ATTR_NODE_state) == 0)) {
-				bad = node_attr_def[j].at_action(pattr,
-					pnode, ATR_ACTION_ALTER);
+			if (pattr && ((strcasecmp(psrp->vna_name, ATTR_NODE_TopologyInfo) == 0) ||
+				(strcasecmp(psrp->vna_name, ATTR_NODE_state) == 0))) {
+				bad = node_attr_def[j].at_action(pattr, pnode, ATR_ACTION_ALTER);
 				if (bad != 0) {
 					snprintf(log_buffer, sizeof(log_buffer),
 						"Error %d setting attribute %s "

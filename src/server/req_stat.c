@@ -688,8 +688,8 @@ status_node(struct pbsnode *pnode, struct batch_request *preq, pbs_list_head *ps
 	bad = 0;                                        /*global variable*/
 	pal = (svrattrl *)GET_NEXT(preq->rq_ind.rq_status.rq_attr);
 
-	rc = status_nodeattrib(pal, pnode, ND_ATR_LAST, preq->rq_perm, &pstat->brp_attr, &bad);
-
+	rc = status_attrib(pal, &pnode->nd_attr, pnode->nd_attr.defn->count, preq->rq_perm, &pstat->brp_attr, &bad);
+	
 	/*reverting back the state*/
 
 	if (get_nattr_long(pnode, ND_ATR_state) & INUSE_PROV)
@@ -748,7 +748,7 @@ req_stat_svr(struct batch_request *preq)
 
 	/* update count and state counts from sv_numjobs and sv_jobstates */
 	set_sattr_l_slim(SVR_ATR_TotalJobs, server.sv_qs.sv_numjobs, SET);
-	update_state_ct(get_sattr(SVR_ATR_JobsByState), server.sv_jobstates, &svr_attr_def[SVR_ATR_JobsByState]);
+	update_state_ct(get_attr_ptr(&server.sv_attr, SVR_ATR_JobsByState), server.sv_jobstates, &svr_attr_def[SVR_ATR_JobsByState]);
 
 	update_license_ct();
 

@@ -280,7 +280,7 @@ decode_attr_db(void *parent, pbs_list_head *attr_list, attribute_arr *parr)
 						return -1;
 					}
 			}
-			(parr->arr[index])->at_flags = (pal->al_flags & ~ATR_VFLAG_MODIFY) | ATR_VFLAG_MODCACHE;
+			(parr->arr[index])->at_flags = (pal->al_flags & ~ATR_VFLAG_MODIFY);
 
 			tmp_pal = pal->al_sister;
 			pal = tmp_pal;

@@ -798,7 +798,9 @@ release_node_lic(void *pobj)
 		licensing_control.licenses_total_needed -= get_nattr_long(pnode, ND_ATR_LicenseInfo);
 
 		/* release license if node is locked */
-		if (get_nattr_c(pnode, ND_ATR_License) == ND_LIC_TYPE_locked && is_nattr_set(pnode, ND_ATR_LicenseInfo)) {
+		if (is_nattr_set(pnode, ND_ATR_License) && 
+				get_nattr_c(pnode, ND_ATR_License) == ND_LIC_TYPE_locked && 
+				is_nattr_set(pnode, ND_ATR_LicenseInfo)) {
 			return_licenses(get_nattr_long(pnode, ND_ATR_LicenseInfo));
 			clear_nattr(pnode, ND_ATR_License);
 			clear_nattr(pnode, ND_ATR_LicenseInfo);

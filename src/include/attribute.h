@@ -254,13 +254,12 @@ typedef struct ecl_attribute_def ecl_attribute_def;
 #define ATR_VFLAG_SET		0x01	/* has specifed value (is set)	*/
 #define ATR_VFLAG_MODIFY	0x02	/* value has been modified	*/
 #define ATR_VFLAG_DEFLT		0x04	/* value is default value	*/
-#define ATR_VFLAG_MODCACHE	0x08	/* value modified since cache 	*/
 #define ATR_VFLAG_INDIRECT	0x10	/* indirect pointer to resource */
 #define ATR_VFLAG_TARGET	0x20	/* target of indirect resource  */
 #define ATR_VFLAG_HOOK		0x40	/* value set by a hook script   */
 #define ATR_VFLAG_IN_EXECVNODE_FLAG	0x80	/* resource key value pair was found in execvnode */
 
-#define ATR_MOD_MCACHE (ATR_VFLAG_MODIFY | ATR_VFLAG_MODCACHE)
+#define ATR_MOD_MCACHE (ATR_VFLAG_MODIFY)
 #define ATR_SET_MOD_MCACHE (ATR_VFLAG_SET | ATR_MOD_MCACHE)
 #define ATR_UNSET(X) if ((X)) (X)->at_flags = (((X)->at_flags & ~ATR_VFLAG_SET) | ATR_MOD_MCACHE)
 

@@ -597,7 +597,6 @@ modify_job_attr(job *pjob, svrattrl *plist, int perm, int *bad)
 			} else {
 				pjob->ji_wattr.arr[i] = pre_copy.arr[i];
 			}
-			/* ATR_VFLAG_MODCACHE will be included if set */
 			pjob->ji_wattr.arr[i]->at_flags = pre_copy.arr[i]->at_flags;
 		}
 	}
@@ -649,7 +648,6 @@ modify_job_attr(job *pjob, svrattrl *plist, int perm, int *bad)
 						pjob->ji_wattr.arr[i] = newattr.arr[i];
 					}
 			}
-			/* ATR_VFLAG_MODCACHE will be included if set */
 			pjob->ji_wattr.arr[i]->at_flags = newattr.arr[i]->at_flags;
 		}
 	}
@@ -1350,7 +1348,6 @@ modify_resv_attr(resc_resv *presv, svrattrl *plist, int perm, int *bad)
 			} else {
 				presv->ri_wattr.arr[i] = newattr.arr[i];
 			}
-			/* ATR_VFLAG_MODCACHE will be included if set */
 			presv->ri_wattr.arr[i]->at_flags = newattr.arr[i]->at_flags;
 		}
 	}

@@ -126,7 +126,6 @@ decode_c(attribute *patr, char *name, char *rescn, char *val)
 
 int
 encode_c(const attribute *attr, pbs_list_head *phead, char *atname, char *rsname, int mode, svrattrl **rtnl)
-
 {
 
 	svrattrl *pal;
@@ -298,5 +297,8 @@ set_attr_short(attribute *pattr, short value, enum batch_op op)
 char
 get_attr_c(const attribute *pattr)
 {
-	return  pattr->at_val.at_char;
+	if (pattr != NULL)
+		return  pattr->at_val.at_char;
+
+	return -1;
 }

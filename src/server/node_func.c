@@ -893,16 +893,17 @@ save_nodes_db(int changemodtime, void *p)
 		if (np->nd_state & INUSE_DELETED)
 			continue;
 
-		for (num=0; num<ND_ATR_LAST; num++) {
+		for (num = 0; num < ND_ATR_LAST; num++) {
 
-			(get_nattr(np, num))->at_flags &= ~ATR_VFLAG_MODIFY;
+			if (is_nattr_set(np, num)) {
+				(get_nattr(np, num))->at_flags &= ~ATR_VFLAG_MODIFY;
 
-			if (num == ND_ATR_ResourceAvail)
-				if (rname != NULL && rscdef != NULL) {
-					if ((resc = find_resc_entry(get_nattr(np, ND_ATR_ResourceAvail), rscdef)))
-						resc->rs_value.at_flags &= ~ATR_VFLAG_MODIFY;
-				}
-
+				if (num == ND_ATR_ResourceAvail)
+					if (rname != NULL && rscdef != NULL) {
+						if ((resc = find_resc_entry(get_nattr(np, ND_ATR_ResourceAvail), rscdef)))
+							resc->rs_value.at_flags &= ~ATR_VFLAG_MODIFY;
+					}
+			}
 		}
 	}
 	return (0);

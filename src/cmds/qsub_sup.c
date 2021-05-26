@@ -1435,7 +1435,7 @@ get_comm_filename(char *fname)
 		((server_out == NULL || server_out[0] == 0) ?
 		"default" : server_out),
 		(unsigned long int)getuid(),
-		cred_name,
+		getenv("QSUB_INST"),
 		get_conf_path(),
 		env_svr ? env_svr : "",
 		env_port ? env_port : "",
