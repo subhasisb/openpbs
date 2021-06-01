@@ -1779,12 +1779,6 @@ req_commit_now(struct batch_request *preq,  job *pj)
 	job_save(pj);
 	start_exec(pj);
 
-	/* The ATR_VFLAG_MODIFY bit for several attributes used to be
-	 * set here. Now we rely on these bits to be set when and where
-	 * an attribute is modified. Several of these are also set in
-	 * record_finish_exec().
-	 */
-
 #else	/* PBS_SERVER */
 	if (svr_authorize_jobreq(preq, pj) == -1) {
 		req_reject(PBSE_PERM, 0, preq);
@@ -3275,7 +3269,7 @@ copy_params_from_job(char *jobid, resc_resv *presv)
 	else
 		set_rattr_l_slim(presv, RESV_ATR_start, time_now, SET);
 
-	post_attr_set(get_rattr(presv, RESV_ATR_SchedSelect));
+	mark_attr_set(get_rattr(presv, RESV_ATR_SchedSelect));
 
 	job_resc_entry = (resource *)GET_NEXT(get_jattr_list(pjob, JOB_ATR_resource));
 	for (; job_resc_entry; job_resc_entry = (resource *)GET_NEXT(job_resc_entry->rs_link)) {

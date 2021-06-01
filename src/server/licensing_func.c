@@ -750,7 +750,7 @@ check_sign(pbsnode *pnode, attribute *new)
 
 	prdef = find_resc_def(svr_resc_def, ND_RESC_LicSignature);
 	presc = find_resc_entry((attribute *)new, prdef);
-	if (presc && (presc->rs_value.at_flags & ATR_VFLAG_MODIFY)) {
+	if (presc && is_attr_set(&presc->rs_value)) {
 		if ((err = validate_sign(presc->rs_value.at_val.at_str, pnode)) != PBSE_NONE)
 			return (err);
 		presc->rs_value.at_flags &= ~ATR_VFLAG_DEFLT;

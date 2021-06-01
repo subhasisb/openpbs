@@ -245,7 +245,7 @@ save_attr_fs(attribute_arr *parr)
 			if (rc < 0)
 				errct++;
 
-			parr->arr[i]->at_flags &= ~ATR_VFLAG_MODIFY;
+			mark_attr_clean(parr->arr[i]);
 
 			/* now that it has been encoded, block and save it */
 			while ((pal = (svrattrl *)GET_NEXT(lhead)) != NULL) {
@@ -428,7 +428,7 @@ recov_attr_fs(int fd, void *parent, attribute_arr *parr)
 			/* for INCR case of entity limit, decode locally */
 			set_attr_generic(parr->arr[index], parr->defn->def + index, pal->al_value, pal->al_resc, INCR);
 		}
-		parr->arr[index]->at_flags = pal->al_flags & ~ATR_VFLAG_MODIFY;
+		mark_attr_clean(parr->arr[index]);
 	}
 
 	(void)free(pal);

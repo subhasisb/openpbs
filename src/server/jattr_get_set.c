@@ -456,7 +456,7 @@ mark_jattr_not_set(job *pjob, int attr_idx)
 {
 	if (pjob != NULL) {
 		attribute *attr = get_jattr(pjob, attr_idx);
-		ATR_UNSET(attr);
+		mark_attr_not_set(attr);
 	}
 }
 

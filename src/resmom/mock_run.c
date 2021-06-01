@@ -166,7 +166,7 @@ mock_run_mom_set_use(job *pjob)
 
 	assert(pjob != NULL);
 	at = get_jattr(pjob, JOB_ATR_resc_used);
-	at->at_flags |= (ATR_VFLAG_MODIFY|ATR_VFLAG_SET);
+	mark_attr_set(at);
 
 	if (rd == NULL) {
 		rd = malloc(5 * sizeof(resource_def *));

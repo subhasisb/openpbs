@@ -732,7 +732,7 @@ get_job_update(job *pjob)
 			log_joberr(errno, __func__, "Out of memory while encoding comment in stat update", pjob->ji_qs.ji_jobid);
 	}
 #endif
-	if ((at = get_jattr(pjob, JOB_ATR_session_id))->at_flags & ATR_VFLAG_MODIFY) {
+	if ((at = get_jattr(pjob, JOB_ATR_session_id)) && is_attr_dirty(at)) {
 		job_attr_def[JOB_ATR_session_id].at_encode(at, &prused->ru_attr,
 							   job_attr_def[JOB_ATR_session_id].at_name,
 							   NULL, ATR_ENCODE_CLIENT, NULL);
@@ -754,12 +754,11 @@ get_job_update(job *pjob)
 		at = get_jattr(pjob, nth);
 		ad = &job_attr_def[nth];
 
-		if ((at->at_flags & ATR_VFLAG_MODIFY) ||
-		    (at->at_flags & ATR_VFLAG_HOOK) ||
+		if (is_attr_dirty(at) || (at->at_flags & ATR_VFLAG_HOOK) ||
 		    (pjob->ji_pending_ruu != NULL && find_svrattrl_list_entry(&(((ruu *) pjob->ji_pending_ruu)->ru_attr), ad->at_name, NULL) != NULL)) {
 			ad->at_encode(at, &prused->ru_attr, ad->at_name, NULL, ATR_ENCODE_CLIENT, NULL);
-			if (at->at_flags & ATR_VFLAG_MODIFY)
-				at->at_flags &= ~ATR_VFLAG_MODIFY;
+			if (is_attr_dirty(at))
+				mark_attr_clean(at);
 		}
 	}
 

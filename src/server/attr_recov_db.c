@@ -145,14 +145,14 @@ encode_attr_db(attribute_arr *parr, pbs_db_attr_list_t *db_attr_list, int all)
 	CLEAR_HEAD(db_attr_list->attrs);
 
 	for (i = 0; i < numattr; i++) {
-		if (!parr->arr[i] || !(parr->arr[i]->at_flags & ATR_VFLAG_MODIFY))
+		if (!is_attr_dirty(parr->arr[i]))
 			continue;
 
 		if ((((parr->defn->def + i)->at_flags & ATR_DFLAG_NOSAVM) == 0) || all) {
 			if (encode_single_attr_db((parr->defn->def + i), parr->arr[i], db_attr_list) != 0)
 				return -1;
 
-			parr->arr[i]->at_flags &= ~ATR_VFLAG_MODIFY;
+			mark_attr_clean(parr->arr[i]);
 		}
 	}
 	return 0;
@@ -264,15 +264,6 @@ decode_attr_db(void *parent, pbs_list_head *attr_list, attribute_arr *parr)
 				if (parr->defn->def[index].at_action)
 					if ((act_rc = (parr->defn->def[index].at_action(parr->arr[index], parent, ATR_ACTION_RECOV)))) {
 						log_errf(act_rc, __func__, "Action function failed for %s attr, errn %d", (parr->defn->def + index)->at_name, act_rc);
-						for ( index++; index <= limit; index++) {
-							while (pal) {
-								tmp_pal = pal->al_sister;
-								free(pal);
-								pal = tmp_pal;
-							}
-							if (index < limit)
-								pal = palarray[index];
-						}
 						free(palarray);
 						/* bailing out from this function */
 						/* any previously allocated attrs will be */
@@ -280,7 +271,7 @@ decode_attr_db(void *parent, pbs_list_head *attr_list, attribute_arr *parr)
 						return -1;
 					}
 			}
-			(parr->arr[index])->at_flags = (pal->al_flags & ~ATR_VFLAG_MODIFY);
+			mark_attr_clean(parr->arr[index]);
 
 			tmp_pal = pal->al_sister;
 			pal = tmp_pal;

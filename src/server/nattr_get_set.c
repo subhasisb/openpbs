@@ -346,5 +346,5 @@ set_nattr_jinfo(struct pbsnode *pnode, int attr_idx, struct pbsnode *val)
 {
 	attribute *attr = get_attr_ptr(&pnode->nd_attr, attr_idx);
 	attr->at_val.at_jinfo = val;
-	attr->at_flags = ATR_SET_MOD_MCACHE;
+	mark_attr_set(attr);
 }

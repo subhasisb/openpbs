@@ -315,7 +315,7 @@ req_releasejob(struct batch_request *preq)
 		{
 			attribute *etime = get_jattr(pjob, JOB_ATR_etime);
 			etime->at_val.at_long = time_now;
-			post_attr_set(etime);
+			mark_attr_set(etime);
 #endif /* localmod 105 */
 		svr_evaljobstate(pjob, &newstate, &newsub, 0);
 		svr_setjobstate(pjob, newstate, newsub); /* saves job */
@@ -339,7 +339,7 @@ req_releasejob(struct batch_request *preq)
 				{
 					attribute *etime = get_jattr(psubjob, JOB_ATR_etime);
 					etime->at_val.at_long = time_now;
-					post_attr_set(etime);
+					mark_attr_set(etime);
 #endif /* localmod 105 */
 					svr_evaljobstate(psubjob, &newstate, &newsub, 0);
 					svr_setjobstate(psubjob, newstate, newsub); /* saves job */

@@ -192,7 +192,7 @@ static void update_depend(job *pjob, char *d_jobid, char *d_svr, int op, int typ
 			return; /* Job dependency already established */
 		if (strcmp(pjob->ji_qs.ji_jobid, d_jobid)) {
 			dpj = make_dependjob(dp, d_jobid, d_svr);
-			post_attr_set(pattr);
+			mark_attr_set(pattr);
 			job_save(pjob);
 			/* runone dependencies are circular */
 			if (type == JOB_DEPEND_TYPE_RUNONE)
@@ -210,7 +210,7 @@ static void update_depend(job *pjob, char *d_jobid, char *d_svr, int op, int typ
 			/* no more dependencies of this type */
 			del_depend(dp);
 
-		pattr->at_flags |= ATR_MOD_MCACHE;
+		mark_attr_dirty(pattr);
 		/* runone dependencies are circular */
 		if (type == JOB_DEPEND_TYPE_RUNONE)
 			update_depend(d_job, pjob->ji_qs.ji_jobid, d_svr, op, type);
@@ -443,7 +443,7 @@ req_register(struct batch_request *preq)
 							preq->rq_ind.rq_register.rq_child);
 						if (pdj) {
 							del_depend_job(pdj);
-							pattr->at_flags |= ATR_MOD_MCACHE;
+							mark_attr_dirty(pattr);
 							(void)sprintf(log_buffer, msg_registerrel,
 								preq->rq_ind.rq_register.rq_child);
 							log_event(PBSEVENT_JOB, PBS_EVENTCLASS_JOB,
@@ -929,7 +929,7 @@ int depend_runone_remove_dependency(job *pjob)
 				temp_pdj = find_dependjob(find_depend(JOB_DEPEND_TYPE_RUNONE, pattr), pjob->ji_qs.ji_jobid);
 				if (temp_pdj) {
 					del_depend_job(temp_pdj);
-					pattr->at_flags |= ATR_MOD_MCACHE;
+					mark_attr_dirty(pattr);
 				}
 			}
 		}
@@ -1223,7 +1223,7 @@ static struct depend *make_depend(int type, attribute *pattr)
 	if (pdep) {
 		clear_depend(pdep, type, 0);
 		append_link(&pattr->at_val.at_list, &pdep->dp_link, pdep);
-		post_attr_set(pattr);
+		mark_attr_set(pattr);
 	}
 	return (pdep);
 }
@@ -1489,7 +1489,6 @@ decode_depend(attribute *patr, char *name, char *rescn, char *val)
 
 	if ((val == NULL) || (*val == 0)) {
 		free_depend(patr);
-		patr->at_flags |= ATR_VFLAG_MODIFY;
 		return (0);
 	}
 
@@ -1506,7 +1505,7 @@ decode_depend(attribute *patr, char *name, char *rescn, char *val)
 		valwd = parse_comma_string(NULL);
 	}
 
-	post_attr_set(patr);
+	mark_attr_set(patr);
 	return (0);
 }
 
@@ -1727,7 +1726,7 @@ enum batch_op op;
 		case DECR:	/* not defined */
 		default:	return (PBSE_IVALREQ);
 	}
-	post_attr_set(attr);
+	mark_attr_set(attr);
 	return (0);
 }
 

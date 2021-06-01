@@ -109,9 +109,9 @@ decode_hold(attribute *patr, char *name, char *rescn, char *val)
 					return (PBSE_BADATVAL);
 			}
 		}
-		post_attr_set(patr);
+		mark_attr_set(patr);
 	} else
-		ATR_UNSET(patr);
+		mark_attr_not_set(patr);
 
 	return (0);
 }

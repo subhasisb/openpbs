@@ -1136,7 +1136,7 @@ mom_set_use(job *pjob)
 
 	DBPRT(("%s: entered %s\n", __func__, pjob->ji_qs.ji_jobid))
 
-	at->at_flags |= (ATR_VFLAG_MODIFY|ATR_VFLAG_SET);
+	mark_attr_set(at);
 
 	rd = &svr_resc_def[RESC_NCPUS];
 	pres = find_resc_entry(at, rd);

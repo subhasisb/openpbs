@@ -354,7 +354,7 @@ req_modifyjob(struct batch_request *preq)
 		}
 	}
 
-	if ((get_jattr(pjob, JOB_ATR_resource))->at_flags & ATR_VFLAG_MODIFY) {
+	if (is_attr_dirty(get_jattr(pjob, JOB_ATR_resource))) {
 		presc = find_resc_entry(get_jattr(pjob, JOB_ATR_resource), &svr_resc_def[RESC_SELECT]);
 		if (presc && (presc->rs_value.at_flags & ATR_VFLAG_DEFLT)) {
 			/* changing Resource_List and select is a default   */
@@ -544,7 +544,7 @@ modify_job_attr(job *pjob, svrattrl *plist, int perm, int *bad)
 
 	/* special check on permissions for hold */
 
-	if ((rc == 0) && (newattr.arr[(int)JOB_ATR_hold]->at_flags & ATR_VFLAG_MODIFY)) {
+	if ((rc == 0) && is_attr_dirty(newattr.arr[(int)JOB_ATR_hold])) {
 		svrattrl *hold_e = find_name_in_svrattrl(plist, ATTR_h);
 		/* don't perform permission check if Hold_Types attribute */
 		/* was set in a hook script (special privilege) */
@@ -556,9 +556,7 @@ modify_job_attr(job *pjob, svrattrl *plist, int perm, int *bad)
 	}
 
 
-	if ((rc == 0) &&
-		((newattr.arr[(int)JOB_ATR_userlst]->at_flags & ATR_VFLAG_MODIFY) ||
-			(newattr.arr[(int)JOB_ATR_grouplst]->at_flags & ATR_VFLAG_MODIFY))) {
+	if ((rc == 0) && (is_attr_dirty(newattr.arr[(int)JOB_ATR_userlst]) || is_attr_dirty(newattr.arr[(int)JOB_ATR_grouplst]))) {
 		/* Need to reset execution uid and gid */
 		rc = set_objexid((void *)pjob, JOB_OBJECT, &newattr);
 	}
@@ -582,7 +580,7 @@ modify_job_attr(job *pjob, svrattrl *plist, int perm, int *bad)
 	/* Now copy the new values into the job attribute array for the purposes of running the action functions */
 
 	for (i = 0; i < JOB_ATR_LAST; i++) {
-		if (newattr.arr[i]->at_flags & ATR_VFLAG_MODIFY) {
+		if (is_attr_dirty(newattr.arr[i])) {
 			/*
 			 * The function update_eligible_time() expects it is the only one setting accrue_type.
 			 * If we set it here, it will get confused.  There is no action function for accrue_type,
@@ -606,7 +604,7 @@ modify_job_attr(job *pjob, svrattrl *plist, int perm, int *bad)
 		 * the attribute already has the modify flag before we added the new attributes to it.
 		 * We only want to call the action functions for attributes which are being modified by this function.
 		 */
-		if (newattr.arr[i]->at_flags & ATR_VFLAG_MODIFY) {
+		if (is_attr_dirty(newattr.arr[i])) {
 			if ((job_attr_def[i].at_flags & ATR_DFLAG_NOSAVM))
 				continue;
 
@@ -628,7 +626,7 @@ modify_job_attr(job *pjob, svrattrl *plist, int perm, int *bad)
 
 	/* The action functions may have modified the attributes, need to set them to newattr2 */
 	for (i = 0; i < JOB_ATR_LAST; i++) {
-		if (newattr.arr[i]->at_flags & ATR_VFLAG_MODIFY) {
+		if (is_attr_dirty(newattr.arr[i])) {
 			free_attr(job_attr_def, pjob->ji_wattr.arr[i], i);
 			switch (i) {
 				case JOB_ATR_state:
@@ -862,7 +860,7 @@ void revert_alter_reservation(resc_resv *presv) {
 	presdef->rs_set(&resc2->rs_value, &atemp, SET);
 	presdef->rs_free(&resc->rs_value);
 	set_chunk_sum(&resc2->rs_value, resc_attr);
-	post_attr_set(resc_attr);
+	mark_attr_set(resc_attr);
 	set_rattr_str_slim(presv, RESV_ATR_SchedSelect, get_rattr_str(presv, RESV_ATR_SchedSelect_orig), NULL);
 	free_rattr(presv, RESV_ATR_SchedSelect_orig);
 
@@ -889,7 +887,7 @@ void save_standing_reservation(resc_resv *presv) {
 	if (is_attr_set(standing))
 		return;
 
-	post_attr_set(standing);
+	mark_attr_set(standing);
 
 	presdef = &svr_resc_def[RESC_START_TIME];
 	resc = add_resource_entry(standing, presdef);
@@ -1174,7 +1172,7 @@ req_modifyReservation(struct batch_request *preq)
 				return;
 			}
 			/* walltime can change */
-			post_attr_set(get_rattr(presv, RESV_ATR_resource));
+			mark_attr_set(get_rattr(presv, RESV_ATR_resource));
 		}
 	}
 
@@ -1184,13 +1182,13 @@ req_modifyReservation(struct batch_request *preq)
 	 * If Authorized_Groups is modified, we need to update the queue's acl_groups and acl_group_enable
 	 * Authorized_Groups could be unset, so we need to update the queue accordingly, unsetting both acl_groups and acl_group_enable
 	 */
-	if ((get_rattr(presv, RESV_ATR_auth_u))->at_flags & ATR_VFLAG_MODIFY) {
+	if (is_attr_dirty(get_rattr(presv, RESV_ATR_auth_u))) {
 		svrattrl *pattrl;
 		resv_attr_def[(int)RESV_ATR_auth_u].at_encode(get_rattr(presv, RESV_ATR_auth_u), NULL, resv_attr_def[RESV_ATR_auth_u].at_name, NULL, ATR_ENCODE_CLIENT, &pattrl);
 		set_qattr_str_slim(presv->ri_qp, QA_ATR_AclUsers, pattrl->al_atopl.value, NULL);
 		free(pattrl);
 	}
-	if ((get_rattr(presv, RESV_ATR_auth_g))->at_flags & ATR_VFLAG_MODIFY) {
+	if (is_attr_dirty(get_rattr(presv, RESV_ATR_auth_g))) {
 		if (is_rattr_set(presv, RESV_ATR_auth_g)) {
 			svrattrl *pattrl = NULL;
 			resv_attr_def[(int)RESV_ATR_auth_g].at_encode(get_rattr(presv, RESV_ATR_auth_g), NULL, resv_attr_def[RESV_ATR_auth_g].at_name, NULL, ATR_ENCODE_CLIENT, &pattrl);
@@ -1316,7 +1314,7 @@ modify_resv_attr(resc_resv *presv, svrattrl *plist, int perm, int *bad)
 	rc = attr_atomic_set(plist, &presv->ri_wattr, &newattr, allow_unkn, perm, bad);
 	if (rc == 0) {
 		for (i = 0; i < resv_attr_defn->count; i++) {
-			if (newattr.arr[i]->at_flags & ATR_VFLAG_MODIFY) {
+			if (is_attr_dirty(newattr.arr[i])) {
 				if (resv_attr_def[i].at_action) {
 					rc = resv_attr_def[i].at_action(newattr.arr[i], presv, ATR_ACTION_ALTER);
 					if (rc)
@@ -1325,8 +1323,8 @@ modify_resv_attr(resc_resv *presv, svrattrl *plist, int perm, int *bad)
 			}
 		}
 		if ((rc == 0) &&
-			((newattr.arr[(int)RESV_ATR_userlst]->at_flags & ATR_VFLAG_MODIFY) ||
-			(newattr.arr[(int)RESV_ATR_grouplst]->at_flags & ATR_VFLAG_MODIFY))) {
+			((is_attr_dirty(newattr.arr[(int)RESV_ATR_userlst])) ||
+			(is_attr_dirty(newattr.arr[(int)RESV_ATR_grouplst])))) {
 			/* Need to reset execution uid and gid */
 			rc = set_objexid((void *)presv, JOB_OBJECT, &newattr);
 		}
@@ -1341,7 +1339,7 @@ modify_resv_attr(resc_resv *presv, svrattrl *plist, int perm, int *bad)
 	/* Now copy the new values into the reservation attribute array */
 
 	for (i = 0; i < resv_attr_defn->count; i++) {
-		if (newattr.arr[i]->at_flags & ATR_VFLAG_MODIFY) {
+		if (is_attr_dirty(newattr.arr[i])) {
 			resv_attr_def[i].at_free(presv->ri_wattr.arr[i]);
 			if ((newattr.arr[i]->at_type == ATR_TYPE_LIST) || (newattr.arr[i]->at_type == ATR_TYPE_RESC)) {
 				list_move(&newattr.arr[i]->at_val.at_list, &presv->ri_wattr.arr[i]->at_val.at_list);

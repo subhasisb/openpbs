@@ -558,7 +558,7 @@ set_all_state(mominfo_t *pmom, int do_set, unsigned long bits, char *txt,
 			}
 		}
 
-		post_attr_set(get_nattr(pvnd, ND_ATR_state));
+		mark_attr_set(get_nattr(pvnd, ND_ATR_state));
 		pat = get_attr_ptr(&pvnd->nd_attr, ND_ATR_Comment);
 
 		/*
@@ -3644,9 +3644,9 @@ update2_to_vnode(vnal_t *pvnal, int new, mominfo_t *pmom, int *madenew, int from
 							/* changes survive */
 							/* server restart */
 							prs->rs_value.at_flags &= ~ATR_VFLAG_DEFLT;
-							post_attr_set(&prs->rs_value);
+							mark_attr_set(&prs->rs_value);
 							if (psrp->vna_val[0] != '\0')
-								prs->rs_value.at_flags |= (ATR_VFLAG_SET|ATR_VFLAG_MODIFY);
+								mark_attr_set(&prs->rs_value);
 						} else
 							prs->rs_value.at_flags |= ATR_VFLAG_DEFLT;
 						if (strcasecmp("ncpus", resc) == 0) {
@@ -3798,9 +3798,9 @@ update2_to_vnode(vnal_t *pvnal, int new, mominfo_t *pmom, int *madenew, int from
 					/* restart */
 
 					pattr->at_flags &= ~ATR_VFLAG_DEFLT;
-					post_attr_set(pattr);
+					mark_attr_set(pattr);
 					if (psrp->vna_val[0] != '\0')
-						pattr->at_flags |= (ATR_VFLAG_SET|ATR_VFLAG_MODIFY);
+						mark_attr_set(pattr);
 					snprintf(log_buffer,
 						sizeof(log_buffer),
 						"Updated vnode %s's "
@@ -4465,7 +4465,8 @@ found:
 						((prc->rs_value.at_flags & ATR_VFLAG_DEFLT) != 0)) {
 						mod_node_ncpus(np, i, ATR_ACTION_ALTER);
 						prc->rs_value.at_val.at_long = i;
-						prc->rs_value.at_flags |= (ATR_SET_MOD_MCACHE | ATR_VFLAG_DEFLT);
+						mark_attr_set(&prc->rs_value);
+						prc->rs_value.at_flags |= ATR_VFLAG_DEFLT;
 					}
 
 					/* available memory */
@@ -4479,7 +4480,8 @@ found:
 						prc->rs_value.at_val.at_size.atsv_num  =
 							psvrmom->msr_pmem;
 						prc->rs_value.at_val.at_size.atsv_shift = 10;
-						prc->rs_value.at_flags |= (ATR_SET_MOD_MCACHE | ATR_VFLAG_DEFLT);
+						mark_attr_set(&prc->rs_value);
+						prc->rs_value.at_flags |= ATR_VFLAG_DEFLT;
 					}
 				}
 			}
@@ -4607,7 +4609,8 @@ found:
 					if (is_attr_set(&prc->rs_value))
 						free(prc->rs_value.at_val.at_str);
 					prc->rs_value.at_val.at_str = strdup(psvrmom->msr_arch);
-					prc->rs_value.at_flags |= (ATR_SET_MOD_MCACHE | ATR_VFLAG_DEFLT);
+					mark_attr_set(&prc->rs_value);
+					prc->rs_value.at_flags |=  ATR_VFLAG_DEFLT;
 				}
 
 				/*
@@ -4624,7 +4627,8 @@ found:
 					if (prc &&
 						((is_attr_set(&prc->rs_value))==0)) {
 						prc->rs_value.at_val.at_long = psvrmom->msr_acpus;
-						prc->rs_value.at_flags |= (ATR_SET_MOD_MCACHE | ATR_VFLAG_DEFLT);
+						mark_attr_set(&prc->rs_value);
+						prc->rs_value.at_flags |= ATR_VFLAG_DEFLT;
 					}
 					prd = &svr_resc_def[RESC_MEM];
 					prc = find_resc_entry(pala, prd);
@@ -4635,7 +4639,8 @@ found:
 						prc->rs_value.at_val.at_size.atsv_num  =
 							psvrmom->msr_pmem;
 						prc->rs_value.at_val.at_size.atsv_shift = 10;
-						prc->rs_value.at_flags |= (ATR_SET_MOD_MCACHE | ATR_VFLAG_DEFLT);
+						mark_attr_set(&prc->rs_value);
+						prc->rs_value.at_flags |= ATR_VFLAG_DEFLT;
 					}
 				}
 
@@ -7366,7 +7371,7 @@ update_job_node_rassn(job *pjob, attribute *pexech, enum batch_op op)
 					if (op == DECR) {
 						check_for_negative_resource(prdef, pr, NULL);
 					}
-					post_attr_set(sysru);
+					mark_attr_set(sysru);
 				}
 
 				/* update queue attribute of resources assigned */
@@ -7382,7 +7387,7 @@ update_job_node_rassn(job *pjob, attribute *pexech, enum batch_op op)
 					if (op == DECR) {
 						check_for_negative_resource(prdef, pr, NULL);
 					}
-					post_attr_set(queru);
+					mark_attr_set(queru);
 				}
 
 			}
@@ -7420,7 +7425,8 @@ update_job_node_rassn(job *pjob, attribute *pexech, enum batch_op op)
 			} else {
 				pr->rs_value.at_val.at_long += nchunk;
 			}
-			pr->rs_value.at_flags |= ATR_SET_MOD_MCACHE | ATR_VFLAG_DEFLT;
+			mark_attr_set(&pr->rs_value);
+			pr->rs_value.at_flags |= ATR_VFLAG_DEFLT;
 		}
 	}
 	if (queru) {
@@ -7434,7 +7440,8 @@ update_job_node_rassn(job *pjob, attribute *pexech, enum batch_op op)
 			} else {
 				pr->rs_value.at_val.at_long += nchunk;
 			}
-			pr->rs_value.at_flags |= ATR_VFLAG_DEFLT | ATR_SET_MOD_MCACHE;
+			mark_attr_set(&pr->rs_value);
+			pr->rs_value.at_flags |= ATR_VFLAG_DEFLT;
 		}
 	}
 	return;

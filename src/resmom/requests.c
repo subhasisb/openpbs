@@ -1032,7 +1032,7 @@ req_modifyjob(struct batch_request *preq)
 	/* OK, now copy the new values into the job attribute array */
 
 	for (i = 0; i < newattr.defn->count; i++) {
-		if (newattr.arr[i]->at_flags & ATR_VFLAG_MODIFY) {
+		if (is_attr_dirty(newattr.arr[i])) {
 
 			if (job_attr_def[i].at_action)
 				(void)job_attr_def[i].at_action(newattr.arr[i], pjob, ATR_ACTION_ALTER);

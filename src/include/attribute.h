@@ -259,10 +259,6 @@ typedef struct ecl_attribute_def ecl_attribute_def;
 #define ATR_VFLAG_HOOK		0x40	/* value set by a hook script   */
 #define ATR_VFLAG_IN_EXECVNODE_FLAG	0x80	/* resource key value pair was found in execvnode */
 
-#define ATR_MOD_MCACHE (ATR_VFLAG_MODIFY)
-#define ATR_SET_MOD_MCACHE (ATR_VFLAG_SET | ATR_MOD_MCACHE)
-#define ATR_UNSET(X) if ((X)) (X)->at_flags = (((X)->at_flags & ~ATR_VFLAG_SET) | ATR_MOD_MCACHE)
-
 /* Defines for Parent Object type field in the attribute definition	*/
 /* really only used for telling queue types apart			*/
 
@@ -628,7 +624,9 @@ void set_attr_b(attribute *pattr, long val, enum batch_op op);
 void set_attr_short(attribute *pattr, short value, enum batch_op op);
 void mark_attr_not_set(attribute *attr);
 void mark_attr_set(attribute *attr);
-void post_attr_set(attribute *attr);
+void post_attr_set_unset(attribute *attr);
+void mark_attr_dirty(attribute *attr);
+void mark_attr_clean(attribute *attr);
 
 /* Attr getters */
 char get_attr_c(const attribute *pattr);
@@ -637,6 +635,7 @@ long long get_attr_ll(const attribute *pattr);
 char *get_attr_str(const attribute *pattr);
 struct array_strings *get_attr_arst(const attribute *pattr);
 int is_attr_set(const attribute *pattr);
+int is_attr_dirty(const attribute *pattr);
 attribute *_get_attr_by_idx(const attribute_arr *list, int attr_idx);
 pbs_list_head get_attr_list(const attribute *pattr);
 void free_attr(attribute_def *attr_def, attribute *pattr, int attr_idx);

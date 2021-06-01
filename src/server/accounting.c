@@ -2117,7 +2117,7 @@ void log_alter_records_for_attrs(job *pjob, svrattrl *plist) {
 	CLEAR_HEAD(phead);
 	for (i = 0; i < JOB_ATR_LAST; i++) {
 		attribute *pattr = get_jattr(pjob, i);
-		if (pattr->at_flags & ATR_VFLAG_MODIFY) {
+		if (is_attr_dirty(pattr)) {
 			svrattrl *svrattrl_list = NULL;
 			job_attr_def[i].at_encode(pattr, &phead, job_attr_def[i].at_name, NULL, ATR_ENCODE_CLIENT, &svrattrl_list);
 			for (cur_plist = plist; cur_plist != NULL; cur_plist = (svrattrl *)GET_NEXT(cur_plist->al_link)) {

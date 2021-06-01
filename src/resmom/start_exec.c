@@ -1805,19 +1805,6 @@ record_finish_exec(int sd)
 		time_resc_updated = time_now;
 		(void)mom_set_use(pjob);
 	}
-	/*
-	 * these are set so that it will
-	 * return them to the Server on the first update below
-	 */
-	(get_jattr(pjob, JOB_ATR_errpath))->at_flags |= ATR_VFLAG_MODIFY;
-	(get_jattr(pjob, JOB_ATR_outpath))->at_flags |= ATR_VFLAG_MODIFY;
-	(get_jattr(pjob, JOB_ATR_session_id))->at_flags |= ATR_VFLAG_MODIFY;
-	(get_jattr(pjob, JOB_ATR_altid))->at_flags |= ATR_VFLAG_MODIFY;
-	(get_jattr(pjob, JOB_ATR_state))->at_flags |= ATR_VFLAG_MODIFY;
-	(get_jattr(pjob, JOB_ATR_substate))->at_flags |= ATR_VFLAG_MODIFY;
-	(get_jattr(pjob, JOB_ATR_jobdir))->at_flags |= ATR_VFLAG_MODIFY;
-	(get_jattr(pjob, JOB_ATR_altid2))->at_flags |= ATR_VFLAG_MODIFY;
-	(get_jattr(pjob, JOB_ATR_acct_id))->at_flags |= ATR_VFLAG_MODIFY;
 
 	enqueue_update_for_send(pjob, IS_RESCUSED);
 	next_sample_time = min_check_poll;
@@ -2506,8 +2493,8 @@ get_new_exec_vnode_host_schedselect(job *pjob, char *msg, size_t msg_size)
 
 	job_save(pjob);
 	/* set modify flag on the job attributes that will be sent to the server */
-	(get_jattr(pjob, JOB_ATR_exec_vnode))->at_flags |= ATR_VFLAG_MODIFY;
-	(get_jattr(pjob, JOB_ATR_SchedSelect))->at_flags |= ATR_VFLAG_MODIFY;
+	mark_attr_dirty(get_jattr(pjob, JOB_ATR_exec_vnode));
+	mark_attr_dirty(get_jattr(pjob, JOB_ATR_SchedSelect));
 	enqueue_update_for_send(pjob, IS_RESCUSED);
 
 	return (0);

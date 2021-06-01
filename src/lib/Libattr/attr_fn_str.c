@@ -107,9 +107,9 @@ decode_str(attribute *patr, char *name, char *rescn, char *val)
 		if (patr->at_val.at_str == NULL)
 			return (PBSE_SYSTEM);
 		(void)strcpy(patr->at_val.at_str, val);
-		post_attr_set(patr);
+		mark_attr_set(patr);
 	} else {
-		ATR_UNSET(patr);
+		mark_attr_not_set(patr);
 		patr->at_val.at_str = NULL;
 	}
 	return (0);
@@ -239,7 +239,7 @@ set_str(attribute *attr, attribute *new, enum batch_op op)
 		default:	return (PBSE_INTERNAL);
 	}
 	if ((attr->at_val.at_str != NULL) && (*attr->at_val.at_str !='\0'))
-		post_attr_set(attr);
+		mark_attr_set(attr);
 	else
 		attr->at_flags &= ~ATR_VFLAG_SET;
 

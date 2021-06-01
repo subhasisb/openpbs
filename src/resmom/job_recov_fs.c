@@ -159,7 +159,7 @@ job_save_fs(job *pjob)
 	}
 
 	for (i = 0; i < JOB_ATR_LAST; i++) {
-		if ((get_jattr(pjob, i))->at_flags & ATR_VFLAG_MODIFY) {
+		if (is_attr_dirty(get_jattr(pjob, i))) {
 			quick = 0;
 			break;
 		}

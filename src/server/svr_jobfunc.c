@@ -1979,7 +1979,8 @@ set_chunk_sum(attribute  *pselectattr, attribute *pattr)
 			presc = add_resource_entry(pattr, pdef);
 		if (presc) {
 			presc->rs_value.at_val.at_long = total_chunks;
-			presc->rs_value.at_flags |= ATR_VFLAG_DEFLT | ATR_SET_MOD_MCACHE;
+			mark_attr_set(&presc->rs_value);
+			presc->rs_value.at_flags |= ATR_VFLAG_DEFLT;
 		}
 	}
 	return 0;
@@ -2075,7 +2076,7 @@ set_deflt_resc(attribute *jb, attribute *dflt, int selflg)
 					if (prescjb) {
 						if (prescdt->rs_defin->rs_set(&prescjb->rs_value, &prescdt->rs_value, SET) == 0)
 							prescjb->rs_value.at_flags |= (ATR_VFLAG_SET|ATR_VFLAG_DEFLT);
-						jb->at_flags |= ATR_MOD_MCACHE;
+						mark_attr_dirty(jb);
 					}
 
 				}
@@ -2789,7 +2790,7 @@ Time4occurrenceFinish(resc_resv *presv)
 		resc2 = find_resc_entry(stnd_revert, &svr_resc_def[RESC_SELECT]);
 		free(resc->rs_value.at_val.at_str);
 		resc->rs_value.at_val.at_str = strdup(resc2->rs_value.at_val.at_str);
-		post_attr_set(resc_attr);
+		mark_attr_set(resc_attr);
 		make_schedselect(resc_attr, resc, NULL, get_rattr(presv, RESV_ATR_SchedSelect));
 		set_chunk_sum(&resc->rs_value, resc_attr);
 	} else
@@ -2924,7 +2925,7 @@ Time4occurrenceFinish(resc_resv *presv)
 	atemp.at_type = ATR_TYPE_LONG;
 	atemp.at_val.at_long = presv->ri_qs.ri_duration;
 	rscdef->rs_set(&prsc->rs_value, &atemp, SET);
-	post_attr_set(get_rattr(presv, RESV_ATR_resource));
+	mark_attr_set(get_rattr(presv, RESV_ATR_resource));
 
 	/* Assign the allocated resources to the reservation
 	 * and the reservation to the associated vnodes

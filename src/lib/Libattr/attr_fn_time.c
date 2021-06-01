@@ -108,7 +108,7 @@ decode_time(attribute *patr, char *name, char *rescn, char *val)
 	int index = -1;
 
 	if ((val == NULL) || (strlen(val) == 0)) {
-		ATR_UNSET(patr);
+		mark_attr_not_set(patr);
 		patr->at_val.at_long = 0;
 		return (0);
 	}
@@ -161,7 +161,7 @@ decode_time(attribute *patr, char *name, char *rescn, char *val)
 	if (atoi(msec) >= 500)
 		rv++;
 	patr->at_val.at_long = rv;
-	post_attr_set(patr);
+	mark_attr_set(patr);
 	(void)free(workvalsv);
 	return (0);
 

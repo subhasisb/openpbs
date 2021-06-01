@@ -157,14 +157,14 @@ attr_atomic_set(struct svrattrl *plist, attribute_arr *old, attribute_arr *new, 
 				break;
 			/*
 			 * we need to know if the value is changed during
-			 * the next step, so clear MODIFY here; including
+			 * the next step, so clear dirty flag here; including
 			 * within resources.
 			 */
-			new->arr[index]->at_flags &= ~ATR_MOD_MCACHE;
+			mark_attr_clean(new->arr[index]);
 			if (new->arr[index]->at_type == ATR_TYPE_RESC) {
 				prc = (resource *)GET_NEXT(new->arr[index]->at_val.at_list);
 				while (prc) {
-					prc->rs_value.at_flags &= ~ATR_MOD_MCACHE;
+					mark_attr_clean(&prc->rs_value);
 					prc = (resource *)GET_NEXT(prc->rs_link);
 				}
 			}
@@ -176,16 +176,16 @@ attr_atomic_set(struct svrattrl *plist, attribute_arr *old, attribute_arr *new, 
 			(plist->al_op != SET))
 			plist->al_op = SET;
 
-		if (temp.at_flags & ATR_VFLAG_SET) {
+		if (is_attr_set(&temp)) {
 			nattr = get_attr_ptr(new, index);
 			rc=(pdef + index)->at_set(nattr, &temp, plist->al_op);
 			if (rc) {
 				(pdef + index)->at_free(&temp);
 				break;
 			}
-		} else if (temp.at_flags & ATR_VFLAG_MODIFY) {
+		} else if (is_attr_dirty(&temp)) {
 			(pdef + index)->at_free(new->arr[index]);
-			new->arr[index]->at_flags |= ATR_MOD_MCACHE; /* SET was removed by at_free */
+			mark_attr_set(new->arr[index]); /* SET was removed by at_free */
 		}
 
 		(pdef+index)->at_free(&temp);

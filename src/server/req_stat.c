@@ -725,7 +725,7 @@ update_isrunhook(attribute *pattr)
 
 	if (new_val != old_val) {
 		pattr->at_val.at_long = new_val;
-		post_attr_set(pattr);
+		mark_attr_set(pattr);
 	}
 }
 

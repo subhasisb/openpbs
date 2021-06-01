@@ -392,7 +392,7 @@ set_resc_assigned(void *pobj, int objtype, enum batch_op op)
 						return;
 				}
 				rscdef->rs_set(&pr->rs_value, &rescp->rs_value, op);
-				sysru->at_flags |= ATR_MOD_MCACHE;
+				mark_attr_dirty(sysru);
 			}
 
 			/* update queue attribute of resources assigned */
@@ -405,7 +405,7 @@ set_resc_assigned(void *pobj, int objtype, enum batch_op op)
 						return;
 				}
 				rscdef->rs_set(&pr->rs_value, &rescp->rs_value, op);
-				queru->at_flags |= ATR_MOD_MCACHE;
+				mark_attr_dirty(queru);
 			}
 		}
 		rescp = (resource *)GET_NEXT(rescp->rs_link);
@@ -578,7 +578,7 @@ action_reserve_retry_time(attribute *pattr, void *pobj, int actmode)
 
 		if (pattr->at_val.at_long <= 0)
 			return PBSE_BADATVAL;
-		ATR_UNSET(get_sattr(SVR_ATR_resv_retry_init));
+		mark_attr_not_set(get_sattr(SVR_ATR_resv_retry_init));
 		resv_retry_time = pattr->at_val.at_long;
 	}
 	return PBSE_NONE;
@@ -4467,7 +4467,7 @@ node_need_prov(struct pbsnode *pnode, char *aoe_name)
 	if (presc == NULL)
 		return -1;
 
-	if (presc->rs_value.at_flags & ATR_VFLAG_MODIFY) {
+	if (is_attr_dirty(&presc->rs_value)) {
 		/* if aoe is not in resources_available.aoe */
 
 		pas = presc->rs_value.at_val.at_arst;

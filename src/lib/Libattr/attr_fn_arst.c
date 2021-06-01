@@ -185,7 +185,7 @@ decode_arst_direct(attribute *patr, char *val)
 
 	stp->as_usedptr = j;
 	stp->as_next = pc;
-	post_attr_set(patr);
+	mark_attr_set(patr);
 	patr->at_val.at_arst = stp;
 
 	if (sbufp != strbuf)	/* buffer on heap, not stack */
@@ -217,9 +217,6 @@ decode_arst(attribute *patr, char *name, char *rescn, char *val)
 
 	if ((val == NULL) || (strlen(val) == 0)) {
 		free_arst(patr);
-		/* _SET cleared in free_arst */
-		patr->at_flags |= ATR_MOD_MCACHE;
-
 		return (0);
 	}
 
@@ -510,7 +507,7 @@ set_arst(attribute *attr, attribute *new, enum batch_op op)
 
 		default:	return (PBSE_INTERNAL);
 	}
-	post_attr_set(attr);
+	mark_attr_set(attr);
 	return (0);
 }
 
@@ -578,7 +575,7 @@ free_arst(attribute *attr)
 	if ((attr->at_flags & ATR_VFLAG_SET) && (attr->at_val.at_arst)) {
 		(void)free(attr->at_val.at_arst->as_buf);
 		(void)free((char *)attr->at_val.at_arst);
-	}
+	};
 	free_null(attr);
 }
 
@@ -850,7 +847,7 @@ decode_arst_direct_bs(attribute *patr, char *val)
 
 	stp->as_usedptr = j;
 	stp->as_next = pc;
-	post_attr_set(patr);
+	mark_attr_set(patr);
 	patr->at_val.at_arst = stp;
 
 	if (sbufp != strbuf)	/* buffer on heap, not stack */
@@ -885,9 +882,6 @@ decode_arst_bs(attribute *patr, char *name, char *rescn, char *val)
 
 	if ((val == NULL) || (strlen(val) == 0)) {
 		free_arst(patr);
-		/* _SET cleared in free_arst */
-		patr->at_flags |= ATR_MOD_MCACHE;
-
 		return (0);
 	}
 
@@ -1152,7 +1146,7 @@ set_arst_uniq(attribute *attr, attribute *new, enum batch_op op)
 		}
 	}
 
-	post_attr_set(attr);
+	mark_attr_set(attr);
 	return (0);
 }
 

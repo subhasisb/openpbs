@@ -265,7 +265,7 @@ warnings_update(int wcode, pbsnode **wnodes, int *widx, pbsnode *np)
 		if (rscdef != NULL) {
 			resc = find_resc_entry(get_nattr(np, ND_ATR_ResourceAvail), rscdef);
 			if (resc != NULL) {
-				if (resc->rs_value.at_flags & ATR_VFLAG_MODIFY) {
+				if (is_attr_set(&resc->rs_value)) {
 					if (np->nd_resvp) {
 						wnodes[*widx] = np;
 						*widx += 1;
@@ -528,7 +528,7 @@ set_queue_type(attribute *pattr, void *pque, int mode)
 			if (pattr->at_val.at_str == NULL)
 				return (PBSE_SYSTEM);
 			(void)strcpy(pattr->at_val.at_str, qt[i].name);
-			pattr->at_flags |= ATR_MOD_MCACHE;
+			mark_attr_set(pattr);
 			return (0);
 		}
 	}
@@ -720,7 +720,7 @@ mgr_set_attr2(attribute_arr *parr, svrattrl *plist, int privil, int *bad, void *
 
 	for (index = 0; index < limit; index++) {
 		pnew = pre_copy.arr[index];
-		if (pnew && pnew->at_flags & ATR_VFLAG_MODIFY) {
+		if (is_attr_set(pnew)) {
 			/* Special test, aka kludge, for entity-limits, make sure
 			 * not accepting an entity without an actual limit; i.e.
 			 * [u:user] instead of [u:user=limit].  The [u:user] form
@@ -761,14 +761,14 @@ mgr_set_attr2(attribute_arr *parr, svrattrl *plist, int privil, int *bad, void *
 				for (presc = GET_NEXT(pold->at_val.at_list);
 					presc;
 					presc = GET_NEXT(presc->rs_link)) {
-					if (presc->rs_value.at_flags & ATR_VFLAG_MODIFY) {
+					if (is_attr_dirty(&presc->rs_value)) {
 						presc->rs_value.at_flags &= ~ATR_VFLAG_DEFLT;
 					}
 				}
 				for (presc = GET_NEXT(pnew->at_val.at_list);
 					presc;
 					presc = GET_NEXT(presc->rs_link)) {
-					if ((presc->rs_value.at_flags & ATR_VFLAG_MODIFY) == 0) {
+					if (is_attr_dirty(&presc->rs_value)) {
 						if (presc->rs_value.at_flags & ATR_VFLAG_DEFLT) {
 							oldpresc = find_resc_entry(pold,
 								presc->rs_defin);
@@ -798,7 +798,7 @@ mgr_set_attr2(attribute_arr *parr, svrattrl *plist, int privil, int *bad, void *
 		 * at_action routine for the attribute, if one exists, with the
 		 * new value.  If the action fails, undo everything.
 		 */
-		if (new.arr[index] && new.arr[index]->at_flags & ATR_VFLAG_MODIFY) {
+		if (is_attr_dirty(new.arr[index])) {
 			if ((parr->defn->def + index)->at_action) {
 				rc = (parr->defn->def + index)->at_action(new.arr[index], parent, mode);
 				if (rc) {
@@ -820,7 +820,7 @@ mgr_set_attr2(attribute_arr *parr, svrattrl *plist, int privil, int *bad, void *
 	for (index = 0; index < limit; index++) {
 		pnew = new.arr[index];
 		
-		if (pnew && pnew->at_flags & ATR_VFLAG_MODIFY) {
+		if (is_attr_dirty(pnew)) {
 			pold = get_attr_ptr(parr, index); /* allocate memory if necessary */
 
 			(parr->defn->def + index)->at_free(pold);
@@ -834,14 +834,14 @@ mgr_set_attr2(attribute_arr *parr, svrattrl *plist, int privil, int *bad, void *
 				for (presc = GET_NEXT(pold->at_val.at_list);
 					presc;
 					presc = GET_NEXT(presc->rs_link)) {
-					if (presc->rs_value.at_flags & ATR_VFLAG_MODIFY) {
+					if (is_attr_dirty(&presc->rs_value)) {
 						presc->rs_value.at_flags &= ~ATR_VFLAG_DEFLT;
 					}
 				}
 				for (presc = GET_NEXT(pnew->at_val.at_list);
 					presc;
 					presc = GET_NEXT(presc->rs_link)) {
-					if ((presc->rs_value.at_flags & ATR_VFLAG_MODIFY) == 0) {
+					if (is_attr_dirty(&presc->rs_value)) {
 						if (presc->rs_value.at_flags & ATR_VFLAG_DEFLT) {
 							oldpresc = find_resc_entry(pold, presc->rs_defin);
 							if (oldpresc) {
@@ -1039,7 +1039,6 @@ mgr_unset_attr(attribute_arr *parr, svrattrl *plist, int privil, int *bad, void 
 			presc = (resource *)GET_NEXT(parr->arr[index]->at_val.at_list);
 			if (presc == NULL)
 				mark_attr_not_set(parr->arr[index]);
-			parr->arr[index]->at_flags |= ATR_MOD_MCACHE;
 
 		} else if (((parr->defn->def + index)->at_type == ATR_TYPE_ENTITY) &&
 			(plist->al_resc != NULL)) {
@@ -1070,7 +1069,7 @@ mgr_unset_attr(attribute_arr *parr, svrattrl *plist, int privil, int *bad, void 
 			/* now free the whole attribute */
 
 			(parr->defn->def + index)->at_free(parr->arr[index]);
-			parr->arr[index]->at_flags |= ATR_VFLAG_MODIFY;
+			mark_attr_not_set(parr->arr[index]);
 		}
 		plist = (svrattrl *)GET_NEXT(plist->al_link);
 	}
@@ -1517,7 +1516,7 @@ mgr_server_unset(struct batch_request *preq, conn_t *conn)
 		reply_badattr(rc, bad_attr, plist, preq);
 	else {
 		attribute *pattr = get_sattr(SVR_ATR_DefaultChunk);
-		if (pattr->at_flags & ATR_VFLAG_MODIFY) {
+		if (is_attr_dirty(pattr)) {
 			(void)deflt_chunk_action(pattr, (void *)&server, ATR_ACTION_ALTER);
 		}
 		/* Now set the default values on some of the unset attributes */
@@ -1877,8 +1876,8 @@ mgr_queue_unset(struct batch_request *preq)
 			reply_badattr(rc, bad_attr, plist, preq);
 			return;
 		} else {
-			attribute *attr;
-			if ((attr = get_qattr(pque, QE_ATR_DefaultChunk))->at_flags & ATR_VFLAG_MODIFY)
+			attribute *attr = get_qattr(pque, QE_ATR_DefaultChunk);
+			if (is_attr_dirty(attr))
 				(void)deflt_chunk_action(attr, (void *)pque, ATR_ACTION_ALTER);
 			que_save_db(pque);
 			mgr_log_attr(msg_man_uns, plist, PBS_EVENTCLASS_QUEUE, pque->qu_qs.qu_name, NULL);
@@ -2406,7 +2405,8 @@ mgr_node_unset(struct batch_request *preq)
 				}
 				if (!is_attr_set(&prc->rs_value)) {
 					prc->rs_value.at_val.at_long = pnode->nd_ncpus;
-					prc->rs_value.at_flags |= ATR_VFLAG_DEFLT | ATR_SET_MOD_MCACHE;
+					mark_attr_set(&prc->rs_value);
+					prc->rs_value.at_flags |= ATR_VFLAG_DEFLT;
 				}
 
 				/* If the Mom attribute is unset, reset to default */
@@ -3128,7 +3128,7 @@ struct batch_request *preq;
 	/* If node being deleted is linked to any queue, clear "has node" flag for that queue */
 	if (pnode->nd_pque != NULL) {
 		set_qattr_l_slim(pnode->nd_pque, QE_ATR_HasNodes, 0, SET);
-		ATR_UNSET(get_qattr(pnode->nd_pque, QE_ATR_HasNodes));
+		mark_attr_not_set(get_qattr(pnode->nd_pque, QE_ATR_HasNodes));
 	}
 
 	log_eventf(PBSEVENT_ADMIN, PBS_EVENTCLASS_NODE, LOG_INFO,
@@ -3767,7 +3767,7 @@ mgr_resource_delete(struct batch_request *preq)
 					 * the server keeps track of defaults to add to
 					 * schedselect @see qu_seldft
 					 */
-					if (i == QE_ATR_DefaultChunk && (get_qattr(pq, QE_ATR_DefaultChunk))->at_flags & ATR_VFLAG_MODIFY)
+					if (i == QE_ATR_DefaultChunk && (is_attr_dirty(get_qattr(pq, QE_ATR_DefaultChunk))))
 						(void)deflt_chunk_action(get_qattr(pq, QE_ATR_DefaultChunk), (void *)pq, ATR_ACTION_ALTER);
 				}
 				updatedb = 1;
@@ -3800,7 +3800,7 @@ mgr_resource_delete(struct batch_request *preq)
 				 * schedselect @see sv_seldft
 				 */
 				attribute *dfltchk_attr;
-				if ((i == SVR_ATR_DefaultChunk) && ((dfltchk_attr = get_sattr(SVR_ATR_DefaultChunk))->at_flags & ATR_VFLAG_MODIFY)) {
+				if ((i == SVR_ATR_DefaultChunk) && (is_attr_dirty(dfltchk_attr = get_sattr(SVR_ATR_DefaultChunk)))) {
 					(void)deflt_chunk_action(dfltchk_attr, (void *)&server, ATR_ACTION_ALTER);
 				}
 			}
@@ -4265,8 +4265,8 @@ mgr_resource_unset(struct batch_request *preq)
 						free(presc);
 						presc = (resource *)GET_NEXT(get_attr_list(pattr));
 						if (presc == NULL)
-							pattr->at_flags &= ~ATR_VFLAG_SET;
-						pattr->at_flags |= ATR_MOD_MCACHE;
+							mark_attr_not_set(pattr);
+						mark_attr_dirty(pattr);
 					}
 				}
 				else
@@ -4295,7 +4295,7 @@ mgr_resource_unset(struct batch_request *preq)
 			presc = (resource *)GET_NEXT(q_attr->at_val.at_list);
 			if (presc == NULL)
 				mark_attr_not_set(q_attr);
-			q_attr->at_flags |= ATR_MOD_MCACHE;
+			mark_attr_dirty(q_attr);
 		}
 		free(pq_list);
 		pq_list = NULL;

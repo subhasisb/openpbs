@@ -231,7 +231,7 @@ set_sched_state(pbs_sched *psched, char *state)
 
 	set_sched_attr_str_slim(psched, SCHED_ATR_sched_state, state, NULL);
 	if (psched == dflt_scheduler)
-		(get_sattr(SVR_ATR_State))->at_flags |= ATR_MOD_MCACHE;
+		mark_attr_dirty(get_sattr(SVR_ATR_State));
 }
 
 /**

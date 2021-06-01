@@ -284,7 +284,7 @@ internal_decode_entlim(attribute *patr,  char *name, char *rn,
 		return (PBSE_BADATVAL);
 	}
 	patr->at_val.at_enty.ae_tree = petree;
-	post_attr_set(patr);
+	mark_attr_set(patr);
 
 	return (0);
 }
@@ -879,7 +879,7 @@ set_entlim(attribute *old, attribute *new, enum batch_op op)
 				free_entlim(old);
 				/* set _MODIFY flag so up level functions */
 				/* know the attribute has been changed    */
-				old->at_flags |= ATR_VFLAG_MODIFY;
+				mark_attr_set(old);
 				return (0);
 			}
 			break;
@@ -888,7 +888,7 @@ set_entlim(attribute *old, attribute *new, enum batch_op op)
 			return (PBSE_INTERNAL);
 	}
 
-	post_attr_set(old);
+	mark_attr_set(old);
 	return (0);
 }
 
@@ -1062,7 +1062,7 @@ unset_entlim_resc(attribute *pattr, char *rescname)
 		}
 	}
 	if (modified)
-		pattr->at_flags |= ATR_MOD_MCACHE;
+		mark_attr_dirty(pattr);
 	if (hasentries == 0)
 		free_entlim(pattr);	/* no entries left, clear attribute */
 	return;

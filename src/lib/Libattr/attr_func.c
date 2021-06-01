@@ -88,6 +88,8 @@ clear_attr(attribute *pattr, attribute_def *pdef)
 	if ((pattr->at_type == ATR_TYPE_RESC) ||
 		(pattr->at_type == ATR_TYPE_LIST))
 		CLEAR_HEAD(pattr->at_val.at_list);
+
+	mark_attr_not_set(pattr);
 }
 
 /**
@@ -196,6 +198,7 @@ free_null(attribute *attr)
 	if (attr->at_type == ATR_TYPE_SIZE)
 		attr->at_val.at_size.atsv_shift = 10;
 	attr->at_flags &= ~(ATR_VFLAG_SET|ATR_VFLAG_INDIRECT|ATR_VFLAG_TARGET);
+	mark_attr_not_set(attr);
 }
 
 /**
@@ -1709,8 +1712,10 @@ set_attr_with_attr(attribute_def *pdef, attribute *oattr, attribute *nattr, enum
 void
 mark_attr_not_set(attribute *attr)
 {
-	if (attr != NULL)
-		attr->at_flags &= ~ATR_VFLAG_SET;
+	if (attr != NULL) {
+		attr->at_flags = (attr->at_flags & ~ATR_VFLAG_SET) | ATR_VFLAG_MODIFY;
+		post_attr_set_unset(attr);
+	}
 }
 
 /**
@@ -1727,8 +1732,30 @@ mark_attr_not_set(attribute *attr)
 void
 mark_attr_set(attribute *attr)
 {
-	if (attr != NULL)
-		attr->at_flags |= ATR_VFLAG_SET;
+	if (attr != NULL) {
+		attr->at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODIFY;
+		post_attr_set_unset(attr);
+	}
+}
+
+/**
+ * @brief	Mark an attribute as "set"
+ *
+ * @param[in]	attr	-	pointer to attribute being modified
+ *
+ * @return	void
+ *
+ * @par MT-Safe: No
+ * @par Side Effects: None
+ *
+ */
+void
+mark_attr_dirty(attribute *attr)
+{
+	if (attr != NULL) {
+		attr->at_flags |= ATR_VFLAG_SET | ATR_VFLAG_MODIFY;
+		post_attr_set_unset(attr);
+	}
 }
 
 /**
@@ -1752,6 +1779,47 @@ is_attr_set(const attribute *pattr)
 }
 
 /**
+ * @brief	Check if an attribute is set
+ *
+ * @param[in]	pattr	-	pointer to the attribute
+ *
+ * @return	int
+ * @retval	1 if the attribute is set
+ * @retval	0 otherwise
+ *
+ * @par MT-Safe: No
+ * @par Side Effects: None
+ */
+int
+is_attr_dirty(const attribute *pattr)
+{
+	if (pattr != NULL)
+		return pattr->at_flags & ATR_VFLAG_MODIFY;
+	return 0;
+}
+
+/**
+ * @brief	Check if an attribute is set
+ *
+ * @param[in]	pattr	-	pointer to the attribute
+ *
+ * @return	int
+ * @retval	1 if the attribute is set
+ * @retval	0 otherwise
+ *
+ * @par MT-Safe: No
+ * @par Side Effects: None
+ */
+void
+mark_attr_clean(attribute *pattr)
+{
+	if (pattr != NULL) {
+		pattr->at_flags &= ~ATR_VFLAG_MODIFY;
+		post_attr_set_unset(pattr);
+	}
+}
+
+/**
  * @brief	Common function to update attribute after set action performed.
  *
  * @param[in]	attr	-	pointer to the attribute
@@ -1762,9 +1830,8 @@ is_attr_set(const attribute *pattr)
  * @par Side Effects: None
  */
 void
-post_attr_set(attribute *attr)
+post_attr_set_unset(attribute *attr)
 {
-	attr->at_flags |= ATR_SET_MOD_MCACHE;
 }
 
 /**

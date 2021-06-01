@@ -260,16 +260,20 @@ init_server_attrs()
 		presc = add_resource_entry(pattr, prdef);
 		if (presc) {
 			presc->rs_value.at_val.at_long = 1;
-			presc->rs_value.at_flags = ATR_VFLAG_DEFLT | ATR_SET_MOD_MCACHE;
-			pattr->at_flags = ATR_VFLAG_DEFLT | ATR_SET_MOD_MCACHE;
+			mark_attr_set(&presc->rs_value);
+			presc->rs_value.at_flags = ATR_VFLAG_DEFLT;
+			mark_attr_set(pattr);
+			pattr->at_flags = ATR_VFLAG_DEFLT;
 			(void)deflt_chunk_action(pattr, (void *)&server, ATR_ACTION_NEW);
 		}
 		pattr = get_attr_ptr(&server.sv_attr, SVR_ATR_resource_deflt);
 		presc = add_resource_entry(pattr, prdef);
 		if (presc) {
 			presc->rs_value.at_val.at_long = 1;
-			presc->rs_value.at_flags = ATR_VFLAG_DEFLT | ATR_SET_MOD_MCACHE;
-			pattr->at_flags = ATR_VFLAG_DEFLT | ATR_SET_MOD_MCACHE;
+			mark_attr_set(&presc->rs_value);
+			presc->rs_value.at_flags = ATR_VFLAG_DEFLT;
+			mark_attr_set(pattr);
+			pattr->at_flags = ATR_VFLAG_DEFLT;
 		}
 
 	}
@@ -1612,7 +1616,7 @@ pbsd_init_reque(job *pjob, int change_state)
 	}
 
 	/* make sure substate attributes match actual value */
-	post_attr_set(get_jattr(pjob, JOB_ATR_substate));
+	mark_attr_set(get_jattr(pjob, JOB_ATR_substate));
 
 	if ((rc = svr_enquejob(pjob, NULL)) == 0) {
 		(void)strcat(logbuf, msg_init_queued);
