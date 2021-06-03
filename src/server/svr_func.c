@@ -7012,7 +7012,7 @@ parse_ts_from_extend(char *extend)
 	char *p;
 	struct timeval from_tm = {0, 0};
 
-	if ((p = strchr(extend, (int) ',')) != NULL) {
+	if (extend && (p = strchr(extend, (int) ',')) != NULL) {
 		p++; /* go past comma */
 		from_tm.tv_sec = strtoul(p, &p, 10);
 		if (*p == ':')
