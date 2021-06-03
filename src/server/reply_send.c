@@ -380,13 +380,14 @@ reply_send(struct batch_request *request)
 			timersub(&preply->brp_ts, &request->rq_time, &serv_time);
 
 			if (request->rq_type == PBS_BATCH_StatusJob || request->rq_type == PBS_BATCH_SelStat || request->rq_type == PBS_BATCH_StatusNode) {
-				log_eventf(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER, LOG_INFO, msg_daemonname, 
-					"Response code %d, %s returned %d objects last_stat_tm %ld.%ld, service time %ld.%ld", 
-					preply->brp_choice, (preply->brp_auxcode) ? "diffstat" : "regular-stat",
+				log_eventf(PBSEVENT_DEBUG2, PBS_EVENTCLASS_REQUEST, LOG_INFO, "", 
+					"Response code: %d, %s returned objects: %d, last_stat_tm: %ld.%ld, service time: %ld.%ld",
+					preply->brp_choice, (preply->brp_auxcode) ? "diffstat" : "stat",
 					preply->brp_count, preply->brp_ts.tv_sec, preply->brp_ts.tv_usec,
 					serv_time.tv_sec, serv_time.tv_usec);
 			} else {
-				log_eventf(PBSEVENT_DEBUG2, PBS_EVENTCLASS_REQUEST, LOG_DEBUG, "", "Response code %d, service time %ld.%ld", 
+				log_eventf(PBSEVENT_DEBUG2, PBS_EVENTCLASS_REQUEST, LOG_INFO, "", 
+					"Response code: %d, service time: %ld.%ld",
 					preply->brp_choice, serv_time.tv_sec, serv_time.tv_usec);
 			}
 

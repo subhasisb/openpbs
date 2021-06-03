@@ -557,8 +557,8 @@ req_selectjobs(struct batch_request *preq)
 	pselx = &preply->brp_un.brp_select;
 	preply->brp_count = 0;
 
-	log_eventf(PBSEVENT_DEBUG3, PBS_EVENTCLASS_SERVER, LOG_DEBUG, msg_daemonname, 
-		"select: dohistjob=%d, dosubjobs=%d, from_tm={%ld:%ld}",
+	log_eventf(PBSEVENT_DEBUG2, PBS_EVENTCLASS_REQUEST, LOG_DEBUG, "", 
+		"select: dohistjob=%d, dosubjobs=%d, from_tm={%ld.%ld}",
 		dohistjobs, dosubjobs, from_tm.tv_sec, from_tm.tv_usec);
 
 	rc = PBSE_NONE;

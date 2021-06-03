@@ -325,8 +325,8 @@ req_stat_job(struct batch_request *preq)
 		from_tm = parse_ts_from_extend(preq->rq_extend);
 	}
 
-	log_eventf(PBSEVENT_DEBUG3, PBS_EVENTCLASS_SERVER, LOG_DEBUG, msg_daemonname, 
-		"jobstat: dohistjob=%d, dosubjobs=%d, from_tm={%ld:%ld}",
+	log_eventf(PBSEVENT_DEBUG2, PBS_EVENTCLASS_REQUEST, LOG_DEBUG, "", 
+		"jobstat: dohistjob=%d, dosubjobs=%d, from_tm={%ld.%ld}",
 		dohistjobs, dosubjobs, from_tm.tv_sec, from_tm.tv_usec);
 
 	/*
@@ -596,19 +596,12 @@ req_stat_node(struct batch_request *preq)
 	int rc = 0;
 	int type = 0;
 	int i;
-	char *p;
 	struct timeval from_tm = {0, 0};
 
-	if (preq->rq_extend) {
-		if ((p = strchr(preq->rq_extend, (int) ',')) != NULL) {
-			p++; /* go past comma */
-			from_tm.tv_sec = strtoul(p, &p, 10);
-			if (*p == ':') 
-				p++; /* go past : */
-			from_tm.tv_usec = strtoul(p, NULL, 10);
-		}
-		from_tm = parse_ts_from_extend(preq->rq_extend);
-	}
+	from_tm = parse_ts_from_extend(preq->rq_extend);
+
+	log_eventf(PBSEVENT_DEBUG2, PBS_EVENTCLASS_REQUEST, LOG_DEBUG, "", 
+		"statnode: from_tm={%ld.%ld}", from_tm.tv_sec, from_tm.tv_usec);
 
 	/*
 	 * first, check that the server indeed has a list of nodes
