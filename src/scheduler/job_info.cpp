@@ -604,7 +604,7 @@ query_jobs(status *policy, int pbs_sd, queue_info *qinfo, resource_resv **pjobs,
 		pjobs = static_cast<resource_resv **>(calloc(2, sizeof(resource_resv*)));
 	
 	/* get jobs from PBS server */
-	log_event(PBSEVENT_SCHED, PBS_EVENTCLASS_JOB, LOG_DEBUG, "selstat", "Before pbs_selstat()");
+	log_eventf(PBSEVENT_SCHED, PBS_EVENTCLASS_JOB, LOG_DEBUG, "selstat", "Before pbs_selstat() extend_buf=%s", extend_buf);
 	if ((jobs = pbs_selstat(pbs_sd, &opl, attrib, extend_buf)) == NULL) {
 		log_event(PBSEVENT_SCHED, PBS_EVENTCLASS_JOB, LOG_DEBUG, "selstat", "After pbs_selstat()");
 

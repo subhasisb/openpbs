@@ -223,11 +223,11 @@ query_nodes(int pbs_sd, server_info *sinfo)
 	}
 
 	if (last_cycle_time.tv_sec > 0)
-		snprintf(extend_buf, sizeof(extend_buf), "%ld:%ld", last_cycle_time.tv_sec, last_cycle_time.tv_usec);
+		snprintf(extend_buf, sizeof(extend_buf), ",%ld:%ld", last_cycle_time.tv_sec, last_cycle_time.tv_usec);
 	else
 		extend_buf[0] = '\0';
 	/* get nodes from PBS server */
-	log_event(PBSEVENT_SCHED, PBS_EVENTCLASS_NODE, LOG_DEBUG, "statvnode", "Before pbs_statvnode()");
+	log_eventf(PBSEVENT_SCHED, PBS_EVENTCLASS_NODE, LOG_DEBUG, "statvnode", "Before pbs_statvnode() extend_buf=%s", extend_buf);
 
 	if ((nodes = pbs_statvnode(pbs_sd, NULL, attrib, extend_buf)) == NULL) {
 		log_event(PBSEVENT_SCHED, PBS_EVENTCLASS_NODE, LOG_DEBUG, "statvnode", "After pbs_statvnode()");
