@@ -175,7 +175,8 @@ query_nodes(int pbs_sd, server_info *sinfo)
 	struct batch_status *cur_node;	/* used to cycle through nodes */
 	node_info **ninfo_arr = NULL;		/* array of nodes for scheduler's use */
 	char *err;				/* used with pbs_geterrmsg() */
-	int num_nodes = 0;			/* the number of nodes */
+	int num_nodes = 0;
+	int num_attrs = 0; /* the number of nodes */
 	int tot_nodes = 0;
 	char extend_buf[128];
 	static struct attrl *attrib = NULL;
@@ -226,15 +227,24 @@ query_nodes(int pbs_sd, server_info *sinfo)
 	else
 		extend_buf[0] = '\0';
 	/* get nodes from PBS server */
+	log_event(PBSEVENT_SCHED, PBS_EVENTCLASS_NODE, LOG_DEBUG, "statvnode", "Before pbs_statvnode()");
+
 	if ((nodes = pbs_statvnode(pbs_sd, NULL, attrib, extend_buf)) == NULL) {
+		log_event(PBSEVENT_SCHED, PBS_EVENTCLASS_NODE, LOG_DEBUG, "statvnode", "After pbs_statvnode()");
+
 		err = pbs_geterrmsg(pbs_sd);
 		log_eventf(PBSEVENT_SCHED, PBS_EVENTCLASS_NODE, LOG_INFO, "", "Error getting nodes: %s", err);
 		return NULL;
 	}
+	log_event(PBSEVENT_SCHED, PBS_EVENTCLASS_NODE, LOG_DEBUG, "statvnode", "After pbs_statvnode()");
 
 	for (cur_node = nodes; cur_node != NULL; cur_node = cur_node->next) {
 		num_nodes++;
+		for (auto attrp = cur_node->attribs; attrp != NULL; attrp = attrp->next)
+			num_attrs++;
 	}
+	log_eventf(PBSEVENT_SCHED, PBS_EVENTCLASS_NODE, LOG_DEBUG, "nodes", "Number of node objects queried %d", num_nodes);
+	log_eventf(PBSEVENT_SCHED, PBS_EVENTCLASS_NODE, LOG_DEBUG, "average attrs", "Average node attributes queried %.3f", (float)num_attrs/num_nodes);
 
 	if (sinfo->nodes == NULL) {
 		if ((ninfo_arr = static_cast<node_info **>(malloc(sizeof(node_info *) * 2))) == NULL) {
@@ -244,8 +254,8 @@ query_nodes(int pbs_sd, server_info *sinfo)
 		}
 
 		ninfo_arr[0] = NULL;
-	} else
-		ninfo_arr = sinfo->nodes;
+	}
+	else ninfo_arr = sinfo->nodes;
 
 	tot_nodes = sinfo->num_nodes;
 
@@ -1498,13 +1508,12 @@ collect_resvs_on_nodes(node_info **ninfo_arr, resource_resv **resresv_arr, int s
  *
  */
 int
-collect_jobs_on_nodes(node_info **ninfo_arr, resource_resv **resresv_arr, int size, int flags)
+collect_jobs_on_nodes(node_info **ninfo_arr, std::unordered_map<std::string, resource_resv *> resresv_umap, int flags)
 {
 	char *ptr;		/* used to find the '/' in the jobs array */
 	resource_resv *job;	/* find the job from the jobs array */
-	resource_resv **susp_jobs = NULL; 	/* list of suspended jobs */
 	counts *cts;		/* used to update user and group counts */
-	int i, j, k;
+	unsigned int i, j, k;
 	node_info *node;	/* used to store pointer of node in ninfo_arr */
 	resource_resv **temp_ninfo_arr = NULL;
 
@@ -1515,7 +1524,7 @@ collect_jobs_on_nodes(node_info **ninfo_arr, resource_resv **resresv_arr, int si
 		if (ninfo_arr[i]->job_arr != NULL)
 			free(ninfo_arr[i]->job_arr);
 
-		if ((ninfo_arr[i]->job_arr = static_cast<resource_resv **> (malloc((size + 1) * sizeof(resource_resv *)))) == NULL)
+		if ((ninfo_arr[i]->job_arr = static_cast<resource_resv **> (malloc((resresv_umap.size() + 1) * sizeof(resource_resv *)))) == NULL)
 		{
 			log_err(errno, __func__, MEM_ERR_MSG);
 			return 0;
@@ -1529,13 +1538,13 @@ collect_jobs_on_nodes(node_info **ninfo_arr, resource_resv **resresv_arr, int si
 			/* If there are no running jobs in the list and node reports a running job,
 			 * mark that the node has ghost job
 			 */
-			if (size == 0 && (flags & DETECT_GHOST_JOBS)) {
+			if (resresv_umap.size() == 0 && (flags & DETECT_GHOST_JOBS)) {
 				ninfo_arr[i]->has_ghost_job = 1;
 				log_event(PBSEVENT_DEBUG2, PBS_EVENTCLASS_NODE, LOG_DEBUG, ninfo_arr[i]->name,
 					  "Jobs reported running on node no longer exists or are not in running state");
 			}
 
-			for (j = 0, k = 0; ninfo_arr[i]->jobs[j] != NULL && k < size; j++) {
+			for (j = 0, k = 0; ninfo_arr[i]->jobs[j] != NULL && k < resresv_umap.size(); j++) {
 				/* jobs are in the format of node_name/sub_node.  We don't care about
 				 * the subnode... we just want to populate the jobs on our node
 				 * structure
@@ -1544,7 +1553,11 @@ collect_jobs_on_nodes(node_info **ninfo_arr, resource_resv **resresv_arr, int si
 				if (ptr != NULL)
 					*ptr = '\0';
 
-				job = find_resource_resv(resresv_arr, ninfo_arr[i]->jobs[j]);
+				auto found = resresv_umap.find(ninfo_arr[i]->jobs[j]);
+				if (found != resresv_umap.end())
+					job = found->second;
+				else
+					job = NULL;
 				if ((job != NULL) && (job->nspec_arr != NULL)) {
 					/* if a distributed job has more then one instance on this node
 					 * it'll show up more then once.  If this is the case, we only
@@ -1582,7 +1595,6 @@ collect_jobs_on_nodes(node_info **ninfo_arr, resource_resv **resresv_arr, int si
 						"Job %s reported running on node no longer exists or is not in running state",
 						ninfo_arr[i]->jobs[j]);
 				}
-
 			}
 			ninfo_arr[i]->num_jobs = k;
 		}
@@ -1600,25 +1612,27 @@ collect_jobs_on_nodes(node_info **ninfo_arr, resource_resv **resresv_arr, int si
 		job_arr[ninfo_arr[i]->num_jobs] = NULL;
 	}
 
-	susp_jobs = resource_resv_filter(resresv_arr,
-		count_array(resresv_arr), check_susp_job, NULL, 0);
-	if (susp_jobs == NULL)
+	std::unordered_set<resource_resv *> susp_jobs;
+	for (auto& r : resresv_umap)
+		if (check_susp_job(r.second, NULL))
+			susp_jobs.insert(r.second);
+
+	if (susp_jobs.empty())
 		return 0;
 
-	for (i = 0; susp_jobs[i] != NULL; i++) {
-		if (susp_jobs[i]->ninfo_arr != NULL) {
-			for (j = 0; susp_jobs[i]->ninfo_arr[j] != NULL; j++) {
+	for (auto& sj : susp_jobs) {
+		if (sj->ninfo_arr != NULL) {
+			for (j = 0; sj->ninfo_arr[j] != NULL; j++) {
 				/* resresv->ninfo_arr is merely a nnode list with pointers to server nodes.
 				 * resresv->resv->resv_nodes is a nnode list with pointers to resv nodes
 				 */
 				node = find_node_info(ninfo_arr,
-						susp_jobs[i]->ninfo_arr[j]->name);
+						sj->ninfo_arr[j]->name);
 				if (node != NULL)
 					node->num_susp_jobs++;
 			}
 		}
 	}
-	free(susp_jobs);
 
 	return 1;
 }

@@ -582,13 +582,15 @@ query_reservations(int pbs_sd, server_info *sinfo, struct batch_status *resvs)
 			}
 
 			if (resresv_arr[i]->resv->resv_queue->jobs != NULL) {
-				resource_resv **jobs_in_reservations;
-				jobs_in_reservations = resource_resv_filter(resresv_arr[i]->resv->resv_queue->jobs,
-									    count_array(resresv_arr[i]->resv->resv_queue->jobs),
-									    check_running_job_in_reservation, NULL, 0);
-				collect_jobs_on_nodes(resresv_arr[i]->resv->resv_nodes, jobs_in_reservations,
-						      count_array(jobs_in_reservations), NO_FLAGS);
-				free(jobs_in_reservations);
+				std::unordered_map<std::string, resource_resv *> jobs_in_reservations;
+				for (int j = 0; resresv_arr[i]->resv->resv_queue->jobs[j] != NULL; j++) {
+					auto job = resresv_arr[i]->resv->resv_queue->jobs[j];
+
+					if (check_running_job_in_reservation(job, NULL))
+						jobs_in_reservations[job->name] = job;
+				}
+
+				collect_jobs_on_nodes(resresv_arr[i]->resv->resv_nodes, jobs_in_reservations, NO_FLAGS);
 
 				for (int j = 0; resresv_arr[i]->resv->resv_nodes[j] != NULL; j++)
 					create_resource_assn_for_node(resresv_arr[i]->resv->resv_nodes[j], 1);

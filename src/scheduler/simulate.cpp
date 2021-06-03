@@ -853,6 +853,9 @@ create_event_list(server_info *sinfo)
 {
 	event_list *elist;
 
+	if (should_create_calendar(sinfo) == false)
+		return NULL;
+
 	elist = new_event_list();
 
 	if (elist == NULL)
@@ -1445,8 +1448,10 @@ add_event(event_list *calendar, timed_event *te)
 	time_t current_time;
 	int events_is_null = 0;
 
-	if (calendar == NULL || calendar->current_time == NULL || te == NULL)
+	if (calendar == NULL || calendar->current_time == NULL || te == NULL) {
+		free_timed_event(te);
 		return 0;
+	}
 
 	current_time = *calendar->current_time;
 
@@ -1554,6 +1559,9 @@ delete_event(server_info *sinfo, timed_event *e)
 	event_list *calendar;
 
 	if (sinfo == NULL || e == NULL)
+		return;
+	
+	if (should_create_calendar(sinfo) == false)
 		return;
 
 	calendar = sinfo->calendar;
@@ -2087,4 +2095,13 @@ generic_sim(event_list *calendar, unsigned int event_mask, time_t end, int defau
 		return 0;
 
 	return default_ret;
+}
+
+bool 
+should_create_calendar(server_info *sinfo)
+{
+	if (cstat.strict_ordering || sc_attrs.sched_preempt_enforce_resumption || sinfo->resvs != NULL)
+		return true;
+
+	return false;
 }

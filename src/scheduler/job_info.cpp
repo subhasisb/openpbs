@@ -533,6 +533,8 @@ query_jobs(status *policy, int pbs_sd, queue_info *qinfo, resource_resv **pjobs,
 	schd_error *err;
 	time_t server_time;
 	char extend_buf[128];
+	int num_jobs = 0;
+	int num_attrs = 0;
 
 	const char *jobattrs[] = {
 		ATTR_p,
@@ -600,9 +602,12 @@ query_jobs(status *policy, int pbs_sd, queue_info *qinfo, resource_resv **pjobs,
 
 	if (pjobs == NULL)
 		pjobs = static_cast<resource_resv **>(calloc(2, sizeof(resource_resv*)));
-
+	
 	/* get jobs from PBS server */
+	log_event(PBSEVENT_SCHED, PBS_EVENTCLASS_JOB, LOG_DEBUG, "selstat", "Before pbs_selstat()");
 	if ((jobs = pbs_selstat(pbs_sd, &opl, attrib, extend_buf)) == NULL) {
+		log_event(PBSEVENT_SCHED, PBS_EVENTCLASS_JOB, LOG_DEBUG, "selstat", "After pbs_selstat()");
+
 		if (pbs_errno > 0) {
 			const char *errmsg;
 			errmsg = pbs_geterrmsg(pbs_sd);
@@ -614,6 +619,17 @@ query_jobs(status *policy, int pbs_sd, queue_info *qinfo, resource_resv **pjobs,
 		}
 		return pjobs;
 	}
+	log_event(PBSEVENT_SCHED, PBS_EVENTCLASS_JOB, LOG_DEBUG, "selstat", "After pbs_selstat()");
+
+	for (auto curjob = jobs; curjob != NULL; curjob = curjob->next) {
+		num_jobs++;
+		for (auto attrp = curjob->attribs; attrp != NULL; attrp = attrp->next)
+			num_attrs++;
+	}
+
+	log_eventf(PBSEVENT_SCHED, PBS_EVENTCLASS_JOB, LOG_DEBUG, "jobs", "Number of job objects stat'd: %d", num_jobs);
+	log_eventf(PBSEVENT_SCHED, PBS_EVENTCLASS_JOB, LOG_DEBUG, "average attrs", "Average job attributes queried %.3f", (float)num_attrs/num_jobs);
+
 
 	err = new_schd_error();
 	if(err == NULL) {

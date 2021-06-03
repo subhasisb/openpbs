@@ -324,7 +324,7 @@ class TestSchedPerf(TestPerformance):
         """
         Submit many short jobs with scheduling on and allow them to finish
         """
-        num_jobs = 2000
+        num_jobs = 1000
         job_sleep_time = 10
 
         a = {'resources_available.ncpus': 1}

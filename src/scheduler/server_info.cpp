@@ -187,7 +187,7 @@ query_server(status *pol, int pbs_sd, server_info *sinfo)
 	int num_express_queues = 0;	/* number of express queues */
 	int i;
 	const char *errmsg;
-	resource_resv **jobs_alive;
+	std::unordered_map<std::string, resource_resv *> jobs_alive;
 	status *policy;
 	int job_arrays_associated = FALSE;
 	queue_info **qinfo_arr;
@@ -377,8 +377,6 @@ query_server(status *pol, int pbs_sd, server_info *sinfo)
 		return NULL;
 	}
 
-	jobs_alive = resource_resv_filter(sinfo->jobs, sinfo->sc.total, check_running_job_not_in_reservation, NULL, 0);
-
 	if (sinfo->has_soft_limit || sinfo->has_hard_limit) {
 		counts *allcts;
 		allcts = find_alloc_counts(sinfo->alljobcounts, PBS_ALL_ENTITY);
@@ -423,6 +421,7 @@ query_server(status *pol, int pbs_sd, server_info *sinfo)
 		}
 		create_total_counts(sinfo, NULL, NULL, SERVER);
 	}
+
 	if (job_arrays_associated == FALSE) {
 		for (i = 0; sinfo->running_jobs[i] != NULL; i++) {
 			if ((sinfo->running_jobs[i]->job->is_subjob) &&
@@ -442,10 +441,11 @@ query_server(status *pol, int pbs_sd, server_info *sinfo)
 	 * nodes, which are accounted for by collect_jobs_on_nodes in
 	 * query_reservation, hence the use of the filtered list of jobs
 	 */
-	collect_jobs_on_nodes(sinfo->nodes, jobs_alive, count_array(jobs_alive), DETECT_GHOST_JOBS);
+	for (int i = 0; sinfo->jobs[i] != NULL; i++)
+		if (check_running_job_not_in_reservation(sinfo->jobs[i], NULL))
+			jobs_alive[sinfo->jobs[i]->name] = sinfo->jobs[i];
 
-	/* Now that the job_arr is created, garbage collect the jobs */
-	free(jobs_alive);
+	collect_jobs_on_nodes(sinfo->nodes, jobs_alive, DETECT_GHOST_JOBS);
 
 	collect_resvs_on_nodes(sinfo->nodes, sinfo->resvs, sinfo->num_resvs);
 
@@ -2506,13 +2506,15 @@ dup_server_info(server_info *osinfo)
 
 	nsinfo->equiv_classes = dup_resresv_set_array(osinfo->equiv_classes, nsinfo);
 
-	/* the event list is created dynamically during the evaluation of resource
-	 * reservations. It is a sorted list of all_resresv, initialized to NULL to
-	 * appropriately be freed in free_event_list */
-	nsinfo->calendar = dup_event_list(osinfo->calendar, nsinfo);
-	if (nsinfo->calendar == NULL) {
-		free_server(nsinfo);
-		return NULL;
+	if (osinfo->calendar != NULL) {
+		/* the event list is created dynamically during the evaluation of resource
+		* reservations. It is a sorted list of all_resresv, initialized to NULL to
+		* appropriately be freed in free_event_list */
+		nsinfo->calendar = dup_event_list(osinfo->calendar, nsinfo);
+		if (nsinfo->calendar == NULL) {
+			free_server(nsinfo);
+			return NULL;
+		}
 	}
 
 	nsinfo->running_jobs =

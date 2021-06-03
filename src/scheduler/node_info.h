@@ -115,7 +115,7 @@ node_info **dup_nodes(node_info **onodes, server_info *nsinfo, unsigned int flag
  *      collect_jobs_on_nodes - collect all the jobs in the job array on the
  *                              nodes
  */
-int collect_jobs_on_nodes(node_info **ninfo_arr, resource_resv **resresv_arr, int size, int flags);
+int collect_jobs_on_nodes(node_info **ninfo_arr, std::unordered_map<std::string, resource_resv *> resresv_arr, int flags);
 
 /*
  *      collect_resvs_on_nodes - collect all the running resvs in the resv array

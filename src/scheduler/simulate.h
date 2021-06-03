@@ -456,5 +456,6 @@ void free_te_list(te_list *tel);
 int add_te_list(te_list **tel, timed_event *te);
 int remove_te_list(te_list **tel, timed_event *e);
 
+bool should_create_calendar(server_info *sinfo);
 
 #endif /* _SIMULATE_H */
