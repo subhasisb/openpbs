@@ -160,14 +160,14 @@ pbs_db_save_svr(void *conn, pbs_db_obj_info_t *obj, int savetype)
 	int rc = 0;
 
 	/* Svr does not have a QS area, so ignoring that */
-	SET_PARAM_BIGINT(conn_data, ps->sv_jobidnumber, 0);
+	SET_PARAM_BIGINT( ps->sv_jobidnumber, 0);
 
 	if ((ps->db_attr_list.attr_count > 0) || (savetype & OBJ_SAVE_NEW)) {
 		/* convert attributes to postgres raw array format */
 		if ((len = attrlist_to_dbarray(&raw_array, &ps->db_attr_list)) <= 0)
 			return -1;
 
-		SET_PARAM_BIN(conn_data, raw_array, len, 1);
+		SET_PARAM_BIN( raw_array, len, 1);
 		params = 2;
 		stmt = STMT_UPDATE_SVR;
 	}
@@ -254,7 +254,7 @@ pbs_db_del_attr_svr(void *conn, void *obj_id, pbs_db_attr_list_t *attr_list)
 	if ((len = attrlist_to_dbarray_ex(&raw_array, attr_list, 1)) <= 0)
 		return -1;
 
-	SET_PARAM_BIN(conn_data, raw_array, len, 0);
+	SET_PARAM_BIN( raw_array, len, 0);
 
 	rc = db_cmd(conn, STMT_REMOVE_SVRATTRS, 1);
 

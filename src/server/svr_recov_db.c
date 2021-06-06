@@ -225,6 +225,8 @@ svr_recov_db(void)
 	pbs_db_obj_info_t obj;
 	int rc = -1;
 
+	pthread_mutex_lock(&server.lock);
+
 	obj.pbs_db_obj_type = PBS_DB_SVR;
 	obj.pbs_db_un.pbs_db_svr = &dbsvr;
 
@@ -236,6 +238,8 @@ svr_recov_db(void)
 		rc = db_to_svr(&server, &dbsvr);
 
 	free_db_attr_list(&dbsvr.db_attr_list);
+
+	pthread_mutex_unlock(&server.lock);
 
 	return rc;
 }
@@ -264,6 +268,8 @@ svr_save_db(struct server *ps)
 	int rc = -1;
 	char *conn_db_err = NULL;
 
+	pthread_mutex_lock(&server.lock);
+
 	/* as part of the server save, update svrlive file now,
 	 * used in failover
 	 */
@@ -281,6 +287,8 @@ svr_save_db(struct server *ps)
 
 done:
 	free_db_attr_list(&dbsvr.db_attr_list);
+	
+	pthread_mutex_unlock(&server.lock);
 
 	if (rc != 0) {
 		pbs_db_get_errmsg(PBS_DB_ERR, &conn_db_err);

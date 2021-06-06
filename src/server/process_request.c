@@ -110,6 +110,7 @@
 #include <libutil.h>
 #include "pbs_sched.h"
 #include "auth.h"
+#include "thpool.h"
 
 /* global data items */
 
@@ -373,6 +374,18 @@ rerr:
 }
 #endif
 
+typedef struct {
+	int sfds;
+	struct batch_request *request;
+} dispatch_wrap_arg;
+
+void 
+dispatch_wrapper(void *dispatch_arg)
+{
+	dispatch_wrap_arg *arg = dispatch_arg; 
+	dispatch_request(arg->sfds, arg->request);
+}
+
 /*
 * @brief
  * 		process_request - process an request from the network:
@@ -393,7 +406,6 @@ process_request(int sfds)
 #ifndef PBS_MOM
 	int		     access_by_krb;
 #endif
-
 
 	time_now = time(NULL);
 
@@ -696,8 +708,17 @@ process_request(int sfds)
 	 * The processing function must call reply_send() to free
 	 * the request struture.
 	 */
-
+#ifndef PBS_MOM
+	{
+		extern threadpool thpool;
+		dispatch_wrap_arg *arg = malloc(sizeof(dispatch_wrap_arg));
+		arg->sfds = sfds;
+		arg->request = request;	
+		thpool_add_work(thpool, dispatch_wrapper, arg);
+	}
+#else
 	dispatch_request(sfds, request);
+#endif
 	return;
 }
 

@@ -118,6 +118,7 @@ decode_arst_direct(attribute *patr, char *val)
 	char			 strbuf[BUF_SIZE];	/* Should handle most values */
 	char			*sbufp = NULL;
 	size_t			 slen;
+	char 			*cbufp;
 
 	if (!patr || !val)
 		return (PBSE_INTERNAL);
@@ -172,14 +173,15 @@ decode_arst_direct(attribute *patr, char *val)
 	/* now copy in substrings and set pointers */
 	pc = pbuf;
 	j = 0;
-	pstr = parse_comma_string(sbufp);
+	cbufp = sbufp;
+	pstr = parse_comma_string_r(&cbufp);
 	while ((pstr != NULL) && (j < ns)) {
 		stp->as_string[j] = pc;
 		while (*pstr) {
 			*pc++ = *pstr++;
 		}
 		*pc++ = '\0';
-		pstr = parse_comma_string(NULL);
+		pstr = parse_comma_string_r(&cbufp);
 		j++;
 	}
 
@@ -639,15 +641,17 @@ arst_string(char *str, attribute *pattr)
  */
 
 static char *
-parse_comma_string_bs(char *start)
+parse_comma_string_bs(char *start, char **saveptr)
 {
-	static char *pc = NULL;	/* if start is null, restart from here */
+	char *pc = NULL;	/* if start is null, restart from here */
 	char	    *dest;
 	char	    *back;
 	char	    *rv;
 
 	if (start != NULL)
 		pc = start;
+	else
+		pc = *saveptr;
 
 	/* skip over leading white space */
 	while (pc && *pc && isspace((int)*pc))
@@ -693,6 +697,8 @@ parse_comma_string_bs(char *start)
 	back = dest;
 	while (isspace((int)*--back))	/* strip trailing spaces */
 		*back = '\0';
+
+	*saveptr = pc;
 
 	return (rv);
 }
@@ -780,6 +786,7 @@ decode_arst_direct_bs(attribute *patr, char *val)
 	char			*sbufp = NULL;
 	struct array_strings	*stp = NULL;
 	char			 strbuf[BUF_SIZE];	/* Should handle most values */
+	char *saveptr;
 
 	if (!patr || !val)
 		return (PBSE_INTERNAL);
@@ -833,14 +840,14 @@ decode_arst_direct_bs(attribute *patr, char *val)
 	/* now copy in substrings and set pointers */
 	pc = pbuf;
 	j = 0;
-	pstr = parse_comma_string_bs(sbufp);
+	pstr = parse_comma_string_bs(sbufp, &saveptr);
 	while ((pstr != NULL) && (j < ns)) {
 		stp->as_string[j] = pc;
 		while (*pstr) {
 			*pc++ = *pstr++;
 		}
 		*pc++ = '\0';
-		pstr = parse_comma_string_bs(NULL);
+		pstr = parse_comma_string_bs(NULL, &saveptr);
 		j++;
 	}
 

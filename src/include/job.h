@@ -617,6 +617,7 @@ struct job {
 	short newobj; /* newly created job? */
 
 	struct timeval update_tm; /* last updated timestamp */
+	pthread_mutex_t lock;
 };
 
 typedef struct job job;

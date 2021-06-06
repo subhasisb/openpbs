@@ -49,6 +49,7 @@
 #include <string.h>
 #include "grunt.h"
 #include "pbs_error.h"
+#include "libutil.h"
 
 #ifdef NAS /* localmod 082 */
 #ifndef	MAX
@@ -498,19 +499,18 @@ parse_chunk(char *str, int *nchk, int *nrtn, struct key_value_pair **rtn, int *s
 	int   i;
 	int   nelm = 0;
 
-	static int   nkvelements = 0;
-	static struct key_value_pair *tpkv = NULL;
-
 	if (str == NULL)
 		return (PBSE_INTERNAL);
+
+	tls_t *tbuf = get_tls();
 
 #ifdef NAS /* localmod 082 */
 	i = parse_chunk_r(str, extra, nchk, &nelm, &nkvelements, &tpkv, setbydflt);
 #else
-	i = parse_chunk_r(str, nchk, &nelm, &nkvelements, &tpkv, setbydflt);
+	i = parse_chunk_r(str, nchk, &nelm, &tbuf->nkvelements, &tbuf->tpkv, setbydflt);
 #endif /* localmod 082 */
 	*nrtn = nelm;
-	*rtn  = tpkv;
+	*rtn  = tbuf->tpkv;
 	return i;
 }
 
@@ -613,6 +613,7 @@ parse_plus_spec_r(char *selstr, char **last, int *hp)
  *	char array for parsing.  The orignal string is untouched.  The array
  *	is grown as need to hold "selstr".
  */
+
 char *
 parse_plus_spec(char *selstr, int *rc)
 {
@@ -620,28 +621,28 @@ parse_plus_spec(char *selstr, int *rc)
 	size_t		len;
 	static char    *pe;
 	char           *ps;
-	static char    *parsebuf = NULL;
-	static int	parsebufsz = 0;
+	
+	tls_t *tbuf = get_tls();
 
 	*rc = 0;
 	if (selstr) {
 
 		if ((len = strlen(selstr)) == 0)
 			return NULL;
-		else if (len >= parsebufsz) {
-			if (parsebuf)
-				free(parsebuf);
-			parsebufsz = len * 2;
-			parsebuf = (char *)malloc(parsebufsz);
-			if (parsebuf == NULL) {
-				parsebufsz = 0;
+		else if (len >= tbuf->staticbufsize) {
+			if (tbuf->staticbuf)
+				free(tbuf->staticbuf);
+			tbuf->staticbufsize = len * 2;
+			tbuf->staticbuf = (char *)malloc(tbuf->staticbufsize);
+			if (tbuf->staticbuf == NULL) {
+				tbuf->staticbufsize = 0;
 				*rc = errno;
 				return NULL;
 			}
 		}
 
-		(void)strcpy(parsebuf, selstr);
-		ps = parsebuf;
+		(void)strcpy(tbuf->staticbuf, selstr);
+		ps = tbuf->staticbuf;
 	} else
 		ps = pe;
 

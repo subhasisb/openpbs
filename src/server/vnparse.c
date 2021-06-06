@@ -3755,7 +3755,7 @@ pbs_release_nodes_given_select(relnodes_input_t *r_input, relnodes_input_select_
 	vnl_t		*vnl_good_master = NULL;
 	char		prev_noden[PBS_MAXNODENAME + 1];
 	char		*parent_mom;
-	char		*tmpstr;
+	char		*tmpstr = NULL;
 	char		*chunk_buf = NULL;
 	int		chunk_buf_sz = 0;
 #ifdef PBS_MOM
@@ -4418,6 +4418,7 @@ pbs_release_nodes_given_select(relnodes_input_t *r_input, relnodes_input_select_
 		goto release_nodes_exit;
 	}
 	new_schedselect = strdup(tmpstr);
+	free(tmpstr);
 	if (new_schedselect == NULL) {
 		log_err(errno, __func__, msg_err_malloc);
 		rc = 1;
@@ -4601,7 +4602,7 @@ do_schedselect(char *select_val, void *server, void *destin, char **presc_in_err
 	int          already_set = 0;
 	int 	     nchunk_internally_set;
 	int	     nelem;
-	static char *outbuf   = NULL;
+	char *outbuf   = NULL;
 	struct key_value_pair *pkvp;
 	struct key_value_pair *qdkvp;
 	int		       qndft;
@@ -4613,7 +4614,7 @@ do_schedselect(char *select_val, void *server, void *destin, char **presc_in_err
 	int	     rc;
 	char	    *tb;
 	int	     validate_resource_exist = 0;
-	static size_t bufsz = 0;
+	size_t bufsz = 0;
 	struct server *pserver = NULL;
 	pbs_queue   *pque = NULL;
 

@@ -89,6 +89,7 @@ struct pbs_queue {
 	/* the queue attributes */
 	attribute qu_attr[QA_ATR_LAST];
 	short newobj;
+	pthread_mutex_t lock;
 };
 typedef struct pbs_queue pbs_queue;
 

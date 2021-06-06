@@ -403,6 +403,8 @@ job_alloc(void)
 	}
 #endif
 
+	pthread_mutex_init(&pj->lock, NULL);
+
 	return (pj);
 }
 
@@ -629,6 +631,7 @@ job_free(job *pj)
 	/* They will be freed when the parent is removed           */
 
 	pj->ji_qs.ji_jobid[0] = 'X';	/* as a "freed" marker */
+	pthread_mutex_destroy(&pj->lock);
 	free(pj);	/* now free the main structure */
 }
 

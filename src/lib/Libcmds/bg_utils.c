@@ -151,7 +151,7 @@ get_comm_filename(char *cmd, char *tmpdir, char *server, char *cred_name)
 		((server == NULL || server[0] == 0) ?
 		"default" : server),
 		(unsigned long int)getuid(),
-		cred_name,
+		getenv("CLI_INST"),
 		get_conf_path(),
 		env_svr ? env_svr : "",
 		env_port ? env_port : "",

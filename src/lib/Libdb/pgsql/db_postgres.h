@@ -184,6 +184,8 @@ struct postgres_conn_data {
 };
 typedef struct postgres_conn_data pg_conn_data_t;
 
+extern pg_conn_data_t *get_db_conn_data();
+
 /**
  * @brief
  * Postgres transaction management helper structure.
@@ -195,8 +197,6 @@ struct pg_conn_trx
 	int conn_trx_async;	   /* 1 - async, 0 - sync, one-shot reset */
 };
 typedef struct pg_conn_trx pg_conn_trx_t;
-
-extern pg_conn_data_t *conn_data;
 extern pg_conn_trx_t *conn_trx;
 
 /**
@@ -280,37 +280,35 @@ typedef struct postgres_db_fn pg_db_fn_t;
  * - temp_int	  - array to use to convert int to network byte order
  * - temp_long	  - array to use to convery BIGINT to network byte order
  */
-#define SET_PARAM_STR(conn_data, itm, i)  \
-		((pg_conn_data_t *) conn_data)->paramValues[i] = (itm); \
+#define SET_PARAM_STR( itm, i)  \
+		get_db_conn_data()->paramValues[i] = (itm); \
 		if (itm) \
-				((pg_conn_data_t *) conn_data)->paramLengths[i] = strlen(itm); \
+				get_db_conn_data()->paramLengths[i] = strlen(itm); \
 		else \
-				((pg_conn_data_t *) conn_data)->paramLengths[i] = 0; \
-		((pg_conn_data_t *) conn_data)->paramFormats[i] = 0;
+				get_db_conn_data()->paramLengths[i] = 0; \
+		get_db_conn_data()->paramFormats[i] = 0;
 
-#define SET_PARAM_STRSZ(conn_data, itm, size, i)  \
-		((pg_conn_data_t *) conn_data)->paramValues[i] = (itm); \
-		((pg_conn_data_t *) conn_data)->paramLengths[i] = (size); \
-		((pg_conn_data_t *) conn_data)->paramFormats[i] = 0;
+#define SET_PARAM_STRSZ( itm, size, i)  \
+		get_db_conn_data()->paramValues[i] = (itm); \
+		get_db_conn_data()->paramLengths[i] = (size); \
+		get_db_conn_data()->paramFormats[i] = 0;
 
-#define SET_PARAM_INTEGER(conn_data, itm, i) \
-		((pg_conn_data_t *) conn_data)->temp_int[i] = (INTEGER) htonl(itm); \
-		((pg_conn_data_t *) conn_data)->paramValues[i] = \
-				(char *) &(((pg_conn_data_t *) conn_data)->temp_int[i]); \
-		((pg_conn_data_t *) conn_data)->paramLengths[i] = sizeof(int); \
-		((pg_conn_data_t *) conn_data)->paramFormats[i] = 1;
+#define SET_PARAM_INTEGER( itm, i) \
+		get_db_conn_data()->temp_int[i] = (INTEGER) htonl(itm); \
+		get_db_conn_data()->paramValues[i] = (char *) &(get_db_conn_data()->temp_int[i]); \
+		get_db_conn_data()->paramLengths[i] = sizeof(int); \
+		get_db_conn_data()->paramFormats[i] = 1;
 
-#define SET_PARAM_BIGINT(conn_data, itm, i) \
-		((pg_conn_data_t *) conn_data)->temp_long[i] = (BIGINT) htonll(itm); \
-		((pg_conn_data_t *) conn_data)->paramValues[i] = \
-				(char *) &(((pg_conn_data_t *) conn_data)->temp_long[i]); \
-		((pg_conn_data_t *) conn_data)->paramLengths[i] = sizeof(BIGINT); \
-		((pg_conn_data_t *) conn_data)->paramFormats[i] = 1;
+#define SET_PARAM_BIGINT( itm, i) \
+		get_db_conn_data()->temp_long[i] = (BIGINT) htonll(itm); \
+		get_db_conn_data()->paramValues[i] = (char *) &(get_db_conn_data()->temp_long[i]); \
+		get_db_conn_data()->paramLengths[i] = sizeof(BIGINT); \
+		get_db_conn_data()->paramFormats[i] = 1;
 
-#define SET_PARAM_BIN(conn_data, itm, len , i)  \
-		((pg_conn_data_t *) conn_data)->paramValues[i] = (itm); \
-		((pg_conn_data_t *) conn_data)->paramLengths[i] = (len); \
-		((pg_conn_data_t *) conn_data)->paramFormats[i] = 1;
+#define SET_PARAM_BIN( itm, len , i)  \
+		get_db_conn_data()->paramValues[i] = (itm); \
+		get_db_conn_data()->paramLengths[i] = (len); \
+		get_db_conn_data()->paramFormats[i] = 1;
 
 #define GET_PARAM_STR(res, row, itm, fnum)  \
 		strcpy((itm), PQgetvalue((res), (row), (fnum)));

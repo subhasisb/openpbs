@@ -346,8 +346,18 @@ extern char *parse_servername(char *, unsigned int *);
 extern int rand_num(void);
 extern int msvr_mode(void);
 
+typedef struct {
+	char *staticbuf;
+	int staticbufsize;
+	int   nkvelements;
+	struct key_value_pair *tpkv;
+	void *conn_data;
+} tls_t;
+
 /* thread utils */
 extern int init_mutex_attr_recursive(void *attr);
+extern int init_tls_key();
+extern tls_t *get_tls();
 
 #ifdef _USRDLL
 #ifdef DLL_EXPORT

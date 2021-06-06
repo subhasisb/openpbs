@@ -1500,13 +1500,13 @@ decode_depend(attribute *patr, char *name, char *rescn, char *val)
 	 * for each sub-string (terminated by comma or new-line),
 	 * add a depend or depend_child structure.
 	 */
-	valwd = parse_comma_string(val);
+	valwd = parse_comma_string_r(&val);
 	while (valwd) {
 		if ((rc=build_depend(patr, valwd)) != 0) {
 			free_depend(patr);
 			return (rc);
 		}
-		valwd = parse_comma_string(NULL);
+		valwd = parse_comma_string_r(&val);
 	}
 
 	mark_attr_set(patr);

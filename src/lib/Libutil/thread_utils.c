@@ -47,6 +47,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <pthread.h>
+#include "libutil.h"
 
 /**
  * @brief	initialize a mutex attr object
@@ -58,7 +59,7 @@
  * @retval -1 for Error
  */
 int
-init_mutex_attr_recursive(pthread_mutexattr_t *attr)
+init_mutex_attr_recursive(void *attr)
 {
 	if (pthread_mutexattr_init(attr) != 0) {
 		return -1;
@@ -75,4 +76,60 @@ init_mutex_attr_recursive(pthread_mutexattr_t *attr)
 	}
 
 	return 0;
+}
+
+static pthread_key_t app_key_tls;
+static pthread_once_t app_once_ctrl = PTHREAD_ONCE_INIT; /* once ctrl to initialize tls key */
+
+static void
+app_init_tls_key_once(void)
+{
+	if (pthread_key_create(&app_key_tls, NULL) != 0) {
+		fprintf(stderr, "Failed to initialize TLS key\n");
+	}
+}
+
+int
+init_tls_key()
+{
+	if (pthread_once(&app_once_ctrl, app_init_tls_key_once) != 0)
+		return -1;
+	return 0;
+}
+
+/**
+ * @brief
+ *	Get the data from the thread TLS
+ *
+ * @return	Pointer of the tpp_thread_data structure from threads TLS
+ * @retval	NULL - Pthread functions failed
+ * @retval	!NULl - Data from TLS
+ *
+ * @par Side Effects:
+ *	None
+ *
+ * @par MT-safe: Yes
+ *
+ */
+tls_t *
+get_tls()
+{
+	tls_t *ptr;
+	if ((ptr = pthread_getspecific(app_key_tls)) == NULL) {
+		ptr = calloc(1, sizeof(tls_t));
+		if (!ptr)
+			return NULL;
+
+		ptr->staticbuf = NULL;
+		ptr->staticbufsize = 0;
+		ptr->nkvelements = 0;
+		ptr->tpkv = NULL;
+		ptr->conn_data = NULL;
+
+		if (pthread_setspecific(app_key_tls, ptr) != 0) {
+			free(ptr);
+			return NULL;
+		}
+	}
+	return (tls_t *) ptr; /* thread data already initialized */
 }

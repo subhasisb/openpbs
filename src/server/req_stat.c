@@ -811,9 +811,11 @@ req_stat_svr(struct batch_request *preq)
 
 	/* update count and state counts from sv_numjobs and sv_jobstates */
 	set_sattr_l_slim(SVR_ATR_TotalJobs, server.sv_qs.sv_numjobs, SET);
+	pthread_mutex_lock(&server.lock);
 	update_state_ct(get_sattr(SVR_ATR_JobsByState), server.sv_jobstates, &svr_attr_def[SVR_ATR_JobsByState]);
 
 	update_license_ct();
+	pthread_mutex_unlock(&server.lock);
 
 	conn = get_conn(preq->rq_conn);
 	if (!conn) {

@@ -104,7 +104,6 @@ void *entlim_get_next(void *ctx, void **key);
 int entlim_parse(char *str, char *resc, void *ctx,
 		 int (*addfunc)(void *ctx, enum lim_keytypes kt, char *fulent,
 				char *entname, char *resc, char *value));
-char *parse_comma_string_r(char **start);
 char *entlim_mk_runkey(enum lim_keytypes kt, const char *entity);
 char *entlim_mk_reskey(enum lim_keytypes kt, const char *entity, const char *resc);
 int entlim_resc_from_key(char *key, char *rtnresc, size_t ln);

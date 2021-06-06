@@ -135,7 +135,7 @@ pbs_db_save_sched(void *conn, pbs_db_obj_info_t *obj, int savetype)
 	int rc = 0;
 	char *raw_array = NULL;
 
-	SET_PARAM_STR(conn_data, psch->sched_name, 0);
+	SET_PARAM_STR( psch->sched_name, 0);
 
 	/* sched does not have a QS area, so ignoring that */
 
@@ -145,7 +145,7 @@ pbs_db_save_sched(void *conn, pbs_db_obj_info_t *obj, int savetype)
 		if ((len = attrlist_to_dbarray(&raw_array, &psch->db_attr_list)) <= 0)
 			return -1;
 
-		SET_PARAM_BIN(conn_data, raw_array, len, 1);
+		SET_PARAM_BIN( raw_array, len, 1);
 		stmt = STMT_UPDATE_SCHED;
 		params = 2;
 	}
@@ -214,7 +214,7 @@ pbs_db_load_sched(void *conn, pbs_db_obj_info_t *obj)
 	int rc;
 	pbs_db_sched_info_t *psch = obj->pbs_db_un.pbs_db_sched;
 
-	SET_PARAM_STR(conn_data, psch->sched_name, 0);
+	SET_PARAM_STR( psch->sched_name, 0);
 
 	if ((rc = db_query(conn, STMT_SELECT_SCHED, 1, &res)) != 0)
 		return rc;
@@ -287,8 +287,8 @@ pbs_db_del_attr_sched(void *conn, void *obj_id, pbs_db_attr_list_t *attr_list)
 	if ((len = attrlist_to_dbarray_ex(&raw_array, attr_list, 1)) <= 0)
 		return -1;
 
-	SET_PARAM_STR(conn_data, obj_id, 0);
-	SET_PARAM_BIN(conn_data, raw_array, len, 1);
+	SET_PARAM_STR( obj_id, 0);
+	SET_PARAM_BIN( raw_array, len, 1);
 
 	rc = db_cmd(conn, STMT_REMOVE_SCHEDATTRS, 2);
 
@@ -333,6 +333,6 @@ int
 pbs_db_delete_sched(void *conn, pbs_db_obj_info_t *obj)
 {
 	pbs_db_sched_info_t *sc = obj->pbs_db_un.pbs_db_sched;
-	SET_PARAM_STR(conn_data, sc->sched_name, 0);
+	SET_PARAM_STR( sc->sched_name, 0);
 	return (db_cmd(conn, STMT_DELETE_SCHED, 1));
 }

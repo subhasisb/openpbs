@@ -134,6 +134,8 @@ que_alloc(char *name)
 	for (i = 0; i < (int) QA_ATR_LAST; i++)
 		clear_attr(get_qattr(pq, i), &que_attr_def[i]);
 
+	pthread_mutex_init(&pq->lock, NULL);
+
 	return (pq);
 }
 

@@ -1797,9 +1797,9 @@ decode_Mom_list(attribute *patr, char *name, char *rescn, char *val)
 	 * decode_arst() that alters the static variable in parse_comma_string().
 	 */
 	str_arr[0]=NULL;
-	p = parse_comma_string(val);
+	p = parse_comma_string_r(&val);
 	for (i = 0; (str_arr[i] = p) != NULL; i++)
-		p = parse_comma_string(NULL);
+		p = parse_comma_string_r(&val);
 
 	for (i = 0; (p = str_arr[i]) != NULL; i++) {
 		clear_attr(&new, &node_attr_def[(int)ND_ATR_Mom]);

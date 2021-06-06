@@ -263,6 +263,7 @@ svr_enquejob(job *pjob, char *selectspec)
 
 	update_job_timedlist(pjob); /* add to the latest jobs list */
 
+	pthread_mutex_lock(&server.lock);
 	pjcur = (job *)GET_PRIOR(svr_alljobs);
 	while (pjcur) {
 		if (get_jattr_ll(pjob, JOB_ATR_qrank) >= get_jattr_ll(pjcur, JOB_ATR_qrank))
@@ -278,10 +279,12 @@ svr_enquejob(job *pjob, char *selectspec)
 	if (state_num != -1)
 		server.sv_jobstates[state_num]++;
 
+	pthread_mutex_unlock(&server.lock);
+
 	/* place into queue in order of queue rank starting at end */
 
 	pjob->ji_qhdr = pque;
-
+	pthread_mutex_lock(&pque->lock);
 	pjcur = (job *)GET_PRIOR(pque->qu_jobs);
 	while (pjcur) {
 		if (get_jattr_ll(pjob, JOB_ATR_qrank) >= get_jattr_ll(pjcur, JOB_ATR_qrank))
@@ -298,6 +301,8 @@ svr_enquejob(job *pjob, char *selectspec)
 	pque->qu_numjobs++;
 	if (state_num != -1)
 		pque->qu_njstate[state_num]++;
+
+	pthread_mutex_unlock(&pque->lock);
 
 	if ((check_job_state(pjob, JOB_STATE_LTR_MOVED)) || (check_job_state(pjob, JOB_STATE_LTR_FINISHED))) {
 		return (0);
@@ -431,12 +436,14 @@ svr_dequejob(job *pjob)
 	int state_num;
 
 	/* remove job from server's all job list and reduce server counts */
+	pthread_mutex_lock(&server.lock);
 
 	if (is_linked(&svr_alljobs, &pjob->ji_alljobs)) {
 		int state_num;
 
 		delete_link(&pjob->ji_alljobs);
 		delete_link(&pjob->ji_unlicjobs);
+		
 		if (pbs_idx_delete(jobs_idx, pjob->ji_qs.ji_jobid) != PBS_IDX_RET_OK)
 			log_joberr(PBSE_INTERNAL, __func__, "Failed to delete job from index", pjob->ji_qs.ji_jobid);
 		if (--server.sv_qs.sv_numjobs < 0)
@@ -446,8 +453,11 @@ svr_dequejob(job *pjob)
 		if (state_num != -1 && --server.sv_jobstates[state_num] < 0)
 			bad_ct = 1;
 	}
+	pthread_mutex_unlock(&server.lock);
 
 	if ((pque = pjob->ji_qhdr) != NULL) {
+
+		pthread_mutex_lock(&pque->lock);
 
 		/* update any entity count and entity resources usage at que */
 
@@ -465,6 +475,8 @@ svr_dequejob(job *pjob)
 				bad_ct = 1;
 		}
 		pjob->ji_qhdr = NULL;
+
+		pthread_mutex_unlock(&pque->lock);
 	}
 
 #ifndef NDEBUG
@@ -1902,8 +1914,9 @@ set_chunk_sum(attribute  *pselectattr, attribute *pattr)
 	if ((pselectattr == NULL) || (pattr == NULL))
 		return 0;
 
-	/* first clear the summation table used later */
+	pthread_mutex_lock(&server.lock);
 
+	/* first clear the summation table used later */
 	for (i=0; svr_resc_sum[i].rs_def; ++i) {
 		(void)memset((char *)&svr_resc_sum[i].rs_attr, 0, sizeof(struct attribute));
 
@@ -1962,6 +1975,7 @@ set_chunk_sum(attribute  *pselectattr, attribute *pattr)
 				}
 			}
 		} else {
+			pthread_mutex_unlock(&server.lock);
 			return (PBSE_BADATVAL);
 		}
 		chunk = parse_plus_spec(NULL, &rc);
@@ -1971,8 +1985,10 @@ set_chunk_sum(attribute  *pselectattr, attribute *pattr)
 
 	/* check that the user asked for at least one chunk total */
 
-	if (total_chunks <= 0)
+	if (total_chunks <= 0) {
+		pthread_mutex_unlock(&server.lock);
 		return (PBSE_BADATVAL);
+	}
 
 	/*
 	 * now that we have summed up the chunks, for each one summed (set) ...
@@ -2008,6 +2024,7 @@ set_chunk_sum(attribute  *pselectattr, attribute *pattr)
 			presc->rs_value.at_flags |= ATR_VFLAG_DEFLT | ATR_SET_MOD_MCACHE;
 		}
 	}
+	pthread_mutex_unlock(&server.lock);
 	return 0;
 }
 
@@ -2052,6 +2069,7 @@ make_schedselect(attribute *patrl, resource *pselect,
 		(void)decode_str(psched, NULL, NULL, sched_select_out);
 		psched->at_flags |= ATR_VFLAG_DEFLT;
 	}
+	free(sched_select_out);
 	return (rc);
 }
 

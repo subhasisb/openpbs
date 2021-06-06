@@ -302,7 +302,9 @@ generate_objid(char *idbuf, char *clusterid, int objtype, char resv_char)
  * @param[in] - ptr to the decoded request
  *
  */
-
+#ifndef PBS_MOM
+static pthread_mutex_t qmutex = PTHREAD_MUTEX_INITIALIZER;
+#endif
 void
 req_quejob(struct batch_request *preq)
 {
@@ -444,16 +446,25 @@ req_quejob(struct batch_request *preq)
 			}
 			psatl = (svrattrl *)GET_NEXT(psatl->al_link);
 		}
+		
+		pthread_mutex_lock(&qmutex);
+
 		/* fetch job id locally*/
 		if ((next_svr_sequence_id = get_next_svr_sequence_id()) == -1) {
+			pthread_mutex_unlock(&qmutex);
 			req_reject(PBSE_SYSTEM, 0, preq);
 			return;
 		}
 		created_here = JOB_SVFLG_HERE;
 		if (generate_objid(jidbuf, server_name, i, '\0') != 0) {
+			pthread_mutex_unlock(&qmutex);
 			req_reject(PBSE_INTERNAL, 0, preq);
 			return;
 		}
+		log_errf(-1, __func__, "Generated id %s", jidbuf);
+		
+		pthread_mutex_unlock(&qmutex);
+
 		jid = jidbuf;
 	}
 

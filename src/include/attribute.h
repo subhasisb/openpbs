@@ -352,7 +352,7 @@ extern int str_array_to_svrattrl(char **str_array, pbs_list_head *to_head, char 
 extern char *str_array_to_str(char **str_array, char delimiter);
 extern char *env_array_to_str(char **env_array, char delimiter);
 extern char **str_to_str_array(char *str, char delimiter);
-extern char *strtok_quoted(char *source, char delimiter);
+extern char *strtok_quoted(char *source, char delimiter, char **saveptr);
 
 extern int  decode_b  (attribute *patr, char *name, char *rn, char *val);
 extern int  decode_c  (attribute *patr, char *name, char *rn, char *val);
@@ -465,6 +465,7 @@ extern void free_depend(attribute *attr);
 extern void free_unkn(attribute *attr);
 extern int   parse_equal_string(char  *start, char **name, char **value);
 extern char *parse_comma_string(char *start);
+extern char *parse_comma_string_r(char **start);
 extern char *return_external_value(char *name, char *val);
 extern char *return_internal_value(char *name, char *val);
 

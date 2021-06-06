@@ -273,7 +273,6 @@ done:
 		if (rc == -1)
 			panic_stop_db();
 	}
-
 	return (rc);
 }
 

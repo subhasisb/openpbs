@@ -187,10 +187,10 @@ pbs_db_save_que(void *conn, pbs_db_obj_info_t *obj, int savetype)
 	int rc = 0;
 	char *raw_array = NULL;
 
-	SET_PARAM_STR(conn_data, pq->qu_name, 0);
+	SET_PARAM_STR( pq->qu_name, 0);
 
 	if (savetype & OBJ_SAVE_QS) {
-		SET_PARAM_INTEGER(conn_data, pq->qu_type, 1);
+		SET_PARAM_INTEGER( pq->qu_type, 1);
 		params = 2;
 		stmt = STMT_UPDATE_QUE_QUICK;
 	} 
@@ -202,11 +202,11 @@ pbs_db_save_que(void *conn, pbs_db_obj_info_t *obj, int savetype)
 			return -1;
 
 		if (savetype & OBJ_SAVE_QS) {
-			SET_PARAM_BIN(conn_data, raw_array, len, 2);
+			SET_PARAM_BIN( raw_array, len, 2);
 			params = 3;
 			stmt = STMT_UPDATE_QUE;
 		} else {
-			SET_PARAM_BIN(conn_data, raw_array, len, 1);
+			SET_PARAM_BIN( raw_array, len, 1);
 			params = 2;
 			stmt = STMT_UPDATE_QUE_ATTRSONLY;
 		}
@@ -241,7 +241,7 @@ pbs_db_load_que(void *conn, pbs_db_obj_info_t *obj)
 	int rc;
 	pbs_db_que_info_t *pq = obj->pbs_db_un.pbs_db_que;
 
-	SET_PARAM_STR(conn_data, pq->qu_name, 0);
+	SET_PARAM_STR( pq->qu_name, 0);
 
 	if ((rc = db_query(conn, STMT_SELECT_QUE, 1, &res)) != 0)
 		return rc;
@@ -328,7 +328,7 @@ int
 pbs_db_delete_que(void *conn, pbs_db_obj_info_t *obj)
 {
 	pbs_db_que_info_t *pq = obj->pbs_db_un.pbs_db_que;
-	SET_PARAM_STR(conn_data, pq->qu_name, 0);
+	SET_PARAM_STR( pq->qu_name, 0);
 	return (db_cmd(conn, STMT_DELETE_QUE, 1));
 }
 
@@ -356,8 +356,8 @@ pbs_db_del_attr_que(void *conn, void *obj_id, pbs_db_attr_list_t *attr_list)
 	if ((len = attrlist_to_dbarray_ex(&raw_array, attr_list, 1)) <= 0)
 		return -1;
 
-	SET_PARAM_STR(conn_data, obj_id, 0);
-	SET_PARAM_BIN(conn_data, raw_array, len, 1);
+	SET_PARAM_STR( obj_id, 0);
+	SET_PARAM_BIN( raw_array, len, 1);
 
 	rc = db_cmd(conn, STMT_REMOVE_QUEATTRS, 2);
 

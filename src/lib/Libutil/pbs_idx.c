@@ -42,10 +42,11 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+#include <pthread.h>
 
 /* iteration context structure, opaque to application */
 typedef struct _iter_ctx {
-	AVL_IX_DESC *idx; /* pointer to idx */
+	void *idx; /* pointer to idx */
 	AVL_IX_REC *pkey; /* pointer to key used while iteration */
 } iter_ctx;
 
@@ -61,10 +62,17 @@ typedef struct _iter_ctx {
  * @retval NULL  - failure
  *
  */
+
+typedef struct {
+	void *idx;
+	pthread_mutex_t mutex;
+} pbs_index_t;
+
 void *
 pbs_idx_create(int flags, int keylen)
 {
 	void *idx = NULL;
+	pbs_index_t *pbs_idx = malloc(sizeof(pbs_index_t));
 
 	idx = malloc(sizeof(AVL_IX_DESC));
 	if (idx == NULL)
@@ -75,7 +83,10 @@ pbs_idx_create(int flags, int keylen)
 		return NULL;
 	}
 
-	return idx;
+	pbs_idx->idx = idx;
+	pthread_mutex_init(&pbs_idx->mutex, NULL);
+
+	return (void *) pbs_idx;
 }
 
 /**
@@ -90,9 +101,11 @@ pbs_idx_create(int flags, int keylen)
 void
 pbs_idx_destroy(void *idx)
 {
+	pbs_index_t *pbs_idx = idx;
 	if (idx != NULL) {
-		avl_destroy_index(idx);
-		free(idx);
+		avl_destroy_index(pbs_idx->idx);
+		free(pbs_idx->idx);
+		free(pbs_idx);
 		idx = NULL;
 	}
 }
@@ -114,20 +127,27 @@ int
 pbs_idx_insert(void *idx, void *key, void *data)
 {
 	AVL_IX_REC *pkey;
+	pbs_index_t *pbs_idx = idx;
 
 	if (idx == NULL || key == NULL)
 		return PBS_IDX_RET_FAIL;
 
-	pkey = avlkey_create(idx, key);
-	if (pkey == NULL)
+	pthread_mutex_lock(&pbs_idx->mutex);
+
+	pkey = avlkey_create(pbs_idx->idx, key);
+	if (pkey == NULL) {
+		pthread_mutex_unlock(&pbs_idx->mutex);
 		return PBS_IDX_RET_FAIL;
+	}
 
 	pkey->recptr = data;
-	if (avl_add_key(pkey, idx) != AVL_IX_OK) {
+	if (avl_add_key(pkey, pbs_idx->idx) != AVL_IX_OK) {
+		pthread_mutex_unlock(&pbs_idx->mutex);
 		free(pkey);
 		return PBS_IDX_RET_FAIL;
 	}
 	free(pkey);
+	pthread_mutex_unlock(&pbs_idx->mutex);
 	return PBS_IDX_RET_OK;
 }
 
@@ -147,17 +167,25 @@ int
 pbs_idx_delete(void *idx, void *key)
 {
 	AVL_IX_REC *pkey;
+	pbs_index_t *pbs_idx = idx;
+
 
 	if (idx == NULL || key == NULL)
 		return PBS_IDX_RET_FAIL;
 
+	pthread_mutex_lock(&pbs_idx->mutex);
+
 	pkey = avlkey_create(idx, key);
-	if (pkey == NULL)
+	if (pkey == NULL) {
+		pthread_mutex_unlock(&pbs_idx->mutex);
 		return PBS_IDX_RET_FAIL;
+	}
 
 	pkey->recptr = NULL;
-	avl_delete_key(pkey, idx);
+	avl_delete_key(pkey, pbs_idx->idx);
 	free(pkey);
+
+	pthread_mutex_unlock(&pbs_idx->mutex);
 	return PBS_IDX_RET_OK;
 }
 
@@ -177,11 +205,16 @@ int
 pbs_idx_delete_byctx(void *ctx)
 {
 	iter_ctx *pctx = (iter_ctx *) ctx;
+	pbs_index_t *pbs_idx = pctx->idx;
 
 	if (pctx == NULL || pctx->idx == NULL || pctx->pkey == NULL)
 		return PBS_IDX_RET_FAIL;
 
+	pthread_mutex_lock(&pbs_idx->mutex);
+
 	avl_delete_key(pctx->pkey, pctx->idx);
+	
+	pthread_mutex_unlock(&pbs_idx->mutex);
 	return PBS_IDX_RET_OK;
 }
 
@@ -209,14 +242,17 @@ pbs_idx_delete_byctx(void *ctx)
  *
  */
 int
-pbs_idx_find(void *idx, void **key, void **data, void **ctx)
+pbs_idx_find(void *pbs_idx, void **key, void **data, void **ctx)
 {
 	iter_ctx *pctx;
 	AVL_IX_REC *pkey;
 	int rc = AVL_IX_FAIL;
+	void *idx = ((pbs_index_t *) pbs_idx)->idx;
 
 	if (idx == NULL || data == NULL)
 		return PBS_IDX_RET_FAIL;
+
+	pthread_mutex_lock(&((pbs_index_t *) pbs_idx)->mutex);
 
 	if (ctx != NULL && *ctx != NULL) {
 		pctx = (iter_ctx *) *ctx;
@@ -225,22 +261,29 @@ pbs_idx_find(void *idx, void **key, void **data, void **ctx)
 		if (key)
 			*key = NULL;
 
-		if (pctx->idx != idx || pctx->pkey == NULL)
+		if (pctx->idx != idx || pctx->pkey == NULL) {
+			pthread_mutex_unlock(&((pbs_index_t *) pbs_idx)->mutex);
 			return PBS_IDX_RET_FAIL;
+		}
 
-		if (avl_next_key(pctx->pkey, pctx->idx) != AVL_IX_OK)
+		if (avl_next_key(pctx->pkey, pctx->idx) != AVL_IX_OK) {
+			pthread_mutex_unlock(&((pbs_index_t *) pbs_idx)->mutex);
 			return PBS_IDX_RET_FAIL;
+		}
 
 		*data = pctx->pkey->recptr;
 		if (key)
 			*key = &pctx->pkey->key;
 
+		pthread_mutex_unlock(&((pbs_index_t *) pbs_idx)->mutex);
 		return PBS_IDX_RET_OK;
 	} else {
 		*data = NULL;
 		pkey = avlkey_create(idx, key ? *key : NULL);
-		if (pkey == NULL)
+		if (pkey == NULL) {
+			pthread_mutex_unlock(&((pbs_index_t *) pbs_idx)->mutex);
 			return PBS_IDX_RET_FAIL;
+		}
 
 		if (key != NULL && *key != NULL) {
 			rc = avl_find_key(pkey, idx);
@@ -257,18 +300,21 @@ pbs_idx_find(void *idx, void **key, void **data, void **ctx)
 				pctx = (iter_ctx *) malloc(sizeof(iter_ctx));
 				if (pctx == NULL) {
 					free(pkey);
+					pthread_mutex_unlock(&((pbs_index_t *) pbs_idx)->mutex);
 					return PBS_IDX_RET_FAIL;
 				}
 				pctx->idx = idx;
 				pctx->pkey = pkey;
 				*ctx = (void *) pctx;
 
+				pthread_mutex_unlock(&((pbs_index_t *) pbs_idx)->mutex);
 				return PBS_IDX_RET_OK;
 			}
 		}
 		free(pkey);
 	}
 
+	pthread_mutex_unlock(&((pbs_index_t *) pbs_idx)->mutex);
 	return rc == AVL_IX_OK ? PBS_IDX_RET_OK : PBS_IDX_RET_FAIL;
 }
 

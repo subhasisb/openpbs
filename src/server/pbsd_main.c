@@ -106,6 +106,7 @@
 #include <pbs_python.h>  /* for python interpreter */
 #include "pbs_undolr.h"
 #include "auth.h"
+#include "thpool.h"
 
 #include "pbs_v1_module_common.i"
 
@@ -136,7 +137,7 @@ static void   lock_out(int, int);
 #define HOT_START_PING_RATE		15
 
 /* Global Data Items */
-
+threadpool thpool = NULL;
 int		stalone = 0;	/* is program running not as a service ? */
 char		*acct_file = NULL;
 char		daemonname[PBS_MAXHOSTNAME+8];
@@ -1098,7 +1099,9 @@ main(int argc, char **argv)
 		log_close(1);
 		return (0);
 	}
-
+	
+	init_tls_key();
+	
 	/* initialize the network interface */
 
 	if ((sock = init_network(pbs_server_port_dis)) < 0) {
@@ -1322,6 +1325,8 @@ main(int argc, char **argv)
 	}
 	process_hooks(periodic_req, hook_msg, sizeof(hook_msg), pbs_python_set_interrupt);
 
+	thpool = thpool_init(24);
+
 	/*
 	 * main loop of server
 	 * stays in this loop until server's state is either
@@ -1455,10 +1460,13 @@ main(int argc, char **argv)
 	}
 	DBPRT(("Server out of main loop, state is %ld\n", *state))
 
-	/* set the current seq id to the last id before final save */
+	pthread_mutex_lock(&server.lock);
+
+	/* set the current seq id to the last id before final save */	
 	server.sv_qs.sv_lastid = server.sv_qs.sv_jobidnumber;
 	svr_save_db(&server);	/* final recording of server */
 	track_save(NULL);	/* save tracking data	     */
+
 
 	/* if brought up the Secondary Scheduler, take it down */
 
@@ -1469,6 +1477,8 @@ main(int argc, char **argv)
 
 	if (state != SV_STATE_SECIDLE && (shutdown_who & SHUT_WHO_MOM))
 		shutdown_nodes();
+
+	pthread_mutex_unlock(&server.lock);
 
 	/* if brought up the DB, take it down */
 	stop_db();

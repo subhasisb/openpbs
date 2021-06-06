@@ -357,24 +357,24 @@ pbs_db_save_job(void *conn, pbs_db_obj_info_t *obj, int savetype)
 	int rc = 0;
 	char *raw_array = NULL;
 
-	SET_PARAM_STR(conn_data, pjob->ji_jobid, 0);
+	SET_PARAM_STR( pjob->ji_jobid, 0);
 
 	if (savetype & OBJ_SAVE_QS) {
-		SET_PARAM_INTEGER(conn_data, pjob->ji_state, 1);
-		SET_PARAM_INTEGER(conn_data, pjob->ji_substate, 2);
-		SET_PARAM_INTEGER(conn_data, pjob->ji_svrflags, 3);
-		SET_PARAM_BIGINT(conn_data, pjob->ji_stime, 4);
-		SET_PARAM_STR(conn_data, pjob->ji_queue, 5);
-		SET_PARAM_STR(conn_data, pjob->ji_destin, 6);
-		SET_PARAM_INTEGER(conn_data, pjob->ji_un_type, 7);
-		SET_PARAM_INTEGER(conn_data, pjob->ji_exitstat, 8);
-		SET_PARAM_BIGINT(conn_data, pjob->ji_quetime, 9);
-		SET_PARAM_BIGINT(conn_data, pjob->ji_rteretry, 10);
-		SET_PARAM_INTEGER(conn_data, pjob->ji_fromsock, 11);
-		SET_PARAM_BIGINT(conn_data, pjob->ji_fromaddr, 12);
-		SET_PARAM_STR(conn_data, pjob->ji_jid, 13);
-		SET_PARAM_INTEGER(conn_data, pjob->ji_credtype, 14);
-		SET_PARAM_BIGINT(conn_data, pjob->ji_qrank, 15);
+		SET_PARAM_INTEGER( pjob->ji_state, 1);
+		SET_PARAM_INTEGER( pjob->ji_substate, 2);
+		SET_PARAM_INTEGER( pjob->ji_svrflags, 3);
+		SET_PARAM_BIGINT( pjob->ji_stime, 4);
+		SET_PARAM_STR( pjob->ji_queue, 5);
+		SET_PARAM_STR( pjob->ji_destin, 6);
+		SET_PARAM_INTEGER( pjob->ji_un_type, 7);
+		SET_PARAM_INTEGER( pjob->ji_exitstat, 8);
+		SET_PARAM_BIGINT( pjob->ji_quetime, 9);
+		SET_PARAM_BIGINT( pjob->ji_rteretry, 10);
+		SET_PARAM_INTEGER( pjob->ji_fromsock, 11);
+		SET_PARAM_BIGINT( pjob->ji_fromaddr, 12);
+		SET_PARAM_STR( pjob->ji_jid, 13);
+		SET_PARAM_INTEGER( pjob->ji_credtype, 14);
+		SET_PARAM_BIGINT( pjob->ji_qrank, 15);
 
 		stmt = STMT_UPDATE_JOB_QUICK;
 		params = 16;
@@ -388,11 +388,11 @@ pbs_db_save_job(void *conn, pbs_db_obj_info_t *obj, int savetype)
 			return -1;
 
 		if (savetype & OBJ_SAVE_QS) {
-			SET_PARAM_BIN(conn_data, raw_array, len, 16);
+			SET_PARAM_BIN( raw_array, len, 16);
 			params = 17;
 			stmt = STMT_UPDATE_JOB;
 		} else {
-			SET_PARAM_BIN(conn_data, raw_array, len, 1);
+			SET_PARAM_BIN( raw_array, len, 1);
 			params = 2;
 			stmt = STMT_UPDATE_JOB_ATTRSONLY;
 		}
@@ -428,7 +428,7 @@ pbs_db_load_job(void *conn, pbs_db_obj_info_t *obj)
 	int rc;
 	pbs_db_job_info_t *pj = obj->pbs_db_un.pbs_db_job;
 
-	SET_PARAM_STR(conn_data, pj->ji_jobid, 0);
+	SET_PARAM_STR( pj->ji_jobid, 0);
 
 	if ((rc = db_query(conn, STMT_SELECT_JOB, 1, &res)) != 0)
 		return rc;
@@ -465,12 +465,13 @@ pbs_db_find_job(void *conn, void *st, pbs_db_obj_info_t *obj,
 	pbs_db_job_info_t *pdjob = obj->pbs_db_un.pbs_db_job;
 	int rc;
 	int params;
+	
 
 	if (!state)
 		return -1;
 
 	if (opts != NULL && opts->flags == FIND_JOBS_BY_QUE) {
-		SET_PARAM_STR(conn_data, pdjob->ji_queue, 0);
+		SET_PARAM_STR(pdjob->ji_queue, 0);
 		params=1;
 		strcpy(conn_sql, STMT_FINDJOBS_BYQUE_ORDBY_QRANK);
 	} else {
@@ -527,7 +528,7 @@ pbs_db_delete_job(void *conn, pbs_db_obj_info_t *obj)
 	pbs_db_job_info_t *pj = obj->pbs_db_un.pbs_db_job;
 	int rc = 0;
 
-	SET_PARAM_STR(conn_data, pj->ji_jobid, 0);
+	SET_PARAM_STR( pj->ji_jobid, 0);
 
 	if ((rc = db_cmd(conn, STMT_DELETE_JOB, 1)) == -1)
 		goto err;
@@ -559,7 +560,7 @@ pbs_db_save_jobscr(void *conn, pbs_db_obj_info_t *obj, int savetype)
 {
 	pbs_db_jobscr_info_t *pscr = obj->pbs_db_un.pbs_db_jobscr;
 
-	SET_PARAM_STR(conn_data, pscr->ji_jobid, 0);
+	SET_PARAM_STR( pscr->ji_jobid, 0);
 
 	/*
 	 * The script data could contain non-UTF8 characters. We therefore
@@ -568,7 +569,7 @@ pbs_db_save_jobscr(void *conn, pbs_db_obj_info_t *obj, int savetype)
 	 * and so we use the function "LOAD_BIN" to load the parameter to
 	 * the prepared statement
 	 */
-	SET_PARAM_BIN(conn_data, pscr->script, (pscr->script)?strlen(pscr->script):0, 1);
+	SET_PARAM_BIN( pscr->script, (pscr->script)?strlen(pscr->script):0, 1);
 
 	return (db_cmd(conn, STMT_INSERT_JOBSCR, 2));
 }
@@ -593,7 +594,7 @@ pbs_db_load_jobscr(void *conn, pbs_db_obj_info_t *obj)
 	char *script = NULL;
 	static int script_fnum = -1;
 
-	SET_PARAM_STR(conn_data, pscr->ji_jobid, 0);
+	SET_PARAM_STR( pscr->ji_jobid, 0);
 
 	/*
 	 * The data (script) we stored was a "encoded" binary. We "decode" it
@@ -644,8 +645,8 @@ pbs_db_del_attr_job(void *conn, void *obj_id, pbs_db_attr_list_t *attr_list)
 	if ((len = attrlist_to_dbarray_ex(&raw_array, attr_list, 1)) <= 0)
 		return -1;
 
-	SET_PARAM_STR(conn_data, obj_id, 0);
-	SET_PARAM_BIN(conn_data, raw_array, len, 1);
+	SET_PARAM_STR( obj_id, 0);
+	SET_PARAM_BIN( raw_array, len, 1);
 
 	rc = db_cmd(conn, STMT_REMOVE_JOBATTRS, 2);
 

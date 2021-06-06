@@ -109,6 +109,7 @@ struct server {
 	int sv_provtracksize;		     /* total number of sv_prov_track entries */
 	struct prov_tracking *sv_prov_track; /* array of provision records */
 	int sv_cur_prov_records;	     /* number of provisiong requests currently running */
+	pthread_mutex_t lock;
 };
 
 extern struct server	server;

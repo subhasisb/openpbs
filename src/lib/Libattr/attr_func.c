@@ -1154,6 +1154,7 @@ str_to_str_array(char *str, char delimiter)
 	char 	**str_array = NULL;
 	char	*str1;
 	char	*p;
+	char *saveptr;
 
 	if (str == NULL)
 		return NULL;
@@ -1166,10 +1167,10 @@ str_to_str_array(char *str, char delimiter)
 		return NULL;
 
 	len=0;
-	p = strtok_quoted(str1, delimiter);
+	p = strtok_quoted(str1, delimiter, &saveptr);
 	while (p) {
 		len++;
-		p = strtok_quoted(NULL, delimiter);
+		p = strtok_quoted(NULL, delimiter, &saveptr);
 	}
 	(void)free(str1);
 
@@ -1183,7 +1184,7 @@ str_to_str_array(char *str, char delimiter)
 		free_str_array(str_array);
 		return NULL;
 	}
-	p = strtok_quoted(str1, delimiter);
+	p = strtok_quoted(str1, delimiter, &saveptr);
 	i = 0;
 	while (p) {
 		str_array[i] = strdup(p);
@@ -1193,7 +1194,7 @@ str_to_str_array(char *str, char delimiter)
 			return NULL;
 		}
 		i++;
-		p = strtok_quoted(NULL, delimiter);
+		p = strtok_quoted(NULL, delimiter, &saveptr);
 	}
 	free(str1);
 
@@ -1370,7 +1371,7 @@ prune_esc_backslash(char *str)
  * @retval	NULL if end of processing, or problem found with quoted string.
  */
 char *
-strtok_quoted(char *source, char delimiter)
+strtok_quoted(char *source, char delimiter, char **saveptr)
 {
 	static char *pc = NULL;	/* save pointer position */
 	char *stok = NULL;  	/* token to return */
@@ -1378,7 +1379,8 @@ strtok_quoted(char *source, char delimiter)
 
 	if (source != NULL) {
 		pc = source;
-	}
+	} else 
+		pc = *saveptr;
 
 	if ((pc == NULL) || (*pc == '\0'))
 		return NULL;

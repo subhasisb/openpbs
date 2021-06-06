@@ -205,6 +205,7 @@ init_server_attrs()
 	resource        *presc = NULL;
 	int 		i = 0;
 
+	pthread_mutex_init(&server.lock, NULL);
 
 	for (i = 0; i < SVR_ATR_LAST; i++)
 		clear_attr(get_sattr(i), &svr_attr_def[i]);

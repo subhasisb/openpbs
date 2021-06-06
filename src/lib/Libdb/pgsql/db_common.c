@@ -60,11 +60,11 @@
 #include "ticket.h"
 #include "log.h"
 #include "server_limits.h"
+#include "pthread.h"
 
 #define IPV4_STR_LEN 15
 
 char *errmsg_cache = NULL;
-pg_conn_data_t *conn_data = NULL;
 pg_conn_trx_t *conn_trx = NULL;
 static char pg_ctl[MAXPATHLEN + 1] = "";
 static char *pg_user = NULL;
@@ -80,6 +80,8 @@ extern char *pbs_get_dataservice_usr(char *, int);
 extern int pbs_decrypt_pwd(char *, int, size_t, char **, const unsigned char *, const unsigned char *);
 extern unsigned char pbs_aes_key[][16];
 extern unsigned char pbs_aes_iv[][16];
+
+pthread_mutex_t dbmutex = PTHREAD_MUTEX_INITIALIZER;
 
 
 /**
@@ -793,19 +795,12 @@ pbs_db_connect(void **db_conn, char *host, int port, int timeout)
 	char db_sys_msg[PBS_MAX_DB_CONN_INIT_ERR + 1] = {0};
 	char *conn_info = NULL;
 
-	conn_data = malloc(sizeof(pg_conn_data_t));
-	if (!conn_data) {
-		failcode = PBS_DB_NOMEM;
-		return failcode;
-	}
-
 	/*
 	 * calloc ensures that everything is initialized to zeros
 	 * so no need to explicitly set fields to 0.
 	 */
 	conn_trx = calloc(1, sizeof(pg_conn_trx_t));
 	if (!conn_trx) {
-		free(conn_data);
 		failcode = PBS_DB_NOMEM;
 		return failcode;
 	}
@@ -836,7 +831,6 @@ pbs_db_connect(void **db_conn, char *host, int port, int timeout)
 
 db_cnerr:
 	if (failcode != PBS_DB_SUCCESS) {
-		free(conn_data);
 		free(conn_trx);
 		*db_conn = NULL;
 	}
@@ -863,7 +857,6 @@ pbs_db_disconnect(void *conn)
 	if (conn)
 		PQfinish(conn);
 
-	free(conn_data);
 	free(conn_trx);
 
 	return 0;
@@ -981,6 +974,20 @@ db_prepare_stmt(void *conn, char *stmt, char *sql, int num_vars)
 	return 0;
 }
 
+pg_conn_data_t *
+get_db_conn_data() 
+{
+	pg_conn_data_t *conn_data = get_tls()->conn_data;
+	if (!conn_data) {
+		conn_data = malloc(sizeof(pg_conn_data_t));
+		if (!conn_data) {
+			exit(1);
+		}
+		get_tls()->conn_data = conn_data;
+	}
+	return conn_data;
+}
+
 /**
  * @brief
  *	Execute a prepared DML (insert or update) statement
@@ -1001,6 +1008,9 @@ db_cmd(void *conn, char *stmt, int num_vars)
 {
 	PGresult *res;
 	char *rows_affected = NULL;
+	pg_conn_data_t *conn_data = get_db_conn_data();
+
+	pthread_mutex_lock(&dbmutex);
 
 	res = PQexecPrepared((PGconn *)conn, stmt, num_vars,
 				conn_data->paramValues,
@@ -1010,6 +1020,7 @@ db_cmd(void *conn, char *stmt, int num_vars)
 		char *sql_error = PQresultErrorField(res, PG_DIAG_SQLSTATE);
 		db_set_error(conn, &errmsg_cache, "Execution of Prepared statement", stmt, sql_error);
 		PQclear(res);
+		pthread_mutex_unlock(&dbmutex);
 		return -1;
 	}
 	rows_affected = PQcmdTuples(res);
@@ -1020,9 +1031,11 @@ db_cmd(void *conn, char *stmt, int num_vars)
 	*/
 	if (rows_affected == NULL || strtol(rows_affected, NULL, 10) <= 0) {
 		PQclear(res);
+		pthread_mutex_unlock(&dbmutex);
 		return 1;
 	}
 	PQclear(res);
+	pthread_mutex_unlock(&dbmutex);
 
 	return 0;
 }
@@ -1046,6 +1059,10 @@ int
 db_query(void *conn, char *stmt, int num_vars, PGresult **res)
 {
 	int conn_result_format = 1;
+	pg_conn_data_t *conn_data = get_db_conn_data();
+
+	pthread_mutex_lock(&dbmutex);
+
 	*res = PQexecPrepared((PGconn *)conn, stmt, num_vars,
 			conn_data->paramValues, conn_data->paramLengths,
 			conn_data->paramFormats, conn_result_format);
@@ -1054,14 +1071,17 @@ db_query(void *conn, char *stmt, int num_vars, PGresult **res)
 		char *sql_error = PQresultErrorField(*res, PG_DIAG_SQLSTATE);
 		db_set_error(conn, &errmsg_cache, "Execution of Prepared statement", stmt, sql_error);
 		PQclear(*res);
+		pthread_mutex_unlock(&dbmutex);
 		return -1;
 	}
 
 	if (PQntuples(*res) <= 0) {
 		PQclear(*res);
+		pthread_mutex_unlock(&dbmutex);
 		return 1;
 	}
 
+	pthread_mutex_unlock(&dbmutex);
 	return 0;
 }
 

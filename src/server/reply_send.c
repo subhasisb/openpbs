@@ -214,7 +214,7 @@ dis_reply_write(int sfds, struct batch_request *preq)
 		if (sigaction(SIGALRM, &act, &oact) == -1)
 			return (PBS_NET_RC_RETRY);
 		alarm(PBS_DIS_TCP_TIMEOUT_REPLY);
-		pbs_tcp_timeout = PBS_DIS_TCP_TIMEOUT_REPLY;
+		//pbs_tcp_timeout = PBS_DIS_TCP_TIMEOUT_REPLY;
 #endif
 		/*
 		 * clear pbs_tcp_errno - set on error in dis_flush when called
@@ -236,7 +236,7 @@ dis_reply_write(int sfds, struct batch_request *preq)
 		alarm(0);
 		(void)sigaction(SIGALRM, &oact, NULL);  /* reset handler for SIGALRM */
 	}
-	pbs_tcp_timeout = old_tcp_timeout;
+	//pbs_tcp_timeout = old_tcp_timeout;
 #endif
 	if (rc) {
 		char hn[PBS_MAXHOSTNAME+1];
