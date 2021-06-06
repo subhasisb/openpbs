@@ -80,7 +80,6 @@ extern struct server server;
 extern pbs_list_head svr_queues;
 extern attribute_def svr_attr_def[];
 extern char	*path_priv;
-extern time_t	time_now;
 extern char	*msg_svdbopen;
 extern char	*msg_svdbnosv;
 extern char	*path_svrlive;

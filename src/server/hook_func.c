@@ -222,7 +222,6 @@ extern pbs_list_head svr_execjob_resize_hooks;
 extern pbs_list_head svr_execjob_abort_hooks;
 extern pbs_list_head svr_execjob_postsuspend_hooks;
 extern pbs_list_head svr_execjob_preresume_hooks;
-extern	time_t	time_now;
 extern 	struct python_interpreter_data  svr_interp_data;
 extern	pbs_list_head task_list_event;
 extern struct work_task *add_mom_deferred_list(int stream, mominfo_t *minfo, void (*func)(), char *msgid, void *parm1, void *parm2);
@@ -1429,7 +1428,7 @@ mgr_hook_import(struct batch_request *preq)
 		if ((phook->enabled == TRUE) && (phook->freq > 0)) {
 			/* Search and delete all already existing periodic hook task */
 			delete_task_by_parm1_func (phook, NULL, DELETE_ALL);
-			(void)set_task(WORK_Timed, time_now+phook->freq, run_periodic_hook, phook);
+			(void)set_task(WORK_Timed, time(0)+phook->freq, run_periodic_hook, phook);
 		}
 	}
 
@@ -1782,7 +1781,7 @@ mgr_hook_set(struct batch_request *preq)
 					 */
 					delete_task_by_parm1_func(phook, NULL, DELETE_ALL);
 					if ((phook->freq > 0) && (phook->script != NULL))
-						(void)set_task(WORK_Timed, time_now + phook->freq,
+						(void)set_task(WORK_Timed, time(0) + phook->freq,
 								run_periodic_hook, phook);
 					else {
 						sprintf(log_buffer, "periodic hook is missing information, check hook frequency and script");
@@ -3885,7 +3884,7 @@ process_hooks(struct batch_request *preq, char *hook_msg, size_t msg_len,
 		}
 
 		if (hook_event & HOOK_EVENT_PERIODIC) {
-			(void)set_task(WORK_Timed, time_now+phook->freq, run_periodic_hook, phook);
+			(void)set_task(WORK_Timed, time(0)+phook->freq, run_periodic_hook, phook);
 			num_run++;
 			continue;
 		}
@@ -6830,7 +6829,7 @@ post_server_periodic_hook(struct work_task *ptask)
 				(void)unlink(hook_outfile);	/* remove file */
 		}
 
-		next_time = time_now + phook->freq;
+		next_time = time(0) + phook->freq;
 		next_time_str = ctime(&next_time);
 		if ((next_time_str != NULL) && (next_time_str[0] != '\0')) {
 			next_time_str[strlen(next_time_str)-1] = '\0'; /* remove newline */
@@ -6886,7 +6885,7 @@ run_periodic_hook(struct work_task *ptask)
 		 * Don't run hook this time, just register a
 		 * timed task for it's next occurance
 		 */
-		(void)set_task(WORK_Timed, time_now + phook->freq, run_periodic_hook, phook);
+		(void)set_task(WORK_Timed, time(0) + phook->freq, run_periodic_hook, phook);
 		return;
 	}
 
@@ -6908,7 +6907,7 @@ run_periodic_hook(struct work_task *ptask)
 			return;
 		}
 		/* Set a timed task for next occurance of this hook */
-		(void)set_task(WORK_Timed, time_now + phook->freq,
+		(void)set_task(WORK_Timed, time(0) + phook->freq,
 			run_periodic_hook, phook);
 	} else {
 		/* Close all server connections */

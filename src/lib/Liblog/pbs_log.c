@@ -230,7 +230,7 @@ mk_log_name(char *pbuf, size_t pbufsz)
 	time_now = time(NULL);
 
 #ifdef WIN32
-	ptm = localtime(&time_now);
+	ptm = localtime(&time(0));
 	(void)snprintf(pbuf, pbufsz, "%s\\%04d%02d%02d", log_directory,
 		ptm->tm_year+1900, ptm->tm_mon+1, ptm->tm_mday);
 #else

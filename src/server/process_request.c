@@ -121,7 +121,6 @@ extern struct server server;
 extern char      server_host[];
 extern pbs_list_head svr_newjobs;
 extern pbs_list_head svr_allconns;
-extern time_t    time_now;
 extern char  *msg_err_noqueue;
 extern char  *msg_err_malloc;
 extern char  *msg_reqbadhost;
@@ -137,6 +136,7 @@ static void freebr_manage(struct rq_manage *);
 static void freebr_cpyfile(struct rq_cpyfile *);
 static void freebr_cpyfile_cred(struct rq_cpyfile_cred *);
 static void close_quejob(int sfds);
+
 
 /**
  * @brief
@@ -243,7 +243,7 @@ req_authenticate(conn_t *conn, struct batch_request *request)
 
 	(void) strcpy(cp->cn_username, request->rq_user);
 	(void) strcpy(cp->cn_hostname, request->rq_host);
-	cp->cn_timestamp = time_now;
+	cp->cn_timestamp = time(0);
 
 	if (encryptdef != NULL) {
 		encryptdef->set_config((const pbs_auth_config_t *)(cp->cn_auth_config));
@@ -406,8 +406,6 @@ process_request(int sfds)
 #ifndef PBS_MOM
 	int		     access_by_krb;
 #endif
-
-	time_now = time(NULL);
 
 	conn = get_conn(sfds);
 
@@ -1264,6 +1262,10 @@ close_client(int sfds)
 {
 	struct batch_request *preq;
 
+#ifndef PBS_MOM
+	pthread_mutex_lock(&server.lock);
+#endif
+
 	close_conn(sfds);	/* close the connection */
 	preq = (struct batch_request *)GET_NEXT(svr_requests);
 	while (preq) {			/* list of outstanding requests */
@@ -1273,6 +1275,9 @@ close_client(int sfds)
 			preq->rq_orgconn = -1;
 		preq = (struct batch_request *)GET_NEXT(preq->rq_link);
 	}
+#ifndef PBS_MOM
+	pthread_mutex_unlock(&server.lock);
+#endif
 }
 
 /**
@@ -1304,7 +1309,14 @@ struct batch_request *alloc_br(int type)
 		req->tppcmd_msgid = NULL; /* NULL msgid to boot */
 		req->rq_reply.brp_is_part = 0;
 		req->rq_reply.brp_choice = BATCH_REPLY_CHOICE_NULL;
+
+#ifndef PBS_MOM
+		pthread_mutex_lock(&server.lock);
+#endif
 		append_link(&svr_requests, &req->rq_link, req);
+#ifndef PBS_MOM
+		pthread_mutex_unlock(&server.lock);
+#endif
 	}
 	return (req);
 }
@@ -1348,7 +1360,14 @@ copy_br(struct batch_request *src)
 		memcpy(&req->rq_user, &src->rq_user, sizeof(req->rq_user));
 	if (src->rq_host)
 		memcpy(&req->rq_host, &src->rq_host, sizeof(req->rq_host));
+
+#ifndef PBS_MOM
+	pthread_mutex_lock(&server.lock);
+#endif
 	append_link(&svr_requests, &req->rq_link, req);
+#ifndef PBS_MOM
+	pthread_mutex_unlock(&server.lock);
+#endif
 
 	return (req);
 }
@@ -1577,7 +1596,14 @@ decode_DIS_RelnodesJob(int sock, struct batch_request *preq)
 void
 free_br(struct batch_request *preq)
 {
+#ifndef PBS_MOM
+	pthread_mutex_lock(&server.lock);
+#endif
 	delete_link(&preq->rq_link);
+#ifndef PBS_MOM
+	pthread_mutex_unlock(&server.lock);
+#endif
+
 	reply_free(&preq->rq_reply);
 
 	if (preq->rq_parentbr) {

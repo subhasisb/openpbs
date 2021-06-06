@@ -103,7 +103,6 @@ extern char *mom_home;
 extern int termin_child;
 #endif
 extern int server_stream;
-extern time_t time_now;
 extern pbs_list_head mom_polljobs;
 extern unsigned int pbs_mom_port;
 extern int gen_nodefile_on_sister_mom;
@@ -382,7 +381,7 @@ send_obit(job *pjob, int exval)
 		job_save(pjob);
 	}
 
-	pjob->ji_sampletim = time_now; /* when obit sent to server */
+	pjob->ji_sampletim = time(0); /* when obit sent to server */
 	/* epilogue script exit of 2 means requeue for	*/
 	/* chkpt/restart if job was checkpointed	*/
 	if (exval == 2 && (pjob->ji_qs.ji_svrflags & JOB_SVFLG_CHKPT))
@@ -425,7 +424,6 @@ scan_for_exiting(void)
 
 #ifdef WIN32
 	/* update the latest intelligence about the running jobs; */
-	time_now = time(NULL);
 	mom_set_use_all();
 	update_svr = 1;
 #endif
@@ -1450,7 +1448,7 @@ mom_deljob_wait(job *pjob)
 
 	if (pjob->ji_qs.ji_svrflags & JOB_SVFLG_HERE) {	/* MS */
 		set_job_substate(pjob, JOB_SUBSTATE_DELJOB);
-		pjob->ji_sampletim      = time_now;
+		pjob->ji_sampletim      = time(0);
 		/*
 		 * The SISTER_KILLDONE flag needs to be reset so
 		 * we can talk to the sisterhood and know when they reply.
@@ -1565,7 +1563,7 @@ send_sisters_deljob_wait(job *pjob)
 
 	if (pjob->ji_qs.ji_svrflags & JOB_SVFLG_HERE) {	/* MS */
 		set_job_substate(pjob, JOB_SUBSTATE_DELJOB);
-		pjob->ji_sampletim = time_now;
+		pjob->ji_sampletim = time(0);
 		/*
 		 * The SISTER_KILLDONE flag needs to be reset so
 		 * we can talk to the sisterhood and know when they reply.

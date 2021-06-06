@@ -62,7 +62,6 @@ extern pbs_list_head task_list_interleave; /* list of tasks that can execute aft
 extern pbs_list_head task_list_timed; /* list of tasks that have set start times */
 extern pbs_list_head task_list_event; /* list of tasks responding to an event */
 extern int svr_delay_entry;
-extern time_t	time_now;
 
 /**
  *
@@ -364,6 +363,8 @@ default_next_task(void)
 	struct work_task  *nxt;
 	struct work_task  *ptask;
 	struct work_task  *last_interleave_task;
+	
+
 	/*
 	 * tilwhen is the basic "idle" time if there is nothing pending sooner
 	 * for the Server (timed-events, call scheduler, IO)
@@ -372,8 +373,6 @@ default_next_task(void)
 	 * if the delay is shorted to 2.
 	 */
 	time_t tilwhen = 2;  /* basic cycle time */
-
-	time_now = time(NULL);
 
 	if (svr_delay_entry) {
 		ptask = (struct work_task *)GET_NEXT(task_list_event);
@@ -403,7 +402,7 @@ default_next_task(void)
 
 
 	while ((ptask=(struct work_task *)GET_NEXT(task_list_timed))!=NULL) {
-		if ((delay = ptask->wt_event - time_now) > 0) {
+		if ((delay = ptask->wt_event - time(0)) > 0) {
 			if (tilwhen > delay)
 				tilwhen = delay;
 			break;

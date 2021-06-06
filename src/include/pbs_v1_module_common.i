@@ -40,8 +40,6 @@
 #if !defined(PBS_v1_COMMON_I_INCLUDED)
 #define PBS_v1_COMMON_I_INCLUDED 1
 
-time_t time_now = 0;
-
 /*
  * the names of the Server:
  *    pbs_server_name - from PBS_SERVER_HOST_NAME

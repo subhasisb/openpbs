@@ -86,7 +86,6 @@
 extern char     *msg_err_unlink;
 extern struct    server server;
 extern pbs_list_head svr_queues;
-extern time_t	 time_now;
 extern long	 svr_history_enable;
 #ifndef PBS_MOM
 extern void	*svr_db_conn;

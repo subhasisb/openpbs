@@ -93,7 +93,6 @@ extern char *acctlog_spacechar;
 extern attribute_def job_attr_def[];
 extern char *path_acct;
 extern int resc_access_perm;
-extern time_t time_now;
 extern struct resc_sum *svr_resc_sum;
 extern struct server server;
 extern char *msg_job_end_stat;
@@ -994,6 +993,7 @@ void
 write_account_record(int acctype, const char *id, char *text)
 {
 	struct tm *ptm;
+	time_t time_now = time(0);
 
 	if (acct_opened == 0)
 		return;		/* file not open, don't bother */
@@ -1231,7 +1231,7 @@ account_jobend(job *pjob, char *used, int type)
 	if (i > len)
 		if (grow_acct_buf(&pb, &len, i) == -1)
 			goto writeit;
-	(void)sprintf(pb, " end=%ld", (long)time_now);
+	(void)sprintf(pb, " end=%ld", (long)time(0));
 	i = strlen(pb);
 	pb  += i;
 	len -= i;

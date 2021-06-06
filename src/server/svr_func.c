@@ -96,7 +96,6 @@
 extern struct python_interpreter_data  svr_interp_data;
 extern pbs_list_head svr_runjob_hooks;
 
-extern time_t time_now;
 extern char  *resc_in_err;
 extern char  *msg_daemonname;
 extern char   server_name[];
@@ -874,7 +873,7 @@ set_license_location(attribute *pattr, void *pobject, int actmode)
 		if (actmode == ATR_ACTION_RECOV)
 			delay = 0;
 
-		init_licensing_task = set_task(WORK_Timed, time_now + delay, init_licensing, NULL);
+		init_licensing_task = set_task(WORK_Timed, time(0) + delay, init_licensing, NULL);
 	}
 
 	return (PBSE_NONE);
@@ -1210,7 +1209,7 @@ set_job_history_enable(attribute *pattr, void *pobject, int actmode)
 		svr_history_enable = pattr->at_val.at_long;
 		if (svr_history_enable) {
 			(void)set_task(WORK_Timed,
-				(long)(time_now + SVR_CLEAN_JOBHIST_TM),
+				(long)(time(0) + SVR_CLEAN_JOBHIST_TM),
 				svr_clean_job_history, 0);
 
 			force_cli_daemons_update(PBS_NET_CONN_FROM_QSTAT_DAEMON);
@@ -4038,7 +4037,7 @@ add_prov_record(prov_pid pid,
 			__func__, server.sv_cur_prov_records))
 		return -1;
 	}
-	server.sv_prov_track[i].pvtk_mtime = time_now;
+	server.sv_prov_track[i].pvtk_mtime = time(0);
 	if ((server.sv_prov_track[i].pvtk_vnode = strdup(prov_vnode_info->pvnfo_vnode)) == NULL) {
 		DBPRT(("%s: Unable to allocate Memory!\n", __func__));
 		return -1;
@@ -4926,7 +4925,7 @@ fail_vnode_job(struct prov_vnode_info * prov_vnode_info, int hold_or_que)
 		return;
 
 	/* add accounting log for provision failure for job */
-	set_job_ProvAcctRcd(pjob, time_now, PROVISIONING_FAILURE);
+	set_job_ProvAcctRcd(pjob, time(0), PROVISIONING_FAILURE);
 
 	/* log job prov failed message */
 	if (hold_or_que == 0) {
@@ -5457,7 +5456,7 @@ prov_startjob(struct work_task *ptask)
 			, __func__))
 
 		/* set a work task to run after 5 sec from now */
-		pjob->ji_prov_startjob_task = set_task(WORK_Timed, time_now + 5,
+		pjob->ji_prov_startjob_task = set_task(WORK_Timed, time(0) + 5,
                         				prov_startjob, pjob);
 		if (pjob->ji_prov_startjob_task == NULL) {
 			log_err(errno, __func__, "Unable to set task for prov_startjob; requeuing the job");
@@ -5467,7 +5466,7 @@ prov_startjob(struct work_task *ptask)
         }
 
 	/*  accounting log about prov for job over */
-	set_job_ProvAcctRcd(pjob, time_now,
+	set_job_ProvAcctRcd(pjob, time(0),
 		PROVISIONING_SUCCESS);
 
 	/* log msg about prov for job over */
@@ -6070,7 +6069,7 @@ start_vnode_provisioning(struct prov_vnode_info * prov_vnode_info)
 	if (!ptask_defer)
 		return (PBSE_INTERNAL);
 
-	ptask_timed = set_task(WORK_Timed, time_now + provision_timeout,
+	ptask_timed = set_task(WORK_Timed, time(0) + provision_timeout,
 		prov_request_timed,
 		(void *)prov_vnode_info);
 	if (!ptask_timed) {
@@ -6833,7 +6832,7 @@ enum failover_state are_we_primary(void)
 void memory_debug_log(struct work_task *ptask) {
 
 	if (ptask)
-		(void)set_task(WORK_Timed, time_now+600, memory_debug_log, NULL);
+		(void)set_task(WORK_Timed, time(0)+600, memory_debug_log, NULL);
 	if (!will_log_event(PBSEVENT_DEBUG4))
 		return;
 	snprintf(log_buffer, LOG_BUF_SIZE, "MEM_DEBUG: sbrk: %zu", (size_t)sbrk(0));
@@ -6955,7 +6954,7 @@ stat_deleted_ids(pbs_list_head *head, struct timeval from_tm, struct batch_reply
 
 		/* important: save prev ptr as my node's position can change in the timed list */
 		nxt = (deleted_obj_t *) GET_PRIOR(dj->deleted_obj_link);
-		if (time_now - dj->tm_deleted.tv_sec > DEL_OBJ_TIME) {
+		if (time(0) - dj->tm_deleted.tv_sec > DEL_OBJ_TIME) {
 			/* too old, remove from deleted objs list */
 			log_errf(-1, __func__, "*** Removing object %s to deleted list as too old!!", dj->obj_id);
 			free(dj->obj_id);

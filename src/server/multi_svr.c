@@ -56,7 +56,6 @@
 
 extern char	server_host[PBS_MAXHOSTNAME + 1];
 extern unsigned int	pbs_server_port_dis;
-extern	time_t	time_now;
 
 static int svridx = -1;
 pbs_list_head peersvrl;
@@ -274,7 +273,7 @@ create_svr_struct(struct sockaddr_in *addr, char *hostname)
 static ulong
 get_day_avg(msvr_stat_type_t type)
 {
-	return (msvr_stat.stat[type] / ((time_now - msvr_stat.last_logged_tm) / HOUR_IN_SEC)) * 24;
+	return (msvr_stat.stat[type] / ((time(0) - msvr_stat.last_logged_tm) / HOUR_IN_SEC)) * 24;
 }
 
 /**
@@ -287,7 +286,7 @@ get_day_avg(msvr_stat_type_t type)
 static int
 log_msvr_stat()
 {
-	if ((time_now - msvr_stat.last_logged_tm) < STAT_LOG_INTL)
+	if ((time(0) - msvr_stat.last_logged_tm) < STAT_LOG_INTL)
 		return 1;
 
 	log_eventf(PBSEVENT_DEBUG, PBS_EVENTCLASS_SERVER, LOG_DEBUG, __func__,
@@ -304,7 +303,7 @@ log_msvr_stat()
 		   get_day_avg(NUM_SCHED_MISS));
 
 	msvr_stat = (const msvr_stat_t){0};
-	msvr_stat.last_logged_tm = time_now;
+	msvr_stat.last_logged_tm = time(0);
 
 	return 0;
 }

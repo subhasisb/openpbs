@@ -83,7 +83,6 @@
 
 /* Global Data Items: */
 extern pbs_list_head task_list_event;
-extern time_t	time_now;
 extern char	*msg_issuebad;
 extern char     *msg_norelytomom;
 extern char	*msg_err_malloc;
@@ -196,7 +195,7 @@ reissue_to_svr(struct work_task *pwt)
 
 	/* if not timed-out, retry send to remote server */
 
-	if (((time_now - preq->rq_time.tv_sec) > PBS_NET_RETRY_LIMIT) ||
+	if (((time(0) - preq->rq_time.tv_sec) > PBS_NET_RETRY_LIMIT) ||
 		(issue_to_svr(preq->rq_host, preq, (void(*)(struct work_task *))pwt->wt_parm2) == -1)) {
 
 		/* either timed-out or got hard error, tell post-function  */
@@ -275,7 +274,7 @@ issue_to_svr(char *servern, struct batch_request *preq, void (*replyfunc)(struct
 	/* if reached here, it didn`t go, do we retry? */
 
 	if (do_retry) {
-		pwt = set_task(WORK_Timed, (long)(time_now+(2*PBS_NET_RETRY_TIME)),
+		pwt = set_task(WORK_Timed, (long)(time(0)+(2*PBS_NET_RETRY_TIME)),
 			reissue_to_svr, (void *)preq);
 		pwt->wt_parm2 = (void *)replyfunc;
 		return (0);

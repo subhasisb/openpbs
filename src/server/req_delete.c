@@ -95,7 +95,6 @@ extern char *msg_job_history_notset;
 extern char *msg_also_deleted_job_history;
 extern char *msg_err_malloc;
 extern struct server server;
-extern time_t time_now;
 
 /* External functions */
 
@@ -850,7 +849,7 @@ req_deletejob2(struct batch_request *preq, job *pjob)
 
 		/* being sent to MOM, wait till she gets it going */
 		/* retry in one second				  */
-		pwtnew = set_task(WORK_Timed, time_now + 1, post_delete_route,
+		pwtnew = set_task(WORK_Timed, time(0) + 1, post_delete_route,
 			preq);
 		if (pwtnew == 0) {
 			if (pjob->ji_pmt_preq != NULL)
@@ -1623,7 +1622,7 @@ struct work_task *pwt;
 		/* one or more jobs still not able to be deleted; set me up for
 		 * another call for 30 seconds into the future.
 		 */
-		pwt = set_task(WORK_Timed, time_now + 30, post_deljobfromresv_req,
+		pwt = set_task(WORK_Timed, time(0) + 30, post_deljobfromresv_req,
 			(void *) presv);
 		if (pwt)
 			append_link(&presv->ri_svrtask, &pwt->wt_linkobj, pwt);

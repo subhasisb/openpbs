@@ -147,7 +147,6 @@ extern	char	no_parm[];
 extern	int	exiting_tasks;
 extern	vnl_t	*vnlp;
 
-extern	time_t	time_now;
 
 /*
  ** external functions and data
@@ -234,7 +233,7 @@ static char *
 sys_clocks(struct rm_attribute *attrib)
 {
 	sprintf(ret_string, "%lu/%lu", (unsigned long) linux_time,
-		(unsigned long) time_now);
+		(unsigned long) time(0));
 	return ret_string;
 }
 
@@ -623,14 +622,14 @@ cput_sum(job *pjob)
 			 * grace time.
 			 */
 			if ((ptask->ti_qs.ti_status == TI_STATE_RUNNING) &&
-				((time_now - pjob->ji_qs.ji_stime) < 10)) {
+				((time(0) - pjob->ji_qs.ji_stime) < 10)) {
 				sprintf(log_buffer,
 					"no active processes for task %8.8X "
 					"session %d exist but the job is"
 					"only %ld secs old",
 					ptask->ti_qs.ti_task,
 					(int)ptask->ti_qs.ti_sid,
-					time_now - pjob->ji_qs.ji_stime);
+					time(0) - pjob->ji_qs.ji_stime);
 				log_event(PBSEVENT_DEBUG3, PBS_EVENTCLASS_JOB,
 					LOG_DEBUG, pjob->ji_qs.ji_jobid,
 					log_buffer);

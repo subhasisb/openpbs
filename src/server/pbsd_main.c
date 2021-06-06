@@ -1009,7 +1009,7 @@ main(int argc, char **argv)
 				/* time stamp is changing, at   */
 				/* least once, loop for a retry */
 				svrlivetime = sb_sa.st_mtime;
-			} else if ((time_now=time(0)) > (svrlivetime+secondary_delay)) {
+			} else if (time(0) > (svrlivetime+secondary_delay)) {
 				/* has not changed during the delay time */
 				break;
 			}
@@ -1236,7 +1236,7 @@ main(int argc, char **argv)
 
 		/* now go set up work task to do timestamp svrlive file */
 
-		(void)set_task(WORK_Timed, time_now, secondary_handshake, NULL);
+		(void)set_task(WORK_Timed, time(0), secondary_handshake, NULL);
 
 		svr_mailowner(0, 0, 1, log_buffer);
 		if (get_sattr_long(SVR_ATR_scheduling)) {
@@ -1266,7 +1266,7 @@ main(int argc, char **argv)
 	} else if (are_primary == FAILOVER_PRIMARY) {
 		/* now go set up work task to do handshake with secondary */
 
-		(void)set_task(WORK_Timed, time_now, primary_handshake, NULL);
+		(void)set_task(WORK_Timed, time(0), primary_handshake, NULL);
 
 	}
 
@@ -1391,7 +1391,7 @@ main(int argc, char **argv)
 					 * scheduling only if server scheduling is turned on.
 					 */
 
-					psched->sch_next_schedule = time_now + get_sched_attr_long(psched, SCHED_ATR_schediteration);
+					psched->sch_next_schedule = time(0) + get_sched_attr_long(psched, SCHED_ATR_schediteration);
 					if (schedule_jobs(psched) == 0 && svr_unsent_qrun_req)
 						svr_unsent_qrun_req = 0;
 				}
@@ -1401,15 +1401,15 @@ main(int argc, char **argv)
 			/* Are there HOT jobs to rerun */
 			/* only try every _CYCLE seconds */
 
-			if (time_now > server.sv_hotcycle + SVR_HOT_CYCLE) {
-				server.sv_hotcycle = time_now + SVR_HOT_CYCLE;
+			if (time(0) > server.sv_hotcycle + SVR_HOT_CYCLE) {
+				server.sv_hotcycle = time(0) + SVR_HOT_CYCLE;
 				c = start_hot_jobs();
 			}
 
 			/* If more than _LIMIT seconds since start, stop */
 
 			if ((c == 0) ||
-				(time_now > server.sv_started + SVR_HOT_LIMIT)) {
+				(time(0) > server.sv_started + SVR_HOT_LIMIT)) {
 				server_init_type = RECOV_WARM;
 				set_sattr_l_slim(SVR_ATR_State, SV_STATE_RUN, SET);
 				state = SV_STATE_RUN;
@@ -1464,6 +1464,8 @@ main(int argc, char **argv)
 
 	/* set the current seq id to the last id before final save */	
 	server.sv_qs.sv_lastid = server.sv_qs.sv_jobidnumber;
+	pthread_mutex_unlock(&server.lock);
+	
 	svr_save_db(&server);	/* final recording of server */
 	track_save(NULL);	/* save tracking data	     */
 
@@ -1477,8 +1479,6 @@ main(int argc, char **argv)
 
 	if (state != SV_STATE_SECIDLE && (shutdown_who & SHUT_WHO_MOM))
 		shutdown_nodes();
-
-	pthread_mutex_unlock(&server.lock);
 
 	/* if brought up the DB, take it down */
 	stop_db();
@@ -1635,7 +1635,7 @@ next_task()
 
 	for (psched = (pbs_sched*) GET_NEXT(svr_allscheds); psched; psched = (pbs_sched*) GET_NEXT(psched->sc_link)) {
 		time_t delay;
-		if ((delay = psched->sch_next_schedule - time_now) <= 0)
+		if ((delay = psched->sch_next_schedule - time(0)) <= 0)
 			set_scheduler_flag(SCH_SCHEDULE_TIME, psched);
 		else if (delay < tilwhen)
 			tilwhen = delay;

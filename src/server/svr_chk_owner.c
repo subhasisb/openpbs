@@ -88,7 +88,6 @@ extern char *msg_unkjobid;
 extern char *msg_system;
 extern char *msg_unkresvID;
 extern char *msg_delProgress;
-extern time_t time_now;
 
 /* Global functions */
 extern int svr_chk_histjob(job *pjob);
@@ -300,8 +299,8 @@ authenticate_user(struct batch_request *preq, struct connection *pcred)
 	if (strncasecmp(preq->rq_host, pcred->cn_hostname, PBS_MAXHOSTNAME))
 		return (PBSE_BADCRED);
 	if (pcred->cn_timestamp) {
-		if ((pcred->cn_timestamp - CREDENTIAL_TIME_DELTA > time_now) ||
-			(pcred->cn_timestamp + CREDENTIAL_LIFETIME < time_now))
+		if ((pcred->cn_timestamp - CREDENTIAL_TIME_DELTA > time(0)) ||
+			(pcred->cn_timestamp + CREDENTIAL_LIFETIME < time(0)))
 			return (PBSE_EXPIRED);
 	}
 

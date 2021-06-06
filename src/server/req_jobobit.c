@@ -102,7 +102,6 @@ extern char *msg_momkillvmem;
 extern char *msg_momkillmem;
 extern char *msg_momkillcput;
 extern char *msg_momkillwalltime;
-extern time_t time_now;
 
 /* External Functions called */
 
@@ -182,7 +181,7 @@ mom_comm(job *pjob, void (*func)(struct work_task *))
 				"in %ld seconds", operation, t);
 			log_err(-1, pjob->ji_qs.ji_jobid, log_buffer);
 
-			t += time_now;
+			t += time(0);
 			pwt = set_task(WORK_Timed, t, func, (void *)pjob);
 			append_link(&pjob->ji_svrtask, &pwt->wt_linkobj, pwt);
 			return (-1);
@@ -583,7 +582,7 @@ on_job_exit(struct work_task *ptask)
 					 * send the delete request again later.
 					 */
 					t = pjob->ji_retryok++;
-					t = time_now + (t * t);
+					t = time(0) + (t * t);
 					ptask = set_task(WORK_Timed, t, on_job_exit, pjob);
 					append_link(&pjob->ji_svrtask, &ptask->wt_linkobj, ptask);
 
@@ -682,7 +681,7 @@ on_job_exit(struct work_task *ptask)
 				 * send the delete request again later.
 				 */
 				t = pjob->ji_retryok++;
-				t = time_now + (t * t);
+				t = time(0) + (t * t);
 				ptask = set_task(WORK_Timed, t, on_job_exit, pjob);
 				append_link(&pjob->ji_svrtask, &ptask->wt_linkobj, ptask);
 
@@ -1317,8 +1316,6 @@ job_obit(ruu *pruu, int stream)
 	void (*eojproc)();
 	char *mailmsg = NULL;
 	char *msg = NULL;
-
-	time_now = time(0);
 
 	DBPRT(("%s: Obit received for job %s status=%d hop=%d\n", __func__, pruu->ru_pjobid, pruu->ru_status, pruu->ru_hop))
 	pjob = find_job(pruu->ru_pjobid);

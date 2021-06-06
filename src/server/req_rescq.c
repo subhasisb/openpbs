@@ -92,7 +92,6 @@ int  gen_task_Time4resv(resc_resv*);
 void revert_alter_reservation(resc_resv *presv);
 
 extern int     svr_totnodes;
-extern time_t  time_now;
 
 extern int cnvrt_local_move(job *, struct batch_request *);
 
@@ -153,7 +152,7 @@ set_idle_delete_task(resc_resv *presv)
 
 	if (num_jobs == 0 && presv->ri_qs.ri_state == RESV_RUNNING) {
 		delete_task_by_parm1_func(presv, resv_idle_delete, DELETE_ONE); /* Delete the previous task if it exists */
-		retry_time = time_now + get_rattr_long(presv, RESV_ATR_del_idle_time);
+		retry_time = time(0) + get_rattr_long(presv, RESV_ATR_del_idle_time);
 		if (retry_time < presv->ri_qs.ri_etime) {
 			wt = set_task(WORK_Timed, retry_time, resv_idle_delete, presv);
 			append_link(&presv->ri_svrtask, &wt->wt_linkobj, wt);
@@ -424,7 +423,7 @@ degrade_overlapping_resv(resc_resv *presv)
 					presv->ri_qs.ri_stime <= tmp_presv->ri_qs.ri_etime &&
 					presv->ri_qs.ri_etime >= tmp_presv->ri_qs.ri_stime) {
 
-					set_resv_retry(tmp_presv, time_now);
+					set_resv_retry(tmp_presv, time(0));
 
 					if (tmp_presv->ri_qs.ri_state == RESV_CONFIRMED) {
 						resv_setResvState(tmp_presv, RESV_DEGRADED, RESV_IN_CONFLICT);
@@ -776,7 +775,7 @@ req_confirmresv(struct batch_request *preq)
 	 * and the reservation to the associated vnodes.
 	 */
 	if (is_being_altered) {
-		if ((is_being_altered & RESV_SELECT_MODIFIED) && presv->ri_qs.ri_stime < time_now) {
+		if ((is_being_altered & RESV_SELECT_MODIFIED) && presv->ri_qs.ri_stime < time(0)) {
 			/* If we are both degraded and ralter -lselect, we are fine.  We will have unset ri_giveback above */
 			if (presv->ri_giveback) {
 				set_resc_assigned((void *) presv, 1, DECR);
@@ -788,7 +787,7 @@ req_confirmresv(struct batch_request *preq)
 	}
 	rc = assign_resv_resc(presv, next_execvnode, FALSE);
 
-	if (presv->ri_qs.ri_stime < time_now) {
+	if (presv->ri_qs.ri_stime < time(0)) {
 		if (is_degraded || is_being_altered & RESV_SELECT_MODIFIED) {
 			if (presv->ri_giveback == 0) {
 				set_resc_assigned((void *) presv, 1, INCR);

@@ -86,7 +86,7 @@ class TestCalendaring(TestFunctional):
         self.server.expect(JOB, {'job_state': 'Q'}, jid2)
         job1 = self.server.status(JOB, id=jid1)
         job2 = self.server.status(JOB, id=jid2)
-        time_now = int(time.time())
+        time(0) = int(time.time())
 
         # get estimated start time of both the jobs
         self.assertIn('estimated.start_time', job1[0])
@@ -104,7 +104,7 @@ class TestCalendaring(TestFunctional):
         self.assertEqual(est_epoch2, est_epoch1 + 30)
         # Also make sure that since second subjob from array is running
         # Third subjob should set estimated.start_time in future.
-        self.assertGreater(est_epoch1, time_now)
+        self.assertGreater(est_epoch1, time(0))
 
     def test_topjob_start_time_of_subjob(self):
         """

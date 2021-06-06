@@ -52,8 +52,6 @@
 #include "svrfunc.h"
 #include "tpp.h"
 
-extern time_t time_now;
-
 static int mtfd_replyhello_psvr = -1;
 
 /**
@@ -272,10 +270,10 @@ send_nodestat_req(void)
 	update_msvr_stat(1, CACHE_MISS);
 
 	/* Do not udate the cache too often */
-	if (time_now < time_last_sent + 2)
+	if (time(0) < time_last_sent + 2)
 		return;
 
-	time_last_sent = time_now;
+	time_last_sent = time(0);
 
 	if (mtfd == -1)
 		return;

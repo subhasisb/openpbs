@@ -64,7 +64,6 @@
 extern struct server server;
 extern void release_req(struct work_task *);
 extern int relay_to_mom(job *, struct batch_request *, void (*)(struct work_task *));
-extern time_t time_now;
 pbs_list_head svr_creds_cache;	/* all credentials cached and available to send */
 extern long svr_cred_renew_cache_period;
 
@@ -111,13 +110,13 @@ get_cached_cred(job  *pjob)
 		nxcred = (cred_cache *)GET_NEXT(cred->cr_link);
 
 		if (strcmp(cred->credid, get_jattr_str(pjob, JOB_ATR_cred_id)) == 0 &&
-			cred->validity - svr_cred_renew_cache_period >  time_now) {
+			cred->validity - svr_cred_renew_cache_period >  time(0)) {
 			/* valid credential found */
 			return cred;
 		}
 
 		/* too old credential - delete from cache */
-		if (cred->validity - svr_cred_renew_cache_period <= time_now) {
+		if (cred->validity - svr_cred_renew_cache_period <= time(0)) {
 		    delete_link(&cred->cr_link);
 		    free(cred->data);
 		    free(cred);
@@ -171,7 +170,7 @@ get_cached_cred(job  *pjob)
 		return NULL;
 	}
 
-	if (buf == NULL || strlen(buf) <= 1 || validity < time_now) {
+	if (buf == NULL || strlen(buf) <= 1 || validity < time(0)) {
 		log_eventf(PBSEVENT_ADMIN, PBS_EVENTCLASS_SERVER,
 			LOG_ERR, msg_daemonname, "%s command '%s' returned invalid credentials for %s",
 			ATTR_cred_renew_tool, cmd,

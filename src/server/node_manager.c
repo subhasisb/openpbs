@@ -106,7 +106,6 @@ static int	 cvt_overflow(size_t, size_t);
 static int	 cvt_realloc(char **, size_t *, char **, size_t *);
 
 static void set_resv_for_degrade(struct pbsnode *pnode, resc_resv *presv);
-extern time_t	 time_now;
 extern int	 server_init_type;
 
 extern int	ctnodes(char *);
@@ -950,10 +949,10 @@ momptr_down(mominfo_t *pmom, char *why)
 
 	/* log message if node just down or been down for an hour */
 	/* mark mom down and vnodes down as well                  */
-	if ((psvrmom->msr_timedown +3600) > time_now)
+	if ((psvrmom->msr_timedown +3600) > time(0))
 		return;
 
-	psvrmom->msr_timedown = time_now;
+	psvrmom->msr_timedown = time(0);
 
 	/* is node provisioning? */
 	for (nchild = 0; nchild < psvrmom->msr_numvnds; ++nchild) {
@@ -1053,7 +1052,7 @@ momptr_down(mominfo_t *pmom, char *why)
 		if (sec < 0)	/* if less than zero, treat as if one */
 			sec = 1;
 
-		psvrmom->msr_wktask = set_task(WORK_Timed, time_now+sec, node_down_requeue, (void *) pmom);
+		psvrmom->msr_wktask = set_task(WORK_Timed, time(0)+sec, node_down_requeue, (void *) pmom);
 	}
 
 	return;
@@ -1168,8 +1167,7 @@ set_vnode_state(struct pbsnode *pnode, unsigned long state_bits, enum vnode_stat
 	int time_int_val;
 	int last_time_int;
 
-	time_now = time(NULL);
-	time_int_val = time_now;
+	time_int_val = time(0);
 
 	if (pnode == NULL) {
 		return;
@@ -4281,11 +4279,11 @@ is_request(int stream, int version)
 		else
 			mcast_add(pmom, &mtfd_replyhello_noinv, FALSE);
 
-		if (reply_send_tm <= time_now) {
+		if (reply_send_tm <= time(0)) {
 			struct work_task *ptask;
 
 			/* time to wait depends on the no of moms server knows */
-			reply_send_tm = time_now + (mominfo_array_size > 1024 ? MCAST_WAIT_TM : 0);
+			reply_send_tm = time(0) + (mominfo_array_size > 1024 ? MCAST_WAIT_TM : 0);
 			ptask = set_task(WORK_Timed, reply_send_tm, mcast_msg, NULL);
 			ptask->wt_aux = IS_REPLYHELLO;
 		}
@@ -7092,7 +7090,7 @@ free_resvNodes(resc_resv *presv)
 			 * that is either being deleted or just ended.
 			 */
 			if (pnode->nd_state & INUSE_RESVEXCL &&
-				presv->ri_qs.ri_stime <= time_now)
+				presv->ri_qs.ri_stime <= time(0))
 				set_vnode_state(pnode, ~INUSE_RESVEXCL, Nd_State_And);
 
 			DBPRT(("Freeing resvinfo on node %s from reservation %s\n",
@@ -7828,7 +7826,7 @@ degrade_offlined_nodes_reservations(void)
 		}
 	}
 	/* create a task to check for vnodes that don't report back up after MAX_NODE_WAIT */
-	(void) set_task(WORK_Timed, time_now + MAX_NODE_WAIT,
+	(void) set_task(WORK_Timed, time(0) + MAX_NODE_WAIT,
 		degrade_downed_nodes_reservations, NULL);
 
 }
@@ -7870,7 +7868,7 @@ degrade_downed_nodes_reservations(void)
 
 /**
  * @brief	Set last_used_time for job's exec_vnodes or reservation's resv_nodes.
- *		Finds the vnodes by name and sets ND_ATR_last_used_time to time_now.
+ *		Finds the vnodes by name and sets ND_ATR_last_used_time to time(0).
  *
  * @param[in]	pobj - pointer to job/reservation.
  * @param[in]	type - int, denoting the type of object.
@@ -7889,7 +7887,7 @@ set_last_used_time_node(void *pobj, int type)
 	int 		rc;
 	int 		time_int_val;
 
-	time_int_val = time_now;
+	time_int_val = time(0);
 
 	if (pobj == NULL)
 		return;
@@ -8162,8 +8160,8 @@ set_resv_for_degrade(struct pbsnode *pnode, resc_resv *presv)
 
 	degraded_time = presv->ri_degraded_time;
 
-	if (degraded_time > (time_now + resv_retry_time))
-			set_resv_retry(presv, (time_now + resv_retry_time));
+	if (degraded_time > (time(0) + resv_retry_time))
+			set_resv_retry(presv, (time(0) + resv_retry_time));
 
 	(void) resv_setResvState(presv, presv->ri_qs.ri_state, RESV_DEGRADED);
 
@@ -8201,10 +8199,10 @@ long determine_resv_retry(resc_resv *presv)
 	long retry;
 	long resv_start = get_rattr_long(presv, RESV_ATR_start);
 
-	if (time_now < resv_start && time_now + resv_retry_time > resv_start)
+	if (time(0) < resv_start && time(0) + resv_retry_time > resv_start)
 		retry = resv_start;
 	else
-		retry = time_now + resv_retry_time;
+		retry = time(0) + resv_retry_time;
 
 	return retry;
 }

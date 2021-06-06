@@ -75,7 +75,6 @@
 
 extern int	 resc_access_perm;
 extern pbs_list_head svr_alljobs;
-extern time_t	 time_now;
 extern char	 statechars[];
 extern long svr_history_enable;
 extern int scheduler_jobs_stat;

@@ -103,7 +103,6 @@ extern	int		min_check_poll;
 extern	unsigned int	pbs_mom_port;
 extern	unsigned int	pbs_rm_port;
 extern	unsigned int	pbs_tm_port;
-extern	time_t		time_now;
 extern	int		internal_state;
 extern	int		internal_state_update;
 extern	int		cycle_harvester;

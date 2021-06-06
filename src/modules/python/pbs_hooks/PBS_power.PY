@@ -202,7 +202,7 @@ if this_event.type not in [pbs.EXECJOB_PROLOGUE, pbs.EXECJOB_EPILOGUE,
 if this_event.type == pbs.PERIODIC:
     vnlist = this_event.vnode_list
     resvlist = this_event.resv_list
-    time_now = time.time()
+    time(0) = time.time()
 
     # Parse the config file for power attributes
     try:
@@ -365,8 +365,8 @@ if this_event.type == pbs.PERIODIC:
                         elif reserve_start < exec_vnodes[vn]["neededby"]:
                             exec_vnodes[vn]["neededby"] = reserve_start
                         # Do not power off a node if it has reservation starting
-                        # in (time_now + min_node_down_delay + 900) seconds
-                        if time_now > (reserve_start - (min_node_down_delay + 900)):
+                        # in (time(0) + min_node_down_delay + 900) seconds
+                        if time(0) > (reserve_start - (min_node_down_delay + 900)):
                             nodes[host]["poweroff"] = 0
                             nodes[host]["can_power_off"] = 0
 
@@ -376,7 +376,7 @@ if this_event.type == pbs.PERIODIC:
                         last_used_time = vnode.last_used_time
                     else:
                         last_used_time = 0
-                    idle_time = time_now - last_used_time
+                    idle_time = time(0) - last_used_time
                     if node_idle_limit < idle_time:
                         nodes[host]["poweroff"] = 1
 
@@ -406,7 +406,7 @@ if this_event.type == pbs.PERIODIC:
                 neededby = 0
             # Check if node is needed in near future.
             # Assuming node will take about 900 seconds to come up.
-            if neededby and neededby < (time_now + 900):
+            if neededby and neededby < (time(0) + 900):
                 nodes[host]["poweron"] = 1
             # See when node was put down
             if vnode.last_state_change_time:
@@ -416,7 +416,7 @@ if this_event.type == pbs.PERIODIC:
             # Do not power on a node if it went down within less than
             # min_node_down_delay seconds
             if power_on_off_enable and last_state_change:
-                if (time_now - last_state_change) < int(min_node_down_delay):
+                if (time(0) - last_state_change) < int(min_node_down_delay):
                     nodes[host]["poweron"] = 0
 
     poweroff_vnlist = []
@@ -460,7 +460,7 @@ if this_event.type == pbs.PERIODIC:
                     for vn in nodes[host]["vnodes"]:
                         prev_state = vn.state
                         vn.state = prev_state & ~(pbs.ND_SLEEP)
-                        vn.last_used_time = time_now
+                        vn.last_used_time = time(0)
             # nodes which are still booting, write them to
             # node file for status check in next iteration.
             if sleep_node_list or poweron_vnlist:
@@ -488,7 +488,7 @@ if this_event.type == pbs.PERIODIC:
             for nd in poweron_vnlist:
                 for vn in nodes[nd]["vnodes"]:
                     vn.state = pbs.ND_FREE
-                    vn.last_used_time = time_now
+                    vn.last_used_time = time(0)
         power.disconnect()
         this_event.accept()
     except Exception as e:

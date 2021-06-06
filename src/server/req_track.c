@@ -86,7 +86,6 @@ static void track_history_job(struct rq_track *, char *);
 
 extern char         *path_track;
 extern struct server server;
-extern time_t        time_now;
 extern char 	     server_name[];
 
 /**
@@ -135,7 +134,7 @@ req_track(struct batch_request *preq)
 					(ptk+i)->tk_hopcount = prqt->rq_hopcount;
 					(void)strcpy((ptk+i)->tk_location, prqt->rq_location);
 					(ptk+i)->tk_state = *prqt->rq_state;
-					(ptk+i)->tk_mtime = time_now;
+					(ptk+i)->tk_mtime = time(0);
 					track_history_job(prqt, preq->rq_extend);
 				}
 				server.sv_trackmodifed = 1;
@@ -172,7 +171,7 @@ req_track(struct batch_request *preq)
 			server.sv_track     = new;
 		}
 
-		empty->tk_mtime = time_now;
+		empty->tk_mtime = time(0);
 		empty->tk_hopcount = prqt->rq_hopcount;
 		(void)strcpy(empty->tk_jobid, prqt->rq_jid);
 		(void)strcpy(empty->tk_location, prqt->rq_location);
@@ -204,7 +203,7 @@ track_save(struct work_task *pwt)
 	/* set task for next round trip */
 
 	if (pwt) { 	/* set up another work task for next time period */
-		if (!set_task(WORK_Timed, (long)time_now + PBS_SAVE_TRACK_TM,
+		if (!set_task(WORK_Timed, (long)time(0) + PBS_SAVE_TRACK_TM,
 			track_save, 0))
 			log_err(errno, __func__, "Unable to set task for save");
 	}

@@ -66,8 +66,6 @@
 long svr_cred_renew_enable = 0; /*disable by default*/
 long svr_cred_renew_period = SVR_RENEW_PERIOD_DEFAULT;
 long svr_cred_renew_cache_period = SVR_RENEW_CACHE_PERIOD_DEFAULT;
-
-extern time_t time_now;
 extern pbs_list_head svr_alljobs;
 
 extern int send_cred(job *pjob);
@@ -126,7 +124,7 @@ svr_renew_creds(struct work_task *pwt)
 	/* first, set up another work task for next time period */
 	if (pwt && svr_cred_renew_enable) {
 		if (!set_task(WORK_Timed,
-			(time_now + SVR_RENEW_CREDS_TM),
+			(time(0) + SVR_RENEW_CREDS_TM),
 			svr_renew_creds, NULL)) {
 			log_err(errno,
 				__func__,
@@ -148,9 +146,9 @@ svr_renew_creds(struct work_task *pwt)
 			check_job_state(pjob, JOB_STATE_LTR_RUNNING)) {
 
 			if ((is_jattr_set(pjob, JOB_ATR_cred_validity)) &&
-				(get_jattr_long(pjob,  JOB_ATR_cred_validity) - svr_cred_renew_period <= time_now)) {
+				(get_jattr_long(pjob,  JOB_ATR_cred_validity) - svr_cred_renew_period <= time(0))) {
 				/* spread the renew tasks to the SVR_RENEW_CREDS_TM interval */
-				if (!set_task(WORK_Timed, (time_now + (rand() % SVR_RENEW_CREDS_TM)), svr_renew_job_cred, pjob->ji_qs.ji_jobid)) {
+				if (!set_task(WORK_Timed, (time(0) + (rand() % SVR_RENEW_CREDS_TM)), svr_renew_job_cred, pjob->ji_qs.ji_jobid)) {
 					log_err(errno, __func__, "Unable to set task for renew job credential");
 				}
 			}
@@ -182,7 +180,7 @@ set_cred_renew_enable(attribute *pattr, void *pobject, int actmode)
 		svr_cred_renew_enable = pattr->at_val.at_long;
 		if (svr_cred_renew_enable) {
 			(void)set_task(WORK_Timed,
-				(long)(time_now + SVR_RENEW_CREDS_TM),
+				(long)(time(0) + SVR_RENEW_CREDS_TM),
 				svr_renew_creds, 0);
 		}
 	}

@@ -124,7 +124,7 @@ const char *str_cred_actions[] = { "singleshot", "renewal", "setenv", "close", "
 
 extern char *path_jobs; /* job directory path */
 extern struct var_table vtable;
-extern time_t time_now;
+extern time_t time(0);
 extern int decode_block_base64(unsigned char *ascii_data, ssize_t ascii_len, unsigned char *bin_data, ssize_t *p_bin_len, char *msg, size_t msg_len);
 
 extern char *log_file;
@@ -467,7 +467,7 @@ get_ticket_from_storage(struct krb_holder *ticket, char *errbuf, size_t errbufsz
 
 	ticket->job_info->endtime = ticket->job_info->creds->times.endtime;
 
-	if (ticket->job_info->endtime < time_now)
+	if (ticket->job_info->endtime < time(0))
 		return KRB5_NOCREDS_SUPPLIED;
 
 out:

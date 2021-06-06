@@ -103,7 +103,6 @@ extern mominfo_time_t  mominfo_time;
 extern char	*resc_in_err;
 extern char	server_host[];
 extern void *node_idx;
-extern time_t	 time_now;
 extern int write_single_node_mom_attr(struct pbsnode *np);
 
 extern struct python_interpreter_data  svr_interp_data;
@@ -699,8 +698,8 @@ setup_notification()
 	}
 
 	/* send IS_CLUSTERADDR2 to happen in next 2 seconds */
-	if (addr_send_tm <= time_now) {
-		addr_send_tm = time_now + MCAST_WAIT_TM;
+	if (addr_send_tm <= time(0)) {
+		addr_send_tm = time(0) + MCAST_WAIT_TM;
 		struct work_task *ptask = set_task(WORK_Timed, addr_send_tm, mcast_msg, NULL);
 		ptask->wt_aux = IS_CLUSTER_ADDRS;
 	}

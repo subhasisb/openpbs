@@ -120,7 +120,6 @@ extern int	comp_resc_gt, comp_resc_eq, comp_resc_lt;
 extern int	pbs_errno;
 extern pbs_net_t pbs_server_addr;
 extern int	resc_access_perm;
-extern time_t	time_now;
 extern int svr_create_tmp_jobscript(job *pj, char *script_name);
 extern int	scheduler_jobs_stat;
 extern	char	*path_hooks_workdir;
@@ -866,7 +865,7 @@ send_job(job *jobp, pbs_net_t hostaddr, int port, int move_type,
 	if ((get_jattr_long(jobp, JOB_ATR_accrue_type) == JOB_ELIGIBLE) &&
 		(get_sattr_long(SVR_ATR_EligibleTimeEnable) == 1) &&
 		(move_type != MOVE_TYPE_Exec)) {
-		tempval = ((long)time_now - get_jattr_long(jobp, JOB_ATR_sample_starttime));
+		tempval = ((long)time(0) - get_jattr_long(jobp, JOB_ATR_sample_starttime));
 		set_jattr_l_slim(jobp, JOB_ATR_eligible_time, tempval, INCR);
 	}
 

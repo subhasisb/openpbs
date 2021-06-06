@@ -87,7 +87,6 @@ extern char *path_priv;
 extern char *path_hooks_workdir;
 
 extern	char	*path_hooks;
-extern	time_t	time_now;
 
 extern pbs_list_head svr_allhooks;
 extern pbs_list_head svr_queuejob_hooks;
@@ -4030,7 +4029,7 @@ cleanup_hooks_workdir(struct work_task *ptask)
 		}
 
 		/* remove files older than 'HOOKS_TMPFILE_MAX_AGE' */
-		if ((time_now - sbuf.st_ctime) > HOOKS_TMPFILE_MAX_AGE) {
+		if ((time(0) - sbuf.st_ctime) > HOOKS_TMPFILE_MAX_AGE) {
 			if (unlink(hook_file) < 0) {
 				if (errno != ENOENT) {
 					sprintf(log_buffer, "could not cleanup %s",
@@ -4049,7 +4048,7 @@ cleanup_hooks_workdir(struct work_task *ptask)
 	}
 	/*  cleanup of hooks temp files happen in the next */
 	/* 'HOOKS_TMPFILE_NEXT_CLEANUP_PERIOD' secs.	   */
-	(void)set_task(WORK_Timed, time_now+HOOKS_TMPFILE_NEXT_CLEANUP_PERIOD,
+	(void)set_task(WORK_Timed, time(0)+HOOKS_TMPFILE_NEXT_CLEANUP_PERIOD,
 		cleanup_hooks_workdir, NULL);
 
 }

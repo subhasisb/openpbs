@@ -142,7 +142,6 @@ enum res_op_flag {
 	INDIRECT_RES_CHECK,
 };
 
-extern time_t time_now;
 extern void	*svr_db_conn;
 struct work_task *rescdef_wt_g = NULL;
 

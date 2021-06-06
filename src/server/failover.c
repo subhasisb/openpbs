@@ -111,7 +111,6 @@ extern char *path_priv;
 extern char *path_svrlive;
 extern char *path_secondaryact;
 extern time_t secondary_delay;
-extern time_t time_now;
 extern char server_host[];
 
 extern struct connection *svr_conn;
@@ -208,7 +207,7 @@ primary_handshake(struct work_task *pwt)
 
 	/* reset work_task to call this again */
 
-	(void)set_task(WORK_Timed, time_now + HANDSHAKE_TIME, primary_handshake, NULL);
+	(void)set_task(WORK_Timed, time(0) + HANDSHAKE_TIME, primary_handshake, NULL);
 
 	return;
 }
@@ -237,7 +236,7 @@ void
 secondary_handshake(struct work_task *pwt)
 {
 	(void)update_svrlive();
-	(void)set_task(WORK_Timed, time_now + HANDSHAKE_TIME,
+	(void)set_task(WORK_Timed, time(0) + HANDSHAKE_TIME,
 		secondary_handshake, NULL);
 }
 
@@ -1035,7 +1034,6 @@ be_secondary(time_t delay)
 	 */
 
 	while (1) {
-		time_now = time(0);
 		++loop;
 
 		DBPRT(("Failover: Secondary_state is %d\n", Secondary_state));
@@ -1058,7 +1056,7 @@ be_secondary(time_t delay)
 					/* if _idle, just try again later */
 					/* else if time is up, go active  */
 
-					if ((Secondary_state == SECONDARY_STATE_noconn) && ((delay == (time_t)-1) || (time_now > takeov_on_nocontact))) {
+					if ((Secondary_state == SECONDARY_STATE_noconn) && ((delay == (time_t)-1) || (time(0) > takeov_on_nocontact))) {
 						/* can take over role of active server */
 						sec_sock = -1;
 						Secondary_state = SECONDARY_STATE_takeov;
@@ -1115,10 +1113,10 @@ be_secondary(time_t delay)
 			case SECONDARY_STATE_handsk:
 				/* waiting for handshake from the primary	*/
 				/* check to see if it has been too long		*/
-				if (time_now >= (hd_time + 2 * HANDSHAKE_TIME)) {
+				if (time(0) >= (hd_time + 2 * HANDSHAKE_TIME)) {
 					/* haven't received handshake recently */
 					Secondary_state = SECONDARY_STATE_nohsk;
-					sprintf(log_buffer, "Secondary has not received handshake in %ld seconds", time_now - hd_time);
+					sprintf(log_buffer, "Secondary has not received handshake in %ld seconds", time(0) - hd_time);
 					log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_SERVER,
 						LOG_WARNING, msg_daemonname, log_buffer);
 				}
@@ -1132,13 +1130,13 @@ be_secondary(time_t delay)
 					/* able to stat the server database */
 
 					DBPRT(("Failover: my: %ld stat: %ld dly: %ld\n",
-						time_now, sb.st_mtime, secondary_delay))
+						time(0), sb.st_mtime, secondary_delay))
 
 					if (sb.st_mtime > sbtime) {
 						/* mtime appears to be changing...           */
 						/* this happens at least the first time here */
 						sbtime = sb.st_mtime;
-						mytime = time_now;
+						mytime = time(0);
 
 						if ((sbloop++ > 4) && (sec_sock == -1)) {
 							/* files still being touched, but    */
@@ -1147,12 +1145,12 @@ be_secondary(time_t delay)
 							Secondary_state = SECONDARY_STATE_noconn;
 						}
 
-					} else if (time_now > (mytime + secondary_delay)) {
+					} else if (time(0) > (mytime + secondary_delay)) {
 						/* mtime hasn't changed in too long, take over */
 						Secondary_state = SECONDARY_STATE_takeov;
 					}
 
-				} else if (time_now > (hd_time + secondary_delay)) {
+				} else if (time(0) > (hd_time + secondary_delay)) {
 					/*
 					 * couldn't stat the directory in the last
 					 * "secondary_delay" seconds, Secondary must be

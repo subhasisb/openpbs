@@ -105,7 +105,6 @@ extern int pbs_errno;
 extern pbs_list_head mom_deadjobs; /* for deferred purging of job */
 extern pbs_list_head mom_polljobs; /* must have resource limits polled */
 extern pbs_list_head svr_alljobs;  /* all jobs under MOM's control */
-extern time_t time_now;
 extern int server_stream;
 extern char mom_short_name[];
 extern unsigned int pbs_mom_port;
@@ -831,7 +830,7 @@ close_sisters_mcast(job *pjob)
 int
 is_comm_up(int maturity_time)
 {
-	if ((mom_net_up == 1) && ((time_now - mom_net_up_time) > maturity_time))
+	if ((mom_net_up == 1) && ((time(0) - mom_net_up_time) > maturity_time))
 		return 1;
 
 	return 0;
@@ -2406,7 +2405,7 @@ im_eof(int stream, int ret)
 					}
 #endif
 					continue;
-				} else if ((time_now - np->hn_eof_ts) <= max_poll_downtime_val) {
+				} else if ((time(0) - np->hn_eof_ts) <= max_poll_downtime_val) {
 					sprintf(log_buffer, "lost communication with %s, not killing job yet", np->hn_host);
 					log_joberr(-1, __func__, log_buffer, pjob->ji_qs.ji_jobid);
 					continue;
@@ -3190,9 +3189,9 @@ im_request(int stream, int version)
 			/* set remaining job structure elements */
 			set_job_state(pjob, JOB_STATE_LTR_RUNNING);
 			set_job_substate(pjob, JOB_SUBSTATE_PRERUN);
-			set_jattr_l_slim(pjob, JOB_ATR_mtime, time_now, SET);
-			pjob->ji_qs.ji_stime = time_now;
-			pjob->ji_polltime = time_now;
+			set_jattr_l_slim(pjob, JOB_ATR_mtime, time(0), SET);
+			pjob->ji_qs.ji_stime = time(0);
+			pjob->ji_polltime = time(0);
 
 			/* np is set from job_nodes_inner */
 
@@ -4150,7 +4149,7 @@ join_err:
 
 			if (check_ms(stream, pjob))
 				goto fini;
-			pjob->ji_polltime = time_now;
+			pjob->ji_polltime = time(0);
 			DBPRT(("%s: POLL_JOB %s\n", __func__, jobid))
 			ret = im_compose(stream, jobid, cookie, IM_ALL_OKAY,
 				event, fromtask, IM_OLD_PROTOCOL_VER);

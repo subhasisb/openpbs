@@ -121,7 +121,6 @@ extern	unsigned int	pbs_rm_port;
 extern	gid_t		pbsgroup;
 extern	int		server_stream;
 extern	unsigned int	pbs_mom_port;
-extern	time_t		time_now;
 extern	time_t		time_resc_updated;
 extern char		*path_hooks_workdir;
 extern	long		joinjob_alarm_time;
@@ -1460,8 +1459,8 @@ job_setup(job *pjob, struct passwd **pwdparm)
 	if (pwdp == NULL) {
 		log_event(PBSEVENT_JOB | PBSEVENT_SECURITY, PBS_EVENTCLASS_JOB,
 			LOG_ERR, pjob->ji_qs.ji_jobid, log_buffer);
-		pjob->ji_qs.ji_stime = time_now; /* for walltime */
-		set_jattr_l_slim(pjob, JOB_ATR_stime, time_now, SET);
+		pjob->ji_qs.ji_stime = time(0); /* for walltime */
+		set_jattr_l_slim(pjob, JOB_ATR_stime, time(0), SET);
 		return JOB_EXEC_FAILUID;
 	}
 	pjob->ji_qs.ji_un.ji_momt.ji_exuid = pjob->ji_grpcache->gc_uid;
@@ -1802,7 +1801,7 @@ record_finish_exec(int sd)
 	job_save(pjob);
 
 	if (mom_get_sample() == PBSE_NONE) {
-		time_resc_updated = time_now;
+		time_resc_updated = time(0);
 		(void)mom_set_use(pjob);
 	}
 	/*
@@ -2626,7 +2625,7 @@ receive_pipe_request(int sd)
 			 * out on job_launch_delay.
 			 */
  			delay_value = 0.95 * job_launch_delay;
-			pjob->ji_report_task = set_task(WORK_Timed, time_now + delay_value, report_failed_node_hosts_task, pjob);
+			pjob->ji_report_task = set_task(WORK_Timed, time(0) + delay_value, report_failed_node_hosts_task, pjob);
 		}
 	} else {
 		snprintf(msg, sizeof(msg), "ignoring unknown cmd %d", cmd);
@@ -3132,9 +3131,9 @@ finish_exec(job *pjob)
 		}
 	}
 
-	pjob->ji_qs.ji_stime = time_now;
-	set_jattr_l_slim(pjob, JOB_ATR_stime, time_now, SET);
-	pjob->ji_sampletim  = time_now;
+	pjob->ji_qs.ji_stime = time(0);
+	set_jattr_l_slim(pjob, JOB_ATR_stime, time(0), SET);
+	pjob->ji_sampletim  = time(0);
 
 	/*
 	 * Fork the child process that will become the job.
@@ -6247,7 +6246,7 @@ start_exec(job *pjob)
 		if (do_tolerate_node_failures(pjob)) {
 			if (!check_job_substate(pjob, JOB_SUBSTATE_WAITING_JOIN_JOB)) {
 				set_job_substate(pjob, JOB_SUBSTATE_WAITING_JOIN_JOB);
-				pjob->ji_joinalarm = time_now + joinjob_alarm_time;
+				pjob->ji_joinalarm = time(0) + joinjob_alarm_time;
 				sprintf(log_buffer, "job waiting up to %ld secs ($sister_join_job_alarm) for all sister moms to join", joinjob_alarm_time);
 				log_event(PBSEVENT_DEBUG3, PBS_EVENTCLASS_JOB, LOG_INFO, pjob->ji_qs.ji_jobid, log_buffer);
 				log_buffer[0] = '\0';

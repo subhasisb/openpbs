@@ -71,8 +71,6 @@ struct preempt_ordering *svr_get_preempt_order(job *pjob, pbs_sched *psched);
 
 extern struct server server;
 
-extern time_t time_now;
-
 const static char *preempt_methods[] = {
 	"",
 	"suspend",

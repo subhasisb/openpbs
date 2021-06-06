@@ -2024,7 +2024,7 @@ e.accept()
         bu = BatchUtils()
         new_end_time = bu.convert_seconds_to_datetime(end_time)
         attrs = {'reserve_end': new_end_time}
-        time_now = time.time()
+        time(0) = time.time()
         self.server.alterresv(modify_resv, attrs)
         attr = {'reserve_state': (MATCH_RE, 'RESV_CONFIRMED|2'),
                 'partition': 'P1'}
@@ -2033,7 +2033,7 @@ e.accept()
         rnodes = {'resv_nodes': '(' + vn + '[0]:ncpus=2)'}
         self.server.expect(RESV, rnodes, id=modify_resv)
         msg = modify_resv + ";Reservation Confirmed"
-        self.scheds['sc1'].log_match(msg, starttime=time_now)
+        self.scheds['sc1'].log_match(msg, starttime=time(0))
 
     def test_setting_default_partition(self):
         """

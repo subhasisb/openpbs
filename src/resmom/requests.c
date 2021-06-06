@@ -110,7 +110,6 @@ extern char		*path_undeliv;
 extern attribute_def	job_attr_def[];
 extern char		*msg_jobmod;
 extern char		*msg_manager;
-extern time_t		time_now;
 extern time_t		time_resc_updated;
 extern int		resc_access_perm;	/* see encode_resc() */
 /* in attr_fn_resc.c */
@@ -1369,7 +1368,7 @@ post_resume(job *pjob, int err)
 		}
 		/* if I'm not MS, start to check for polling again */
 		if ((pjob->ji_qs.ji_svrflags & JOB_SVFLG_HERE) == 0)
-			pjob->ji_polltime = time_now;
+			pjob->ji_polltime = time(0);
 		set_job_substate(pjob, JOB_SUBSTATE_RUNNING);
 		pjob->ji_qs.ji_svrflags &= ~JOB_SVFLG_Suspend;
 		(void)job_save(pjob);
@@ -1835,8 +1834,8 @@ terminate_job(job *pjob, int internal)
 	if (internal == 1)
 		pjob->ji_qs.ji_svrflags |= JOB_SVFLG_OVERLMT1;
 
-	/* set overlimit time stamp by adding kill_delay and time_now. */
-	pjob->ji_overlmt_timestamp = time_now + get_jattr_long(pjob, JOB_ATR_job_kill_delay);
+	/* set overlimit time stamp by adding kill_delay and time(0). */
+	pjob->ji_overlmt_timestamp = time(0) + get_jattr_long(pjob, JOB_ATR_job_kill_delay);
 	if ((chk_mom_action(TerminateAction) == Script) &&
 		((i = do_mom_action_script(TerminateAction, pjob, NULL, NULL,
 		post_terminate)) == 1)) {
@@ -4305,7 +4304,7 @@ post_restart(job *pjob, int ev)
 		start_walltime(pjob);
 
 		if (mom_get_sample() != PBSE_NONE) {
-			time_resc_updated = time_now;
+			time_resc_updated = time(0);
 			(void)mom_set_use(pjob);
 		}
 	} else {

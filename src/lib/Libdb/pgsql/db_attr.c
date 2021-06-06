@@ -245,8 +245,8 @@ int
 attrlist_to_dbarray_ex(char **raw_array, pbs_db_attr_list_t *attr_list, int keys_only)
 {
 	/* use static variables to improve performance by not allocating memory for each object save */
-	static struct pg_array *array = NULL, *tmp;
-	static int len = sizeof(struct pg_array) + DBARRAY_BUF_LEN;
+	struct pg_array *array = NULL, *tmp;
+	int len = sizeof(struct pg_array) + DBARRAY_BUF_LEN;
 	struct str_data *val = NULL;
 	svrattrl *pal;
 	char *p;

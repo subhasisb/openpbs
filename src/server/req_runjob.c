@@ -141,7 +141,6 @@ extern char *msg_manager;
 extern char *msg_stageinfail;
 extern char *msg_job_abort;
 extern pbs_list_head svr_deferred_req;
-extern time_t time_now;
 extern int   svr_totnodes;	/* non-zero if using nodes */
 extern job  *chk_job_request(char *, struct batch_request *, int *, int *);
 extern int send_cred(job *pjob);
@@ -211,7 +210,7 @@ check_and_provision_job(struct batch_request *preq, job *pjob, int *need_prov)
 	DBPRT(("%s: Sucessfully enqueued provisioning for job %s\n", __func__, pjob->ji_qs.ji_jobid))
 
 	/* log accounting line for start of prov for a job */
-	set_job_ProvAcctRcd(pjob, time_now, PROVISIONING_STARTED);
+	set_job_ProvAcctRcd(pjob, time(0), PROVISIONING_STARTED);
 
 	return PBSE_NONE;
 }
@@ -874,7 +873,7 @@ post_stagein(struct work_task *pwt)
 			}
 			pwait = get_jattr(paltjob, JOB_ATR_exectime);
 			if (!is_jattr_set(paltjob, JOB_ATR_exectime)) {
-				set_jattr_l_slim(paltjob, JOB_ATR_exectime, time_now + PBS_STAGEFAIL_WAIT, SET);
+				set_jattr_l_slim(paltjob, JOB_ATR_exectime, time(0) + PBS_STAGEFAIL_WAIT, SET);
 				job_set_wait(pwait, paltjob, 0);
 			}
 			svr_setjobstate(paltjob, JOB_STATE_LTR_WAITING, JOB_SUBSTATE_STAGEFAIL);
@@ -975,6 +974,7 @@ char *
 form_attr_comment(const char *template, const char *execvnode)
 {
 	char timebuf[128];
+	time_t time_now = time(0);
 	strftime(timebuf, 128, "%a %b %d at %H:%M", localtime(&time_now));
 	sprintf(log_buffer, template, timebuf);
 	if (execvnode != NULL) {
@@ -1224,8 +1224,8 @@ complete_running(job *jobp)
 			svr_setjobstate(parent, JOB_STATE_LTR_BEGUN, JOB_SUBSTATE_BEGUN);
 
 			/* Also set the parent job's stime */
-			parent->ji_qs.ji_stime = time_now;
-			set_jattr_l_slim(parent, JOB_ATR_stime, time_now, SET);
+			parent->ji_qs.ji_stime = time(0);
+			set_jattr_l_slim(parent, JOB_ATR_stime, time(0), SET);
 
 			account_jobstr(parent, PBS_ACCT_RUN);
 			set_jattr_str_slim(parent, JOB_ATR_Comment, form_attr_comment("Job Array Began at %s", NULL), NULL);
@@ -1247,8 +1247,8 @@ complete_running(job *jobp)
 	/* record start time for accounting and for the Scheduler */
 	/* setting ji_stime is also an indicator that we have done all this */
 
-	jobp->ji_qs.ji_stime = time_now;
-	set_jattr_l_slim(jobp, JOB_ATR_stime, time_now, SET);
+	jobp->ji_qs.ji_stime = time(0);
+	set_jattr_l_slim(jobp, JOB_ATR_stime, time(0), SET);
 
 	/*
 	 * if job is in substate PROVISION, set to PRERUN.

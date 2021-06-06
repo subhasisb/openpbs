@@ -87,7 +87,6 @@
 /* global data items */
 
 extern char  *path_jobs;
-extern time_t time_now;
 extern char   pbs_recov_filename[];
 
 /* data global only to this file */
@@ -193,7 +192,7 @@ job_save_fs(job *pjob)
 
 	} else {
 		/* an attribute changed,  update mtime */
-		set_jattr_l_slim(pjob, JOB_ATR_mtime, time_now, SET);
+		set_jattr_l_slim(pjob, JOB_ATR_mtime, time(0), SET);
 		/*
 		 * write the whole structure to the file.
 		 * For a update, this is done to a new file to protect the

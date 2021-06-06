@@ -82,7 +82,6 @@ extern char          server_name[];
 extern attribute_def svr_attr_def[];
 extern attribute_def que_attr_def[];
 extern attribute_def job_attr_def[];
-extern time_t	     time_now;
 extern char	    *msg_init_norerun;
 extern int resc_access_perm;
 extern long svr_history_enable;

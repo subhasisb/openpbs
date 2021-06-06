@@ -89,7 +89,6 @@ extern char	*msg_badstate;
 extern char	*msg_routexceed;
 extern char	*msg_routebad;
 extern char	*msg_err_malloc;
-extern time_t	 time_now;
 
 /**
  * @brief
@@ -304,16 +303,16 @@ job_route(job *jobp)
 	/* what is the retry time and life time of a job in this queue */
 
 	if (is_qattr_set(qp, QR_ATR_RouteRetryTime))
-		retry_time = (long)time_now + get_qattr_long(qp, QR_ATR_RouteRetryTime);
+		retry_time = (long)time(0) + get_qattr_long(qp, QR_ATR_RouteRetryTime);
 	else
-		retry_time = (long)time_now + PBS_NET_RETRY_TIME;
+		retry_time = (long)time(0) + PBS_NET_RETRY_TIME;
 
 	if (is_qattr_set(qp, QR_ATR_RouteLifeTime))
 		life = jobp->ji_qs.ji_un.ji_routet.ji_quetime + get_qattr_long(qp, QR_ATR_RouteLifeTime);
 	else
 		life = 0;	/* forever */
 
-	if (life && (life < time_now)) {
+	if (life && (life < time(0))) {
 		log_event(PBSEVENT_JOB, PBS_EVENTCLASS_JOB, LOG_DEBUG,
 			jobp->ji_qs.ji_jobid, msg_routexceed);
 		return (PBSE_ROUTEEXPD);   /* job too long in queue */
@@ -359,7 +358,7 @@ queue_route(pbs_queue *pque)
 	pjob = (job *)GET_NEXT(pque->qu_jobs);
 	while (pjob) {
 		nxjb = (job *)GET_NEXT(pjob->ji_jobque);
-		if (pjob->ji_qs.ji_un.ji_routet.ji_rteretry <= time_now) {
+		if (pjob->ji_qs.ji_un.ji_routet.ji_rteretry <= time(0)) {
 			if ((rc = job_route(pjob)) == PBSE_ROUTEREJ)
 				job_abt(pjob, msg_routebad);
 			else if (rc == PBSE_ROUTEEXPD)

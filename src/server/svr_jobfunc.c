@@ -128,7 +128,6 @@ extern char   server_host[];
 extern pbs_list_head svr_queues;
 extern int    comp_resc_lt;
 extern int    comp_resc_gt;
-extern time_t time_now;
 extern char  *resc_in_err;
 
 extern struct licenses_high_use usedlicenses;
@@ -185,7 +184,7 @@ clear_default_resc(job *pjob)
 void
 tickle_for_reply(void)
 {
-	(void)set_task(WORK_Timed, time_now + 10, 0, NULL);
+	(void)set_task(WORK_Timed, time(0) + 10, 0, NULL);
 }
 
 /**
@@ -320,7 +319,7 @@ svr_enquejob(job *pjob, char *selectspec)
 	set_jattr_c_slim(pjob, JOB_ATR_queuetype, *qtype, SET);
 
 	if (!is_jattr_set(pjob, JOB_ATR_qtime))
-		set_jattr_l_slim(pjob, JOB_ATR_qtime, time_now, SET);
+		set_jattr_l_slim(pjob, JOB_ATR_qtime, time(0), SET);
 
 	/*
 	 * set any "unspecified" resources which have default values,
@@ -380,7 +379,7 @@ svr_enquejob(job *pjob, char *selectspec)
 		/* set eligible time */
 
 		if (!is_jattr_set(pjob, JOB_ATR_etime) && check_job_state(pjob, JOB_STATE_LTR_QUEUED)) {
-			set_jattr_l_slim(pjob, JOB_ATR_etime, time_now, SET);
+			set_jattr_l_slim(pjob, JOB_ATR_etime, time(0), SET);
 
 			/* better notify the Scheduler we have a new job */
 			if (!selectspec) {
@@ -415,7 +414,7 @@ svr_enquejob(job *pjob, char *selectspec)
 		/* start attempts to route job */
 
 		pjob->ji_qs.ji_un_type = JOB_UNION_TYPE_ROUTE;
-		pjob->ji_qs.ji_un.ji_routet.ji_quetime = time_now;
+		pjob->ji_qs.ji_un.ji_routet.ji_quetime = time(0);
 		pjob->ji_qs.ji_un.ji_routet.ji_rteretry = 0;
 	}
 	return (0);
@@ -567,7 +566,7 @@ svr_setjobstate(job *pjob, char newstate, int newsubstate)
 					}
 
 					if (!is_jattr_set(pjob, JOB_ATR_etime))
-						set_jattr_l_slim(pjob, JOB_ATR_etime, time_now, SET);
+						set_jattr_l_slim(pjob, JOB_ATR_etime, time(0), SET);
 
 					/* clear start time (stime) */
 					free_jattr(pjob, JOB_ATR_stime);
@@ -671,7 +670,7 @@ svr_evaljobstate(job *pjob, char *newstate, int *newsub, int forceeval)
 			*newsub   = JOB_SUBSTATE_HELD;
 		}
 
-	} else if (get_jattr_long(pjob, JOB_ATR_exectime) > (long)time_now) {
+	} else if (get_jattr_long(pjob, JOB_ATR_exectime) > (long)time(0)) {
 
 		*newstate = JOB_STATE_LTR_WAITING;
 		*newsub   = JOB_SUBSTATE_WAITING;
@@ -1349,7 +1348,7 @@ check_block_wt(struct work_task *ptask)
 
 retry:
 	if ((time(0) - blockj->reply_time) < BLOCK_JOB_REPLY_TIMEOUT) {
-		set_task(WORK_Timed, time_now + 10, check_block_wt, blockj);
+		set_task(WORK_Timed, time(0) + 10, check_block_wt, blockj);
 		return;
 	} else {
 		sprintf(log_buffer, "Unable to reply to client %s for job %s",
@@ -2582,13 +2581,13 @@ Time4resv(struct work_task *ptask)
 		notify_scheds_about_resv(SCH_SCHEDULE_JOBRESV, presv);
 
 		/*notify the relevant persons that the reservation time has arrived*/
-		if (presv->ri_qs.ri_tactive == time_now){
+		if (presv->ri_qs.ri_tactive == time(0)){
 			svr_mailownerResv(presv, MAIL_BEGIN, MAIL_NORMAL, "");
 			account_resvstart(presv);
 		}
 
 		presv->resv_start_task = NULL;
-		if ((ptask = set_task(WORK_Timed, time_now + 60,
+		if ((ptask = set_task(WORK_Timed, time(0) + 60,
 			Time4resv1, presv)) != 0) {
 
 			ptask->wt_aux = 4;	/*we will attempt up to 5 times*/
@@ -2636,7 +2635,7 @@ Time4resv1(struct work_task *ptask)
 
 	/*put on another reminder timed for 60 seconds in the future*/
 	if (ptask->wt_aux > 0) {
-		if ((pwt = set_task(WORK_Timed, time_now + 60,
+		if ((pwt = set_task(WORK_Timed, time(0) + 60,
 			Time4resv1, presv)) != 0) {
 
 			pwt->wt_aux = ptask->wt_aux - 1;
@@ -2662,7 +2661,7 @@ Time4resv1(struct work_task *ptask)
 
 /**
  * @brief
- * 		Time4resvFinish - function that's to execute when "time_now" exceeds
+ * 		Time4resvFinish - function that's to execute when "time(0)" exceeds
  *		the ending time of the reservation
  *
  * @param[in,out]	ptask	-	work task structure which contains reservation structure.
@@ -3026,8 +3025,8 @@ Time4occurrenceFinish(resc_resv *presv)
 	 */
 	if (is_rattr_set(presv, RESV_ATR_retry)) {
 		sub = RESV_DEGRADED;
-		if (get_rattr_long(presv, RESV_ATR_retry) > 0 && get_rattr_long(presv, RESV_ATR_retry) <= time_now)
-			set_resv_retry(presv, time_now + 120);
+		if (get_rattr_long(presv, RESV_ATR_retry) > 0 && get_rattr_long(presv, RESV_ATR_retry) <= time(0))
+			set_resv_retry(presv, time(0) + 120);
 	}
 
 	if (sub == RESV_DEGRADED) {
@@ -3097,7 +3096,7 @@ delete_occurrence_jobs(resc_resv *presv)
 	 * the work task gets deleted when the reservation is deleted.
 	 * This can happen if a pbs_rdel is invoked on the reservation while it is
 	 * processing the deletion of running jobs. */
-	if ((ptask = set_task(WORK_Timed, time_now + 5, running_jobs_count, presv)) != 0)
+	if ((ptask = set_task(WORK_Timed, time(0) + 5, running_jobs_count, presv)) != 0)
 		append_link(&presv->ri_svrtask, &ptask->wt_linkobj, ptask);
 }
 
@@ -3262,7 +3261,7 @@ eval_resvState(resc_resv *presv, enum resvState_discrim s, int relVal, int *psta
 	*pstate = presv->ri_qs.ri_state;
 	*psub = presv->ri_qs.ri_substate;
 
-	if (time_now >= presv->ri_qs.ri_stime && time_now < presv->ri_qs.ri_etime)
+	if (time(0) >= presv->ri_qs.ri_stime && time(0) < presv->ri_qs.ri_etime)
 		is_running = 1;
 
 	if (s == RESVSTATE_gen_task_Time4resv) {
@@ -3287,7 +3286,7 @@ eval_resvState(resc_resv *presv, enum resvState_discrim s, int relVal, int *psta
 						*pstate = RESV_CONFIRMED;
 						*psub = RESV_CONFIRMED;
 					}
-				} else if (presv->ri_qs.ri_etime > time_now) {
+				} else if (presv->ri_qs.ri_etime > time(0)) {
 					*pstate = RESV_CONFIRMED;
 					*psub = RESV_CONFIRMED;
 				}
@@ -3303,18 +3302,18 @@ eval_resvState(resc_resv *presv, enum resvState_discrim s, int relVal, int *psta
 		}
 	} else if (s == RESVSTATE_Time4resv) {
 		if (relVal == 0) {
-			if (presv->ri_qs.ri_stime <= time_now &&
-				time_now <= presv->ri_qs.ri_etime) {
+			if (presv->ri_qs.ri_stime <= time(0) &&
+				time(0) <= presv->ri_qs.ri_etime) {
 				if (*pstate == RESV_DEGRADED || *psub == RESV_DEGRADED)
 					*psub = RESV_DEGRADED;
 				else
 					*psub = RESV_RUNNING;
 				*pstate = RESV_RUNNING;
 				if (presv->ri_qs.ri_tactive < get_rattr_long(presv, RESV_ATR_start))
-					/* Assigning time_now to indicate when reservation become active
+					/* Assigning time(0) to indicate when reservation become active
  					 *to help in fend off accounting on server restart
 					 */
-					presv->ri_qs.ri_tactive = time_now;
+					presv->ri_qs.ri_tactive = time(0);
 			}
 		}
 	} else if (s == RESVSTATE_req_deleteReservation) {
@@ -3335,7 +3334,7 @@ eval_resvState(resc_resv *presv, enum resvState_discrim s, int relVal, int *psta
 		*pstate = RESV_UNCONFIRMED;
 		*psub = RESV_UNCONFIRMED;
 	} else if (s == RESVSTATE_is_resv_window_in_future) {
-		if (presv->ri_qs.ri_etime < time_now) {
+		if (presv->ri_qs.ri_etime < time(0)) {
 			*pstate = RESV_FINISHED;
 			*psub = RESV_FINISHED;
 		}
@@ -3519,7 +3518,7 @@ gen_task_EndResvWindow(resc_resv *presv)
 	if (presv == NULL)
 		return (PBSE_INTERNAL);
 
-	fromNow = presv->ri_qs.ri_etime - (long)time_now;
+	fromNow = presv->ri_qs.ri_etime - (long)time(0);
 	if (is_sattr_set(SVR_ATR_resv_post_processing))
 		fromNow -= get_sattr_long(SVR_ATR_resv_post_processing);
 	rc = gen_future_deleteResv(presv, fromNow);
@@ -3531,7 +3530,7 @@ gen_task_EndResvWindow(resc_resv *presv)
  * @brief
  * 		gen_deleteResv - creates a work_task for deleting a reservation
  * 		Argument "fromNow" needs to be a non-negative value.  It's the number of
- * 		seconds into the future (measured from from global variable "time_now")
+ * 		seconds into the future (measured from from global variable "time(0)")
  * 		that this task is to be activated.
  *
  * @param[in,out]	presv	-	pointer to reservation.
@@ -3546,7 +3545,7 @@ gen_deleteResv(resc_resv *presv, long fromNow)
 {
 	struct work_task	*ptask;
 	int			rc = 0;		/*assume success*/
-	long			event = (long)time_now + fromNow;
+	long			event = (long)time(0) + fromNow;
 
 	if ((ptask = set_task(WORK_Timed, event,
 		Time4_term, presv)) != 0) {
@@ -3571,7 +3570,7 @@ gen_deleteResv(resc_resv *presv, long fromNow)
  * 		if the reservation was submitted with a negative value for "I" attribute -
  * 		meaning: willing to wait "n" seconds, but after that forget it.
  * 		Argument "fromNow" needs to be a non-negative value.  It's the number of
- * 		seconds into the future (measured from from global variable "time_now")
+ * 		seconds into the future (measured from from global variable "time(0)")
  * 		that this task is to be activated.
  *
  * @param[in,out]	presv	-	pointer to reservation.
@@ -3586,7 +3585,7 @@ gen_negI_deleteResv(resc_resv *presv, long fromNow)
 {
 	struct work_task	*ptask;
 	int			rc = 0;		/*assume success*/
-	long			event = (long)time_now + fromNow;
+	long			event = (long)time(0) + fromNow;
 
 	if ((ptask = set_task(WORK_Timed, event,
 		Time4_I_term, presv)) != 0) {
@@ -3611,7 +3610,7 @@ gen_negI_deleteResv(resc_resv *presv, long fromNow)
  * 		in the future and puts it on the "WORK_Timed" work_task list at the
  * 		appropriate (time sequential) location.  Argument "fromNow" is to be a
  * 		non-negative value.  It's the number of seconds into the future
- * 		(measured from from global variable "time_now") that the task is to become
+ * 		(measured from from global variable "time(0)") that the task is to become
  * 		active.
  *
  * @param[in,out]	presv	-	pointer to reservation.
@@ -3626,7 +3625,7 @@ gen_future_deleteResv(resc_resv *presv, long fromNow)
 {
 	struct work_task	*ptask = NULL;
 	int			rc = 0;		/*assume success*/
-	long			event = (long)time_now + fromNow;
+	long			event = (long)time(0) + fromNow;
 
 	if (presv->resv_end_task)
 		delete_task(presv->resv_end_task);
@@ -3655,7 +3654,7 @@ gen_future_deleteResv(resc_resv *presv, long fromNow)
  * 		reservation request submitted now. Place on the "WORK_Timed" work_task
  * 		list at the appropriate (time sequential) location.  Argument "fromNow"
  * 		is to be a non-negative value.  It's the number of seconds into the future
- * 		(measured from from global variable "time_now") that the task is to become
+ * 		(measured from from global variable "time(0)") that the task is to become
  * 		active.
  *
  * @param[in,out]	presv	-	pointer to reservation.
@@ -3670,7 +3669,7 @@ gen_future_reply(resc_resv *presv, long fromNow)
 {
 	struct work_task	*ptask;
 	int			rc = 0;		/*assume success*/
-	long			event = (long)time_now + fromNow;
+	long			event = (long)time(0) + fromNow;
 
 	if ((ptask = set_task(WORK_Timed, event,
 		Time4reply, presv)) != 0) {
@@ -3857,7 +3856,7 @@ remove_deleted_resvs(void)
 			 *and issued against this reservation
 			 */
 
-			if ((ptask = set_task(WORK_Timed, time_now + 5,
+			if ((ptask = set_task(WORK_Timed, time(0) + 5,
 				Time4resvFinish, presv)) != 0) {
 
 				/* set things so that the reservation going away results in
@@ -4064,7 +4063,7 @@ start_end_dur_wall(resc_resv *presv)
 	atemp.at_type = ATR_TYPE_LONG;
 	switch (swcode) {
 		case  3:	/* start, end */
-			if (((check_start && (stime < time_now)) && (pstate != RESV_BEING_ALTERED)) ||
+			if (((check_start && (stime < time(0))) && (pstate != RESV_BEING_ALTERED)) ||
 				(etime <= stime))
 				rc = -1;
 			else {
@@ -4079,7 +4078,7 @@ start_end_dur_wall(resc_resv *presv)
 
 		case  4:
 		case  5:	/* start, duration */
-			if (((check_start && stime < time_now) && (pstate != RESV_BEING_ALTERED)) ||
+			if (((check_start && stime < time(0)) && (pstate != RESV_BEING_ALTERED)) ||
 				(duration <= 0))
 				rc = -1;
 			else {
@@ -4093,7 +4092,7 @@ start_end_dur_wall(resc_resv *presv)
 			break;
 
 		case  7:	/* start, end, duration */
-			if (((check_start) && (stime < time_now)) ||
+			if (((check_start) && (stime < time(0))) ||
 				(etime < stime) ||
 				(duration <= 0) ||
 				((etime - stime) !=
@@ -4109,7 +4108,7 @@ start_end_dur_wall(resc_resv *presv)
 		case  8:	/* end, duration */
 			if ((duration <= 0) ||
 				(etime - duration <
-					time_now)) {
+					time(0))) {
 				rc = -1;
 			}
 			else {
@@ -4123,7 +4122,7 @@ start_end_dur_wall(resc_resv *presv)
 			break;
 
 		case  9:	/* start, wall */
-			if (((check_start) && (stime < time_now)) ||
+			if (((check_start) && (stime < time(0))) ||
 				(prsc->rs_value.at_val.at_long <= 0))
 				rc = -1;
 			else {
@@ -4138,7 +4137,7 @@ start_end_dur_wall(resc_resv *presv)
 		case 10:	/* end, wall */
 			if ((prsc->rs_value.at_val.at_long <= 0) ||
 				(etime - prsc->rs_value.at_val.at_long <
-					time_now)) {
+					time(0))) {
 				rc = -1;
 			}
 			else {
@@ -4151,7 +4150,7 @@ start_end_dur_wall(resc_resv *presv)
 			break;
 
 		case 11:	/* start, end, wall */
-			if (((check_start) && (stime < time_now)) ||
+			if (((check_start) && (stime < time(0))) ||
 				(prsc->rs_value.at_val.at_long <= 0) ||
 				(etime - stime !=
 					prsc->rs_value.at_val.at_long))
@@ -4165,7 +4164,7 @@ start_end_dur_wall(resc_resv *presv)
 			break;
 
 		case 13:	/* start, duration & wall */
-			if (((check_start) && (stime < time_now)) ||
+			if (((check_start) && (stime < time(0))) ||
 				(prsc->rs_value.at_val.at_long != duration) ||
 				(duration <= 0))
 				rc = -1;
@@ -4178,7 +4177,7 @@ start_end_dur_wall(resc_resv *presv)
 			break;
 
 		case 15:	/* start, end, duration & wall */
-			if (((check_start) || (stime < time_now)) ||
+			if (((check_start) || (stime < time(0))) ||
 				(etime < stime) ||
 				(duration <= 0) ||
 				(prsc->rs_value.at_val.at_long != duration) ||
@@ -4422,7 +4421,7 @@ update_eligible_time(long newaccruetype, job *pjob)
 	char str[256];
 	long accrued_time = 0;			/* accrued time */
 	long oldaccruetype = get_jattr_long(pjob, JOB_ATR_accrue_type);
-	long timestamp = (long) time_now; 	/* time since accrual begins */
+	long timestamp = (long) time(0); 	/* time since accrual begins */
 
 	/* check if updating same accrue type or do nothing */
 	if (newaccruetype == oldaccruetype || newaccruetype == -1)
@@ -4473,7 +4472,7 @@ int
 alter_eligibletime(attribute *pattr, void *pobject, int actmode)
 {
 	static char errtime[] = "00:00:00";
-	long timestamp = (long)time_now; /* accrual begins from here */
+	long timestamp = (long)time(0); /* accrual begins from here */
 	job * pjob = (job*)pobject;
 	long oldaccruetype = get_jattr_long(pjob, JOB_ATR_accrue_type);
 	long newaccruetype = oldaccruetype; /* We are not changing accrue type */
@@ -4496,7 +4495,7 @@ alter_eligibletime(attribute *pattr, void *pobject, int actmode)
 				"exiting"
 			};
 
-			accrued_time = (long)time_now -
+			accrued_time = (long)time(0) -
 				get_jattr_long(pjob, JOB_ATR_sample_starttime);
 
 			/* Sample time accrual continues with this time .... */
@@ -4625,7 +4624,7 @@ svr_clean_job_history(struct work_task *pwt)
 
 			if (!(is_jattr_set(pjob,  JOB_ATR_history_timestamp))) {
 				if (check_job_state(pjob, JOB_STATE_LTR_MOVED))
-					set_jattr_l_slim(pjob, JOB_ATR_history_timestamp, time_now, SET);
+					set_jattr_l_slim(pjob, JOB_ATR_history_timestamp, time(0), SET);
 			else {
 					if (((walltime_used = get_used_wall(pjob)) == -1) ||
 						!(is_jattr_set(pjob,  JOB_ATR_stime))) {
@@ -4640,7 +4639,7 @@ svr_clean_job_history(struct work_task *pwt)
 				job_save_db(pjob);
 			}
 
-			if (time_now >= (get_jattr_long(pjob,  JOB_ATR_history_timestamp) + svr_history_duration)) {
+			if (time(0) >= (get_jattr_long(pjob,  JOB_ATR_history_timestamp) + svr_history_duration)) {
 				job_purge(pjob);
 				pjob = NULL;
 			}
@@ -4687,7 +4686,7 @@ svr_clean_job_history(struct work_task *pwt)
 	 */
 	if (pwt && svr_history_enable) {
 		if (!set_task(WORK_Timed,
-			(time_now + time_between_tasks),
+			(time(0) + time_between_tasks),
 			svr_clean_job_history, NULL)) {
 			log_err(errno,
 				"svr_clean_job_history",
@@ -5015,7 +5014,7 @@ svr_setjob_histinfo(job *pjob, histjob_type type)
 	}
 
 	/* set the history timestamp */
-	set_jattr_l_slim(pjob, JOB_ATR_history_timestamp, time_now, SET);
+	set_jattr_l_slim(pjob, JOB_ATR_history_timestamp, time(0), SET);
 	/* update the history job state and substate */
 	svr_histjob_update(pjob, newstate, newsubstate);
 

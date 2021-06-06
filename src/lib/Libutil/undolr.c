@@ -92,14 +92,14 @@ static void mk_recording_path(char * fpath)
 {
 	struct tm ltm;
 	struct tm *ptm;
-	time_t time_now;
+	time_t time(0);
 
 	if (pbs_loadconf(1) == 0)
 		log_eventf(PBSEVENT_ERROR, PBS_EVENTCLASS_SERVER, LOG_ALERT, msg_daemonname,
 				"%s: Could not load pbs configuration, will use it's default value", __func__);
 
-	time_now = time(NULL);
-	ptm = localtime_r(&time_now, &ltm);
+	time(0) = time(NULL);
+	ptm = localtime_r(&time(0), &ltm);
 
 	if (pbs_conf.pbs_lr_save_path)
 		(void)snprintf(fpath, MAXPATHLEN,

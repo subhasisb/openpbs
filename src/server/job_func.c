@@ -97,8 +97,6 @@
 #include "renew_creds.h"
 #endif
 
-extern int time_now;
-
 /* External functions */
 #ifdef WIN32
 extern int read_cred(job *pjob, char **cred, size_t *len);
@@ -384,7 +382,7 @@ job_alloc(void)
 	set_job_substate(pj, JOB_SUBSTATE_TRANSIN);
 
 	/* start accruing time from the time job was created */
-	set_jattr_l_slim(pj, JOB_ATR_sample_starttime, time_now, SET);
+	set_jattr_l_slim(pj, JOB_ATR_sample_starttime, time(0), SET);
 	set_jattr_l_slim(pj, JOB_ATR_eligible_time, 0, SET);
 
 	if ((svr_inst_id = gen_svr_inst_id()) == NULL) {

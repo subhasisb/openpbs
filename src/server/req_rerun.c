@@ -81,7 +81,6 @@ static int req_rerunjob2(struct batch_request *preq, job *pjob);
 
 extern char *msg_manager;
 extern char *msg_jobrerun;
-extern time_t time_now;
 extern job  *chk_job_request(char *, struct batch_request *, int *, int *);
 
 
@@ -493,11 +492,10 @@ req_rerunjob2(struct batch_request *preq, job *pjob)
 	/* put a timeout on the rerun request so that it doesn't hang 	*/
 	/* indefinitely; if it does, the scheduler would also hang on a */
 	/* requeue request  */
-	time_now = time(NULL);
 	if (!is_sattr_set(SVR_ATR_JobRequeTimeout))
-		rerun_to = time_now + PBS_DIS_TCP_TIMEOUT_RERUN;
+		rerun_to = time(0) + PBS_DIS_TCP_TIMEOUT_RERUN;
 	else
-		rerun_to = time_now + get_sattr_long(SVR_ATR_JobRequeTimeout);
+		rerun_to = time(0) + get_sattr_long(SVR_ATR_JobRequeTimeout);
 	ptask = set_task(WORK_Timed, rerun_to, timeout_rerun_request, pjob);
 	if (ptask) {
 		/* this ensures that the ptask created gets cleared in case */

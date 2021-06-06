@@ -130,8 +130,6 @@ extern	pbs_list_head	svr_alljobs;
 
 extern	char		*msg_err_malloc;
 
-extern	time_t		time_now;
-
 extern	int		num_pcpus;
 extern	int		num_acpus;
 extern 	u_Long		av_phy_mem;
@@ -2792,7 +2790,7 @@ post_periodic_hook(struct work_task *pwt)
 	}
 	vna_list_free(vnl_changes);	/* free the list of changes */
 
-	next_time = time_now+phook->freq;
+	next_time = time(0)+phook->freq;
 	next_time_str = ctime(&next_time);
 	if ((next_time_str != NULL) && (next_time_str[0] != '\0')) {
 		next_time_str[strlen(next_time_str)-1] = '\0'; /* rem newline */
@@ -2802,7 +2800,7 @@ post_periodic_hook(struct work_task *pwt)
 			LOG_ERR, phook->hook_name, log_buffer);
 	}
 
-	(void)set_task(WORK_Timed, time_now+phook->freq,
+	(void)set_task(WORK_Timed, time(0)+phook->freq,
 		run_periodic_hook_bg_task, phook);
 }
 
@@ -3877,7 +3875,7 @@ cleanup_hooks_in_path_spool(struct work_task *ptask)
 		}
 
 		/* remove files older than 'HOOKS_TMPFILE_MAX_AGE' */
-		if ((time_now - sbuf.st_ctime) > HOOKS_TMPFILE_MAX_AGE) {
+		if ((time(0) - sbuf.st_ctime) > HOOKS_TMPFILE_MAX_AGE) {
 			if (unlink(hook_file) < 0) {
 				if (errno != ENOENT) {
 					sprintf(log_buffer, "could not cleanup %s",
@@ -3897,7 +3895,7 @@ cleanup_hooks_in_path_spool(struct work_task *ptask)
 
 	/*  cleanup of hooks temp files happen in the next */
 	/* 'HOOKS_TMPFILE_NEXT_CLEANUP_PERIOD' secs.	   */
-	(void)set_task(WORK_Timed, time_now+HOOKS_TMPFILE_NEXT_CLEANUP_PERIOD,
+	(void)set_task(WORK_Timed, time(0)+HOOKS_TMPFILE_NEXT_CLEANUP_PERIOD,
 		cleanup_hooks_in_path_spool, NULL);
 }
 

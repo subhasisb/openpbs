@@ -252,7 +252,6 @@ int server_stream = -1;
 pbs_list_head svr_newjobs; /* jobs being sent to MOM */
 pbs_list_head svr_alljobs; /* all jobs under MOM's control */
 time_t time_last_sample = 0;
-extern time_t time_now;
 time_t time_resc_updated = 0;
 extern pbs_list_head svr_requests;
 struct var_table vtable; /* see start_exec.c */
@@ -2401,7 +2400,7 @@ do_mom_action_script(int ae,	      /* index into action table */
 		pjob->ji_momsubt = child;
 		pjob->ji_mompost = post;
 		if (ma->ma_timeout)
-			pjob->ji_actalarm = time_now + ma->ma_timeout;
+			pjob->ji_actalarm = time(0) + ma->ma_timeout;
 		else
 			pjob->ji_actalarm = 0;
 		goto done;
@@ -5686,7 +5685,7 @@ calc_cpupercent(job *pjob, u_long oldcput, u_long newcput, time_t sampletime)
 						MAX((double)ncpus_req,
 							(double)oldcput/(double)wallt)*100.0));
 		/* note wallt above corresponds to the old cput
-		 * -- resource is only set to time_now further down
+		 * -- resource is only set to time(0) further down
 		 *    in the mom_set_use() routine
 		 */
 
@@ -6034,7 +6033,7 @@ mom_over_limit(job *pjob)
 				if (retval != PBSE_NONE)
 					continue;
 				/* add time that has not been accumulated */
-				num += (time_now - pjob->ji_walltime_stamp) * wallfactor;
+				num += (time(0) - pjob->ji_walltime_stamp) * wallfactor;
 				if (num > value) {
 					sprintf(log_buffer,
 						"walltime %lu exceeded limit %lu",
@@ -7917,7 +7916,7 @@ main(int argc, char *argv[])
 	CLEAR_HEAD(mom_copyreqs_list);
 
 	_ftime_s(&tval);
-	time_now = tval.time;
+	time(0) = tval.time;
 	srand(tval.millitm);
 #else
 	maxtm = time(0);
@@ -7929,7 +7928,6 @@ main(int argc, char *argv[])
 		log_err(errno, __func__, "sigprocmask(BLOCK)");
 
 	gettimeofday(&tval, NULL);
-	time_now = tval.tv_sec;
 
 	srandom(tval.tv_usec);
 #endif	/* !WIN32 */
@@ -8358,12 +8356,10 @@ main(int argc, char *argv[])
 			internal_state_update = UPDATE_MOM_STATE;
 		}
 #endif
-
-		time_now = time(NULL);
 		if (server_stream == -1) {
-			if (time_now > time_next_hello) {
+			if (time(0) > time_next_hello) {
 				send_hellosvr(server_stream);
-				time_next_hello = time_now + time_delta_hellosvr(MOM_DELTA_NORMAL);
+				time_next_hello = time(0) + time_delta_hellosvr(MOM_DELTA_NORMAL);
 				if (server_stream != -1) {
 					job *m_job;
 					for (m_job = (job *)GET_NEXT(multinode_jobs); m_job;
@@ -8402,10 +8398,10 @@ main(int argc, char *argv[])
 				 * about the same time of the next activity check
 				 */
 				lastkey  = getkbdtime();
-				if (lastkey > time_now)
+				if (lastkey > time(0))
 					idletime = 0;
 				else
-					idletime = time_now - lastkey;
+					idletime = time(0) - lastkey;
 
 				if (internal_state & MOM_STATE_BUSYKB) {
 					/* currently busy keyboard */
@@ -8463,8 +8459,8 @@ main(int argc, char *argv[])
 		 * Is it time to update internal state?
 		 * This is done at a more leisurely pace
 		 */
-		if (time_now > time_state_update) {
-			time_state_update = time_now + STATE_UPDATE_TIME;
+		if (time(0) > time_state_update) {
+			time_state_update = time(0) + STATE_UPDATE_TIME;
 
 			/*
 			 * If required, update node state info to Server
@@ -8532,7 +8528,7 @@ main(int argc, char *argv[])
 			pjob = (job *)GET_NEXT(pjob->ji_alljobs)) {
 			if ((pjob->ji_momsubt != 0) &&
 				(pjob->ji_actalarm != 0) &&
-				(pjob->ji_actalarm < time_now)) {
+				(pjob->ji_actalarm < time(0))) {
 				log_event(PBSEVENT_ADMIN, PBS_EVENTCLASS_JOB,
 					LOG_INFO, pjob->ji_qs.ji_jobid,
 					"Action alarm time exceeded");
@@ -8545,7 +8541,7 @@ main(int argc, char *argv[])
 			if (do_tolerate_node_failures(pjob) &&
 				(check_job_substate(pjob, JOB_SUBSTATE_WAITING_JOIN_JOB)) &&
 				(pjob->ji_joinalarm != 0) &&
-				(pjob->ji_joinalarm < time_now)) {
+				(pjob->ji_joinalarm < time(0))) {
 				int rcode;
 
 				snprintf(log_buffer, sizeof(log_buffer), "sister_join_job_alarm wait time %ld secs exceeded", joinjob_alarm_time);
@@ -8571,7 +8567,7 @@ main(int argc, char *argv[])
 		 * everything from here on in the main loop.
 		 */
 
-		if (time_now < (time_resc_updated + next_sample_time))
+		if (time(0) < (time_resc_updated + next_sample_time))
 			continue;
 
 		/*
@@ -8592,12 +8588,12 @@ main(int argc, char *argv[])
 
 		/* there are jobs so update status	 */
 		/* if we just got a sample, don't bother */
-		if (time_now > time_last_sample) {
+		if (time(0) > time_last_sample) {
 			if (mom_get_sample() != PBSE_NONE)
 				continue;
 		}
 
-		time_resc_updated = time_now;
+		time_resc_updated = time(0);
 		for (pjob = (job *)GET_NEXT(svr_alljobs);
 			pjob != NULL;
 			pjob = nxpjob) {
@@ -8607,12 +8603,12 @@ main(int argc, char *argv[])
 
 			/* check for job stuck waiting for Svr to ack obit */
 			if (!pjob->ji_hook_running_bg_on && check_job_substate(pjob, JOB_SUBSTATE_OBIT) &&
-				pjob->ji_sampletim < time_now - 45) {
+				pjob->ji_sampletim < time(0) - 45) {
 				send_obit(pjob, 0);	/* resend obit */
 			}
 			/* check for job stuck waiting for sister to deljob */
 			if ((check_job_substate(pjob, JOB_SUBSTATE_DELJOB)) &&
-				(pjob->ji_sampletim < (time_now - 2 * MAX_CHECK_POLL_TIME))) {
+				(pjob->ji_sampletim < (time(0) - 2 * MAX_CHECK_POLL_TIME))) {
 				/* just delete the job and let server deal */
 				if (pjob->ji_preq) {
 					req_reject(PBSE_SISCOMM, 0, pjob->ji_preq);
@@ -8628,7 +8624,7 @@ main(int argc, char *argv[])
 				JOB_SVFLG_TERMJOB)) {
 				/* job is over a limit, if it is not already  */
 				/* being terminated by action script, kill it */
-				if ((!check_job_substate(pjob, JOB_SUBSTATE_TERM)) && (time_now >= pjob->ji_overlmt_timestamp)) {
+				if ((!check_job_substate(pjob, JOB_SUBSTATE_TERM)) && (time(0) >= pjob->ji_overlmt_timestamp)) {
 					/* Unset the TERMJOB flag for KILL signal */
 					pjob->ji_qs.ji_svrflags &= ~JOB_SVFLG_TERMJOB;
 					(void)kill_job(pjob, SIGKILL);
@@ -8736,7 +8732,7 @@ main(int argc, char *argv[])
 								sprintf(log_buffer, "ignoring lost communication with %s for reliable job startup", np->hn_host);
 								log_event(PBSEVENT_DEBUG3, PBS_EVENTCLASS_JOB, LOG_DEBUG, pjob->ji_qs.ji_jobid, log_buffer);
 								err_flag = 1;
-							} else if ((time_now - np->hn_eof_ts) <= max_poll_downtime_val) {
+							} else if ((time(0) - np->hn_eof_ts) <= max_poll_downtime_val) {
 								pjob->ji_nodekill = TM_ERROR_NODE; /* send poll failed, but dont kill job */
 								sprintf(log_buffer, "lost communication with %s, not killing job yet", np->hn_host);
 								log_joberr(-1, __func__, log_buffer, pjob->ji_qs.ji_jobid);
@@ -9242,7 +9238,7 @@ setmax(char *dev)
 
 /**
  * get the most recent access time for mouse/keyboard/...
- *	we assume that "time_now" is the current time
+ *	we assume that "time(0)" is the current time
  */
 #ifdef	WIN32
 /**
@@ -9296,7 +9292,7 @@ getkbdtime(void)
 			while ((de=readdir(dp)) != NULL) {
 				ptsname = de->d_name;
 
-				if (maxtm >= time_now)
+				if (maxtm >= time(0))
 					break;
 				if (*ptsname == '.')
 					continue;
@@ -9347,13 +9343,11 @@ idletime(struct rm_attribute *attrib)
 		return NULL;
 	}
 
-	time_now = time(0);
-
 	lastkey = getkbdtime();
-	if (lastkey > time_now)
+	if (lastkey > time(0))
 		idle = 0;
 	else
-		idle = time_now - lastkey;
+		idle = time(0) - lastkey;
 	sprintf(ret_string, "%lu", (u_long)idle);
 	return ret_string;
 }
@@ -9384,7 +9378,6 @@ active_idle(job *pjob, int which)
 			return;
 	}
 
-	time_now = time(0);
 	if (which == 1) {	/* suspend */
 		set_job_substate(pjob, JOB_SUBSTATE_SUSPEND);
 		pjob->ji_qs.ji_svrflags |= JOB_SVFLG_Actsuspd;

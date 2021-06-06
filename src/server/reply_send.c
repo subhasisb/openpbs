@@ -199,7 +199,7 @@ dis_reply_write(int sfds, struct batch_request *preq)
 	struct batch_reply *preply = &preq->rq_reply;
 #ifndef WIN32
 	struct sigaction act, oact;
-	time_t  old_tcp_timeout = pbs_tcp_timeout ;
+	//time_t  old_tcp_timeout = pbs_tcp_timeout ;
 #endif
 
 	if (preq->prot == PROT_TPP) {

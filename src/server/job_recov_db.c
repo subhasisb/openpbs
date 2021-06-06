@@ -74,9 +74,6 @@ extern pbs_list_head svr_allresvs;
 #define BACKTRACE_BUF_SIZE 50
 void print_backtrace(char *);
 
-/* global data items */
-extern time_t time_now;
-
 job *recov_job_cb(pbs_db_obj_info_t *dbobj, int *refreshed);
 resc_resv *recov_resv_cb(pbs_db_obj_info_t *dbobj, int *refreshed);
 
@@ -248,7 +245,7 @@ job_save_db(job *pjob)
 	obj.pbs_db_un.pbs_db_job = &dbjob;
 
 	/* update mtime before save, so the same value gets to the DB as well */
-	set_jattr_l_slim(pjob, JOB_ATR_mtime, time_now, SET);
+	set_jattr_l_slim(pjob, JOB_ATR_mtime, time(0), SET);
 	if ((rc = pbs_db_save_obj(conn, &obj, savetype)) == 0)
 		pjob->newobj = 0;
 
@@ -466,7 +463,7 @@ resv_save_db(resc_resv *presv)
 	obj.pbs_db_un.pbs_db_resv = &dbresv;
 
 	/* update mtime before save, so the same value gets to the DB as well */
-	set_rattr_l_slim(presv, RESV_ATR_mtime, time_now, SET);
+	set_rattr_l_slim(presv, RESV_ATR_mtime, time(0), SET);
 	if ((rc = pbs_db_save_obj(conn, &obj, savetype)) == 0)
 		presv->newobj = 0;
 

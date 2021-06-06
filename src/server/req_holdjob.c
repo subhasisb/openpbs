@@ -85,7 +85,6 @@ extern char	*msg_jobholdset;
 extern char	*msg_jobholdrel;
 extern char	*msg_mombadhold;
 extern char	*msg_postmomnojob;
-extern time_t	 time_now;
 extern job  *chk_job_request(char *, struct batch_request *, int *, int *);
 
 
@@ -314,7 +313,7 @@ req_releasejob(struct batch_request *preq)
 #ifdef NAS /* localmod 105 */
 		{
 			attribute *etime = get_jattr(pjob, JOB_ATR_etime);
-			etime->at_val.at_long = time_now;
+			etime->at_val.at_long = time(0);
 			mark_attr_set(etime);
 #endif /* localmod 105 */
 		svr_evaljobstate(pjob, &newstate, &newsub, 0);
@@ -339,7 +338,7 @@ req_releasejob(struct batch_request *preq)
 #ifdef NAS /* localmod 105 */
 				{
 					attribute *etime = get_jattr(psubjob, JOB_ATR_etime);
-					etime->at_val.at_long = time_now;
+					etime->at_val.at_long = time(0);
 					mark_attr_set(etime);
 #endif /* localmod 105 */
 					svr_evaljobstate(psubjob, &newstate, &newsub, 0);

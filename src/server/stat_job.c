@@ -74,7 +74,6 @@ extern attribute_def job_attr_def[];
 extern int	     resc_access_perm; /* see encode_resc() in attr_fn_resc.c */
 extern struct server server;
 extern char	     statechars[];
-extern time_t time_now;
 
 /* convenience macro to check for diffstat and print attribute name and value to logs */
 #ifdef DEBUG
@@ -317,7 +316,7 @@ status_job(job *pjob, struct batch_request *preq,
 		if (get_jattr_long(pjob, JOB_ATR_accrue_type) == JOB_ELIGIBLE) {
 			oldtime = get_jattr_long(pjob, JOB_ATR_eligible_time);
 			set_jattr_l_slim(pjob, JOB_ATR_eligible_time,
-					time_now - get_jattr_long(pjob, JOB_ATR_sample_starttime), INCR);
+					time(0) - get_jattr_long(pjob, JOB_ATR_sample_starttime), INCR);
 		}
 	} else {
 		/* eligible_time_enable is off so, clear set flag so that eligible_time and accrue type dont show */

@@ -145,7 +145,6 @@ extern char	 server_host[];
 extern char	 server_name[];
 extern pbs_list_head svr_newjobs;
 extern pbs_list_head svr_allresvs;
-extern time_t	 time_now;
 
 extern struct server server;
 extern struct attribute attr_jobscript_max_size;
@@ -497,8 +496,6 @@ pbsd_init(int type)
 	}
 #endif	/* not DEBUG and not NO_SECURITY_CHECK */
 
-	time_now = time(NULL);
-
 	rc = setup_resc(1);
 	if (rc != 0) {
 		/* log_buffer set in setup_resc */
@@ -511,7 +508,7 @@ pbsd_init(int type)
 
 	/* 3. Set default server attibutes values */
 	memset(&server, 0, sizeof(server));
-	server.sv_started = time(&time_now);	/* time server started */
+	server.sv_started = time(0);	/* time server started */
 	if (is_sattr_set(SVR_ATR_scheduling))
 		a_opt = get_sattr_long(SVR_ATR_scheduling);
 
@@ -594,6 +591,8 @@ pbsd_init(int type)
 	if ((fd == -1) ||
 		(read(fd, &(license_counts.licenses_high_use), sizeof(pbs_licenses_high_use)) !=
 		sizeof(pbs_licenses_high_use))) {
+			time_t time_now = time(0);
+
 		license_counts.licenses_high_use.lu_max_hr      = 0;
 		license_counts.licenses_high_use.lu_max_day     = 0;
 		license_counts.licenses_high_use.lu_max_month   = 0;
@@ -631,7 +630,7 @@ pbsd_init(int type)
 
 	/* start a timed-event every hour to long the number of floating used */
 	if ((license_counts.licenses_local > 0))
-		(void)set_task(WORK_Timed, (long)(((time_now + 3600) / 3600) * 3600),
+		(void)set_task(WORK_Timed, (long)(((time(0) + 3600) / 3600) * 3600),
 			call_log_license, 0);
 
 	/* 6. open accounting file */
@@ -918,7 +917,7 @@ pbsd_init(int type)
 
 	/* set work task to periodically save the tracking records */
 
-	(void)set_task(WORK_Timed, (long)(time_now + PBS_SAVE_TRACK_TM),
+	(void)set_task(WORK_Timed, (long)(time(0) + PBS_SAVE_TRACK_TM),
 		track_save, 0);
 
 	fd = open(path_prov_track, O_RDONLY | O_CREAT, 0600);
@@ -1138,7 +1137,7 @@ pbsd_init(int type)
 	send_rescdef(0);
 	hook_track_save(NULL, -1); /* refresh path_hooks_tracking file */
 
-	(void)set_task(WORK_Immed, time_now, memory_debug_log, NULL);
+	(void)set_task(WORK_Immed, time(0), memory_debug_log, NULL);
 
 	return (0);
 }
@@ -1867,7 +1866,7 @@ Rmv_if_resv_not_possible(job *pjob)
 			if (get_rattr_long(presv, RESV_ATR_resv_count) > 1)
 				return 0;
 
-			if (presv->ri_qs.ri_etime < time_now)
+			if (presv->ri_qs.ri_etime < time(0))
 				rc = 1;
 		}
 	}

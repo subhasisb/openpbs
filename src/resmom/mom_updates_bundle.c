@@ -55,7 +55,6 @@
 extern pbs_list_head mom_pending_ruu;
 extern int resc_access_perm;
 extern int server_stream;
-extern time_t time_now;
 
 static void bundle_ruu(int *r_cnt, ruu **prused, int *rh_cnt, ruu **prhused, int *o_cnt, ruu **obits);
 static ruu *get_job_update(job *pjob);
@@ -848,7 +847,7 @@ bundle_ruu(int *r_cnt, ruu **prused, int *rh_cnt, ruu **prhused, int *obits_cnt,
 			cur->ru_next = *obits;
 			*obits = cur;
 			(*obits_cnt)++;
-		} else if (time_now >= (cur->ru_created_at + rescused_send_delay)) {
+		} else if (time(0) >= (cur->ru_created_at + rescused_send_delay)) {
 			if (cur->ru_cmd == IS_RESCUSED) {
 				cur->ru_next = *prused;
 				*prused = cur;

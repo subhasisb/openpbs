@@ -46,7 +46,6 @@
 #include <sys/types.h>
 #include <time.h>
 
-time_t time_now = 0;
 double wallfactor = 1.00;
 
 /**
@@ -65,14 +64,8 @@ start_walltime(job *pjob)
 {
 	if (NULL == pjob)
 		return;
-	/*
-	 * time_now is global and should have positive value at this time
-	 * if not, set it to current time
-	 */
-	if (0 == time_now)
-		time_now = time(NULL);
 
-	pjob->ji_walltime_stamp = time_now;
+	pjob->ji_walltime_stamp = time(0);
 }
 
 /**
@@ -115,8 +108,8 @@ update_walltime(job *pjob)
 
 	if (0 != pjob->ji_walltime_stamp) {
 		/* walltime counting is not stopped so update it */
-		set_attr_l(&used_walltime->rs_value, (long)((time_now - pjob->ji_walltime_stamp) * wallfactor), INCR);
-		pjob->ji_walltime_stamp = time_now;
+		set_attr_l(&used_walltime->rs_value, (long)((time(0) - pjob->ji_walltime_stamp) * wallfactor), INCR);
+		pjob->ji_walltime_stamp = time(0);
 	}
 }
 
@@ -136,12 +129,6 @@ stop_walltime(job *pjob)
 {
 	if (NULL == pjob)
 		return;
-	/*
-	 * time_now is global and should have positive value at this time
-	 * if not, set it to current time
-	 */
-	if (0 == time_now)
-		time_now = time(NULL);
 
 	/* update walltime and stop accumulating */
 	update_walltime(pjob);
@@ -172,9 +159,6 @@ recover_walltime(job *pjob)
 	if (0 == pjob->ji_qs.ji_stime)
 		return;
 
-	if (0 == time_now)
-		time_now = time(NULL);
-
 	resources_used = get_jattr(pjob, JOB_ATR_resc_used);
 	assert(resources_used != NULL);
 	walltime_def = &svr_resc_def[RESC_WALLTIME];
@@ -188,6 +172,6 @@ recover_walltime(job *pjob)
 		used_walltime = add_resource_entry(resources_used, walltime_def);
 		mark_attr_set(&used_walltime->rs_value);
 		used_walltime->rs_value.at_type = ATR_TYPE_LONG;
-		used_walltime->rs_value.at_val.at_long = (long)((double)(time_now - pjob->ji_qs.ji_stime) * wallfactor);
+		used_walltime->rs_value.at_val.at_long = (long)((double)(time(0) - pjob->ji_qs.ji_stime) * wallfactor);
 	}
 }

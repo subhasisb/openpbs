@@ -60,7 +60,6 @@
 #include "renew_creds.h"
 #endif
 
-extern time_t time_now;
 extern time_t time_resc_updated;
 extern int min_check_poll;
 extern int next_sample_time;
@@ -79,10 +78,8 @@ mock_run_finish_exec(job *pjob)
 		start_walltime(pjob);
 	}
 
-	time_now = time(NULL);
-
 	/* Add a work task that runs when the job is supposed to end */
-	set_task(WORK_Timed, time_now + walltime, mock_run_end_job_task, pjob);
+	set_task(WORK_Timed, time(0) + walltime, mock_run_end_job_task, pjob);
 
 	sprintf(log_buffer, "Started mock run of job");
 	log_event(PBSEVENT_JOB, PBS_EVENTCLASS_JOB,
@@ -101,7 +98,7 @@ mock_run_record_finish_exec(job *pjob)
 
 	job_save(pjob);
 
-	time_resc_updated = time_now;
+	time_resc_updated = time(0);
 	mock_run_mom_set_use(pjob);
 
 	enqueue_update_for_send(pjob, IS_RESCUSED);

@@ -142,7 +142,6 @@ extern char *msg_resvQcreateFail;
 extern char *msg_defproject;
 extern char *msg_mom_reject_root_scripts;
 extern int reject_root_scripts;
-extern time_t time_now;
 
 #ifndef PBS_MOM
 extern void	*svr_db_conn;
@@ -892,7 +891,7 @@ req_quejob(struct batch_request *preq)
 		}
 
 		/* set create time */
-		set_jattr_l_slim(pj, JOB_ATR_ctime, time_now, SET);
+		set_jattr_l_slim(pj, JOB_ATR_ctime, time(0), SET);
 
 		/* set hop count = 1 */
 
@@ -1081,7 +1080,7 @@ req_quejob(struct batch_request *preq)
 
 	set_job_state(pj, JOB_STATE_LTR_TRANSIT);
 	set_job_substate(pj, JOB_SUBSTATE_TRANSIN);
-	set_jattr_l_slim(pj, JOB_ATR_mtime, time_now, SET);
+	set_jattr_l_slim(pj, JOB_ATR_mtime, time(0), SET);
 
 	pj->ji_qs.ji_un_type = JOB_UNION_TYPE_NEW;
 	pj->ji_qs.ji_un.ji_newt.ji_fromsock = sock;
@@ -1774,8 +1773,8 @@ req_commit_now(struct batch_request *preq,  job *pj)
 		pj->ji_qs.ji_un.ji_momt.ji_svraddr = get_connectaddr(preq->rq_conn);
 	pj->ji_qs.ji_un.ji_momt.ji_exitstat = 0;
 	if ((pj->ji_qs.ji_svrflags & (JOB_SVFLG_CHKPT|JOB_SVFLG_ChkptMig)) == 0) {
-		pj->ji_qs.ji_stime = time_now; 	/* start of walltime */
-		set_jattr_l_slim(pj, JOB_ATR_stime, time_now, SET);
+		pj->ji_qs.ji_stime = time(0); 	/* start of walltime */
+		set_jattr_l_slim(pj, JOB_ATR_stime, time(0), SET);
 	}
 
 	/*
@@ -2485,7 +2484,7 @@ req_resvSub(struct batch_request *preq)
 		}
 
 		/* set create time */
-		set_rattr_l_slim(presv, RESV_ATR_ctime, (long)time_now, SET);
+		set_rattr_l_slim(presv, RESV_ATR_ctime, (long)time(0), SET);
 		/* set hop count = 1 */
 		set_rattr_l_slim(presv, RESV_ATR_hopcount, 1, SET);
 
@@ -2592,7 +2591,7 @@ req_resvSub(struct batch_request *preq)
 
 	set_rattr_l_slim(presv, RESV_ATR_state, RESV_UNCONFIRMED, SET);
 	set_rattr_l_slim(presv, RESV_ATR_substate, RESV_UNCONFIRMED, SET);
-	set_rattr_l_slim(presv, RESV_ATR_mtime, (long)time_now, SET);
+	set_rattr_l_slim(presv, RESV_ATR_mtime, (long)time(0), SET);
 
 	if (is_rattr_set(presv, RESV_ATR_convert) && !is_rattr_set(presv, RESV_ATR_del_idle_time))
 		set_rattr_l_slim(presv, RESV_ATR_del_idle_time, RESV_ASAP_IDLE_TIME, SET);
@@ -3270,7 +3269,7 @@ copy_params_from_job(char *jobid, resc_resv *presv)
 	if (is_jattr_set(pjob, JOB_ATR_stime))
 		set_rattr_l_slim(presv, RESV_ATR_start, get_jattr_long(pjob, JOB_ATR_stime), SET);
 	else
-		set_rattr_l_slim(presv, RESV_ATR_start, time_now, SET);
+		set_rattr_l_slim(presv, RESV_ATR_start, time(0), SET);
 
 	mark_attr_set(get_rattr(presv, RESV_ATR_SchedSelect));
 

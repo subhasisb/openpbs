@@ -63,7 +63,6 @@ pbs_list_head unlicensed_nodes_list;
 struct work_task *init_licensing_task;
 struct work_task *get_more_licenses_task;
 struct work_task *licenses_linger_time_task;
-extern time_t time_now;
 /**
  * @brief
  * 	consume_licenses - use count licenses from the pool of
@@ -339,6 +338,7 @@ void
 check_license_expiry(struct work_task *wt)
 {
 	char *warn_str = NULL;
+	time_t time_now = time(0);
 
 	warn_str = lic_check_expiry();
 	if (warn_str && (strlen(warn_str) > 0)) {
@@ -360,7 +360,7 @@ check_license_expiry(struct work_task *wt)
 			licensing_control.expiry_warning_email_yday = plt->tm_yday;
 		}
 	}
-	set_task(WORK_Timed, time_now + 86400, check_license_expiry, NULL);
+	set_task(WORK_Timed, time(0) + 86400, check_license_expiry, NULL);
 }
 
 /**
@@ -397,7 +397,7 @@ get_licenses(int lic_count)
 			LOG_NOTICE, msg_daemonname, log_buffer);
 
 		licensing_control.licenses_checked_out = lic_count;
-		licensing_control.licenses_checkout_time = time_now;
+		licensing_control.licenses_checkout_time = time(0);
 		license_counts.licenses_local = lic_count - license_counts.licenses_used;
 		license_counts.licenses_global -= diff;
 	}
@@ -453,7 +453,7 @@ get_more_licenses(struct work_task *ptask)
 	license_counts.licenses_global = lic_obtainable();
 
 	if (license_counts.licenses_global < (licensing_control.licenses_total_needed - licensing_control.licenses_checked_out))
-		get_more_licenses_task = set_task(WORK_Timed, time_now + 300, get_more_licenses, NULL);
+		get_more_licenses_task = set_task(WORK_Timed, time(0) + 300, get_more_licenses, NULL);
 
 	if (license_counts.licenses_global > 0) {
 		lic_count = calc_licenses_allowed();
@@ -518,7 +518,7 @@ license_one_node(pbsnode *pnode)
 				}
 				if (get_more_licenses_task)
 					delete_task(get_more_licenses_task);
-				get_more_licenses_task = set_task(WORK_Timed, time_now + 2, get_more_licenses, NULL);
+				get_more_licenses_task = set_task(WORK_Timed, time(0) + 2, get_more_licenses, NULL);
 			}
 		}
 	} else
@@ -879,6 +879,6 @@ return_lingering_licenses(struct work_task *ptask)
 		get_licenses(licensing_control.licenses_min);
 
 	licenses_linger_time_task = set_task(WORK_Timed,
-		time_now + licensing_control.licenses_linger_time,
+		time(0) + licensing_control.licenses_linger_time,
 		return_lingering_licenses, NULL);
 }
