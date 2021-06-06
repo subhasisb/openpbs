@@ -134,7 +134,7 @@ pthread_mutex_t tind_lock;
  * Set max_threads to 2 by default since mom, server etc have basically 2 threads
  * If caller has > 2 threads, e.g. pbs_comm, it must first call avl_set_maxthreads()
  */
-static int max_threads = 2; 
+static int max_threads = 30; 
 
 /**
  * @brief set the max threads that the application uses, before any calls to avltree

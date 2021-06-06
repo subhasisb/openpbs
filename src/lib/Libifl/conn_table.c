@@ -62,6 +62,8 @@ static int add_connection(int fd);
 #define MUTEX_TYPE PTHREAD_MUTEX_RECURSIVE
 #endif
 
+pthread_mutex_t conn_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 #define LOCK_TABLE(x) \
 	do { \
 		if (pbs_client_thread_init_thread_context() != 0) { \
@@ -157,6 +159,7 @@ add_connection_err:
 static void
 _destroy_connection(int fd)
 {
+	pthread_mutex_lock(&conn_mutex);
 	if (connection[fd]) {
 		if (connection[fd]->ch_errtxt)
 			free(connection[fd]->ch_errtxt);
@@ -169,6 +172,7 @@ _destroy_connection(int fd)
 		allocated_connection--;
 	}
 	connection[fd] = NULL;
+	pthread_mutex_unlock(&conn_mutex);
 }
 
 
@@ -254,16 +258,23 @@ destroy_connection(int fd)
  * @par MT-safe: No
  *
  */
+
 static pbs_conn_t *
 get_connection(int fd)
 {
+	 pbs_conn_t * ret;
 	if (INVALID_SOCK(fd))
 		return NULL;
+	
+	pthread_mutex_lock(&conn_mutex);
 	if ((fd >= curr_connection_sz) || (connection[fd] == NULL)) {
 		if (add_connection(fd) != 0)
 			return NULL;
 	}
-	return connection[fd];
+	ret = connection[fd];
+	pthread_mutex_unlock(&conn_mutex);
+
+	return ret;
 }
 
 /**
