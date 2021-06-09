@@ -77,7 +77,7 @@ extern char	     statechars[];
 extern time_t time_now;
 
 /* convenience macro to check for diffstat and print attribute name and value to logs */
-#ifdef DEBUG
+#ifdef DIFFSTAT_DEBUG
 #define LOG_DIFFSTAT_ATTR(x, from_tm, msg) if (!IS_FULLSTAT(from_tm)) { \
 							log_eventf(PBSEVENT_DEBUG4, PBS_EVENTCLASS_SERVER, LOG_DEBUG, \
 								msg_daemonname, \
