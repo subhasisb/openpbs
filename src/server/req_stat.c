@@ -393,7 +393,7 @@ req_stat_job(struct batch_request *preq)
 				"diffstat considering job, job_tm={%ld:%ld}, from_tm={%ld:%ld}", 
 				pjob->update_tm.tv_sec, pjob->update_tm.tv_usec, from_tm.tv_sec, from_tm.tv_usec);
 					
-			if (!(eligible_time_enabled) && (get_jattr_long(pjob, JOB_ATR_accrue_type) == JOB_ELIGIBLE)) {
+			if (!((eligible_time_enabled) && (get_jattr_long(pjob, JOB_ATR_accrue_type) == JOB_ELIGIBLE))) {
 				/* stat the job if eligible time is to be returned, since that would have changed anyway */
 				if (!(TS_NEWER(pjob->update_tm, from_tm)))
 					break;
