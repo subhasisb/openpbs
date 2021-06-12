@@ -437,7 +437,7 @@ issue_Drequest(int conn, struct batch_request *request, void (*func)(), struct w
 
 		/* the request should be issued to ourself */
 
-		dispatch_request(PBS_LOCAL_CONNECTION, request);
+		dispatch_request(PBS_LOCAL_CONNECTION, NULL, request);
 		if (ppwt != 0)
 			*ppwt = ptask;
 		return (0);

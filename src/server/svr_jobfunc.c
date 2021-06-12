@@ -249,11 +249,13 @@ svr_enquejob(job *pjob, char *selectspec)
 	/* add job to server's all job list and update server counts */
 
 #ifndef NDEBUG
+	/*
 	(void)sprintf(log_buffer, "enqueuing into %s, state %c hop %ld",
 		pque->qu_qs.qu_name, get_job_state(pjob),
 		get_jattr_long(pjob, JOB_ATR_hopcount));
 	log_event(PBSEVENT_DEBUG2, PBS_EVENTCLASS_JOB, LOG_DEBUG,
 		pjob->ji_qs.ji_jobid, log_buffer);
+	*/
 #endif	/* NDEBUG */
 
 	if (pbs_idx_insert(jobs_idx, pjob->ji_qs.ji_jobid, pjob) != PBS_IDX_RET_OK) {
@@ -5632,8 +5634,12 @@ update_job_timedlist_inner(pbs_list_head *head, job *pjob, struct timeval update
 {
 	job *platest;
 	pbs_list_head hd = *head;
+	extern int mode;
 
 	if (!pjob)
+		return;
+	
+	if (mode == 1)
 		return;
 
 	pjob->update_tm = update_tm;
@@ -5804,12 +5810,31 @@ static int svr_con = 0;
 int
 connect_svr()
 {
+	struct pollfd pollfds[1];
+	int rc;
+	
+	if (svr_con != 0) {
+		/* check the connection is still up */
+		pollfds[0].fd = svr_con;
+		pollfds[0].events = POLLIN | POLLERR;
+		pollfds[0].revents = 0;
+
+		do {
+			rc = poll(pollfds, 1, 0);
+		} while (rc == -1 && errno == EINTR);
+
+		if (rc <= 0)
+			svr_con = 0;
+
+	}
+
 	if (svr_con == 0) {
 		if ((svr_con = pbs_connect_extend(pbs_server_name, NULL)) == -1) {
 			log_errf(-1, __func__, "Failed to connect to main server");
 			return -1;
 		}
 	}
+
 	return 0;
 }
 
@@ -5857,7 +5882,9 @@ sync_jobs()
 	struct batch_status *bs;
 	static struct timeval last_stat_ts = {0};
 
-	connect_svr();
+	if (connect_svr() == -1)
+		return -1;
+		
 	sync_queues();
 	update_resc_sum();
 	

@@ -782,8 +782,11 @@ main(int argc, char **argv)
 	/* set standard umask */
 	umask(022);
 
-	/* set single threaded mode */
-	pbs_client_thread_set_single_threaded_mode();
+	if (mode == 0) {
+		/* set single threaded mode */
+		pbs_client_thread_set_single_threaded_mode();
+	}
+
 	/* disable attribute verification */
 	set_no_attribute_verification();
 
@@ -1118,7 +1121,7 @@ main(int argc, char **argv)
 			return (0);
 		}
 	}
-	
+
 	init_tls_key();
 	
 	/* initialize the network interface */
@@ -1352,7 +1355,8 @@ main(int argc, char **argv)
 		process_hooks(periodic_req, hook_msg, sizeof(hook_msg), pbs_python_set_interrupt);
 	}
 
-	thpool = thpool_init(24);
+	if (mode == 1)
+		thpool = thpool_init(6);
 
 	/*
 	 * main loop of server
@@ -1487,8 +1491,6 @@ main(int argc, char **argv)
 	}
 	DBPRT(("Server out of main loop, state is %ld\n", *state))
 
-	pthread_mutex_lock(&server.lock);
-
 	/* set the current seq id to the last id before final save */	
 	server.sv_qs.sv_lastid = server.sv_qs.sv_jobidnumber;
 	svr_save_db(&server);	/* final recording of server */
@@ -1504,8 +1506,6 @@ main(int argc, char **argv)
 
 	if (state != SV_STATE_SECIDLE && (shutdown_who & SHUT_WHO_MOM))
 		shutdown_nodes();
-
-	pthread_mutex_unlock(&server.lock);
 
 	/* if brought up the DB, take it down */
 	if (mode == 0) {

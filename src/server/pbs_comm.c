@@ -83,6 +83,7 @@ extern char	*msg_corelimit;
 extern char	*msg_init_chdir;
 int lockfds;
 int already_forked = 0;
+int mode = 0;
 #define PBS_COMM_LOGDIR "comm_logs"
 
 char	        server_host[PBS_MAXHOSTNAME+1];   /* host_name of server */

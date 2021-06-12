@@ -120,6 +120,7 @@ char *msg_orighost 	= "Job missing PBS_O_HOST value";
 char *msg_permlog	= "Unauthorized Request, request type: %d, Object: %s, Name: %s, request from: %s@%s";
 char *msg_postmomnojob	= "Job not found after hold reply from MOM";
 char *msg_request	= "Type %d request received from %s@%s, sock=%d";
+char *msg_request_thrd = "Thread(%d);Type %d request received from %s@%s, sock=%d";
 char *msg_regrej	= "Dependency request for job rejected by ";
 char *msg_registerdel	= "Job deleted as result of dependency on job %s";
 char *msg_registerrel	= "Dependency on job %s released.";

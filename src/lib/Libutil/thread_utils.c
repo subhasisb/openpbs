@@ -122,9 +122,7 @@ get_tls()
 
 		ptr->staticbuf = NULL;
 		ptr->staticbufsize = 0;
-		ptr->nkvelements = 0;
-		ptr->tpkv = NULL;
-		ptr->conn_data = NULL;
+		ptr->thread_index = -1;
 
 		if (pthread_setspecific(app_key_tls, ptr) != 0) {
 			free(ptr);

@@ -269,9 +269,12 @@ reply_send_status_part(struct batch_request *preq)
 		rc = dis_reply_write(preq->rq_conn, preq);
 		if (rc != PBSE_NONE)
 			return rc;
+
 		reply_free(&preq->rq_reply);
 		preply->brp_choice = orig_brp_choice;
 		CLEAR_HEAD(preply->brp_un.brp_status);
+
+		preply->brp_totcount += preply->brp_count;
 		preply->brp_count = 0;
 	}
 	return rc;
@@ -380,11 +383,24 @@ reply_send(struct batch_request *request)
 			timersub(&preply->brp_ts, &request->rq_time, &serv_time);
 
 			if (request->rq_type == PBS_BATCH_StatusJob || request->rq_type == PBS_BATCH_SelStat || request->rq_type == PBS_BATCH_StatusNode) {
-				log_eventf(PBSEVENT_DEBUG2, PBS_EVENTCLASS_REQUEST, LOG_INFO, "", 
-					"Response code: %d, %s returned objects: %d, last_stat_tm: %ld.%ld, service time: %ld.%ld",
-					preply->brp_choice, (preply->brp_auxcode) ? "diffstat" : "stat",
-					preply->brp_count, preply->brp_ts.tv_sec, preply->brp_ts.tv_usec,
-					serv_time.tv_sec, serv_time.tv_usec);
+#ifndef PBS_MOM
+				extern int mode;
+				if (mode == 1) {
+					tls_t *tls = get_tls();
+
+						log_eventf(PBSEVENT_DEBUG2, PBS_EVENTCLASS_REQUEST, LOG_INFO, "", 
+							"Thread(%d);Response code: %d, %s returned objects: %d, last_stat_tm: %ld.%ld, service time: %ld.%ld",
+							tls->thread_index, preply->brp_choice, (preply->brp_auxcode) ? "diffstat" : "stat",
+							preply->brp_totcount, preply->brp_ts.tv_sec, preply->brp_ts.tv_usec,
+							serv_time.tv_sec, serv_time.tv_usec);
+				} else 
+#endif
+					log_eventf(PBSEVENT_DEBUG2, PBS_EVENTCLASS_REQUEST, LOG_INFO, "", 
+						"Response code: %d, %s returned objects: %d, last_stat_tm: %ld.%ld, service time: %ld.%ld",
+						preply->brp_choice, (preply->brp_auxcode) ? "diffstat" : "stat",
+						preply->brp_totcount, preply->brp_ts.tv_sec, preply->brp_ts.tv_usec,
+						serv_time.tv_sec, serv_time.tv_usec);
+
 			} else {
 				log_eventf(PBSEVENT_DEBUG2, PBS_EVENTCLASS_REQUEST, LOG_INFO, "", 
 					"Response code: %d, service time: %ld.%ld",

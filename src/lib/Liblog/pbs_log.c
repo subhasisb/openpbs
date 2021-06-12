@@ -1036,10 +1036,9 @@ log_record_inner(int eventtype, int objclass, int sev, const char *objname, cons
 	int rc = 0;
 	if (locallog != 0 || syslogfac == 0) {
 		rc = fprintf(logfile,
-				"%02d/%02d/%04d %02d:%02d:%02d%s;Thread(%ld);%04x;%s;%s;%s;%s\n",
+				"%02d/%02d/%04d %02d:%02d:%02d%s;%04x;%s;%s;%s;%s\n",
 				mst->ptm.tm_mon + 1, mst->ptm.tm_mday, mst->ptm.tm_year + 1900,
 				mst->ptm.tm_hour, mst->ptm.tm_min, mst->ptm.tm_sec, mst->microsec_buf,
-				pthread_self(),
 				eventtype & ~PBSEVENT_FORCE, msg_daemonname,
 				class_names[objclass], objname, text);
 

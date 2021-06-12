@@ -353,7 +353,7 @@ extern int reply_send_status_part(struct batch_request *);
 extern int reply_jobid(struct batch_request *, char *, int);
 extern int reply_jobid_msg(struct batch_request *, char *, int, int);
 extern void reply_free(struct batch_reply *);
-extern void dispatch_request(int, struct batch_request *);
+extern void dispatch_request(int, conn_t *conn, struct batch_request *);
 extern void free_br(struct batch_request *);
 extern int isode_request_read(int, struct batch_request *);
 extern void req_stat_job(struct batch_request *);

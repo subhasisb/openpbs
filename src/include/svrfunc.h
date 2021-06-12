@@ -66,6 +66,7 @@ typedef struct {
 	struct timeval tm_deleted; /* time of deletion */
 } deleted_obj_t;
 
+
 extern int check_num_cpus(void);
 extern int chk_hold_priv(long, int);
 extern void close_client(int);

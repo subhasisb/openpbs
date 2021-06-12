@@ -108,6 +108,17 @@ struct map {
 	struct map *next;
 };
 
+typedef struct {
+	char *staticbuf;
+	int staticbufsize;
+	int thread_index;
+} tls_t;
+
+
+int init_tls_key();
+
+tls_t *get_tls();
+
 /* Compress a delimited string into a dictionary compressed representation */
 char *condense_execvnode_seq(const char *);
 

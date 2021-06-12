@@ -126,6 +126,7 @@ extern char  *msg_err_noqueue;
 extern char  *msg_err_malloc;
 extern char  *msg_reqbadhost;
 extern char  *msg_request;
+extern char  *msg_request_thrd;
 extern char  *msg_auth_request;
 
 extern int    is_local_root(char *, char *);
@@ -376,14 +377,19 @@ rerr:
 
 typedef struct {
 	int sfds;
+	conn_t *conn;
 	struct batch_request *request;
 } dispatch_wrap_arg;
 
 void 
-dispatch_wrapper(void *dispatch_arg)
+dispatch_wrapper(void *dispatch_arg, int id)
 {
 	dispatch_wrap_arg *arg = dispatch_arg; 
-	dispatch_request(arg->sfds, arg->request);
+	
+	tls_t *tls = get_tls();
+	tls->thread_index = id;
+
+	dispatch_request(arg->sfds, arg->conn, arg->request);
 }
 
 /*
@@ -400,11 +406,12 @@ dispatch_wrapper(void *dispatch_arg)
 void
 process_request(int sfds)
 {
-	int		      rc;
+	int rc;
 	struct batch_request *request;
-	conn_t		     *conn;
+	conn_t *conn;
 #ifndef PBS_MOM
-	int		     access_by_krb;
+	int access_by_krb;
+	extern int mode;
 #endif
 
 	time_now = time(NULL);
@@ -709,16 +716,48 @@ process_request(int sfds)
 	 * the request struture.
 	 */
 #ifndef PBS_MOM
-	{
+	if (mode == 1) {
 		extern threadpool thpool;
+		static time_t last_refresh_time = 0;
+
+		switch (request->rq_type) {
+			case PBS_BATCH_SelectJobs:
+			case PBS_BATCH_SelStat:
+			case PBS_BATCH_StatusJob:
+			case PBS_BATCH_StatusQue:
+			case PBS_BATCH_StatusNode:
+			case PBS_BATCH_StatusResv:
+			case PBS_BATCH_StatusSvr:
+			case PBS_BATCH_StatusSched:
+			case PBS_BATCH_StatusHook:
+				break;
+			default:
+				req_reject(PBSE_SVRDOWN, 0, request);
+				return;
+		}
+
+
+		if ((time(0) - last_refresh_time) > 5) {
+			extern int sync_jobs();
+
+			/* wait for all running work to finish */
+			thpool_wait(thpool);
+			
+			/* refresh data from primary server */
+			log_errf(-1, __func__, "Refreshing stat");
+			sync_jobs();
+			last_refresh_time = time(0);
+		}
+
 		dispatch_wrap_arg *arg = malloc(sizeof(dispatch_wrap_arg));
 		arg->sfds = sfds;
-		arg->request = request;	
+		arg->conn = conn;
+		arg->request = request;
 		thpool_add_work(thpool, dispatch_wrapper, arg);
-	}
-#else
-	dispatch_request(sfds, request);
+	} else
 #endif
+	dispatch_request(sfds, conn, request);
+
 	return;
 }
 
@@ -800,14 +839,12 @@ clear_non_blocking(conn_t *conn)
  */
 
 void
-dispatch_request(int sfds, struct batch_request *request)
+dispatch_request(int sfds, conn_t *conn, struct batch_request *request)
 {
 extern int sync_jobs();
 #ifndef PBS_MOM
 extern int mode;
 #endif
-
-	conn_t *conn = NULL;
 	int prot = request->prot;
 #ifndef PBS_MOM
 	struct work_task ptask;
@@ -815,7 +852,6 @@ extern int mode;
 
 	if (prot == PROT_TCP) {
 		if (sfds != PBS_LOCAL_CONNECTION) {
-			conn = get_conn(sfds);
 			if (!conn) {
 				log_event(PBSEVENT_SYSTEM, PBS_EVENTCLASS_REQUEST, LOG_ERR, __func__, "did not find socket in connection table");
 				req_reject(PBSE_SYSTEM, 0, request);
@@ -1025,9 +1061,6 @@ extern int mode;
 				close_client(sfds);
 				return;
 			}
-			if (mode == 1) {
-				sync_jobs();
-			}	
 			req_stat_job(request);
 			clear_non_blocking(get_conn(sfds));
 			break;
@@ -1255,7 +1288,7 @@ process_IS_CMD(int stream)
 	}
 #endif
 
-	dispatch_request(stream, request);
+	dispatch_request(stream, NULL, request);
 }
 
 /**

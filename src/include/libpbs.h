@@ -213,6 +213,7 @@ struct batch_reply
 	int brp_choice; /* the union discriminator */
 	int brp_is_part;
 	int brp_count;
+	int brp_totcount;
 	int brp_type;
 	struct batch_status *last;
 	struct timeval brp_ts; /* timestamp of this response */
