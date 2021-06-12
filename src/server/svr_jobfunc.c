@@ -5724,3 +5724,160 @@ touch_deleted_subjob_list(job *aj)
 			gettimeofday(&dj->tm_deleted, NULL);
 	}
 }
+
+/**
+ * @brief
+ *	Decode the list of attributes from the database to the regular attribute structure
+ *
+ * @param[in]	  attr_list - recovered/to be decoded attribute list
+ * @param[in]     padef_idx - Search index of this attribute array
+ * @param[in]	  padef - Address of parent's attribute definition array
+ * @param[in,out] pattr - Address of the parent objects attribute array
+ * @param[in]	  limit - Number of attributes in the list
+ * @param[in]	  unknown	- The index of the unknown attribute if any
+ *
+ * @return      Error code
+ * @retval	 0  - Success
+ * @retval	-1  - Failure
+ *
+ *
+ */
+int
+update_attr(struct attrl *attrlist , void *padef_idx, struct attribute_def *padef, struct attribute *pattr, int limit, int unknown)
+{
+	int rc;
+	int index;
+	struct attrl *attr;
+
+	for (attr = attrlist; attr; attr = attr->next) {
+		index = find_attr(padef_idx, padef, attr->name);
+		if (index < 0) {
+			if (unknown > 0)
+				index = unknown;
+			else
+				return -1;
+		}
+		resc_access_perm = ATR_DFLAG_USRD | ATR_DFLAG_USWR | \
+				ATR_DFLAG_OPRD | ATR_DFLAG_OPWR | \
+				ATR_DFLAG_MGRD | ATR_DFLAG_MGWR | \
+				ATR_DFLAG_SvWR;
+		
+		if ((rc = padef[index].at_decode(&pattr[index], padef[index].at_name, attr->resource, attr->value)) != 0) {
+			log_errf(rc, __func__, "decode of %s failed", padef[index].at_name);
+			return rc;
+		}
+		mark_attr_set(pattr);
+	}
+
+	return 0;
+}
+
+static job *
+to_job(struct batch_status *bs)
+{
+	job *pjob = job_alloc();
+
+	/* Variables assigned constant values are not stored in the DB */
+	pjob->ji_qs.ji_jsversion = JSVERSION;
+	strcpy(pjob->ji_qs.ji_jobid, bs->name);
+	update_attr(bs->attribs, job_attr_idx, job_attr_def, pjob->ji_wattr, JOB_ATR_LAST, JOB_ATR_UNKN);
+
+	pjob->ji_qs.ji_svrflags = 0;
+	if (strstr(bs->name, "[]")) {
+		pjob->ji_qs.ji_svrflags = JOB_SVFLG_ArrayJob;
+	} else if (strchr(bs->name, '[')) {
+		pjob->ji_qs.ji_svrflags = JOB_SVFLG_SubJob;
+	}
+
+	pjob->ji_qs.ji_stime = 0;
+	strcpy(pjob->ji_qs.ji_queue, get_jattr_str(pjob, JOB_ATR_in_queue));
+	pjob->ji_qs.ji_destin[0] = 0;
+	pjob->ji_qs.ji_fileprefix[0] = 0;
+	pjob->ji_qs.ji_un_type = JOB_UNION_TYPE_NEW;
+	pjob->newobj = 0;
+
+	return pjob;
+}
+
+static int svr_con = 0;
+
+int
+connect_svr()
+{
+	if (svr_con == 0) {
+		if ((svr_con = pbs_connect_extend(pbs_server_name, NULL)) == -1) {
+			log_errf(-1, __func__, "Failed to connect to main server");
+			return -1;
+		}
+	}
+	return 0;
+}
+
+static pbs_queue *
+to_que(struct batch_status *bs)
+{
+	pbs_queue *pque = que_alloc(bs->name);
+	update_attr(bs->attribs, que_attr_idx, que_attr_def, pque->qu_attr, QA_ATR_LAST, -1);	
+	set_queue_type(get_qattr(pque, QA_ATR_QType), pque, ATR_ACTION_NEW);
+	 
+	pque->newobj = 0;
+
+	return pque;
+}
+
+int sync_queues()
+{
+	char buf[50];
+	pbs_queue *pque;
+	struct batch_status *bs;
+	static struct timeval last_stat_ts = {0};
+	
+    sprintf(buf, "xt,%ld:%ld", last_stat_ts.tv_sec, last_stat_ts.tv_usec);
+	bs = pbs_statque(svr_con, NULL, NULL, NULL);
+    while(bs) {
+		if ((pque = find_queuebyname(bs->name))) {
+			/* found job, update with this batch status record */
+			update_attr(bs->attribs, que_attr_idx, que_attr_def, pque->qu_attr, QA_ATR_LAST, -1);	
+		} else {
+			pque = to_que(bs);
+		}
+		bs = bs->next;
+    }
+	last_stat_ts = pbs_get_last_stat_ts();
+
+	return 0;
+
+}
+
+int
+sync_jobs()
+{
+	char buf[50];
+	job *pjob;
+	struct batch_status *bs;
+	static struct timeval last_stat_ts = {0};
+
+	connect_svr();
+	sync_queues();
+	update_resc_sum();
+	
+    sprintf(buf, "xt,%ld:%ld", last_stat_ts.tv_sec, last_stat_ts.tv_usec);
+	bs = pbs_statjob(svr_con, NULL, NULL, buf);
+    while(bs) {
+		if ((pjob = find_job(bs->name))) {
+			/* found job, update with this batch status record */
+			update_attr(bs->attribs, job_attr_idx, job_attr_def, pjob->ji_wattr, JOB_ATR_LAST, JOB_ATR_UNKN);	
+		} else {
+			pjob = to_job(bs);
+
+			/* job not in this server, add to the global list, basically enque */
+			svr_enquejob(pjob, NULL);
+		}
+		bs = bs->next;
+    }
+	last_stat_ts = pbs_get_last_stat_ts();
+
+	return 0;
+}	
+
+

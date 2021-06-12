@@ -781,6 +781,10 @@ clear_non_blocking(conn_t *conn)
 void
 dispatch_request(int sfds, struct batch_request *request)
 {
+extern int sync_jobs();
+#ifndef PBS_MOM
+extern int mode;
+#endif
 
 	conn_t *conn = NULL;
 	int prot = request->prot;
@@ -1000,6 +1004,9 @@ dispatch_request(int sfds, struct batch_request *request)
 				close_client(sfds);
 				return;
 			}
+			if (mode == 1) {
+				sync_jobs();
+			}	
 			req_stat_job(request);
 			clear_non_blocking(get_conn(sfds));
 			break;

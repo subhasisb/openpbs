@@ -127,13 +127,14 @@ int
 svr_connect(pbs_net_t hostaddr, unsigned int port, void (*func)(int), enum conn_type cntype, int prot)
 {
 	int sock;
+	extern int mode;
 	mominfo_t *pmom = NULL;
 	conn_t *conn = NULL;
 	dmn_info_t *pdmninfo;
 
 	/* First, determine if the request is to another server or ourselves */
 
-	if ((hostaddr == pbs_server_addr) && (port == pbs_server_port_dis))
+	if ((mode == 0) && (hostaddr == pbs_server_addr) && (port == pbs_server_port_dis))
 		return (PBS_LOCAL_CONNECTION);	/* special value for local */
 	pmom = tfind2((unsigned long)hostaddr, port, &ipaddrs);
 

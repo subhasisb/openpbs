@@ -111,7 +111,7 @@
 
 /* External functions called */
 
-extern int  pbsd_init(int);
+extern int  pbsd_init(int, int);
 extern void shutdown_ack();
 extern int takeover_from_secondary(void);
 extern int  be_secondary(time_t sec);
@@ -136,7 +136,7 @@ static void   lock_out(int, int);
 #define HOT_START_PING_RATE		15
 
 /* Global Data Items */
-
+int mode = 0;
 int		stalone = 0;	/* is program running not as a service ? */
 char		*acct_file = NULL;
 char		daemonname[PBS_MAXHOSTNAME+8];
@@ -162,6 +162,7 @@ unsigned int	pbs_mom_port;
 unsigned int	pbs_rm_port;
 pbs_net_t	pbs_server_addr;
 unsigned int	pbs_server_port_dis;
+unsigned int	pbs_stat_port_dis;
 int		reap_child_flag = 0;
 time_t		secondary_delay = 30;
 pbs_sched	*dflt_scheduler = NULL; /* the default scheduler */
@@ -616,6 +617,7 @@ main(int argc, char **argv)
 	pid_t sid = -1;
 	long state;
 	time_t waittime;
+	int init_port = 0;
 #ifdef _POSIX_MEMLOCK
 	int do_mlockall = 0;
 #endif /* _POSIX_MEMLOCK */
@@ -663,81 +665,9 @@ main(int argc, char **argv)
 		return (1);
 	}
 
-	/* set standard umask */
-	umask(022);
-
-	/* set single threaded mode */
-	pbs_client_thread_set_single_threaded_mode();
-	/* disable attribute verification */
-	set_no_attribute_verification();
-
-	/* initialize the thread context */
-	if (pbs_client_thread_init_thread_context() != 0) {
-		log_err(-1, __func__,
-			"Unable to initialize thread context");
-		return (1);
-	}
-
-	if (pbs_loadconf(0) == 0)
-		return (1);
-
-	set_log_conf(pbs_conf.pbs_leaf_name, pbs_conf.pbs_mom_node_name,
-			pbs_conf.locallog, pbs_conf.syslogfac,
-			pbs_conf.syslogsvr, pbs_conf.pbs_log_highres_timestamp);
-
-	/* find out who we are (hostname) */
-	server_host[0] = '\0';
-	if (pbs_conf.pbs_leaf_name) {
-		char *endp;
-		snprintf(server_host, sizeof(server_host), "%s", pbs_conf.pbs_leaf_name);
-		endp = strchr(server_host, ','); /* find first name */
-		if (endp)
-			*endp = '\0';
-		endp = strchr(server_host, ':'); /* cut out port, if present */
-		if (endp)
-			*endp = '\0';
-	} else if (gethostname(server_host, (sizeof(server_host) - 1)) == -1) {
-		log_err(-1, __func__, "Host name too large");
-		return (-1);
-	}
-	if ((server_host[0] == '\0') ||
-	    (get_fullhostname(server_host, server_host, (sizeof(server_host) - 1)) == -1)) {
-		log_err(-1, __func__, "Unable to get my host name");
-		return (-1);
-	}
-
-	(void)strcpy(daemonname, "Server@");
-	(void)strcat(daemonname, server_host);
-	if ((pc = strchr(daemonname, (int)'.')) != NULL)
-		*pc = '\0';
-
-	if (set_msgdaemonname(daemonname)) {
-		fprintf(stderr, "Out of memory\n");
-		return 1;
-	}
-
-	/* initialize service port numbers for self, Scheduler, and MOM */
-
-	pbs_server_port_dis = pbs_conf.batch_service_port;
-	pbs_mom_port = pbs_conf.mom_service_port;
-	pbs_rm_port = pbs_conf.manager_service_port;
-
-
-	/* by default, server_name is what is set in /etc/pbs.conf */
-	(void)strcpy(server_name, pbs_conf.pbs_server_name);
-
-	pbs_server_name = pbs_default();
-	if ((!pbs_server_name) || (*pbs_server_name == '\0')) {
-		log_err(-1, __func__, "Unable to get server host name");
-		return (-1);
-	}
-
-	pbs_server_addr = get_hostaddr(server_host);
-	pbs_mom_addr = pbs_server_addr;		/* assume on same host */
-
 	/* parse the parameters from the command line */
 
-	while ((c = getopt(argc, argv, "A:a:Cd:e:F:p:t:lL:M:NR:g:G:s:P:-:")) != -1) {
+	while ((c = getopt(argc, argv, "A:a:Cd:e:F:p:t:lL:M:NR:g:G:Ss:P:-:")) != -1) {
 		switch (c) {
 			case 'a':
 				if (decode_b(get_sattr(SVR_ATR_scheduling), NULL,
@@ -828,6 +758,9 @@ main(int argc, char **argv)
 					return 1;
 				}
 				break;
+			case 'S':
+				mode = 1;
+				break;
 
 			case '-':
 				(void)fprintf(stderr, "%s: bad - mistyped or specified more than --version\n", argv[0]);
@@ -844,16 +777,98 @@ main(int argc, char **argv)
 		return (1);
 	}
 
+	/* set standard umask */
+	umask(022);
+
+	/* set single threaded mode */
+	pbs_client_thread_set_single_threaded_mode();
+	/* disable attribute verification */
+	set_no_attribute_verification();
+
+	/* initialize the thread context */
+	if (pbs_client_thread_init_thread_context() != 0) {
+		log_err(-1, __func__,
+			"Unable to initialize thread context");
+		return (1);
+	}
+
+	if (pbs_loadconf(0) == 0)
+		return (1);
+
+	set_log_conf(pbs_conf.pbs_leaf_name, pbs_conf.pbs_mom_node_name,
+			pbs_conf.locallog, pbs_conf.syslogfac,
+			pbs_conf.syslogsvr, pbs_conf.pbs_log_highres_timestamp);
+
+	/* find out who we are (hostname) */
+	server_host[0] = '\0';
+	if (pbs_conf.pbs_leaf_name) {
+		char *endp;
+		snprintf(server_host, sizeof(server_host), "%s", pbs_conf.pbs_leaf_name);
+		endp = strchr(server_host, ','); /* find first name */
+		if (endp)
+			*endp = '\0';
+		endp = strchr(server_host, ':'); /* cut out port, if present */
+		if (endp)
+			*endp = '\0';
+	} else if (gethostname(server_host, (sizeof(server_host) - 1)) == -1) {
+		log_err(-1, __func__, "Host name too large");
+		return (-1);
+	}
+	if ((server_host[0] == '\0') ||
+	    (get_fullhostname(server_host, server_host, (sizeof(server_host) - 1)) == -1)) {
+		log_err(-1, __func__, "Unable to get my host name");
+		return (-1);
+	}
+
+	if (mode == 0)
+		(void)strcpy(daemonname, "Server@");
+	else
+		(void)strcpy(daemonname, "StatSvr@");
+
+	(void)strcat(daemonname, server_host);
+	if ((pc = strchr(daemonname, (int)'.')) != NULL)
+		*pc = '\0';
+
+	if (set_msgdaemonname(daemonname)) {
+		fprintf(stderr, "Out of memory\n");
+		return 1;
+	}
+
+	/* initialize service port numbers for self, Scheduler, and MOM */
+
+	pbs_server_port_dis = pbs_conf.batch_service_port;
+	pbs_stat_port_dis = pbs_server_port_dis + 1;
+	pbs_mom_port = pbs_conf.mom_service_port;
+	pbs_rm_port = pbs_conf.manager_service_port;
+
+
+	/* by default, server_name is what is set in /etc/pbs.conf */
+	(void)strcpy(server_name, pbs_conf.pbs_server_name);
+
+	pbs_server_name = pbs_default();
+	if ((!pbs_server_name) || (*pbs_server_name == '\0')) {
+		log_err(-1, __func__, "Unable to get server host name");
+		return (-1);
+	}
+
+	pbs_server_addr = get_hostaddr(server_host);
+	pbs_mom_addr = pbs_server_addr;		/* assume on same host */
+
 	/* make sure no other server is running with this home directory */
 
-	(void)sprintf(lockfile, "%s/%s/server.lock", pbs_conf.pbs_home_path,
-		PBS_SVR_PRIVATE);
-	if ((are_primary = are_we_primary()) == FAILOVER_SECONDARY) {
-		strcat(lockfile, ".secondary");
-	} else if (are_primary == FAILOVER_CONFIG_ERROR) {
-		log_err(-1, msg_daemonname, "neither primary or secondary server");
-		return (3);
+	if (mode == 0) {
+		(void)sprintf(lockfile, "%s/%s/server.lock", pbs_conf.pbs_home_path, PBS_SVR_PRIVATE);
+		if ((are_primary = are_we_primary()) == FAILOVER_SECONDARY) {
+			strcat(lockfile, ".secondary");
+		} else if (are_primary == FAILOVER_CONFIG_ERROR) {
+			log_err(-1, msg_daemonname, "neither primary or secondary server");
+			return (3);
+		}
+	} else {
+		are_primary = FAILOVER_NONE;
+		(void)sprintf(lockfile, "%s/%s/stat_server.lock", pbs_conf.pbs_home_path, PBS_SVR_PRIVATE);
 	}
+
 
 #ifdef NAS /* localmod 104 */
 	if ((lockfds = open(lockfile, O_CREAT | O_WRONLY, 0644)) < 0)
@@ -1073,37 +1088,43 @@ main(int argc, char **argv)
 	/* Setup db connection here */
 	if (server_init_type != RECOV_CREATE && !stalone && !already_forked)
 		background = 1;
-	if ((rc = connect_to_db(background)) != 0)
-		return rc;
 
-	/* database connection code end */
+	if (mode == 0) {
+		if ((rc = connect_to_db(background)) != 0)
+			return rc;
 
-	/* Curses! pbsd_init() calls validate_job_formula() (in svr_recov()) */
-	/* which makes Python calls, so Python interpreter must be	     */
-	/* temporarily initialized. Can't call the real                      */
-	/* pbs_python_ext_start_interpreter() this early, as this loads PBS  */
-	/* attributes  and resources (including custom resources) into       */
-	/* Python world, which are made  complete after call to pbsd_init()! */
-	pbs_python_ext_quick_start_interpreter();
+		/* database connection code end */
 
-	/* The real pbs_python_ext_start_interpreter() will be called later  */
-	/* for the permanent interpreter start.				     */
-	pbs_python_ext_quick_shutdown_interpreter();
+		/* Curses! pbsd_init() calls validate_job_formula() (in svr_recov()) */
+		/* which makes Python calls, so Python interpreter must be	     */
+		/* temporarily initialized. Can't call the real                      */
+		/* pbs_python_ext_start_interpreter() this early, as this loads PBS  */
+		/* attributes  and resources (including custom resources) into       */
+		/* Python world, which are made  complete after call to pbsd_init()! */
+		pbs_python_ext_quick_start_interpreter();
 
-	if (stalone == 2) {
-		log_event(PBSEVENT_SYSTEM | PBSEVENT_FORCE, LOG_NOTICE,
-			PBS_EVENTCLASS_SERVER, msg_daemonname, msg_svrdown);
-		acct_close();
-		stop_db();
-		log_close(1);
-		return (0);
+		/* The real pbs_python_ext_start_interpreter() will be called later  */
+		/* for the permanent interpreter start.				     */
+		pbs_python_ext_quick_shutdown_interpreter();
+
+		if (stalone == 2) {
+			log_event(PBSEVENT_SYSTEM | PBSEVENT_FORCE, LOG_NOTICE,
+				PBS_EVENTCLASS_SERVER, msg_daemonname, msg_svrdown);
+			acct_close();
+			stop_db();
+			log_close(1);
+			return (0);
+		}
 	}
 
 	/* initialize the network interface */
+	if (mode == 0)
+		init_port = pbs_server_port_dis;
+	else
+		init_port = pbs_stat_port_dis;
 
-	if ((sock = init_network(pbs_server_port_dis)) < 0) {
-		(void) sprintf(log_buffer,
-			"init_network failed using ports Server:%u MOM:%u RM:%u",
+	if ((sock = init_network(init_port)) < 0) {
+		(void) sprintf(log_buffer, "init_network failed using ports Server:%u MOM:%u RM:%u",
 			pbs_server_port_dis, pbs_mom_port, pbs_rm_port);
 		log_event(PBSEVENT_SYSTEM | PBSEVENT_ADMIN, PBS_EVENTCLASS_SERVER,
 			LOG_ERR, msg_daemonname, log_buffer);
@@ -1192,32 +1213,34 @@ main(int argc, char **argv)
 		return (1);
 	}
 
-	/* set tpp config */
-	rc = set_tpp_config(&pbs_conf, &tpp_conf, nodename, pbs_server_port_dis, pbs_conf.pbs_leaf_routers);
-	free(nodename);
-	if (rc == -1) {
-		(void) sprintf(log_buffer, "Error setting TPP config");
-		fprintf(stderr, "%s", log_buffer);
-		stop_db();
-		return (3);
+	if (mode == 0) {
+		/* set tpp config */
+		rc = set_tpp_config(&pbs_conf, &tpp_conf, nodename, pbs_server_port_dis, pbs_conf.pbs_leaf_routers);
+		free(nodename);
+		if (rc == -1) {
+			(void) sprintf(log_buffer, "Error setting TPP config");
+			fprintf(stderr, "%s", log_buffer);
+			stop_db();
+			return (3);
+		}
+
+		tpp_set_app_net_handler(net_down_handler, net_restore_handler);
+		tpp_conf.node_type = TPP_LEAF_NODE_LISTEN; /* server needs to know about all CTL LEAVE messages */
+
+		if ((tppfd = tpp_init(&tpp_conf)) == -1) {
+			log_err(-1, msg_daemonname, "tpp_init failed");
+			fprintf(stderr, "%s", log_buffer);
+			stop_db();
+			return (3);
+		}
+
+		(void)add_conn(tppfd, TppComm, (pbs_net_t)0, 0, NULL, tpp_request);
+
+		tfree2(&ipaddrs);
+		tfree2(&streams);
 	}
 
-	tpp_set_app_net_handler(net_down_handler, net_restore_handler);
-	tpp_conf.node_type = TPP_LEAF_NODE_LISTEN; /* server needs to know about all CTL LEAVE messages */
-
-	if ((tppfd = tpp_init(&tpp_conf)) == -1) {
-		log_err(-1, msg_daemonname, "tpp_init failed");
-		fprintf(stderr, "%s", log_buffer);
-		stop_db();
-		return (3);
-	}
-
-	(void)add_conn(tppfd, TppComm, (pbs_net_t)0, 0, NULL, tpp_request);
-
-	tfree2(&ipaddrs);
-	tfree2(&streams);
-
-	if (pbsd_init(server_init_type) != 0) {
+	if (pbsd_init(server_init_type, mode) != 0) {
 		log_err(-1, msg_daemonname, "pbsd_init failed");
 		pbs_python_ext_quick_shutdown_interpreter();
 		stop_db();
@@ -1225,46 +1248,47 @@ main(int argc, char **argv)
 	}
 
 	/* record the fact that the Secondary is up and active (running) */
+	if (mode == 0) {
+		if (pbs_failover_active) {
+			sprintf(log_buffer, "Failover Secondary Server at %s has gone active", server_host);
+			log_event(PBSEVENT_SYSTEM | PBSEVENT_FORCE, PBS_EVENTCLASS_SERVER,
+				LOG_CRIT, msg_daemonname, log_buffer);
 
-	if (pbs_failover_active) {
-		sprintf(log_buffer, "Failover Secondary Server at %s has gone active", server_host);
-		log_event(PBSEVENT_SYSTEM | PBSEVENT_FORCE, PBS_EVENTCLASS_SERVER,
-			LOG_CRIT, msg_daemonname, log_buffer);
+			/* now go set up work task to do timestamp svrlive file */
 
-		/* now go set up work task to do timestamp svrlive file */
+			(void)set_task(WORK_Timed, time_now, secondary_handshake, NULL);
 
-		(void)set_task(WORK_Timed, time_now, secondary_handshake, NULL);
+			svr_mailowner(0, 0, 1, log_buffer);
+			if (get_sattr_long(SVR_ATR_scheduling)) {
+				/* Bring up scheduler here */
+				if (dflt_scheduler->sc_primary_conn == -1) {
+					char **workenv;
+					char schedcmd[MAXPATHLEN + 1];
+					/* save the current, "safe", environment.
+					* reset the enviroment to that when first started
+					* this is to get PBS_CONF_FILE if specified.*/
+					workenv = environ;
+					environ = origevp;
 
-		svr_mailowner(0, 0, 1, log_buffer);
-		if (get_sattr_long(SVR_ATR_scheduling)) {
-			/* Bring up scheduler here */
-			if (dflt_scheduler->sc_primary_conn == -1) {
-				char **workenv;
-				char schedcmd[MAXPATHLEN + 1];
-				/* save the current, "safe", environment.
-				 * reset the enviroment to that when first started
-				 * this is to get PBS_CONF_FILE if specified.*/
-				workenv = environ;
-				environ = origevp;
+					snprintf(schedcmd, sizeof(schedcmd), "%s/sbin/pbs_sched &", pbs_conf.pbs_exec_path);
+					snprintf(log_buffer, sizeof(log_buffer), "starting scheduler: %s", schedcmd);
+					(void)system(schedcmd);
 
-				snprintf(schedcmd, sizeof(schedcmd), "%s/sbin/pbs_sched &", pbs_conf.pbs_exec_path);
-				snprintf(log_buffer, sizeof(log_buffer), "starting scheduler: %s", schedcmd);
-				(void)system(schedcmd);
+					log_event(PBSEVENT_SYSTEM | PBSEVENT_FORCE,
+						PBS_EVENTCLASS_SERVER, LOG_CRIT,
+						msg_daemonname, log_buffer);
 
-				log_event(PBSEVENT_SYSTEM | PBSEVENT_FORCE,
-					PBS_EVENTCLASS_SERVER, LOG_CRIT,
-					msg_daemonname, log_buffer);
-
-				brought_up_alt_sched = 1;
-				/* restore environment to "safe" one */
-				environ = workenv;
+					brought_up_alt_sched = 1;
+					/* restore environment to "safe" one */
+					environ = workenv;
+				}
 			}
+		} else if (are_primary == FAILOVER_PRIMARY) {
+			/* now go set up work task to do handshake with secondary */
+
+			(void)set_task(WORK_Timed, time_now, primary_handshake, NULL);
+
 		}
-	} else if (are_primary == FAILOVER_PRIMARY) {
-		/* now go set up work task to do handshake with secondary */
-
-		(void)set_task(WORK_Timed, time_now, primary_handshake, NULL);
-
 	}
 
 	log_eventf(PBSEVENT_SYSTEM | PBSEVENT_FORCE, PBS_EVENTCLASS_SERVER, LOG_INFO,
@@ -1300,27 +1324,29 @@ main(int argc, char **argv)
 	if ((pc=strchr(svr_interp_data.local_host_name, '.')) != NULL)
 		*pc = '\0';
 
-	if (pbs_python_ext_start_interpreter(&svr_interp_data) != 0) {
-		log_err(-1, msg_daemonname, "Failed to start Python interpreter");
-		stop_db();
-		free(keep_daemon_name);
-		return (1);
+	if (mode == 0) {
+		if (pbs_python_ext_start_interpreter(&svr_interp_data) != 0) {
+			log_err(-1, msg_daemonname, "Failed to start Python interpreter");
+			stop_db();
+			free(keep_daemon_name);
+			return (1);
+		}
+
+		/* check and enable the prov attributes */
+		set_srv_prov_attributes();
+
+		/* check and set power attribute */
+		set_srv_pwr_prov_attribute();
+
+		periodic_req = alloc_br(PBS_BATCH_HookPeriodic);
+		if (periodic_req == NULL) {
+			log_err(errno, msg_daemonname, "Out of memory!");
+			stop_db();
+			free(keep_daemon_name);
+			return (1);
+		}
+		process_hooks(periodic_req, hook_msg, sizeof(hook_msg), pbs_python_set_interrupt);
 	}
-
-	/* check and enable the prov attributes */
-	set_srv_prov_attributes();
-
-	/* check and set power attribute */
-	set_srv_pwr_prov_attribute();
-
-	periodic_req = alloc_br(PBS_BATCH_HookPeriodic);
-	if (periodic_req == NULL) {
-		log_err(errno, msg_daemonname, "Out of memory!");
-		stop_db();
-		free(keep_daemon_name);
-		return (1);
-	}
-	process_hooks(periodic_req, hook_msg, sizeof(hook_msg), pbs_python_set_interrupt);
 
 	/*
 	 * main loop of server
@@ -1471,7 +1497,9 @@ main(int argc, char **argv)
 		shutdown_nodes();
 
 	/* if brought up the DB, take it down */
-	stop_db();
+	if (mode == 0) {
+		stop_db();
+	}
 
 	if (are_primary == FAILOVER_SECONDARY) {
 		/* we are the secondary server */

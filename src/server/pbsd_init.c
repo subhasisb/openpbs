@@ -294,7 +294,7 @@ init_server_attrs()
  *
  */
 int
-pbsd_init(int type)
+pbsd_init(int type, int mode)
 {
 	int	a_opt = -1;
 	int	baselen;
@@ -477,6 +477,22 @@ pbsd_init(int type)
 		return (2);
 	}
 
+	if ((jobs_idx = pbs_idx_create(0, 0)) == NULL) {
+		log_err(-1, __func__, "Creating jobs index failed!");
+		return (-1);
+	}
+
+	if ((resvs_idx = pbs_idx_create(0, 0)) == NULL) {
+		log_err(-1, __func__, "Creating reservations index failed!");
+		return (-1);
+	}
+
+	if ((queues_idx = pbs_idx_create(0, 0)) == NULL) {
+		log_err(-1, __func__, "Creating queue index failed!");
+		return (-1);
+	}
+
+
 	/* 2. check security and set up various global variables we need */
 
 #if !defined(DEBUG) && !defined(NO_SECURITY_CHECK)
@@ -515,6 +531,9 @@ pbsd_init(int type)
 		a_opt = get_sattr_long(SVR_ATR_scheduling);
 
 	init_server_attrs();
+
+	if (mode == 1)
+		return 0;
 
 	/* 5. If not a "create" initialization, recover server db */
 	/*    and sched db					  */
@@ -651,10 +670,6 @@ pbsd_init(int type)
 	 * 8A. If not a "create" initialization, recover queues.
 	 *    If a create, remove any queues that might be there.
 	 */
-	if ((queues_idx = pbs_idx_create(0, 0)) == NULL) {
-		log_err(-1, __func__, "Creating queue index failed!");
-		return (-1);
-	}
 
 	server.sv_qs.sv_numque = 0;
 
@@ -696,10 +711,7 @@ pbsd_init(int type)
 	set_ical_zoneinfo(zone_dir);
 
 	/* load reservations */
-	if ((resvs_idx = pbs_idx_create(0, 0)) == NULL) {
-		log_err(-1, __func__, "Creating reservations index failed!");
-		return (-1);
-	}
+	
 	obj.pbs_db_obj_type = PBS_DB_RESV;
 	obj.pbs_db_un.pbs_db_resv = &dbresv;
 
@@ -718,10 +730,6 @@ pbsd_init(int type)
 	 *    If a create or clean recovery, delete any jobs.
 	 *    Before job creation/recovery, create the jobs index.
 	 */
-	if ((jobs_idx = pbs_idx_create(0, 0)) == NULL) {
-		log_err(-1, __func__, "Creating jobs index failed!");
-		return (-1);
-	}
 
 	server.sv_qs.sv_numjobs = 0;
 
