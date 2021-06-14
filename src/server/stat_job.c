@@ -157,10 +157,11 @@ svrcached(attribute *pat, pbs_list_head *phead, attribute_def *pdef, struct time
 			LOG_DIFFSTAT_ATTR(working, from_tm, "Adding attr (unset)");
 		}
 	} else if (encoded) {
+		extern int mode;
 		/* can use the existing cached svrattrl structure */
 
 		working = encoded;
-		if (working->al_refct < 2) {
+		if (mode == 0 && working->al_refct < 2) {
 			while (working) {
 				CLEAR_LINK(working->al_link);
 				if (phead != NULL) {
