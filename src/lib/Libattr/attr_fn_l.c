@@ -112,6 +112,7 @@ decode_l(attribute *patr, char *name, char *rescn, char *val)
 			pc++;
 		}
 		patr->at_val.at_long = strtol(val, &endp, 10);
+		mark_attr_set(patr);
 	} else if ((val != NULL) && (strlen(val) == 0)) {
 		patr->at_val.at_long = 0;
 		mark_attr_set(patr);
